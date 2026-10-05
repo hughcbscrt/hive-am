@@ -34,7 +34,7 @@ En los CLIs aparecen como `mcp__hive__list_agents` y `mcp__hive__dispatch`.
 |---|---|
 | Claude | Archivo `~/.hive-am/mcp/<agentId>.json` + `--mcp-config` + `--allowedTools mcp__hive` |
 | OpenCode | Variable de entorno `OPENCODE_CONFIG_CONTENT` con `{ mcp: { hive: { type: 'local', command: [...], environment: {...} } } }` |
-| Kiro | **No implementado**: un orquestador Kiro no puede delegar |
+| Kiro | Perfil de agente generado `~/.kiro/agents/hive-<agentId>.json` con el servidor MCP `hive` (se reescribe en cada turno y se pasa con `--agent`); herramientas `@hive/dispatch` y `@hive/list_agents` |
 
 Solo se inyecta cuando el agente es orquestador **y** tiene al menos un subagente (`mcpDispatch = true` en `runtime.ts`). La configuración se regenera en cada turno, por lo que refleja siempre las conexiones actuales.
 

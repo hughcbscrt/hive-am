@@ -24,6 +24,7 @@ hive-am/
 │       ├── models.ts         # lista de modelos por proveedor (con caché)
 │       ├── pricing.ts        # estimación de costo y suma de uso de tokens
 │       ├── stats.ts          # estadísticas de una sesión (tokens, herramientas, línea de tiempo)
+│       ├── git.ts            # lectura de solo lectura de git para el explorador de cambios
 │       ├── mcp-config.ts     # puerto de la API y configuración MCP para Claude/OpenCode
 │       ├── providers/
 │       │   ├── index.ts      # tabla proveedor → runner
@@ -61,13 +62,23 @@ hive-am/
     │   ├── ColonyEditor.tsx  # crear/editar colonias + pregunta de herencia
     │   ├── Chat.tsx          # transcripción, vista en vivo, caja de texto
     │   ├── ToolCall.tsx      # render de cada herramienta que usa el agente
-    │   └── StatsBar.tsx      # barra y panel de tokens, costo y herramientas
+    │   ├── StatsBar.tsx      # barra y panel de tokens, costo y herramientas
+    │   ├── GitExplorer.tsx   # pestaña Cambios: árbol con resaltado + visor de diffs (solo lectura)
+    │   └── HelpPopover.tsx   # icono de ayuda con popover
     └── lib/
-        ├── api.ts            # cliente fetch hacia /api
+        ├── api.ts            # cliente fetch hacia /api (traduce los errores del servidor)
         ├── store.tsx         # estado global + WebSocket
         ├── types.ts          # tipos del frontend (espejo de los del backend)
         ├── meta.ts           # nombres/colores de proveedores, permisos, utilidades
-        └── format.ts         # formato de tokens, costo y duración
+        ├── format.ts         # formato de tokens, costo, duración, bytes y números
+        ├── useGit.ts         # hook del explorador de cambios
+        ├── gitTree.ts        # árbol de archivos para el explorador
+        ├── diff.ts           # parser de diff unificado
+        └── i18n/
+            ├── core.ts       # idiomas, translate(), detección, errores del servidor
+            ├── index.tsx     # I18nProvider y useI18n()
+            ├── en.ts         # catálogo en inglés (fuente de todas las claves)
+            └── es.ts         # catálogo en español (debe tener las mismas claves)
 ```
 
 No existen aún carpetas de pruebas automatizadas; la verificación se describe en el [documento 12](12-operacion-y-problemas.md).
@@ -85,6 +96,7 @@ No existen aún carpetas de pruebas automatizadas; la verificación se describe 
 | `models.ts` | Modelos disponibles por proveedor; caché de 10 minutos. |
 | `pricing.ts` | Tabla de precios por familia (opus/sonnet/haiku) y utilidades de suma de uso. |
 | `stats.ts` | `sessionStats(mensajes)`: totales de tokens, costo, herramientas, modelos y línea de tiempo por turno. |
+| `git.ts` | Lectura de solo lectura de git (estado, árbol, diff, contenido, imágenes) con validación de rutas; ver [documento 13](13-explorador-de-cambios-git.md). |
 | `mcp-config.ts` | `API_PORT` (variable `HIVE_AM_PORT`, 4400 por defecto) y los objetos de configuración MCP que se entregan a Claude y OpenCode. |
 | `providers/spawn.ts` | `spawnLines`: lanza el CLI, entrega stdout línea a línea, maneja cancelación, errores y `PWD`. |
 | `providers/claude.ts`, `opencode.ts`, `kiro.ts` | Un generador asíncrono por proveedor que produce `StreamEvent`. |
@@ -110,7 +122,9 @@ No existen aún carpetas de pruebas automatizadas; la verificación se describe 
 | `components/Chat.tsx` | Transcripción memoizada, turno en vivo, tarjeta de delegación, caja de texto aislada. |
 | `components/ToolCall.tsx` | Convierte cada llamada a herramienta en una fila legible (`describe`). |
 | `components/StatsBar.tsx` | Resumen de la sesión y panel desplegable. |
+| `components/GitExplorer.tsx` | Pestaña **Cambios**: árbol de archivos con resaltado y visor de diferencias (solo lectura). |
 | `lib/store.tsx` | Estado global, WebSocket y reductor de eventos. |
+| `lib/i18n/*` | Traducciones de la interfaz (inglés y español); ver [documento 11](11-frontend.md#118-internacionalización-i18n). |
 
 ## Dependencias principales
 

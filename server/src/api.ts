@@ -10,6 +10,8 @@ import { readHistory } from './history/index.js';
 import { listModels } from './models.js';
 import type { Provider } from './types.js';
 import { sessionStats } from './stats.js';
+import { createReadStream } from 'node:fs';
+import { gitDiff, gitFile, gitImagePath, gitStatus, gitTree, isPathError } from './git.js';
 
 const exec = promisify(execFile);
 const PROVIDERS: Record<Provider, { bin: string; label: string }> = {
@@ -131,6 +133,22 @@ route('GET', '/api/agents/:id/stats', ({ params, url }) => {
 });
 route('GET', '/api/agents/:id/live', ({ params }) => liveTurn(params[0]));
 route('GET', '/api/agents/:id/sessions', ({ params }) => agents.sessions(params[0]));
+
+// ---- read-only git explorer (scoped to the agent's effective folder) ----
+const agentCwd = (id: string) => { const a = agents.get(id); if (!a) throw notFound('Agent not found'); return resolved(a).cwd; };
+const gitSafe = async <T,>(fn: () => Promise<T>): Promise<T> => { try { return await fn(); } catch (e) { if (isPathError(e)) throw bad(e.message); throw e; } };
+const qpath = (url: URL) => { const p = url.searchParams.get('path'); if (!p) throw bad('path is required'); return p; };
+
+route('GET', '/api/agents/:id/git/status', ({ params }) => gitStatus(agentCwd(params[0])));
+route('GET', '/api/agents/:id/git/tree', ({ params }) => gitTree(agentCwd(params[0])));
+route('GET', '/api/agents/:id/git/diff', ({ params, url }) => gitSafe(() => gitDiff(agentCwd(params[0]), qpath(url), url.searchParams.get('old') ?? undefined)));
+route('GET', '/api/agents/:id/git/file', ({ params, url }) => gitSafe(() => gitFile(agentCwd(params[0]), qpath(url))));
+route('GET', '/api/agents/:id/git/raw', async ({ params, url, res }) => {
+  const img = await gitSafe(() => gitImagePath(agentCwd(params[0]), qpath(url)));
+  // Served only as an inert image: no sniffing, and a sandbox policy so an SVG can never run scripts.
+  res.writeHead(200, { 'content-type': img.type, 'content-length': img.size, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'" });
+  createReadStream(img.abs).pipe(res);
+});
 
 // ---- sessions across all managed agents ----
 route('GET', '/api/sessions', () => {
@@ -260,6 +278,7 @@ export async function handle(req: IncomingMessage, res: ServerResponse) {
     if (!match) continue;
     try {
       const out = await h({ req, res, params: match.slice(1).map(decodeURIComponent), url });
+      if (res.headersSent) return; // the handler streamed its own response
       return json(res, 200, out ?? null);
     } catch (e) {
       if (e instanceof HttpError) return json(res, e.status, { error: e.message });

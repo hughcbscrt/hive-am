@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Bot, Check, ChevronRight, Copy, FilePen, FilePlus, FileText, Globe, ListChecks, Search, Terminal, Waypoints, Wrench } from 'lucide-react';
 import { fmtDur } from '@/lib/format';
+import { translate as tr, useI18n } from '@/lib/i18n';
 import type { Block } from '@/lib/types';
 
 type Tool = Extract<Block, { type: 'tool' }>;
@@ -14,12 +15,14 @@ export const ToolsOpen = createContext<boolean | null>(null);
 
 const tilde = (p: string) => p.replace(/^\/home\/[^/]+/, '~');
 
-export function CopyBtn({ text, label = 'Copy' }: { text: string; label?: string }) {
+export function CopyBtn({ text, label }: { text: string; label?: string }) {
+  const { t } = useI18n();
+  label ??= t('common.copy');
   const [ok, setOk] = useState(false);
   return (
     <button type="button" className="copybtn" aria-label={label} title={label}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard?.writeText(text).then(() => { setOk(true); setTimeout(() => setOk(false), 1200); }).catch(() => undefined); }}>
-      {ok ? <Check size={13} /> : <Copy size={13} />}{ok ? 'Copied' : label}
+      {ok ? <Check size={13} /> : <Copy size={13} />}{ok ? t('common.copied') : label}
     </button>
   );
 }
@@ -41,43 +44,43 @@ function Kv({ rows }: { rows: [string, ReactNode][] }) {
 }
 
 /** Turn a provider-specific tool call (Claude / OpenCode / Kiro naming) into something readable. */
-export function describe(t: Tool): Described {
-  const input = (t.input && typeof t.input === 'object' ? t.input : {}) as Obj;
-  const raw = t.name;
+export function describe(tool: Tool): Described {
+  const input = (tool.input && typeof tool.input === 'object' ? tool.input : {}) as Obj;
+  const raw = tool.name;
   const mcp = /^mcp__([^_]+(?:_[^_]+)*)__(.+)$/.exec(raw);
   const n = (mcp ? mcp[2] : raw).toLowerCase().replace(/[^a-z]/g, '');
 
   if (mcp?.[1] === 'hive' && mcp[2] === 'dispatch')
-    return { icon: <Waypoints size={14} />, label: 'Delegate', summary: `${str(input.agent)} — ${str(input.task).slice(0, 90)}`, body: <Kv rows={[['Subagent', <b key="a">{str(input.agent)}</b>], ['Task', <span key="t" className="pre-wrap">{str(input.task)}</span>]]} /> };
-  if (mcp?.[1] === 'hive') return { icon: <Waypoints size={14} />, label: 'Team roster', summary: '', body: null };
+    return { icon: <Waypoints size={14} />, label: tr('tool.delegate'), summary: `${str(input.agent)} — ${str(input.task).slice(0, 90)}`, body: <Kv rows={[[tr('tool.k.subagent'), <b key="a">{str(input.agent)}</b>], [tr('tool.k.task'), <span key="t" className="pre-wrap">{str(input.task)}</span>]]} /> };
+  if (mcp?.[1] === 'hive') return { icon: <Waypoints size={14} />, label: tr('tool.roster'), summary: '', body: null };
 
   if (['bash', 'shell', 'executebash', 'execute', 'run', 'runcommand', 'command'].includes(n) || (input.command && n.includes('bash'))) {
     const cmd = str(pick(input, 'command', 'cmd', 'code', 'script'));
     return {
-      icon: <Terminal size={14} />, label: 'Shell', kind: 'shell', command: cmd, summary: cmd,
+      icon: <Terminal size={14} />, label: tr('tool.shell'), kind: 'shell', command: cmd, summary: cmd,
       body: (<>
-        <div className="cmdhead"><span className="eyebrow">Command</span><CopyBtn text={cmd} label="Copy command" /></div>
+        <div className="cmdhead"><span className="eyebrow">{tr('tool.command')}</span><CopyBtn text={cmd} label={tr('tool.copyCommand')} /></div>
         <pre className="cmd"><span className="prompt">$</span> {cmd}</pre>
         {input.description && <p className="hint" style={{ margin: '2px 0 0' }}>{str(input.description)}</p>}
-        <Kv rows={[['Tool', <code key="n">{raw}</code>], ['Working dir', input.cwd || input.workdir ? <code key="c">{tilde(str(input.cwd ?? input.workdir))}</code> : ''], ['Timeout', input.timeout ? fmtDur(Number(input.timeout)) : ''], ['Background', input.run_in_background ? 'yes' : '']]} />
+        <Kv rows={[[tr('tool.k.tool'), <code key="n">{raw}</code>], [tr('tool.k.workdir'), input.cwd || input.workdir ? <code key="c">{tilde(str(input.cwd ?? input.workdir))}</code> : ''], [tr('tool.k.timeout'), input.timeout ? fmtDur(Number(input.timeout)) : ''], [tr('tool.k.background'), input.run_in_background ? tr('common.yes') : '']]} />
       </>),
     };
   }
   if (['read', 'fsread', 'view', 'cat'].includes(n)) {
     const p = str(pick(input, 'file_path', 'filePath', 'path', 'file'));
-    return { icon: <FileText size={14} />, label: 'Read', summary: tilde(p) || str(input.operations ? JSON.stringify(input.operations).slice(0, 80) : ''), body: <Kv rows={[['Path', <code key="p">{p}</code>], ['Offset', str(input.offset ?? '')], ['Limit', str(input.limit ?? '')]]} /> };
+    return { icon: <FileText size={14} />, label: tr('tool.read'), summary: tilde(p) || str(input.operations ? JSON.stringify(input.operations).slice(0, 80) : ''), body: <Kv rows={[[tr('tool.k.path'), <code key="p">{p}</code>], [tr('tool.k.offset'), str(input.offset ?? '')], [tr('tool.k.limit'), str(input.limit ?? '')]]} /> };
   }
   if (['write', 'fswrite', 'create', 'writefile'].includes(n)) {
     const p = str(pick(input, 'file_path', 'filePath', 'path')); const c = str(pick(input, 'content', 'file_text', 'text'));
-    return { icon: <FilePlus size={14} />, label: 'Write', summary: `${tilde(p)} · ${c.split('\n').length} lines`, body: (<><Kv rows={[['Path', <code key="p">{p}</code>]]} /><pre className="codebox">{c.slice(0, 4000)}{c.length > 4000 ? '\n…' : ''}</pre></>) };
+    return { icon: <FilePlus size={14} />, label: tr('tool.write'), summary: tr('tool.writeSummary', { path: tilde(p), count: c.split('\n').length }), body: (<><Kv rows={[[tr('tool.k.path'), <code key="p">{p}</code>]]} /><pre className="codebox">{c.slice(0, 4000)}{c.length > 4000 ? '\n…' : ''}</pre></>) };
   }
   if (['edit', 'strreplace', 'strreplaceeditor', 'patch', 'replace'].includes(n)) {
     const p = str(pick(input, 'file_path', 'filePath', 'path'));
-    return { icon: <FilePen size={14} />, label: 'Edit', summary: tilde(p), body: (<><Kv rows={[['Path', <code key="p">{p}</code>], ['Replace all', input.replace_all ? 'yes' : '']]} /><Diff oldText={str(pick(input, 'old_string', 'oldString', 'old_str'))} newText={str(pick(input, 'new_string', 'newString', 'new_str'))} /></>) };
+    return { icon: <FilePen size={14} />, label: tr('tool.edit'), summary: tilde(p), body: (<><Kv rows={[[tr('tool.k.path'), <code key="p">{p}</code>], [tr('tool.k.replaceAll'), input.replace_all ? tr('common.yes') : '']]} /><Diff oldText={str(pick(input, 'old_string', 'oldString', 'old_str'))} newText={str(pick(input, 'new_string', 'newString', 'new_str'))} /></>) };
   }
   if (n === 'multiedit' && Array.isArray(input.edits)) {
     const p = str(input.file_path);
-    return { icon: <FilePen size={14} />, label: 'Edit', summary: `${tilde(p)} · ${input.edits.length} changes`, body: (<><Kv rows={[['Path', <code key="p">{p}</code>]]} />{input.edits.map((e: Obj, i: number) => <Diff key={i} oldText={str(e.old_string)} newText={str(e.new_string)} />)}</>) };
+    return { icon: <FilePen size={14} />, label: tr('tool.edit'), summary: tr('tool.editSummary', { path: tilde(p), count: input.edits.length }), body: (<><Kv rows={[[tr('tool.k.path'), <code key="p">{p}</code>]]} />{input.edits.map((e: Obj, i: number) => <Diff key={i} oldText={str(e.old_string)} newText={str(e.new_string)} />)}</>) };
   }
   if (['grep', 'glob', 'search', 'find', 'ls', 'list', 'codesearch'].includes(n)) {
     const pat = str(pick(input, 'pattern', 'query', 'glob', 'path'));
@@ -88,11 +91,11 @@ export function describe(t: Tool): Described {
     return { icon: <Globe size={14} />, label: raw, summary: q, body: <Kv rows={Object.entries(input).map(([k, v]) => [k, <span key={k} className="pre-wrap">{str(v)}</span>] as [string, ReactNode])} /> };
   }
   if (['task', 'agent', 'subagent'].includes(n)) {
-    return { icon: <Bot size={14} />, label: 'Subagent', summary: str(pick(input, 'description', 'subagent_type')), body: <Kv rows={[['Type', str(input.subagent_type ?? '')], ['Description', str(input.description ?? '')], ['Prompt', <span key="p" className="pre-wrap">{str(input.prompt ?? '').slice(0, 1500)}</span>]]} /> };
+    return { icon: <Bot size={14} />, label: tr('tool.subagent'), summary: str(pick(input, 'description', 'subagent_type')), body: <Kv rows={[[tr('tool.k.type'), str(input.subagent_type ?? '')], [tr('tool.k.description'), str(input.description ?? '')], [tr('tool.k.prompt'), <span key="p" className="pre-wrap">{str(input.prompt ?? '').slice(0, 1500)}</span>]]} /> };
   }
   if (n === 'todowrite' && Array.isArray(input.todos)) {
     const done = input.todos.filter((x: Obj) => x.status === 'completed').length;
-    return { icon: <ListChecks size={14} />, label: 'Plan', summary: `${done}/${input.todos.length} done`, body: <ul className="todos">{input.todos.map((x: Obj, i: number) => <li key={i} data-s={x.status}><i />{str(x.content)}</li>)}</ul> };
+    return { icon: <ListChecks size={14} />, label: tr('tool.plan'), summary: tr('tool.planSummary', { done, total: input.todos.length }), body: <ul className="todos">{input.todos.map((x: Obj, i: number) => <li key={i} data-s={x.status}><i />{str(x.content)}</li>)}</ul> };
   }
   const entries = Object.entries(input);
   return {
@@ -107,6 +110,7 @@ function useTick(active: boolean) {
 }
 
 export function ToolCall({ tool, streaming }: { tool: Tool; streaming?: boolean }) {
+  const { t } = useI18n();
   const d = describe(tool);
   const done = tool.output !== undefined;
   const running = !done && !!streaming;
@@ -125,9 +129,9 @@ export function ToolCall({ tool, streaming }: { tool: Tool; streaming?: boolean 
         <b className="tlabel">{d.label}</b>
         <span className="tsum mono" title={d.command ?? d.summary}>{d.kind === 'shell' && <span className="prompt">$ </span>}{d.summary}</span>
         <span className="tmeta">
-          {exit !== undefined && exit !== '0' && <span className="tbad">exit {exit}</span>}
-          {tool.error && exit === undefined && <span className="tbad">failed</span>}
-          {done && !tool.error && lines > 0 && <span>{lines} {lines === 1 ? 'line' : 'lines'}</span>}
+          {exit !== undefined && exit !== '0' && <span className="tbad">{t('tool.exit', { code: exit })}</span>}
+          {tool.error && exit === undefined && <span className="tbad">{t('tool.failed')}</span>}
+          {done && !tool.error && lines > 0 && <span>{t('tool.lines', { count: lines })}</span>}
           {dur !== undefined && <span className={running ? 'live' : ''}>{fmtDur(dur)}</span>}
           {running && <i className="dot run" />}
         </span>
@@ -135,7 +139,7 @@ export function ToolCall({ tool, streaming }: { tool: Tool; streaming?: boolean 
       </summary>
       <div className="tbody">
         {d.body}
-        {done && <div className="tout"><div className="cmdhead"><span className="eyebrow">Output</span>{out && <CopyBtn text={out} label="Copy output" />}</div><pre>{out ? (out.length > 12000 ? out.slice(0, 12000) + '\n… (truncated)' : out) : '(no output)'}</pre></div>}
+        {done && <div className="tout"><div className="cmdhead"><span className="eyebrow">{t('tool.output')}</span>{out && <CopyBtn text={out} label={t('tool.copyOutput')} />}</div><pre>{out ? (out.length > 12000 ? out.slice(0, 12000) + `\n${t('tool.truncated')}` : out) : t('tool.noOutput')}</pre></div>}
       </div>
     </details>
   );

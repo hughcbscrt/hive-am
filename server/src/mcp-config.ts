@@ -14,3 +14,10 @@ export const dispatchMcpConfig = (agentId: string) => ({
 export const dispatchMcpConfigOpencode = (agentId: string) => ({
   mcp: { hive: { type: 'local', command: [process.execPath, script], environment: env(agentId), enabled: true } },
 });
+
+/** Kiro agent profile (~/.kiro/agents/<name>.json): Kiro only loads MCP servers from config files, so each orchestrator gets its own profile. */
+export const dispatchKiroProfile = (agentId: string, name: string) => ({
+  name, description: 'hive-am orchestrator profile (generated)', prompt: null,
+  mcpServers: { hive: { command: process.execPath, args: [script], env: env(agentId) } },
+  tools: ['*'], allowedTools: ['@hive'], includeMcpJson: false,
+});

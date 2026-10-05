@@ -116,7 +116,7 @@ kiro-cli chat --no-interactive --output-format stream-json \
 | Permisos | `--trust-all-tools` salvo que el permiso sea `plan`. (`acceptEdits` y `bypassPermissions` se comportan igual.) |
 | Reanudación | `--resume-id <id>`. Las sesiones de Kiro son por carpeta, de ahí la importancia del `cwd`. |
 | Instrucciones | Preámbulo en el mensaje (ver 6.6). |
-| Delegación | **No implementada** para Kiro: no se le inyecta el servidor MCP. Un orquestador Kiro no puede delegar (limitación conocida). |
+| Delegación | Kiro solo carga servidores MCP desde archivos de configuración, así que un orquestador con subagentes recibe un perfil `~/.kiro/agents/hive-<agentId>.json` (`mcpServers.hive`, `tools: ["*"]`, `allowedTools: ["@hive"]`) y se ejecuta con `--agent hive-<agentId>`. |
 | Id de sesión | `data.sessionId` de cualquier evento. |
 
 **Traducción de eventos** (Kiro emite eventos ACP en formato JSON por líneas):

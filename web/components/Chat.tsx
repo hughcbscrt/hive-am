@@ -10,6 +10,7 @@ import type { Agent, Block, ChatMessage } from '@/lib/types';
 import { Hex, useToast } from './ui';
 import { ToolCall, ToolsOpen } from './ToolCall';
 import { fmtCost, fmtDur, fmtTokens, totalTokens } from '@/lib/format';
+import { translateServerError, useI18n } from '@/lib/i18n';
 
 /** Claude writes one transcript entry per tool call; show a run of assistant entries as one reply. */
 function coalesce(list: ChatMessage[]): (ChatMessage & { durationMs?: number })[] {
@@ -37,31 +38,33 @@ function coalesce(list: ChatMessage[]): (ChatMessage & { durationMs?: number })[
 }
 
 function ReplyMeta({ m }: { m: ChatMessage & { durationMs?: number } }) {
+  const { t } = useI18n();
   const u = m.meta?.usage; const tools = m.blocks.filter((b) => b.type === 'tool').length;
   if (!u && !m.durationMs && !tools) return null;
   const tokens = totalTokens(u);
   return (
     <div className="replymeta">
       {m.meta?.model && <span className="mono">{m.meta.model.replace(/^claude-/, '').replace(/-\d{8}$/, '')}</span>}
-      {tokens > 0 && <span title={u ? `input ${u.input} · output ${u.output} · cache read ${u.cacheRead} · cache write ${u.cacheWrite}` : ''}><Layers size={12} />{fmtTokens(u!.input + u!.cacheRead + u!.cacheWrite)} in · {fmtTokens(u!.output)} out</span>}
-      {u?.credits ? <span><Coins size={12} />{u.credits.toFixed(2)} credits</span> : null}
-      {m.meta?.cost !== undefined && <span title={m.meta.costEstimated ? 'Estimated from list prices' : 'Reported by the CLI'}><Coins size={12} />{m.meta.costEstimated ? '≈ ' : ''}{fmtCost(m.meta.cost)}</span>}
-      {tools > 0 && <span><Hammer size={12} />{tools} {tools === 1 ? 'tool' : 'tools'}</span>}
+      {tokens > 0 && <span title={u ? t('chat.tokenDetail', { input: u.input, output: u.output, cacheRead: u.cacheRead, cacheWrite: u.cacheWrite }) : ''}><Layers size={12} />{t('chat.inOut', { in: fmtTokens(u!.input + u!.cacheRead + u!.cacheWrite), out: fmtTokens(u!.output) })}</span>}
+      {u?.credits ? <span><Coins size={12} />{t('chat.credits', { value: u.credits.toFixed(2) })}</span> : null}
+      {m.meta?.cost !== undefined && <span title={m.meta.costEstimated ? t('stats.costEstimated') : t('stats.costReported')}><Coins size={12} />{m.meta.costEstimated ? '≈ ' : ''}{fmtCost(m.meta.cost)}</span>}
+      {tools > 0 && <span><Hammer size={12} />{t('chat.tools', { count: tools })}</span>}
       {m.durationMs ? <span><Timer size={12} />{fmtDur(m.durationMs)}</span> : null}
     </div>
   );
 }
 
 function LiveMeta({ turn }: { turn: NonNullable<ReturnType<typeof useHive>['live'][string]> }) {
+  const { t } = useI18n();
   const [, set] = useState(0);
   useEffect(() => { const i = setInterval(() => set((x) => x + 1), 500); return () => clearInterval(i); }, []);
   const u = turn.usage; const tools = turn.blocks.filter((b) => b.type === 'tool').length;
   return (
     <div className="replymeta live">
       <span><Timer size={12} />{fmtDur(Date.now() - turn.startedAt)}</span>
-      {tools > 0 && <span><Hammer size={12} />{tools} {tools === 1 ? 'tool' : 'tools'}</span>}
-      {u && (u.output ?? 0) > 0 && <span><Layers size={12} />{fmtTokens((u.input ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0))} in · {fmtTokens(u.output ?? 0)} out</span>}
-      {u?.contextPct !== undefined && <span>context {u.contextPct.toFixed(1)}%</span>}
+      {tools > 0 && <span><Hammer size={12} />{t('chat.tools', { count: tools })}</span>}
+      {u && (u.output ?? 0) > 0 && <span><Layers size={12} />{t('chat.inOut', { in: fmtTokens((u.input ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0)), out: fmtTokens(u.output ?? 0) })}</span>}
+      {u?.contextPct !== undefined && <span>{t('chat.contextPct', { pct: u.contextPct.toFixed(1) })}</span>}
     </div>
   );
 }
@@ -73,12 +76,13 @@ const Md = memo(function Md({ text }: { text: string }) {
 });
 
 const Blocks = memo(function Blocks({ blocks, streaming }: { blocks: Block[]; streaming?: boolean }) {
+  const { t } = useI18n();
   return (
     <>
       {blocks.map((b, i) => {
         if (b.type === 'text') return <Md key={i} text={b.text} />;
         if (b.type === 'thinking') return (
-          <details key={i} className="fold think"><summary><Brain size={14} />{streaming && i === blocks.length - 1 ? 'Thinking…' : 'Thought process'}<ChevronRight size={14} className="chev" /></summary><pre>{b.text}</pre></details>
+          <details key={i} className="fold think"><summary><Brain size={14} />{streaming && i === blocks.length - 1 ? t('activity.thinking') : t('chat.thought')}<ChevronRight size={14} className="chev" /></summary><pre>{b.text}</pre></details>
         );
         return <ToolCall key={i} tool={b} streaming={streaming} />;
       })}
@@ -90,6 +94,7 @@ type Reply = ChatMessage & { durationMs?: number };
 
 /** The saved transcript. Memoised so typing in the composer never re-renders it. */
 const History = memo(function History({ msgs, agent }: { msgs: ChatMessage[]; agent: Pick<Agent, 'name' | 'provider' | 'role'> }) {
+  useI18n(); // re-render the relative times when the language changes
   const list = useMemo(() => coalesce(msgs), [msgs]);
   return (
     <>
@@ -111,6 +116,7 @@ const Composer = memo(function Composer({ name, running, queued, readOnly, onSen
   name: string; running: boolean; queued: number; readOnly: boolean;
   onSend: (prompt: string) => Promise<boolean>; onStop: () => void; toolsOpen: boolean | null; onToggleTools: () => void;
 }) {
+  const { t } = useI18n();
   const [text, setText] = useState('');
   const ref = useRef<HTMLTextAreaElement>(null);
   const grow = () => { const el = ref.current; if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 200) + 'px'; } };
@@ -122,22 +128,23 @@ const Composer = memo(function Composer({ name, running, queued, readOnly, onSen
   return (
     <div className="composer">
       {readOnly ? (
-        <div className="composer-box" style={{ justifyContent: 'space-between', alignItems: 'center' }}><span className="muted">You’re reading an older session. Make it current to continue it.</span></div>
+        <div className="composer-box" style={{ justifyContent: 'space-between', alignItems: 'center' }}><span className="muted">{t('chat.readOnly')}</span></div>
       ) : (
         <div className="composer-box">
-          <textarea ref={ref} rows={1} value={text} placeholder={running ? 'Queue a follow-up…' : `Message ${name}`} aria-label="Message"
+          <textarea ref={ref} rows={1} value={text} placeholder={running ? t('chat.queuePlaceholder') : t('chat.placeholder', { name })} aria-label={t('chat.messageLabel')}
             onChange={(e) => { setText(e.target.value); grow(); }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
-          {running && <button className="btn" onClick={onStop} aria-label="Stop"><Square size={14} fill="currentColor" />Stop</button>}
-          <button className="btn primary icon" onClick={() => void send()} disabled={!text.trim()} aria-label="Send"><ArrowUp size={18} /></button>
+          {running && <button className="btn" onClick={onStop} aria-label={t('chat.stop')}><Square size={14} fill="currentColor" />{t('chat.stop')}</button>}
+          <button className="btn primary icon" onClick={() => void send()} disabled={!text.trim()} aria-label={t('chat.send')}><ArrowUp size={18} /></button>
         </div>
       )}
-      <div className="composer-meta"><span>Enter to send · Shift+Enter for a new line</span><button type="button" className="linkbtn" onClick={onToggleTools}>{toolsOpen ? 'Collapse all tools' : 'Expand all tools'}</button>{queued > 0 && <span>{queued} queued</span>}</div>
+      <div className="composer-meta"><span>{t('chat.keys')}</span><button type="button" className="linkbtn" onClick={onToggleTools}>{toolsOpen ? t('chat.collapseTools') : t('chat.expandTools')}</button>{queued > 0 && <span>{t('queue.count', { count: queued })}</span>}</div>
     </div>
   );
 });
 
 export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride?: string | null }) {
+  const { t } = useI18n();
   const { live, finished, clearLive, agents } = useHive();
   const toast = useToast();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
@@ -175,8 +182,8 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
     if (readOnly) return false;
     setPending(prompt); stick.current = true;
     try { await api.post(`/agents/${agent.id}/messages`, { prompt }); return true; }
-    catch (e) { setPending(null); toast(e instanceof Error ? e.message : 'Could not send', 'err'); return false; }
-  }, [agent.id, readOnly, toast]);
+    catch (e) { setPending(null); toast(e instanceof Error ? e.message : t('chat.sendFailed'), 'err'); return false; }
+  }, [agent.id, readOnly, toast, t]);
   const stop = useCallback(() => { void api.post(`/agents/${agent.id}/stop`).catch(() => undefined); }, [agent.id]);
   const toggleTools = useCallback(() => setToolsOpen((o) => (o ? false : true)), []);
 
@@ -190,8 +197,8 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
         <div className="thread-inner">
           {isEmpty && (
             <div className="empty" style={{ marginTop: 40 }}>
-              <Hex agent={agent} size="lg" /><h3>Say hello to {agent.name}</h3>
-              <p>{agent.role === 'orchestrator' ? 'Describe a goal. It will break it down and dispatch the pieces to its team.' : 'Give it a task. The conversation is stored by the CLI itself, so it survives restarts.'}</p>
+              <Hex agent={agent} size="lg" /><h3>{t('chat.empty.title', { name: agent.name })}</h3>
+              <p>{agent.role === 'orchestrator' ? t('chat.empty.orchestrator') : t('chat.empty.worker')}</p>
             </div>
           )}
           <History msgs={msgs} agent={agent} />
@@ -200,9 +207,9 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
             <>
               {turn.source === 'dispatch' ? (
                 <div className="delegation-card">
-                  <div className="head"><Waypoints size={14} />Delegated task from {agents.find((a) => a.id === turn.from)?.name ?? 'an orchestrator'}</div>
+                  <div className="head"><Waypoints size={14} />{t('chat.delegatedFrom', { name: agents.find((a) => a.id === turn.from)?.name ?? t('chat.anOrchestrator') })}</div>
                   <p>{turn.prompt}</p>
-                  <span className="hint">Runs in its own session — it won’t appear in this conversation. Find it under Settings → Sessions.</span>
+                  <span className="hint">{t('chat.delegatedNote')}</span>
                 </div>
               ) : !msgs.some((m) => m.role === 'user' && m.blocks.some((b) => b.type === 'text' && b.text.trim() === turn.prompt.trim())) && (
                 <div className="msg user"><div className="bubble">{turn.prompt}</div></div>
@@ -210,10 +217,10 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
               <div className="msg assistant">
                 <div className="who"><Hex agent={agent} size="sm" />{agent.name}</div>
                 <Blocks blocks={turn.blocks} streaming />
-                {!turn.error && <span className="typing" aria-label="Working"><i /><i /><i /></span>}
+                {!turn.error && <span className="typing" aria-label={t('common.working')}><i /><i /><i /></span>}
                 <LiveMeta turn={turn} />
                 {turn.error && (
-                  <div className="banner err"><AlertTriangle size={16} /><div className="grow">{turn.error}</div><button className="btn sm" onClick={() => clearLive(agent.id)}>Dismiss</button></div>
+                  <div className="banner err"><AlertTriangle size={16} /><div className="grow">{translateServerError(turn.error)}</div><button className="btn sm" onClick={() => clearLive(agent.id)}>{t('common.dismiss')}</button></div>
                 )}
               </div>
             </>

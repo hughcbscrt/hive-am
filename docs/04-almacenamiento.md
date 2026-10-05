@@ -175,6 +175,8 @@ Solo preferencias de vista; si se borran, la interfaz funciona igual.
 | `hive-theme` | `light` \| `dark` | `Shell.tsx`: tema elegido (si no existe, se sigue el del sistema) |
 | `hive-cfg-open` | `1` \| `0` | `agents/[id]/page.tsx`: si el panel de ajustes del agente queda abierto |
 | `hive-rel-pos-v2` | JSON `{ id: {x, y} }` | `relations/page.tsx`: posiciones de nodos que arrastraste a mano |
+| `hive-locale` | `en` \| `es` | `lib/i18n`: idioma de la interfaz (nunca se refleja en la URL) |
+| `hive-switcher-collapsed` | `1` \| `0` | `agents/[id]/page.tsx`: si la lista lateral de agentes está contraída |
 
 La clave anterior `hive-rel-pos` ya no se usa (se abandonó al rediseñar el lienzo).
 

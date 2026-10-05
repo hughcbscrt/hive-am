@@ -9,7 +9,7 @@ Este documento describe **qué se muestra** en la conversación con un agente, *
 ```
 ┌ barra lateral ┬ selector de agentes ┬ chat ─────────────────────────┬ ajustes (opcional) ┐
 │ (navegación)  │ AgentSwitcher       │ cabecera + StatsBar            │ Configuration      │
-│ 220 px        │ 290 px              │ transcripción                  │ Sessions           │
+│ 220 px        │ 290 px (o 68 px)    │ transcripción                  │ Sessions           │
 │               │                     │ caja de texto                  │ 400 px             │
 └───────────────┴─────────────────────┴────────────────────────────────┴────────────────────┘
 ```
@@ -18,6 +18,8 @@ Este documento describe **qué se muestra** en la conversación con un agente, *
 - La página se monta con `key={id}`: al cambiar de agente desde el selector se reinicia todo el estado local (borrador, pestaña, sesión en lectura).
 
 ### Selector de agentes (`AgentSwitcher`)
+
+Se puede **contraer** con el botón de su cabecera (icono de panel): pasa de 290 px a 68 px y deja solo el **avatar con la inicial** de cada agente, agrupados por colonia con una pequeña barra de color. Al pasar el mouse, el *tooltip* muestra el nombre y el proveedor; el agente actual sigue resaltado y los que trabajan conservan su punto pulsante. Cambiar de agente no lo expande y la elección se recuerda (`hive-switcher-collapsed` en `localStorage`).
 
 Lista lateral agrupada por colonia (y "No colony"), con búsqueda. Cada agente muestra:
 

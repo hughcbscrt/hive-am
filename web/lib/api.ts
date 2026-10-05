@@ -1,3 +1,5 @@
+import { translateServerError } from './i18n/core';
+
 export class ApiError extends Error {}
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -7,7 +9,8 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(data?.error ?? `Request failed (${res.status})`);
+  // The server speaks English; known messages are shown in the selected language.
+  if (!res.ok) throw new ApiError(translateServerError(data?.error ?? `Request failed (${res.status})`));
   return data as T;
 }
 
