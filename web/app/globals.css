@@ -429,3 +429,8 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .hex:not(.queen) { color: #0c1411; } }
 
 .card-corner { position: absolute; top: 10px; right: 10px; z-index: 1; }
+
+/* ---------- language switch ---------- */
+.lang-row { display: flex; align-items: center; gap: 8px; padding: 0 10px 12px; color: var(--muted); }
+.lang-row .seg { flex: 1; } .lang-row .seg button { flex: 1; padding: 4px 8px; font-size: 12px; letter-spacing: .04em; }
+@media (max-width: 760px) { .lang-row { padding: 0 6px; flex: none; } }
