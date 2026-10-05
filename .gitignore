@@ -1,0 +1,17 @@
+# dependencies
+node_modules
+
+# build output (Next.js, incl. the extra dist dirs used for previews/tests)
+.next
+.next-*
+
+# generated / local
+*.log
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+
+# secrets
+.env
+.env.*
+!.env.example
