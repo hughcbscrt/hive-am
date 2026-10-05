@@ -63,11 +63,16 @@ hive-am/
     │   ├── ToolCall.tsx      # render de cada herramienta que usa el agente
     │   └── StatsBar.tsx      # barra y panel de tokens, costo y herramientas
     └── lib/
-        ├── api.ts            # cliente fetch hacia /api
+        ├── api.ts            # cliente fetch hacia /api (traduce los errores del servidor)
         ├── store.tsx         # estado global + WebSocket
         ├── types.ts          # tipos del frontend (espejo de los del backend)
         ├── meta.ts           # nombres/colores de proveedores, permisos, utilidades
-        └── format.ts         # formato de tokens, costo y duración
+        ├── format.ts         # formato de tokens, costo, duración y números
+        └── i18n/
+            ├── core.ts       # idiomas, translate(), detección, errores del servidor
+            ├── index.tsx     # I18nProvider y useI18n()
+            ├── en.ts         # catálogo en inglés (fuente de todas las claves)
+            └── es.ts         # catálogo en español (debe tener las mismas claves)
 ```
 
 No existen aún carpetas de pruebas automatizadas; la verificación se describe en el [documento 12](12-operacion-y-problemas.md).
@@ -111,6 +116,7 @@ No existen aún carpetas de pruebas automatizadas; la verificación se describe 
 | `components/ToolCall.tsx` | Convierte cada llamada a herramienta en una fila legible (`describe`). |
 | `components/StatsBar.tsx` | Resumen de la sesión y panel desplegable. |
 | `lib/store.tsx` | Estado global, WebSocket y reductor de eventos. |
+| `lib/i18n/*` | Traducciones de la interfaz (inglés y español); ver [documento 11](11-frontend.md#118-internacionalización-i18n). |
 
 ## Dependencias principales
 

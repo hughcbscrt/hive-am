@@ -42,6 +42,8 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 | 16 | **Tipos duplicados** | `server/src/types.ts` y `web/lib/types.ts` se mantienen a mano. |
 | 17 | **Mover agentes entre colonias** | Se hace con selectores y listas; no hay arrastrar y soltar en el panal. |
 | 18 | **`type_id` informativo** | Editar un tipo no actualiza a los agentes ya creados. |
+| 19 | **Parpadeo de idioma** | En la primera carga se ve brevemente el inglés base antes de aplicar el idioma guardado. |
+| 20 | **Contenido sin traducir** | Los nombres/descripciones creados por ti o por el seed, las instrucciones que reciben los agentes y los errores crudos de los CLIs se muestran como vienen (ver [documento 11](11-frontend.md#118-internacionalización-i18n)). |
 
 ## 12.3 Solución de problemas
 
