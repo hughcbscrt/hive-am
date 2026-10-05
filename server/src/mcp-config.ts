@@ -1,0 +1,16 @@
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+export const API_PORT = Number(process.env.HIVE_AM_PORT ?? 4400);
+const script = join(dirname(fileURLToPath(import.meta.url)), '..', 'mcp', 'dispatch.mjs');
+const env = (agentId: string) => ({ HIVE_AGENT_ID: agentId, HIVE_AM_API: `http://127.0.0.1:${API_PORT}` });
+
+/** Claude Code --mcp-config shape (server name "hive" → tools prefixed mcp__hive__). */
+export const dispatchMcpConfig = (agentId: string) => ({
+  mcpServers: { hive: { command: process.execPath, args: [script], env: env(agentId) } },
+});
+
+/** OpenCode config (OPENCODE_CONFIG_CONTENT) shape. */
+export const dispatchMcpConfigOpencode = (agentId: string) => ({
+  mcp: { hive: { type: 'local', command: [process.execPath, script], environment: env(agentId), enabled: true } },
+});
