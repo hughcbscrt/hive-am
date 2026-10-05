@@ -6,8 +6,11 @@ import { Plus, Search, Trash2 } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
 import { Field, Modal, Segmented, useToast } from '@/components/ui';
+import { useI18n } from '@/lib/i18n';
+import { fmtNum } from '@/lib/format';
 
 export default function Skills() {
+  const { t } = useI18n();
   const { skills, refresh, ready } = useHive();
   const toast = useToast();
   const [sel, setSel] = useState<string | 'new' | null>(null);
@@ -31,61 +34,61 @@ export default function Skills() {
   const dirty = sel === 'new' ? !!(draft.name || draft.content) : !!current && (current.name !== draft.name || current.description !== draft.description || current.content !== draft.content);
 
   const save = async () => {
-    if (!draft.name.trim()) { setErr('Give the skill a name.'); return; }
+    if (!draft.name.trim()) { setErr(t('skills.err.name')); return; }
     try {
-      if (sel === 'new') { const s = await api.post<{ id: string }>('/skills', draft); await refresh(['skills']); setSel(s.id); toast('Skill created'); }
-      else { await api.patch(`/skills/${sel}`, draft); await refresh(['skills']); toast('Skill saved'); }
+      if (sel === 'new') { const s = await api.post<{ id: string }>('/skills', draft); await refresh(['skills']); setSel(s.id); toast(t('skills.created')); }
+      else { await api.patch(`/skills/${sel}`, draft); await refresh(['skills']); toast(t('skills.saved')); }
       setErr('');
-    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save'); }
+    } catch (e) { setErr(e instanceof Error ? e.message : t('edit.saveFailed')); }
   };
 
   return (
     <div className="page">
       <div className="page-head">
-        <div><h1>Skills</h1><p>Markdown instructions you attach to agents or types. They are appended to the system prompt, so write them as guidance the agent follows.</p></div>
-        <button className="btn primary" onClick={() => setSel('new')}><Plus size={16} />New skill</button>
+        <div><h1>{t('nav.skills')}</h1><p>{t('skills.subtitle')}</p></div>
+        <button className="btn primary" onClick={() => setSel('new')}><Plus size={16} />{t('skills.new')}</button>
       </div>
       {ready && !skills.length && sel !== 'new' ? (
-        <div className="empty"><h3>No skills yet</h3><p>A skill is a reusable block of instructions — a review checklist, a commit style, how to run your tests.</p><button className="btn primary" onClick={() => setSel('new')}><Plus size={16} />Write the first skill</button></div>
+        <div className="empty"><h3>{t('skills.empty.title')}</h3><p>{t('skills.empty.body')}</p><button className="btn primary" onClick={() => setSel('new')}><Plus size={16} />{t('skills.empty.create')}</button></div>
       ) : (
         <div className="split">
           <div className="card listcard">
-            <div style={{ padding: 12, borderBottom: '1px solid var(--line)' }}><div className="search"><Search size={16} /><input className="input" placeholder="Search skills" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search skills" /></div></div>
-            {sel === 'new' && <button className="listitem" aria-current="true"><b>New skill</b><span className="muted small">Unsaved</span></button>}
+            <div style={{ padding: 12, borderBottom: '1px solid var(--line)' }}><div className="search"><Search size={16} /><input className="input" placeholder={t('skills.search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('skills.search')} /></div></div>
+            {sel === 'new' && <button className="listitem" aria-current="true"><b>{t('skills.new')}</b><span className="muted small">{t('skills.unsaved')}</span></button>}
             {list.map((s) => (
               <button key={s.id} className="listitem" aria-current={sel === s.id} onClick={() => setSel(s.id)}>
-                <b>{s.name}</b><span className="muted small" style={{ display: 'block' }}>{s.description || 'No description'}</span>
-                <span className="muted" style={{ fontSize: 12 }}>{usage[s.id]?.agents ?? 0} agents · {usage[s.id]?.types ?? 0} types</span>
+                <b>{s.name}</b><span className="muted small" style={{ display: 'block' }}>{s.description || t('common.noDescription')}</span>
+                <span className="muted" style={{ fontSize: 12 }}>{t('skills.nAgents', { count: usage[s.id]?.agents ?? 0 })} · {t('skills.nTypes', { count: usage[s.id]?.types ?? 0 })}</span>
               </button>
             ))}
-            {!list.length && sel !== 'new' && <p className="muted small" style={{ padding: 16 }}>No skills match “{q}”.</p>}
+            {!list.length && sel !== 'new' && <p className="muted small" style={{ padding: 16 }}>{t('skills.noMatch', { query: q })}</p>}
           </div>
           {sel && (
             <div className="card card-pad col" style={{ gap: 16 }}>
-              <Field label="Name" error={err}><input className="input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. conventional-commits" /></Field>
-              <Field label="Description" hint="One line, shown in pickers."><input className="input" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
+              <Field label={t('form.name')} error={err}><input className="input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder={t('skills.name.placeholder')} /></Field>
+              <Field label={t('types.description')} hint={t('skills.description.hint')}><input className="input" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
               <div className="field">
-                <div className="row"><label className="label grow">Instructions</label><Segmented value={mode} onChange={setMode} options={[{ id: 'write', label: 'Write' }, { id: 'preview', label: 'Preview' }]} /></div>
+                <div className="row"><label className="label grow">{t('skills.instructions')}</label><Segmented value={mode} onChange={setMode} options={[{ id: 'write', label: t('skills.write') }, { id: 'preview', label: t('skills.preview') }]} /></div>
                 {mode === 'write'
-                  ? <textarea className="textarea mono" rows={16} value={draft.content} onChange={(e) => setDraft({ ...draft, content: e.target.value })} placeholder={'When writing commits:\n- Use the imperative mood\n- Keep the subject under 72 characters'} spellCheck={false} />
-                  : <div className="md card-pad" style={{ border: '1px solid var(--line)', borderRadius: 10, minHeight: 280, background: 'var(--surface-2)' }}><ReactMarkdown remarkPlugins={[remarkGfm]}>{draft.content || '*Nothing to preview yet.*'}</ReactMarkdown></div>}
-                <span className="hint">{draft.content.length.toLocaleString()} characters</span>
+                  ? <textarea className="textarea mono" rows={16} value={draft.content} onChange={(e) => setDraft({ ...draft, content: e.target.value })} placeholder={t('skills.content.placeholder')} spellCheck={false} />
+                  : <div className="md card-pad" style={{ border: '1px solid var(--line)', borderRadius: 10, minHeight: 280, background: 'var(--surface-2)' }}><ReactMarkdown remarkPlugins={[remarkGfm]}>{draft.content || t('skills.previewEmpty')}</ReactMarkdown></div>}
+                <span className="hint">{t('skills.chars', { count: draft.content.length, n: fmtNum(draft.content.length) })}</span>
               </div>
               <div className="row">
-                {current && <button className="btn danger" onClick={() => setDel(true)}><Trash2 size={15} />Delete</button>}
+                {current && <button className="btn danger" onClick={() => setDel(true)}><Trash2 size={15} />{t('common.delete')}</button>}
                 <span className="grow" />
-                {dirty && <button className="btn ghost" onClick={() => setSel(sel === 'new' ? (skills[0]?.id ?? null) : sel)}>Discard</button>}
-                <button className="btn primary" disabled={!dirty} onClick={save}>{sel === 'new' ? 'Create skill' : 'Save skill'}</button>
+                {dirty && <button className="btn ghost" onClick={() => setSel(sel === 'new' ? (skills[0]?.id ?? null) : sel)}>{t('common.discard')}</button>}
+                <button className="btn primary" disabled={!dirty} onClick={save}>{sel === 'new' ? t('skills.create') : t('skills.save')}</button>
               </div>
             </div>
           )}
         </div>
       )}
       {del && current && (
-        <Modal title={`Delete ${current.name}?`} onClose={() => setDel(false)}>
-          <p style={{ margin: 0 }} className="muted">It will be detached from {usage[current.id]?.agents ?? 0} agents and {usage[current.id]?.types ?? 0} types.</p>
-          <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn ghost" onClick={() => setDel(false)}>Keep skill</button>
-            <button className="btn danger" onClick={async () => { await api.del(`/skills/${current.id}`); await refresh(['skills', 'agents', 'types']); setDel(false); setSel(null); toast('Skill deleted'); }}>Delete skill</button></div>
+        <Modal title={t('skills.deleteTitle', { name: current.name })} onClose={() => setDel(false)}>
+          <p style={{ margin: 0 }} className="muted">{t('skills.deleteBody', { agents: t('skills.nAgents', { count: usage[current.id]?.agents ?? 0 }), types: t('skills.nTypes', { count: usage[current.id]?.types ?? 0 }) })}</p>
+          <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn ghost" onClick={() => setDel(false)}>{t('skills.keep')}</button>
+            <button className="btn danger" onClick={async () => { await api.del(`/skills/${current.id}`); await refresh(['skills', 'agents', 'types']); setDel(false); setSel(null); toast(t('skills.deleted')); }}>{t('skills.delete')}</button></div>
         </Modal>
       )}
     </div>

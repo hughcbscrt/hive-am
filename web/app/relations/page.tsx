@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 import { PROVIDERS } from '@/lib/meta';
 import type { Agent } from '@/lib/types';
 import { Hex, useToast } from '@/components/ui';
+import { useI18n } from '@/lib/i18n';
 
 /** One colour per orchestrator, so overlapping lines can still be told apart. */
 const LINE_COLORS = ['#e8a317', '#2f5bea', '#c0399a', '#0f8f9e', '#7a4de0', '#d4663f', '#2f8f5b', '#9a7400'];
@@ -21,13 +22,14 @@ interface NodeData extends Record<string, unknown> { agent: Agent; dim: boolean;
 interface EdgeData extends Record<string, unknown> { color: string; dim: boolean; active: boolean; show: boolean; label: string; onRemove: () => void }
 
 function AgentNode({ data }: { data: NodeData }) {
+  const { t } = useI18n();
   const a = data.agent;
   return (
     <div className={`rnode ${data.dim ? 'dim' : ''} ${data.active ? 'active' : ''}`}>
       {a.role === 'worker' && <Handle type="target" position={Position.Top} />}
       <Hex agent={a} />
       <b>{a.name}</b>
-      <small>{a.role === 'orchestrator' ? 'Orchestrator' : PROVIDERS[a.provider].short}</small>
+      <small>{a.role === 'orchestrator' ? t('role.orchestrator') : PROVIDERS[a.provider].short}</small>
       {a.role === 'orchestrator' && <Handle type="source" position={Position.Bottom} />}
     </div>
   );
@@ -71,6 +73,7 @@ function autoLayout(agents: Agent[]): Record<string, { x: number; y: number }> {
 }
 
 export default function Relations() {
+  const { t, locale } = useI18n();
   const { agents, refresh, ready } = useHive();
   const toast = useToast();
   const [dragged, setDragged] = useState<Record<string, { x: number; y: number }>>({});
@@ -94,15 +97,15 @@ export default function Relations() {
 
   const assign = useCallback(async (qid: string, ids: string[], msg: string) => {
     try { await api.put(`/orchestrators/${qid}/workers`, { worker_ids: ids }); await refresh(['agents']); toast(msg); }
-    catch (e) { toast(e instanceof Error ? e.message : 'Could not update the connection', 'err'); }
+    catch (e) { toast(e instanceof Error ? e.message : t('rel.updateFailed'), 'err'); }
   }, [refresh, toast]);
   const disconnect = useCallback((qid: string, wid: string) => {
     const q = agents.find((a) => a.id === qid); if (!q) return;
-    void assign(qid, q.worker_ids.filter((w) => w !== wid), `${name(wid)} disconnected from ${q.name}`);
+    void assign(qid, q.worker_ids.filter((w) => w !== wid), t('rel.disconnected', { worker: name(wid), orchestrator: q.name }));
   }, [agents, assign]); // eslint-disable-line react-hooks/exhaustive-deps
   const connect = useCallback((qid: string, wid: string) => {
     const q = agents.find((a) => a.id === qid); if (!q || q.worker_ids.includes(wid)) return;
-    void assign(qid, [...q.worker_ids, wid], `${name(wid)} connected to ${q.name}`);
+    void assign(qid, [...q.worker_ids, wid], t('rel.connected', { worker: name(wid), orchestrator: q.name }));
   }, [agents, assign]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const edges: Edge<EdgeData>[] = useMemo(() => agents.filter((a) => a.role === 'orchestrator').flatMap((q) => q.worker_ids.map((w) => {
@@ -110,9 +113,9 @@ export default function Relations() {
     const related = !!focus && (q.id === focus || w === focus);
     return {
       id, source: q.id, target: w, type: 'link' as const, animated: agents.find((x) => x.id === w)?.status === 'running',
-      data: { color: LINE_COLORS[(qIndex.get(q.id) ?? 0) % LINE_COLORS.length], dim: !!focus && !related, active: related || hoverEdge === id, show: related || hoverEdge === id, label: `Disconnect ${name(w)} from ${q.name}`, onRemove: () => disconnect(q.id, w) },
+      data: { color: LINE_COLORS[(qIndex.get(q.id) ?? 0) % LINE_COLORS.length], dim: !!focus && !related, active: related || hoverEdge === id, show: related || hoverEdge === id, label: t('rel.disconnectLabel', { worker: name(w), orchestrator: q.name }), onRemove: () => disconnect(q.id, w) },
     };
-  })), [agents, focus, hoverEdge, qIndex, disconnect]); // eslint-disable-line react-hooks/exhaustive-deps
+  })), [agents, focus, hoverEdge, qIndex, disconnect, locale]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const shown = useMemo(() => {
     const rel = new Set<string>(focus ? [focus] : []);
@@ -125,7 +128,7 @@ export default function Relations() {
     const done = c.filter((x) => x.type === 'position' && !x.dragging && x.position);
     if (done.length) setDragged((d) => { const next = { ...d }; for (const x of done) if (x.type === 'position' && x.position) next[x.id] = x.position; try { localStorage.setItem(STORE_KEY, JSON.stringify(next)); } catch { /* ignore */ } return next; });
   }, []);
-  const arrange = () => { setDragged({}); try { localStorage.removeItem(STORE_KEY); } catch { /* ignore */ } setFitKey((k) => k + 1); toast('Layout reset'); };
+  const arrange = () => { setDragged({}); try { localStorage.removeItem(STORE_KEY); } catch { /* ignore */ } setFitKey((k) => k + 1); toast(t('rel.layoutReset')); };
   const onConnect = (c: Connection) => { if (c.source && c.target) connect(c.source, c.target); };
 
   const selected = agents.find((a) => a.id === sel);
@@ -134,11 +137,11 @@ export default function Relations() {
 
   return (
     <div className="page full rel">
-      <div className="rel-hud"><h1>Relations</h1><p>Who can delegate to whom. Each orchestrator has its own line colour. Hover or select an agent to see its connections; click the ✕ on a line to remove it, or drag from an orchestrator’s bottom dot to a worker to add one.</p></div>
-      <div className="rel-tools"><button className="btn sm" onClick={arrange}><LayoutGrid size={14} />Auto-arrange</button></div>
+      <div className="rel-hud"><h1>{t('nav.relations')}</h1><p>{t('rel.hud')}</p></div>
+      <div className="rel-tools"><button className="btn sm" onClick={arrange}><LayoutGrid size={14} />{t('rel.autoArrange')}</button></div>
 
       {ready && agents.length === 0 ? (
-        <div className="empty" style={{ margin: '140px auto', maxWidth: 420, background: 'var(--surface)' }}><h3>Nothing to connect yet</h3><p>Create at least one orchestrator and one worker first.</p></div>
+        <div className="empty" style={{ margin: '140px auto', maxWidth: 420, background: 'var(--surface)' }}><h3>{t('rel.empty.title')}</h3><p>{t('rel.empty.body')}</p></div>
       ) : (
         <ReactFlow key={fitKey} nodes={shown} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
           onNodesChange={onNodesChange} onConnect={onConnect}
@@ -152,29 +155,29 @@ export default function Relations() {
 
       {selected && (
         <aside className="rel-panel card">
-          <div className="row gap-l"><Hex agent={selected} /><div className="grow"><b style={{ fontFamily: 'var(--font-display)', fontSize: 17 }}>{selected.name}</b><div className="muted small">{selected.role === 'orchestrator' ? 'Orchestrator' : 'Worker'}</div></div>
-            <button className="btn ghost icon sm" onClick={() => setSel(null)} aria-label="Close"><X size={16} /></button></div>
+          <div className="row gap-l"><Hex agent={selected} /><div className="grow"><b style={{ fontFamily: 'var(--font-display)', fontSize: 17 }}>{selected.name}</b><div className="muted small">{t(`role.${selected.role}`)}</div></div>
+            <button className="btn ghost icon sm" onClick={() => setSel(null)} aria-label={t('common.close')}><X size={16} /></button></div>
           {selected.role === 'orchestrator' ? (
             <>
-              <div className="eyebrow">Delegates to · {selected.worker_ids.length}</div>
-              {selected.worker_ids.length === 0 && <p className="muted small" style={{ margin: 0 }}>No workers yet.</p>}
+              <div className="eyebrow">{t('rel.delegatesTo', { count: selected.worker_ids.length })}</div>
+              {selected.worker_ids.length === 0 && <p className="muted small" style={{ margin: 0 }}>{t('rel.noWorkers')}</p>}
               {selected.worker_ids.map((w) => (
-                <div key={w} className="relrow"><span className="grow">{name(w)}</span><button className="btn sm" onClick={() => disconnect(selected.id, w)}>Disconnect</button></div>
+                <div key={w} className="relrow"><span className="grow">{name(w)}</span><button className="btn sm" onClick={() => disconnect(selected.id, w)}>{t('rel.disconnect')}</button></div>
               ))}
-              <select className="select" value="" onChange={(e) => e.target.value && connect(selected.id, e.target.value)} aria-label="Connect a worker">
-                <option value="">Connect a worker…</option>
+              <select className="select" value="" onChange={(e) => e.target.value && connect(selected.id, e.target.value)} aria-label={t('rel.connectWorker')}>
+                <option value="">{t('rel.connectWorker')}</option>
                 {workers.filter((w) => !selected.worker_ids.includes(w.id)).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
             </>
           ) : (
             <>
-              <div className="eyebrow">Directed by</div>
-              {orchestrators.filter((q) => q.worker_ids.includes(selected.id)).length === 0 && <p className="muted small" style={{ margin: 0 }}>No orchestrator can delegate to this worker.</p>}
+              <div className="eyebrow">{t('rel.directedBy')}</div>
+              {orchestrators.filter((q) => q.worker_ids.includes(selected.id)).length === 0 && <p className="muted small" style={{ margin: 0 }}>{t('rel.noOrchestrators')}</p>}
               {orchestrators.filter((q) => q.worker_ids.includes(selected.id)).map((q) => (
-                <div key={q.id} className="relrow"><i className="cdot" style={{ background: LINE_COLORS[(qIndex.get(q.id) ?? 0) % LINE_COLORS.length], margin: 0 }} /><span className="grow">{q.name}</span><button className="btn sm" onClick={() => disconnect(q.id, selected.id)}>Disconnect</button></div>
+                <div key={q.id} className="relrow"><i className="cdot" style={{ background: LINE_COLORS[(qIndex.get(q.id) ?? 0) % LINE_COLORS.length], margin: 0 }} /><span className="grow">{q.name}</span><button className="btn sm" onClick={() => disconnect(q.id, selected.id)}>{t('rel.disconnect')}</button></div>
               ))}
-              <select className="select" value="" onChange={(e) => e.target.value && connect(e.target.value, selected.id)} aria-label="Connect an orchestrator">
-                <option value="">Connect to an orchestrator…</option>
+              <select className="select" value="" onChange={(e) => e.target.value && connect(e.target.value, selected.id)} aria-label={t('rel.connectOrchestrator')}>
+                <option value="">{t('rel.connectOrchestrator')}</option>
                 {orchestrators.filter((q) => !q.worker_ids.includes(selected.id)).map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}
               </select>
             </>

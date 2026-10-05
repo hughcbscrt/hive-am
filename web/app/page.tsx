@@ -10,6 +10,7 @@ import { Hex, ProviderBadge, RoleChip, StatusChip, useToast } from '@/components
 import { NewAgentDrawer } from '@/components/NewAgentDrawer';
 import { ColonyEditor } from '@/components/ColonyEditor';
 import { AgentEditDrawer } from '@/components/AgentEditDrawer';
+import { useI18n } from '@/lib/i18n';
 
 const S = 74; // hex circumradius
 const W = Math.sqrt(3) * S, H = 2 * S;
@@ -64,6 +65,7 @@ function layout(agents: Agent[], colonies: Colony[]): { clusters: Cluster[]; wid
 }
 
 export default function Colony() {
+  const { t } = useI18n();
   const { agents, colonies, ready, refresh } = useHive();
   const toast = useToast();
   const [sel, setSel] = useState<string | null>(null);
@@ -72,7 +74,7 @@ export default function Colony() {
   const [editing, setEditing] = useState<Colony | 'new' | null>(null);
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
   const [feed, setFeed] = useState<Dispatch[]>([]);
-  useEffect(() => { const load = () => api.get<Dispatch[]>('/dispatches').then(setFeed).catch(() => undefined); load(); const t = setInterval(load, 6000); return () => clearInterval(t); }, []);
+  useEffect(() => { const load = () => api.get<Dispatch[]>('/dispatches').then(setFeed).catch(() => undefined); load(); const iv = setInterval(load, 6000); return () => clearInterval(iv); }, []);
 
   const { clusters, width, height } = useMemo(() => layout(agents, colonies), [agents, colonies]);
   const margin = 40;
@@ -96,29 +98,29 @@ export default function Colony() {
   const ups = (id: string) => agents.filter((q) => q.role === 'orchestrator' && q.worker_ids.includes(id));
   const running = agents.filter((a) => a.status === 'running').length;
   const queens = agents.filter((a) => a.role === 'orchestrator').length;
-  const name = (id: string) => agents.find((a) => a.id === id)?.name ?? 'removed agent';
+  const name = (id: string) => agents.find((a) => a.id === id)?.name ?? t('colony.removedAgent');
   const selColony = selected ? colonies.find((c) => c.id === selected.colony_id) : undefined;
 
   const moveTo = async (a: Agent, colonyId: string) => {
-    try { await api.patch(`/agents/${a.id}`, { colony_id: colonyId || null, overrides: [] }); await refresh(['agents', 'colonies']); toast(colonyId ? `${a.name} joined ${colonies.find((c) => c.id === colonyId)?.name}` : `${a.name} left its colony`); }
-    catch (e) { toast(e instanceof Error ? e.message : 'Could not move the agent', 'err'); }
+    try { await api.patch(`/agents/${a.id}`, { colony_id: colonyId || null, overrides: [] }); await refresh(['agents', 'colonies']); toast(colonyId ? t('colony.joined', { name: a.name, colony: colonies.find((c) => c.id === colonyId)?.name ?? '' }) : t('colony.left', { name: a.name })); }
+    catch (e) { toast(e instanceof Error ? e.message : t('colony.moveFailed'), 'err'); }
   };
 
   return (
     <div className="page">
       <div className="page-head">
-        <div><h1>Colony</h1><p>Every agent you run, grouped into colonies and wired to the orchestrators that direct them.</p></div>
+        <div><h1>{t('nav.colony')}</h1><p>{t('colony.page.subtitle')}</p></div>
         <div className="row">
-          <button className="btn" onClick={() => setEditing('new')}><Plus size={16} />New colony</button>
-          <button className="btn primary" onClick={() => setCreating({})}><Plus size={16} />New agent</button>
+          <button className="btn" onClick={() => setEditing('new')}><Plus size={16} />{t('colony.newTitle')}</button>
+          <button className="btn primary" onClick={() => setCreating({})}><Plus size={16} />{t('newAgent.title')}</button>
         </div>
       </div>
       <div className="stats">
-        <div className="card stat"><b>{agents.length}</b><span>agents</span></div>
-        <div className="card stat"><b>{colonies.length}</b><span>colonies</span></div>
-        <div className="card stat"><b>{queens}</b><span>orchestrators</span></div>
-        <div className="card stat"><b>{running}</b><span>working now</span></div>
-        <div className="card stat"><b>{feed.filter((d) => d.status === 'running').length}</b><span>tasks in flight</span></div>
+        <div className="card stat"><b>{agents.length}</b><span>{t('stat.agents', { count: agents.length })}</span></div>
+        <div className="card stat"><b>{colonies.length}</b><span>{t('stat.colonies', { count: colonies.length })}</span></div>
+        <div className="card stat"><b>{queens}</b><span>{t('stat.orchestrators', { count: queens })}</span></div>
+        <div className="card stat"><b>{running}</b><span>{t('stat.working')}</span></div>
+        <div className="card stat"><b>{feed.filter((d) => d.status === 'running').length}</b><span>{t('stat.tasks')}</span></div>
       </div>
 
       <div className="colony">
@@ -126,9 +128,9 @@ export default function Colony() {
           {!ready ? null : agents.length === 0 && colonies.length === 0 ? (
             <div className="empty" style={{ border: 0, minHeight: 520, justifyContent: 'center' }}>
               <Hex size="lg" queen label="+" />
-              <h3>Your colony is empty</h3>
-              <p>Create a colony to group agents that share a folder and rules, then add an orchestrator and a few workers.</p>
-              <div className="row"><button className="btn" onClick={() => setEditing('new')}><Plus size={16} />Create a colony</button><button className="btn primary" onClick={() => setCreating({})}><Plus size={16} />Create an agent</button></div>
+              <h3>{t('colony.empty.title')}</h3>
+              <p>{t('colony.empty.body')}</p>
+              <div className="row"><button className="btn" onClick={() => setEditing('new')}><Plus size={16} />{t('colony.empty.createColony')}</button><button className="btn primary" onClick={() => setCreating({})}><Plus size={16} />{t('colony.empty.createAgent')}</button></div>
             </div>
           ) : (
             <div style={{ width: fullW * k, height: fullH * k, flex: 'none' }}>
@@ -149,29 +151,29 @@ export default function Colony() {
               {clusters.map((c) => (
                 <div key={c.key + 'l'}>
                   {c.colony ? (
-                    <button className="colony-label" style={{ left: c.x + c.w / 2 + margin, top: c.y + LABEL - 10 + margin, ['--c' as any]: c.colony.color || 'var(--honey)' }} onClick={() => setEditing(c.colony!)} title={c.colony.cwd ? `Edit colony · ${shortPath(c.colony.cwd)}` : 'Edit colony'}>
-                      <i className="cdot" />{c.colony.name}<small>{c.cells.filter((x) => x.agent).length} {c.cells.filter((x) => x.agent).length === 1 ? 'agent' : 'agents'}</small><Settings2 size={13} className="muted" />
+                    <button className="colony-label" style={{ left: c.x + c.w / 2 + margin, top: c.y + LABEL - 10 + margin, ['--c' as any]: c.colony.color || 'var(--honey)' }} onClick={() => setEditing(c.colony!)} title={c.colony.cwd ? t('colony.editHover', { path: shortPath(c.colony.cwd) }) : t('colony.editHoverShort')}>
+                      <i className="cdot" />{c.colony.name}<small>{t('colony.agentCount', { count: c.cells.filter((x) => x.agent).length })}</small><Settings2 size={13} className="muted" />
                     </button>
                   ) : colonies.length > 0 && c.cells.some((x) => x.agent) ? (
-                    <span className="colony-label" style={{ left: c.x + c.w / 2 + margin, top: c.y + LABEL - 10 + margin, ['--c' as any]: 'var(--line-strong)', boxShadow: 'none', background: 'transparent' }}><small>No colony</small></span>
+                    <span className="colony-label" style={{ left: c.x + c.w / 2 + margin, top: c.y + LABEL - 10 + margin, ['--c' as any]: 'var(--line-strong)', boxShadow: 'none', background: 'transparent' }}><small>{t('common.noColony')}</small></span>
                   ) : null}
                   {c.cells.map((cell, i) => {
                     const a = cell.agent; const style = { left: cell.x + margin, top: cell.y + margin };
                     if (!a) return (
-                      <button key={c.key + 'g' + i} className="cell ghost" style={style} onClick={() => setCreating({ colonyId: c.colony?.id })} aria-label={c.colony ? `Add agent to ${c.colony.name}` : 'Add agent'}>
-                        <svg className="ghost-hex" viewBox="0 0 100 115" preserveAspectRatio="none" aria-hidden><polygon points="50,2 98,29 98,86 50,113 2,86 2,29" /></svg><span className="label"><Plus size={18} />Add agent</span>
+                      <button key={c.key + 'g' + i} className="cell ghost" style={style} onClick={() => setCreating({ colonyId: c.colony?.id })} aria-label={c.colony ? t('colony.addTo', { name: c.colony.name }) : t('colony.addAgent')}>
+                        <svg className="ghost-hex" viewBox="0 0 100 115" preserveAspectRatio="none" aria-hidden><polygon points="50,2 98,29 98,86 50,113 2,86 2,29" /></svg><span className="label"><Plus size={18} />{t('colony.addAgent')}</span>
                       </button>
                     );
                     return (
                       <button key={a.id} className={`cell fill ${a.role === 'orchestrator' ? 'queen' : ''} ${a.status === 'running' ? 'running' : ''} ${focus && !related.has(a.id) ? 'dim' : ''} ${focus && related.has(a.id) && a.id !== focus ? 'linked' : ''}`}
                         onMouseEnter={() => setHover(a.id)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(a.id)} onBlur={() => setHover(null)}
                         style={{ ...style, ['--c' as any]: PROVIDERS[a.provider].color }} aria-pressed={sel === a.id}
-                        onClick={() => setSel(a.id === sel ? null : a.id)} aria-label={`${a.name}, ${a.role}, ${PROVIDERS[a.provider].short}, ${a.status}`}>
+                        onClick={() => setSel(a.id === sel ? null : a.id)} aria-label={`${a.name}, ${t(`role.${a.role}`)}, ${PROVIDERS[a.provider].short}, ${t(`status.${a.status}`)}`}>
                         <span className="shape" />
                         <span className="label"><b>{a.name}</b><small>{PROVIDERS[a.provider].short}</small></span>
                         {a.status !== 'idle' && <span className={`pip ${a.status === 'error' ? 'err' : ''}`} />}
                         {(a.role === 'orchestrator' ? a.worker_ids.length > 0 : ups(a.id).length > 0) && (
-                          <span className="ltag" title={a.role === 'orchestrator' ? `Delegates to ${a.worker_ids.length}` : `Connected to ${ups(a.id).map((q) => q.name).join(', ')}`}>
+                          <span className="ltag" title={a.role === 'orchestrator' ? t('colony.delegatesTo', { count: a.worker_ids.length }) : t('colony.connectedTo', { names: ups(a.id).map((q) => q.name).join(', ') })}>
                             {a.role === 'orchestrator' ? `↓ ${a.worker_ids.length}` : `↑ ${ups(a.id).length === 1 ? ups(a.id)[0].name : ups(a.id).length}`}
                           </span>
                         )}
@@ -206,36 +208,36 @@ export default function Colony() {
           )}
           <div className="comb-legend">
             {(Object.keys(PROVIDERS) as (keyof typeof PROVIDERS)[]).map((p) => <span key={p} className="pbadge" style={{ '--c': PROVIDERS[p].color } as any}><i />{PROVIDERS[p].short}</span>)}
-            <span className="pbadge" style={{ '--c': 'var(--honey)' } as any}><i />Orchestrator</span>
+            <span className="pbadge" style={{ '--c': 'var(--honey)' } as any}><i />{t('role.orchestrator')}</span>
           </div>
         </div>
 
         <aside className="side">
           {selected ? (
             <div className="card card-pad col" style={{ gap: 14, position: 'relative' }}>
-              <button className="btn ghost icon sm card-corner" onClick={() => setEditingAgent(selected.id)} aria-label={`Settings for ${selected.name}`} title="Agent settings"><SlidersHorizontal size={17} /></button>
+              <button className="btn ghost icon sm card-corner" onClick={() => setEditingAgent(selected.id)} aria-label={t('colony.settingsFor', { name: selected.name })} title={t('colony.agentSettings')}><SlidersHorizontal size={17} /></button>
               <div className="row gap-l" style={{ paddingRight: 30 }}><Hex agent={selected} size="lg" /><div className="grow"><h2 style={{ fontSize: 22 }}>{selected.name}</h2><div className="row gap-s wrap" style={{ marginTop: 6 }}><RoleChip role={selected.role} /><StatusChip status={selected.status} /></div></div></div>
               {selected.description && <p style={{ margin: 0 }}>{selected.description}</p>}
               <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 14px', fontSize: 13.5 }}>
-                <dt className="muted">Provider</dt><dd style={{ margin: 0 }}><ProviderBadge provider={selected.provider} /></dd>
-                <dt className="muted">Model</dt><dd style={{ margin: 0 }}>{selected.model || 'CLI default'}</dd>
-                <dt className="muted">Folder</dt><dd className="mono" style={{ margin: 0, wordBreak: 'break-all' }}>{shortPath(selected.effective.cwd)}{selected.effective.inherited.includes('cwd') && <span className="muted"> · from colony</span>}</dd>
-                <dt className="muted">Session</dt><dd className="mono" style={{ margin: 0 }}>{selected.session_id ? selected.session_id.slice(0, 13) + '…' : 'none yet'}</dd>
-                {selected.role === 'orchestrator' && (<><dt className="muted">Team</dt><dd style={{ margin: 0 }}>{selected.worker_ids.length ? selected.worker_ids.map(name).join(', ') : 'No workers connected'}</dd></>)}
+                <dt className="muted">{t('form.provider')}</dt><dd style={{ margin: 0 }}><ProviderBadge provider={selected.provider} /></dd>
+                <dt className="muted">{t('field.model')}</dt><dd style={{ margin: 0 }}>{selected.model || t('model.cliDefault')}</dd>
+                <dt className="muted">{t('colony.folder')}</dt><dd className="mono" style={{ margin: 0, wordBreak: 'break-all' }}>{shortPath(selected.effective.cwd)}{selected.effective.inherited.includes('cwd') && <span className="muted"> · {t('colony.fromColony')}</span>}</dd>
+                <dt className="muted">{t('colony.session')}</dt><dd className="mono" style={{ margin: 0 }}>{selected.session_id ? selected.session_id.slice(0, 13) + '…' : t('colony.noSession')}</dd>
+                {selected.role === 'orchestrator' && (<><dt className="muted">{t('form.team')}</dt><dd style={{ margin: 0 }}>{selected.worker_ids.length ? selected.worker_ids.map(name).join(', ') : t('colony.noWorkers')}</dd></>)}
               </dl>
-              <div className="field"><label>Colony</label>
+              <div className="field"><label>{t('form.colony')}</label>
                 <select className="select" value={selColony?.id ?? ''} onChange={(e) => void moveTo(selected, e.target.value)}>
-                  <option value="">No colony</option>{colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  <option value="">{t('common.noColony')}</option>{colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <Link className="btn primary" href={`/agents/${selected.id}`}>Open chat <ArrowRight size={16} /></Link>
+              <Link className="btn primary" href={`/agents/${selected.id}`}>{t('colony.openChat')} <ArrowRight size={16} /></Link>
             </div>
           ) : (
-            <div className="card card-pad"><div className="eyebrow">How to read this</div><p style={{ margin: '8px 0 0' }} className="muted small">Each outlined area is a colony. Select a cell to inspect an agent. Honey lines and tags connect an orchestrator (↓ number of workers) to the workers it can delegate to (↑ its name) — only those directly connected. Hover an agent to highlight its connections; a moving line means a task is running.</p></div>
+            <div className="card card-pad"><div className="eyebrow">{t('colony.howTitle')}</div><p style={{ margin: '8px 0 0' }} className="muted small">{t('colony.howBody')}</p></div>
           )}
           <div className="card card-pad">
-            <div className="row" style={{ marginBottom: 6 }}><div className="eyebrow grow">Recent delegations</div></div>
-            {feed.length === 0 ? <p className="muted small" style={{ margin: 0 }}>When an orchestrator hands a task to a worker, it shows up here.</p> :
+            <div className="row" style={{ marginBottom: 6 }}><div className="eyebrow grow">{t('colony.recent')}</div></div>
+            {feed.length === 0 ? <p className="muted small" style={{ margin: 0 }}>{t('colony.recentEmpty')}</p> :
               feed.slice(0, 6).map((d) => (
                 <div key={d.id} className="feed-item">
                   <i className={`dot ${d.status === 'running' ? 'run' : d.status === 'done' ? 'ok' : 'err'}`} style={{ marginTop: 7 }} />

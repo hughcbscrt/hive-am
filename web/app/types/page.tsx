@@ -7,11 +7,14 @@ import { PROVIDERS } from '@/lib/meta';
 import type { AgentType, Permission, Provider, Role } from '@/lib/types';
 import { Drawer, Field, Hex, ModelField, Modal, PermissionField, ProviderPicker, RoleChip, Segmented, SkillPicker, useToast } from '@/components/ui';
 import { NewAgentDrawer } from '@/components/NewAgentDrawer';
+import { useI18n } from '@/lib/i18n';
+import { fmtNum } from '@/lib/format';
 
 interface Draft { id?: string; name: string; description: string; role: Role; provider: Provider; model: string; system_prompt: string; permission: Permission; skill_ids: string[] }
 const blank: Draft = { name: '', description: '', role: 'worker', provider: 'claude', model: '', system_prompt: '', permission: 'acceptEdits', skill_ids: [] };
 
 export default function Types() {
+  const { t } = useI18n();
   const { types, agents, skills, providers, refresh, ready } = useHive();
   const toast = useToast();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -21,35 +24,35 @@ export default function Types() {
 
   const save = async () => {
     if (!draft) return;
-    if (!draft.name.trim()) { setErr('Give the type a name.'); return; }
+    if (!draft.name.trim()) { setErr(t('types.err.name')); return; }
     try {
       if (draft.id) await api.patch(`/types/${draft.id}`, draft); else await api.post('/types', draft);
-      await refresh(['types']); toast(draft.id ? 'Type updated' : 'Type created'); setDraft(null); setErr('');
-    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save'); }
+      await refresh(['types']); toast(draft.id ? t('types.updated') : t('types.created')); setDraft(null); setErr('');
+    } catch (e) { setErr(e instanceof Error ? e.message : t('edit.saveFailed')); }
   };
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => d && { ...d, [k]: v });
 
   return (
     <div className="page">
       <div className="page-head">
-        <div><h1>Agent types</h1><p>Reusable blueprints: provider, model, prompt, permissions and skills. Create an agent from a type in two clicks.</p></div>
-        <button className="btn primary" onClick={() => { setDraft(blank); setErr(''); }}><Plus size={16} />New type</button>
+        <div><h1>{t('nav.types')}</h1><p>{t('types.subtitle')}</p></div>
+        <button className="btn primary" onClick={() => { setDraft(blank); setErr(''); }}><Plus size={16} />{t('types.new')}</button>
       </div>
       {ready && !types.length ? (
-        <div className="empty"><h3>No types yet</h3><p>Define a “Reviewer” or “Builder” once, then spin up as many agents from it as you need.</p><button className="btn primary" onClick={() => setDraft(blank)}><Plus size={16} />Create a type</button></div>
+        <div className="empty"><h3>{t('types.empty.title')}</h3><p>{t('types.empty.body')}</p><button className="btn primary" onClick={() => setDraft(blank)}><Plus size={16} />{t('types.empty.create')}</button></div>
       ) : (
         <div className="typegrid">
-          {types.map((t) => {
-            const n = agents.filter((a) => a.type_id === t.id).length;
+          {types.map((ty) => {
+            const n = agents.filter((a) => a.type_id === ty.id).length;
             return (
-              <div key={t.id} className="card typecard">
-                <div className="row gap-l"><Hex color={PROVIDERS[t.provider].color} queen={t.role === 'orchestrator'} label={t.name.slice(0, 2).toUpperCase()} /><div className="grow"><h3 style={{ fontSize: 19 }}>{t.name}</h3><div className="row gap-s" style={{ marginTop: 4 }}><RoleChip role={t.role} /></div></div></div>
-                <p className="muted small" style={{ margin: 0, minHeight: 40 }}>{t.description || 'No description.'}</p>
-                <div className="row gap-s wrap"><span className="chip">{PROVIDERS[t.provider].label}</span><span className="chip">{t.model || 'default model'}</span><span className="chip">{t.skill_ids.length} skills</span></div>
+              <div key={ty.id} className="card typecard">
+                <div className="row gap-l"><Hex color={PROVIDERS[ty.provider].color} queen={ty.role === 'orchestrator'} label={ty.name.slice(0, 2).toUpperCase()} /><div className="grow"><h3 style={{ fontSize: 19 }}>{ty.name}</h3><div className="row gap-s" style={{ marginTop: 4 }}><RoleChip role={ty.role} /></div></div></div>
+                <p className="muted small" style={{ margin: 0, minHeight: 40 }}>{ty.description || t('types.noDescription')}</p>
+                <div className="row gap-s wrap"><span className="chip">{PROVIDERS[ty.provider].label}</span><span className="chip">{ty.model || t('types.defaultModel')}</span><span className="chip">{t('types.skillsCount', { count: ty.skill_ids.length })}</span></div>
                 <div className="row" style={{ marginTop: 4 }}>
-                  <span className="muted small grow">{n} {n === 1 ? 'agent' : 'agents'} use this</span>
-                  <button className="btn sm" onClick={() => { setDraft({ ...t }); setErr(''); }}>Edit</button>
-                  <button className="btn sm primary" onClick={() => setSpawn(t.id)}>Create agent</button>
+                  <span className="muted small grow">{t('types.usedBy', { count: n })}</span>
+                  <button className="btn sm" onClick={() => { setDraft({ ...ty }); setErr(''); }}>{t('common.edit')}</button>
+                  <button className="btn sm primary" onClick={() => setSpawn(ty.id)}>{t('newAgent.create')}</button>
                 </div>
               </div>
             );
@@ -58,23 +61,23 @@ export default function Types() {
       )}
 
       {draft && (
-        <Drawer title={draft.id ? `Edit ${draft.name || 'type'}` : 'New agent type'} subtitle="Agents created from this type start with these values. Existing agents are not changed." onClose={() => setDraft(null)}
-          footer={<>{draft.id && <button className="btn danger" style={{ marginRight: 'auto' }} onClick={() => setDel(types.find((t) => t.id === draft.id) ?? null)}><Trash2 size={15} />Delete</button>}<button className="btn ghost" onClick={() => setDraft(null)}>Cancel</button><button className="btn primary" onClick={save}>{draft.id ? 'Save type' : 'Create type'}</button></>}>
-          <Field label="Name" error={err}><input className="input" value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Reviewer" autoFocus /></Field>
-          <Field label="Description" hint="Shown when picking a type."><input className="input" value={draft.description} onChange={(e) => set('description', e.target.value)} /></Field>
-          <Field label="Role"><Segmented value={draft.role} onChange={(v) => set('role', v)} options={[{ id: 'worker', label: 'Worker' }, { id: 'orchestrator', label: 'Orchestrator' }]} /></Field>
-          <Field label="Provider"><ProviderPicker value={draft.provider} onChange={(p) => setDraft({ ...draft, provider: p, model: '' })} providers={providers} /></Field>
+        <Drawer title={draft.id ? t('types.editTitle', { name: draft.name || t('types.typeWord') }) : t('types.newTitle')} subtitle={t('types.drawerSubtitle')} onClose={() => setDraft(null)}
+          footer={<>{draft.id && <button className="btn danger" style={{ marginRight: 'auto' }} onClick={() => setDel(types.find((ty) => ty.id === draft.id) ?? null)}><Trash2 size={15} />{t('common.delete')}</button>}<button className="btn ghost" onClick={() => setDraft(null)}>{t('common.cancel')}</button><button className="btn primary" onClick={save}>{draft.id ? t('types.save') : t('types.create')}</button></>}>
+          <Field label={t('form.name')} error={err}><input className="input" value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder={t('types.name.placeholder')} autoFocus /></Field>
+          <Field label={t('types.description')} hint={t('types.description.hint')}><input className="input" value={draft.description} onChange={(e) => set('description', e.target.value)} /></Field>
+          <Field label={t('form.role')}><Segmented value={draft.role} onChange={(v) => set('role', v)} options={[{ id: 'worker', label: t('role.worker') }, { id: 'orchestrator', label: t('role.orchestrator') }]} /></Field>
+          <Field label={t('form.provider')}><ProviderPicker value={draft.provider} onChange={(p) => setDraft({ ...draft, provider: p, model: '' })} providers={providers} /></Field>
           <ModelField provider={draft.provider} value={draft.model} onChange={(v) => set('model', v)} />
           <PermissionField value={draft.permission} onChange={(v) => set('permission', v)} />
-          <Field label="System prompt" hint={`${draft.system_prompt.length.toLocaleString()} characters`}><textarea className="textarea mono" rows={9} value={draft.system_prompt} onChange={(e) => set('system_prompt', e.target.value)} spellCheck={false} /></Field>
-          <Field label="Skills"><SkillPicker skills={skills} value={draft.skill_ids} onChange={(v) => set('skill_ids', v)} /></Field>
+          <Field label={t('form.systemPrompt')} hint={t('types.chars', { count: draft.system_prompt.length, n: fmtNum(draft.system_prompt.length) })}><textarea className="textarea mono" rows={9} value={draft.system_prompt} onChange={(e) => set('system_prompt', e.target.value)} spellCheck={false} /></Field>
+          <Field label={t('form.skills')}><SkillPicker skills={skills} value={draft.skill_ids} onChange={(v) => set('skill_ids', v)} /></Field>
         </Drawer>
       )}
       {del && (
-        <Modal title={`Delete ${del.name}?`} onClose={() => setDel(null)}>
-          <p style={{ margin: 0 }} className="muted">Agents already created from it keep their settings and simply lose the link.</p>
-          <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn ghost" onClick={() => setDel(null)}>Keep type</button>
-            <button className="btn danger" onClick={async () => { await api.del(`/types/${del.id}`); await refresh(['types', 'agents']); setDel(null); setDraft(null); toast('Type deleted'); }}>Delete type</button></div>
+        <Modal title={t('types.deleteTitle', { name: del.name })} onClose={() => setDel(null)}>
+          <p style={{ margin: 0 }} className="muted">{t('types.deleteBody')}</p>
+          <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn ghost" onClick={() => setDel(null)}>{t('types.keep')}</button>
+            <button className="btn danger" onClick={async () => { await api.del(`/types/${del.id}`); await refresh(['types', 'agents']); setDel(null); setDraft(null); toast(t('types.deleted')); }}>{t('types.delete')}</button></div>
         </Modal>
       )}
       {spawn && <NewAgentDrawer presetTypeId={spawn} onClose={() => setSpawn(null)} />}
