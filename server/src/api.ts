@@ -1,0 +1,271 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { readdirSync, statSync, existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { agents, colonies, dispatches, resolved, skills, types } from './db.js';
+import { dispatch, liveTurn, notifyAgentsChanged, queueDepth, sendTurn, stopAgent } from './runtime.js';
+import { readHistory } from './history/index.js';
+import { listModels } from './models.js';
+import type { Provider } from './types.js';
+import { sessionStats } from './stats.js';
+
+const exec = promisify(execFile);
+const PROVIDERS: Record<Provider, { bin: string; label: string }> = {
+  claude: { bin: 'claude', label: 'Claude Code' },
+  opencode: { bin: 'opencode', label: 'OpenCode' },
+  kiro: { bin: 'kiro-cli', label: 'Kiro' },
+};
+
+class HttpError extends Error { constructor(public status: number, msg: string) { super(msg); } }
+const bad = (m: string) => new HttpError(400, m);
+const notFound = (m = 'Not found') => new HttpError(404, m);
+
+async function body<T = any>(req: IncomingMessage): Promise<T> {
+  const chunks: Buffer[] = [];
+  for await (const c of req) chunks.push(c as Buffer);
+  if (!chunks.length) return {} as T;
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw bad('Request body is not valid JSON'); }
+}
+
+function json(res: ServerResponse, status: number, data: unknown) {
+  res.writeHead(status, { 'content-type': 'application/json' });
+  res.end(JSON.stringify(data));
+}
+
+let providerCache: { at: number; data: unknown } | null = null;
+async function providerStatus() {
+  if (providerCache && Date.now() - providerCache.at < 60_000) return providerCache.data;
+  const data = await Promise.all((Object.keys(PROVIDERS) as Provider[]).map(async (id) => {
+    try {
+      const { stdout } = await exec(PROVIDERS[id].bin, ['--version'], { timeout: 8000 });
+      return { id, label: PROVIDERS[id].label, installed: true, version: stdout.trim().split('\n')[0].slice(0, 60) };
+    } catch { return { id, label: PROVIDERS[id].label, installed: false, version: '' }; }
+  }));
+  providerCache = { at: Date.now(), data };
+  return data;
+}
+
+function validateAgentInput(p: any, partial = false) {
+  if (!partial || p.name !== undefined) { if (!String(p.name ?? '').trim()) throw bad('Name is required'); }
+  if (p.provider !== undefined && !(p.provider in PROVIDERS)) throw bad(`Unknown provider "${p.provider}"`);
+  if (p.role !== undefined && !['orchestrator', 'worker'].includes(p.role)) throw bad('Role must be orchestrator or worker');
+  if (p.cwd && !existsSync(p.cwd)) throw bad(`Folder does not exist: ${p.cwd}`);
+  if (p.colony_id && !colonies.get(p.colony_id)) throw bad('That colony no longer exists');
+}
+
+type Handler = (ctx: { req: IncomingMessage; res: ServerResponse; params: string[]; url: URL }) => Promise<unknown> | unknown;
+const routes: [string, RegExp, Handler][] = [];
+const route = (method: string, path: string, h: Handler) =>
+  routes.push([method, new RegExp('^' + path.replace(/:[^/]+/g, '([^/]+)') + '$'), h]);
+
+route('GET', '/api/health', () => ({ ok: true }));
+route('GET', '/api/providers', () => providerStatus());
+route('GET', '/api/providers/:p/models', async ({ params }) => {
+  if (!(params[0] in PROVIDERS)) throw notFound('Unknown provider');
+  return listModels(params[0] as Provider);
+});
+
+// ---- agents ----
+route('GET', '/api/agents', () => agents.list().map((a) => ({ ...a, queued: queueDepth(a.id), live: !!liveTurn(a.id) })));
+route('POST', '/api/agents', async ({ req }) => {
+  const p = await body(req);
+  validateAgentInput(p);
+  if (agents.byName(p.name)) throw bad(`An agent named "${p.name}" already exists`);
+  const a = agents.create({ ...p, name: p.name.trim(), cwd: p.cwd ?? '' });
+  if (!a.effective.cwd) { agents.remove(a.id); throw bad('Choose a working folder, or put the agent in a colony that provides one.'); }
+  notifyAgentsChanged();
+  return a;
+});
+route('GET', '/api/agents/:id', ({ params }) => agents.get(params[0]) ?? (() => { throw notFound('Agent not found'); })());
+route('PATCH', '/api/agents/:id', async ({ req, params }) => {
+  const p = await body(req);
+  validateAgentInput(p, true);
+  const cur = agents.get(params[0]); if (!cur) throw notFound('Agent not found');
+  if (p.name && p.name.toLowerCase() !== cur.name.toLowerCase() && agents.byName(p.name)) throw bad(`An agent named "${p.name}" already exists`);
+  // Changing provider invalidates the native session pointer. (A changed folder is detected when the next turn starts.)
+  const a = agents.update(params[0], p)!;
+  if (p.provider && p.provider !== cur.provider) agents.setSession(a, null);
+  if (!agents.get(a.id)!.effective.cwd) throw bad('Choose a working folder, or keep inheriting the colony’s folder.');
+  notifyAgentsChanged();
+  return agents.get(params[0]);
+});
+route('DELETE', '/api/agents/:id', ({ params }) => {
+  stopAgent(params[0]);
+  if (!agents.remove(params[0])) throw notFound('Agent not found');
+  notifyAgentsChanged();
+  return { ok: true };
+});
+route('POST', '/api/agents/:id/messages', async ({ req, params }) => {
+  const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');
+  const { prompt } = await body(req);
+  if (!String(prompt ?? '').trim()) throw bad('Message is empty');
+  void sendTurn(a.id, String(prompt)).catch((e) => console.error('[turn]', e));
+  return { accepted: true };
+});
+route('POST', '/api/agents/:id/stop', ({ params }) => ({ stopped: stopAgent(params[0]) }));
+route('POST', '/api/agents/:id/new-session', ({ params }) => {
+  const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');
+  stopAgent(a.id); agents.setSession(a, null); notifyAgentsChanged();
+  return { ok: true };
+});
+route('POST', '/api/agents/:id/resume-session', async ({ req, params }) => {
+  const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');
+  const { session_id } = await body(req);
+  if (!agents.sessions(a.id).some((s) => s.session_id === session_id && s.kind !== 'delegation')) throw bad('Only the agent’s own conversations can be made current. Delegated sessions are read-only.');
+  agents.setSession(a, session_id); notifyAgentsChanged();
+  return { ok: true };
+});
+route('GET', '/api/agents/:id/history', ({ params, url }) => {
+  const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');
+  const sid = url.searchParams.get('session') ?? a.session_id;
+  if (sid && sid !== a.session_id && !agents.sessions(a.id).some((s) => s.session_id === sid)) throw bad('That session does not belong to this agent');
+  return { session_id: sid, messages: readHistory(resolved(a), sid) };
+});
+route('GET', '/api/agents/:id/stats', ({ params, url }) => {
+  const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');
+  const sid = url.searchParams.get('session') ?? a.session_id;
+  if (sid && sid !== a.session_id && !agents.sessions(a.id).some((s) => s.session_id === sid)) throw bad('That session does not belong to this agent');
+  return sessionStats(readHistory(resolved(a), sid));
+});
+route('GET', '/api/agents/:id/live', ({ params }) => liveTurn(params[0]));
+route('GET', '/api/agents/:id/sessions', ({ params }) => agents.sessions(params[0]));
+
+// ---- sessions across all managed agents ----
+route('GET', '/api/sessions', () => {
+  const byAgent = new Map(agents.list().map((a) => [a.id, a]));
+  return agents.allSessions().map((s) => {
+    const a = byAgent.get(s.agent_id)!;
+    const msgs = readHistory({ provider: s.provider, cwd: s.cwd, session_id: s.session_id }, s.session_id);
+    const first = msgs.find((m) => m.role === 'user')?.blocks.find((b) => b.type === 'text');
+    const st = sessionStats(msgs);
+    return {
+      ...s, current: a.session_id === s.session_id, message_count: msgs.length,
+      usage: st.usage, cost: st.cost, tool_calls: st.toolCalls, model: st.models[0]?.model ?? null,
+      preview: first && first.type === 'text' ? first.text.slice(0, 160) : '',
+    };
+  });
+});
+
+// ---- skills ----
+route('GET', '/api/skills', () => skills.list());
+route('GET', '/api/skills/usage', () => skills.usage());
+route('POST', '/api/skills', async ({ req }) => {
+  const p = await body(req);
+  if (!String(p.name ?? '').trim()) throw bad('Name is required');
+  try { return skills.create({ name: p.name.trim(), description: p.description ?? '', content: p.content ?? '' }); }
+  catch { throw bad(`A skill named "${p.name}" already exists`); }
+});
+route('PATCH', '/api/skills/:id', async ({ req, params }) => {
+  const p = await body(req);
+  try { return skills.update(params[0], p) ?? (() => { throw notFound('Skill not found'); })(); }
+  catch (e) { if (e instanceof HttpError) throw e; throw bad(`A skill named "${p.name}" already exists`); }
+});
+route('DELETE', '/api/skills/:id', ({ params }) => { if (!skills.remove(params[0])) throw notFound('Skill not found'); return { ok: true }; });
+
+// ---- agent types ----
+route('GET', '/api/types', () => types.list());
+route('POST', '/api/types', async ({ req }) => {
+  const p = await body(req);
+  if (!String(p.name ?? '').trim()) throw bad('Name is required');
+  if (!(p.provider in PROVIDERS)) throw bad('Pick a provider');
+  try { return types.create({ ...p, name: p.name.trim() }); } catch { throw bad(`A type named "${p.name}" already exists`); }
+});
+route('PATCH', '/api/types/:id', async ({ req, params }) => {
+  const t = types.update(params[0], await body(req)); if (!t) throw notFound('Type not found'); return t;
+});
+route('DELETE', '/api/types/:id', ({ params }) => { if (!types.remove(params[0])) throw notFound('Type not found'); return { ok: true }; });
+route('POST', '/api/types/:id/spawn', async ({ req, params }) => {
+  const t = types.get(params[0]); if (!t) throw notFound('Type not found');
+  const p = await body(req);
+  validateAgentInput({ name: p.name, cwd: p.cwd, colony_id: p.colony_id });
+  if (agents.byName(p.name)) throw bad(`An agent named "${p.name}" already exists`);
+  const a = agents.create({
+    name: p.name.trim(), description: p.description ?? t.description, role: t.role, type_id: t.id, provider: t.provider, model: t.model,
+    system_prompt: t.system_prompt, permission: t.permission, cwd: p.cwd ?? '', skill_ids: t.skill_ids, colony_id: p.colony_id ?? null,
+  });
+  if (!a.effective.cwd) { agents.remove(a.id); throw bad('Choose a working folder, or put the agent in a colony that provides one.'); }
+  notifyAgentsChanged();
+  return a;
+});
+
+// ---- colonies ----
+function validateColony(p: any, partial = false) {
+  if (!partial || p.name !== undefined) { if (!String(p.name ?? '').trim()) throw bad('Name is required'); }
+  if (p.cwd && !existsSync(p.cwd)) throw bad(`Folder does not exist: ${p.cwd}`);
+}
+route('GET', '/api/colonies', () => colonies.list());
+route('POST', '/api/colonies', async ({ req }) => {
+  const p = await body(req); validateColony(p);
+  if (colonies.list().some((c) => c.name.toLowerCase() === p.name.trim().toLowerCase())) throw bad(`A colony named "${p.name}" already exists`);
+  const c = colonies.create({ ...p, name: p.name.trim() });
+  notifyAgentsChanged();
+  return c;
+});
+route('PATCH', '/api/colonies/:id', async ({ req, params }) => {
+  const p = await body(req); validateColony(p, true);
+  const cur = colonies.get(params[0]); if (!cur) throw notFound('Colony not found');
+  if (p.name && p.name.toLowerCase() !== cur.name.toLowerCase() && colonies.list().some((c) => c.name.toLowerCase() === p.name.trim().toLowerCase())) throw bad(`A colony named "${p.name}" already exists`);
+  const c = colonies.update(params[0], p.name ? { ...p, name: p.name.trim() } : p)!;
+  notifyAgentsChanged();
+  return c;
+});
+route('DELETE', '/api/colonies/:id', ({ params }) => {
+  if (!colonies.remove(params[0])) throw notFound('Colony not found');
+  notifyAgentsChanged();
+  return { ok: true };
+});
+
+// ---- orchestration ----
+route('GET', '/api/orchestrators/:id/workers', ({ params }) => {
+  const o = agents.get(params[0]); if (!o) throw notFound('Agent not found');
+  return o.worker_ids.map((id) => agents.get(id)).filter(Boolean).map((w) => ({ name: w!.name, role: w!.role, description: w!.description, provider: w!.provider, busy: !!liveTurn(w!.id) }));
+});
+route('PUT', '/api/orchestrators/:id/workers', async ({ req, params }) => {
+  const o = agents.get(params[0]); if (!o) throw notFound('Agent not found');
+  if (o.role !== 'orchestrator') throw bad('Only orchestrators can have subagents');
+  const { worker_ids } = await body(req);
+  agents.setWorkers(o.id, worker_ids ?? []); notifyAgentsChanged();
+  return agents.get(o.id);
+});
+route('POST', '/api/dispatch', async ({ req }) => {
+  const { from, agent, task } = await body(req);
+  if (!from || !agent || !task) throw bad('from, agent and task are required');
+  try { return await dispatch(from, agent, task); } catch (e) { throw bad(e instanceof Error ? e.message : String(e)); }
+});
+route('GET', '/api/dispatches', () => dispatches.recent());
+
+// ---- folder picker ----
+route('GET', '/api/fs/dirs', ({ url }) => {
+  const p = resolve(url.searchParams.get('path') || homedir());
+  if (!existsSync(p) || !statSync(p).isDirectory()) throw bad('Not a folder');
+  let entries: string[] = [];
+  try {
+    entries = readdirSync(p, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && !d.name.startsWith('.') && d.name !== 'node_modules').map((d) => d.name).sort((a, b) => a.localeCompare(b));
+  } catch { /* unreadable */ }
+  return { path: p, parent: p === '/' ? null : dirname(p), dirs: entries.map((n) => ({ name: n, path: join(p, n) })) };
+});
+
+export async function handle(req: IncomingMessage, res: ServerResponse) {
+  res.setHeader('access-control-allow-origin', '*');
+  res.setHeader('access-control-allow-methods', 'GET,POST,PATCH,PUT,DELETE,OPTIONS');
+  res.setHeader('access-control-allow-headers', 'content-type');
+  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+  const url = new URL(req.url ?? '/', 'http://localhost');
+  for (const [m, re, h] of routes) {
+    if (m !== req.method) continue;
+    const match = re.exec(url.pathname);
+    if (!match) continue;
+    try {
+      const out = await h({ req, res, params: match.slice(1).map(decodeURIComponent), url });
+      return json(res, 200, out ?? null);
+    } catch (e) {
+      if (e instanceof HttpError) return json(res, e.status, { error: e.message });
+      console.error('[api]', e);
+      return json(res, 500, { error: 'Unexpected server error' });
+    }
+  }
+  json(res, 404, { error: 'No such route' });
+}
