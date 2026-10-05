@@ -11,6 +11,7 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 | CORS | `Access-Control-Allow-Origin: *`. Cualquier página que abras en tu navegador podría hacer peticiones a `http://127.0.0.1:4400`. Dado que la API permite ejecutar agentes con acceso a tu máquina, **no navegues sitios no confiables mientras hive-am esté en marcha** o restringe el origen (ver mejoras). |
 | Qué puede hacer un agente | Lo que permita su permiso y el CLI: `bypassPermissions` ejecuta cualquier comando sin preguntar; `acceptEdits` edita archivos libremente. Úsalos en carpetas de confianza. |
 | Explorador de carpetas | `GET /api/fs/dirs` lista subcarpetas de cualquier ruta legible. |
+| Explorador de cambios (git) | Solo lectura y limitado a la carpeta del agente; rechaza rutas fuera de ella (también por enlaces simbólicos) y cualquier ruta con `.git`. Detalle en el [documento 13](13-explorador-de-cambios-git.md#135-seguridad). |
 | Secretos | hive-am no guarda credenciales. Los CLIs usan su propia sesión. La base de datos contiene tus prompts y skills en texto plano. |
 | Lectores de historial | Validan los ids de sesión (Claude: `^[\w-]+$`; Kiro: UUID) y abren la base de OpenCode en solo lectura. |
 
@@ -43,6 +44,7 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 | 17 | **Mover agentes entre colonias** | Se hace con selectores y listas; no hay arrastrar y soltar en el panal. |
 | 18 | **`type_id` informativo** | Editar un tipo no actualiza a los agentes ya creados. |
 | 19 | **Parpadeo de idioma** | En la primera carga se ve brevemente el inglés base antes de aplicar el idioma guardado. |
+| 21 | **Explorador de cambios** | Diferencias contra `HEAD` sin resaltado de sintaxis; árbol recortado a 30 000 archivos ([documento 13](13-explorador-de-cambios-git.md#137-límites-conocidos)). |
 | 20 | **Contenido sin traducir** | Los nombres/descripciones creados por ti o por el seed, las instrucciones que reciben los agentes y los errores crudos de los CLIs se muestran como vienen (ver [documento 11](11-frontend.md#118-internacionalización-i18n)). |
 
 ## 12.3 Solución de problemas

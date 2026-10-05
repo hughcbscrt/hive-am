@@ -9,6 +9,8 @@ import { ago, shortPath } from '@/lib/meta';
 import { Chat } from '@/components/Chat';
 import { StatsBar } from '@/components/StatsBar';
 import { AgentSwitcher } from '@/components/AgentSwitcher';
+import { GitExplorer } from '@/components/GitExplorer';
+import { useGit } from '@/lib/useGit';
 import { AgentForm, draftFromAgent, validate, type AgentDraft } from '@/components/AgentForm';
 import { Hex, Modal, ProviderBadge, RoleChip, StatusChip, useToast } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
@@ -34,6 +36,13 @@ function Workspace({ id }: { id: string }) {
   const [viewing, setViewing] = useState<string | undefined>(undefined);
   const [confirm, setConfirm] = useState<'delete' | 'new' | null>(null);
   const [saving, setSaving] = useState(false);
+  const [view, setView] = useState<'chat' | 'changes'>('chat');
+  const [swCollapsed, setSwCollapsed] = useState(false);
+  useEffect(() => { try { setSwCollapsed(localStorage.getItem('hive-switcher-collapsed') === '1'); } catch { /* ignore */ } }, []);
+  const toggleSwitcher = () => setSwCollapsed((c) => { try { localStorage.setItem('hive-switcher-collapsed', c ? '0' : '1'); } catch { /* ignore */ } return !c; });
+  // Always loaded (cheap) so the tab can show how many files changed; the file tree loads when the tab opens.
+  const git = useGit(agent, view === 'changes');
+  const changedCount = git.status && git.status.isRepo ? git.status.changes.length : 0;
 
   useEffect(() => { try { setOpen(localStorage.getItem('hive-cfg-open') === '1'); } catch { /* ignore */ } }, []);
   const toggle = (v: boolean, tb?: 'config' | 'sessions') => { setOpen(v); if (tb) setTab(tb); try { localStorage.setItem('hive-cfg-open', v ? '1' : '0'); } catch { /* ignore */ } };
@@ -45,7 +54,7 @@ function Workspace({ id }: { id: string }) {
   const errors = draft ? validate(draft, agents, id, colonies) : {};
 
   if (!agent) return (
-    <div className="ws"><AgentSwitcher activeId={id} /><div className="page">{ready ? <div className="empty"><h3>{t('agent.missing.title')}</h3><p>{t('agent.missing.body')}</p><Link className="btn" href="/agents">{t('agent.missing.back')}</Link></div> : null}</div></div>
+    <div className={`ws ${swCollapsed ? 'sw-collapsed' : ''}`}><AgentSwitcher activeId={id} collapsed={swCollapsed} onToggle={toggleSwitcher} /><div className="page">{ready ? <div className="empty"><h3>{t('agent.missing.title')}</h3><p>{t('agent.missing.body')}</p><Link className="btn" href="/agents">{t('agent.missing.back')}</Link></div> : null}</div></div>
   );
 
   const save = async () => {
@@ -64,20 +73,28 @@ function Workspace({ id }: { id: string }) {
   const delegated = sessions.filter((s) => s.kind === 'delegation');
 
   return (
-    <div className={`ws ${open ? 'with-config' : ''}`}>
-      <AgentSwitcher activeId={id} />
+    <div className={`ws ${open ? 'with-config' : ''} ${swCollapsed ? 'sw-collapsed' : ''}`}>
+      <AgentSwitcher activeId={id} collapsed={swCollapsed} onToggle={toggleSwitcher} />
       <section className="ws-chat">
         <header className="ws-head">
           <Link href="/" className="btn ghost icon" aria-label={t('agent.backToColony')}><ArrowLeft size={18} /></Link>
           <Hex agent={agent} />
           <div className="grow"><h1>{agent.name}</h1><div className="row gap-s wrap" style={{ marginTop: 3 }}><RoleChip role={agent.role} /><ProviderBadge provider={agent.provider} /><span className="muted small">{agent.model || t('model.cliDefault')}</span><StatusChip status={agent.status} /></div></div>
+          <div className="seg" role="group" aria-label={t('git.tab.label')}>
+            <button type="button" aria-pressed={view === 'chat'} onClick={() => setView('chat')}>{t('git.tab.chat')}</button>
+            <button type="button" aria-pressed={view === 'changes'} onClick={() => setView('changes')}>{t('git.tab.changes')}{changedCount > 0 && <span className="tabcount">{changedCount}</span>}</button>
+          </div>
           {viewing && <button className="btn primary sm" onClick={() => resume(viewing)} disabled={sessions.find((s) => s.session_id === viewing)?.kind === 'delegation'}>{t('agent.makeCurrent')}</button>}
           {viewing && <button className="btn sm" onClick={() => setViewing(undefined)}>{t('agent.backToCurrent')}</button>}
           <button className="btn sm" onClick={() => setConfirm('new')} disabled={!agent.session_id || agent.status === 'running'}><RotateCcw size={14} />{t('agent.newConversation')}</button>
           <button className={`btn sm ${open ? 'primary' : ''}`} onClick={() => toggle(!open)} aria-expanded={open} aria-label={t('colony.agentSettings')}><SlidersHorizontal size={14} />{t('agent.settings')}{dirty && <i className="dot run" title={t('agent.unsaved')} />}</button>
         </header>
-        <StatsBar agent={agent} session={viewing} />
-        <Chat agent={agent} sessionOverride={viewing} />
+        {/* The chat stays mounted (just hidden) so a half-written message and the scroll position survive a visit to Changes. */}
+        <div className="chat-pane" hidden={view !== 'chat'}>
+          <StatsBar agent={agent} session={viewing} />
+          <Chat agent={agent} sessionOverride={viewing} />
+        </div>
+        {view === 'changes' && <GitExplorer agent={agent} git={git} />}
       </section>
 
       {open && (

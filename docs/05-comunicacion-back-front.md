@@ -67,6 +67,18 @@ Navegador ── WebSocket directo ──▶ ws://<hostname>:4400/ws
 |---|---|
 | `GET /api/sessions` | Todas las sesiones registradas, más `current`, `message_count`, `preview`, `usage`, `cost`, `tool_calls`, `model`. **Lee el historial de cada sesión** en cada llamada. |
 
+### Explorador de cambios (git, solo lectura)
+
+Ver el detalle en el [documento 13](13-explorador-de-cambios-git.md#134-api-solo-lectura).
+
+| Método y ruta | Respuesta |
+|---|---|
+| `GET /api/agents/:id/git/status` | Rama, último commit y lista de cambios de la carpeta efectiva del agente |
+| `GET /api/agents/:id/git/tree` | Todos los archivos (versionados + nuevos, sin ignorados) |
+| `GET /api/agents/:id/git/diff?path=&old=` | Diff unificado de un archivo contra `HEAD` |
+| `GET /api/agents/:id/git/file?path=` | Contenido de un archivo (o su versión de `HEAD` si fue borrado) |
+| `GET /api/agents/:id/git/raw?path=` | Bytes de una imagen para la vista previa |
+
 ### Skills
 
 | Método y ruta | Cuerpo | Respuesta |

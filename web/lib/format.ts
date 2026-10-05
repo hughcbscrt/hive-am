@@ -12,3 +12,9 @@ export function fmtDur(ms: number): string {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 export const totalTokens = (u?: { input: number; output: number; cacheRead: number; cacheWrite: number }) => (u ? u.input + u.output + u.cacheRead + u.cacheWrite : 0);
+
+export function fmtBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 10 * 1024 ? 1 : 0)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}

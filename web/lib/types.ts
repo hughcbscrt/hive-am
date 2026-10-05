@@ -57,3 +57,21 @@ export interface SessionRow {
   kind: 'direct' | 'delegation'; from_name: string | null; task: string | null;
 }
 export interface Dispatch { id: string; from_id: string; to_id: string; task: string; status: string; result: string | null; created_at: number; finished_at: number | null }
+
+// ---- read-only git explorer ----
+export type GitChangeStatus = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflict' | 'typechange';
+export interface GitChange {
+  path: string; oldPath?: string; status: GitChangeStatus; staged: boolean; unstaged: boolean;
+  additions: number | null; deletions: number | null; binary: boolean;
+}
+export type GitStatus =
+  | { isRepo: false; reason: 'no-git' | 'not-repo' | 'error'; message: string; cwd: string }
+  | {
+      isRepo: true; cwd: string; root: string; scope: string; branch: string | null; detached: boolean;
+      head: { sha: string; subject: string; when: string; author: string } | null;
+      upstream: { ahead: number; behind: number } | null;
+      changes: GitChange[]; truncated: boolean; generatedAt: number;
+    };
+export type GitTree = { isRepo: false; reason: string; message: string } | { isRepo: true; root: string; scope: string; files: string[]; truncated: boolean };
+export interface GitDiffResult { path: string; diff: string; truncated: boolean; binary: boolean }
+export interface GitFileResult { path: string; size: number; binary: boolean; truncated: boolean; content: string; source: 'worktree' | 'head' }
