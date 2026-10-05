@@ -1,3 +1,7 @@
+import { intlLocale } from './i18n/core';
+
+/** Plain number in the current language (thousands separators). */
+export const fmtNum = (n: number) => n.toLocaleString(intlLocale());
 export const fmtTokens = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e4 ? `${(n / 1e3).toFixed(1)}k` : n >= 1e3 ? `${(n / 1e3).toFixed(2)}k` : String(Math.round(n)));
 export const fmtCost = (c: number) => (c === 0 ? '$0' : c < 0.01 ? '<$0.01' : c < 1 ? `$${c.toFixed(3)}` : `$${c.toFixed(2)}`);
 export function fmtDur(ms: number): string {

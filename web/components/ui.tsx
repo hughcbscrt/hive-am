@@ -2,9 +2,9 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Check, ChevronLeft, Folder, X } from 'lucide-react';
 import { api } from '@/lib/api';
-import { PROVIDERS, initials } from '@/lib/meta';
+import { PROVIDERS, initials, permissions, providerBlurb } from '@/lib/meta';
+import { useI18n } from '@/lib/i18n';
 import type { Agent, ModelInfo, Permission, Provider, ProviderInfo, Skill } from '@/lib/types';
-import { PERMISSIONS } from '@/lib/meta';
 
 /* ---------- toasts ---------- */
 const ToastCtx = createContext<(msg: string, kind?: 'ok' | 'err') => void>(() => undefined);
@@ -36,16 +36,18 @@ export function ProviderBadge({ provider }: { provider: Provider }) {
   return <span className="pbadge" style={{ '--c': PROVIDERS[provider].color } as any}><i />{PROVIDERS[provider].short}</span>;
 }
 export function StatusChip({ status }: { status: Agent['status'] }) {
-  const map = { idle: ['Idle', ''], running: ['Working', 'run'], error: ['Needs attention', 'err'] } as const;
-  const [t, c] = map[status];
-  return <span className="chip"><i className={`dot ${c}`} />{t}</span>;
+  const { t } = useI18n();
+  const dot = { idle: '', running: 'run', error: 'err' }[status];
+  return <span className="chip"><i className={`dot ${dot}`} />{t(`status.${status}`)}</span>;
 }
 export function RoleChip({ role }: { role: Agent['role'] }) {
-  return role === 'orchestrator' ? <span className="chip honey">Orchestrator</span> : <span className="chip">Worker</span>;
+  const { t } = useI18n();
+  return role === 'orchestrator' ? <span className="chip honey">{t('role.orchestrator')}</span> : <span className="chip">{t('role.worker')}</span>;
 }
 
 /* ---------- containers ---------- */
 export function Drawer({ title, subtitle, onClose, children, footer }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
+  const { t } = useI18n();
   useEffect(() => { const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [onClose]);
   return (
     <>
@@ -53,7 +55,7 @@ export function Drawer({ title, subtitle, onClose, children, footer }: { title: 
       <aside className="drawer" role="dialog" aria-modal aria-label={title}>
         <header>
           <div className="grow"><h2>{title}</h2>{subtitle && <p className="muted small" style={{ margin: '4px 0 0' }}>{subtitle}</p>}</div>
-          <button className="btn ghost icon" onClick={onClose} aria-label="Close"><X size={18} /></button>
+          <button className="btn ghost icon" onClick={onClose} aria-label={t('common.close')}><X size={18} /></button>
         </header>
         <div className="body">{children}</div>
         {footer && <footer>{footer}</footer>}
@@ -74,6 +76,7 @@ export function Segmented<T extends string>({ value, onChange, options }: { valu
 
 /* ---------- domain pickers ---------- */
 export function ProviderPicker({ value, onChange, providers }: { value: Provider; onChange: (p: Provider) => void; providers: ProviderInfo[] }) {
+  const { t } = useI18n();
   return (
     <div className="pcards">
       {(Object.keys(PROVIDERS) as Provider[]).map((p) => {
@@ -81,8 +84,8 @@ export function ProviderPicker({ value, onChange, providers }: { value: Provider
         return (
           <button key={p} type="button" className="pcard" aria-pressed={value === p} style={{ '--c': PROVIDERS[p].color } as any} onClick={() => onChange(p)}>
             <b>{PROVIDERS[p].label}</b>
-            <span>{PROVIDERS[p].blurb}</span>
-            {info && <span className="tag" style={{ color: info.installed ? 'var(--ok)' : 'var(--err)' }}>{info.installed ? '● installed' : '● not found'}</span>}
+            <span>{providerBlurb(p)}</span>
+            {info && <span className="tag" style={{ color: info.installed ? 'var(--ok)' : 'var(--err)' }}>{info.installed ? t('provider.installed') : t('provider.notFound')}</span>}
           </button>
         );
       })}
@@ -93,25 +96,29 @@ export function ProviderPicker({ value, onChange, providers }: { value: Provider
 export function ModelField({ provider, value, onChange }: { provider: Provider; value: string; onChange: (v: string) => void }) {
   const [models, setModels] = useState<ModelInfo[] | null>(null);
   useEffect(() => { setModels(null); api.get<ModelInfo[]>(`/providers/${provider}/models`).then(setModels).catch(() => setModels([])); }, [provider]);
+  const { t } = useI18n();
   const id = `models-${provider}`;
   return (
-    <Field label="Model" hint={models === null ? 'Loading the models this CLI offers…' : models.length ? 'Pick one, or type any model id. Leave empty to use the CLI’s default.' : 'Could not list models. Type a model id, or leave empty for the CLI’s default.'}>
-      <input className="input" list={id} value={value} onChange={(e) => onChange(e.target.value)} placeholder="CLI default" spellCheck={false} />
+    <Field label={t('field.model')} hint={models === null ? t('model.loading') : models.length ? t('model.pick') : t('model.none')}>
+      <input className="input" list={id} value={value} onChange={(e) => onChange(e.target.value)} placeholder={t('model.cliDefault')} spellCheck={false} />
       <datalist id={id}>{models?.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</datalist>
     </Field>
   );
 }
 
 export function PermissionField({ value, onChange }: { value: Permission; onChange: (v: Permission) => void }) {
+  const { t } = useI18n();
+  const list = permissions();
   return (
-    <Field label="What can it do?" hint={PERMISSIONS.find((p) => p.id === value)?.hint}>
-      <Segmented value={value} onChange={onChange} options={PERMISSIONS.map((p) => ({ id: p.id, label: p.label }))} />
+    <Field label={t('permission.title')} hint={list.find((p) => p.id === value)?.hint}>
+      <Segmented value={value} onChange={onChange} options={list.map((p) => ({ id: p.id, label: p.label }))} />
     </Field>
   );
 }
 
 export function SkillPicker({ skills, value, onChange }: { skills: Skill[]; value: string[]; onChange: (v: string[]) => void }) {
-  if (!skills.length) return <p className="hint">No skills yet. Create some in the Skills library, then attach them here.</p>;
+  const { t } = useI18n();
+  if (!skills.length) return <p className="hint">{t('skillPicker.empty')}</p>;
   const toggle = (id: string) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
   return (
     <div className="skillpick">
@@ -126,24 +133,25 @@ export function SkillPicker({ skills, value, onChange }: { skills: Skill[]; valu
 }
 
 export function FolderPicker({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [dir, setDir] = useState<{ path: string; parent: string | null; dirs: { name: string; path: string }[] } | null>(null);
   const load = useCallback((p?: string) => api.get<typeof dir>(`/fs/dirs${p ? `?path=${encodeURIComponent(p)}` : ''}`).then(setDir).catch(() => undefined), []);
   useEffect(() => { if (open) void load(value || undefined); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <Field label="Working folder" hint="The agent runs here, and each folder keeps its own native sessions." error={error}>
+    <Field label={t('field.folder')} hint={t('folder.hint')} error={error}>
       <div className="row gap-s">
-        <input className="input mono" value={value} onChange={(e) => onChange(e.target.value)} placeholder="/home/you/project" spellCheck={false} />
-        <button type="button" className="btn" onClick={() => setOpen((o) => !o)}><Folder size={16} />Browse</button>
+        <input className="input mono" value={value} onChange={(e) => onChange(e.target.value)} placeholder={t('folder.placeholder')} spellCheck={false} />
+        <button type="button" className="btn" onClick={() => setOpen((o) => !o)}><Folder size={16} />{t('folder.browse')}</button>
       </div>
       {open && dir && (
         <div className="picker">
           <div className="path">
-            <button type="button" className="btn ghost icon sm" disabled={!dir.parent} onClick={() => dir.parent && load(dir.parent)} aria-label="Up one folder"><ChevronLeft size={14} /></button>
+            <button type="button" className="btn ghost icon sm" disabled={!dir.parent} onClick={() => dir.parent && load(dir.parent)} aria-label={t('folder.up')}><ChevronLeft size={14} /></button>
             <span className="grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{dir.path}</span>
-            <button type="button" className="btn sm primary" onClick={() => { onChange(dir.path); setOpen(false); }}>Use this folder</button>
+            <button type="button" className="btn sm primary" onClick={() => { onChange(dir.path); setOpen(false); }}>{t('folder.use')}</button>
           </div>
-          <ul>{dir.dirs.length ? dir.dirs.map((d) => <li key={d.path}><button type="button" onClick={() => load(d.path)}><Folder size={15} className="muted" />{d.name}</button></li>) : <li className="hint" style={{ padding: 10 }}>No subfolders here.</li>}</ul>
+          <ul>{dir.dirs.length ? dir.dirs.map((d) => <li key={d.path}><button type="button" onClick={() => load(d.path)}><Folder size={15} className="muted" />{d.name}</button></li>) : <li className="hint" style={{ padding: 10 }}>{t('folder.empty')}</li>}</ul>
         </div>
       )}
     </Field>
