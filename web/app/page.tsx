@@ -10,6 +10,8 @@ import { Hex, ProviderBadge, RoleChip, StatusChip, useToast } from '@/components
 import { NewAgentDrawer } from '@/components/NewAgentDrawer';
 import { ColonyEditor } from '@/components/ColonyEditor';
 import { AgentEditDrawer } from '@/components/AgentEditDrawer';
+import { HelpPopover } from '@/components/HelpPopover';
+import { useAgentCard } from '@/components/AgentCard';
 import { useI18n } from '@/lib/i18n';
 
 const S = 74; // hex circumradius
@@ -70,6 +72,7 @@ export default function Colony() {
   const toast = useToast();
   const [sel, setSel] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
+  const card = useAgentCard();
   const [creating, setCreating] = useState<{ colonyId?: string } | null>(null);
   const [editing, setEditing] = useState<Colony | 'new' | null>(null);
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
@@ -109,7 +112,7 @@ export default function Colony() {
   return (
     <div className="page">
       <div className="page-head">
-        <div><h1>{t('nav.colony')}</h1><p>{t('colony.page.subtitle')}</p></div>
+        <div><div className="row gap-s"><h1>{t('nav.colony')}</h1><HelpPopover label={t('colony.helpLabel')} title={t('colony.howTitle')}>{t('colony.howBody')}</HelpPopover></div><p>{t('colony.page.subtitle')}</p></div>
         <div className="row">
           <button className="btn" onClick={() => setEditing('new')}><Plus size={16} />{t('colony.newTitle')}</button>
           <button className="btn primary" onClick={() => setCreating({})}><Plus size={16} />{t('newAgent.title')}</button>
@@ -166,7 +169,7 @@ export default function Colony() {
                     );
                     return (
                       <button key={a.id} className={`cell fill ${a.role === 'orchestrator' ? 'queen' : ''} ${a.status === 'running' ? 'running' : ''} ${focus && !related.has(a.id) ? 'dim' : ''} ${focus && related.has(a.id) && a.id !== focus ? 'linked' : ''}`}
-                        onMouseEnter={() => setHover(a.id)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(a.id)} onBlur={() => setHover(null)}
+                        onMouseEnter={(e) => { setHover(a.id); card.bind(a.id).onMouseEnter(e); }} onMouseLeave={() => { setHover(null); card.bind(a.id).onMouseLeave(); }} onFocus={(e) => { setHover(a.id); card.bind(a.id).onFocus(e); }} onBlur={() => { setHover(null); card.bind(a.id).onBlur(); }}
                         style={{ ...style, ['--c' as any]: PROVIDERS[a.provider].color }} aria-pressed={sel === a.id}
                         onClick={() => setSel(a.id === sel ? null : a.id)} aria-label={`${a.name}, ${t(`role.${a.role}`)}, ${PROVIDERS[a.provider].short}, ${t(`status.${a.status}`)}`}>
                         <span className="shape" />
@@ -232,9 +235,7 @@ export default function Colony() {
               </div>
               <Link className="btn primary" href={`/agents/${selected.id}`}>{t('colony.openChat')} <ArrowRight size={16} /></Link>
             </div>
-          ) : (
-            <div className="card card-pad"><div className="eyebrow">{t('colony.howTitle')}</div><p style={{ margin: '8px 0 0' }} className="muted small">{t('colony.howBody')}</p></div>
-          )}
+          ) : null}
           <div className="card card-pad">
             <div className="row" style={{ marginBottom: 6 }}><div className="eyebrow grow">{t('colony.recent')}</div></div>
             {feed.length === 0 ? <p className="muted small" style={{ margin: 0 }}>{t('colony.recentEmpty')}</p> :
@@ -247,6 +248,7 @@ export default function Colony() {
           </div>
         </aside>
       </div>
+      {card.node}
       {creating && <NewAgentDrawer presetColonyId={creating.colonyId} onClose={() => setCreating(null)} onCreated={(id) => setSel(id)} />}
       {editingAgent && agents.find((a) => a.id === editingAgent) && <AgentEditDrawer key={editingAgent} agent={agents.find((a) => a.id === editingAgent)!} onClose={() => setEditingAgent(null)} />}
       {editing && <ColonyEditor colony={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />}

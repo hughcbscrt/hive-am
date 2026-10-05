@@ -80,6 +80,13 @@ const SERVER_ERRORS: [RegExp, MessageKey, (string | number)[]?][] = [
   [/^This agent has no working folder\. Set one on the agent or on its colony\.$/, 'server.noWorkingFolder'],
   [/^Agent no longer exists$/, 'server.agentGone'],
   [/^Request failed \((\d+)\)$/, 'server.requestFailed', ['status']],
+  [/^Invalid path$/, 'server.invalidPath'],
+  [/^Path is outside the agent’s folder$/, 'server.pathOutside'],
+  [/^File not found$/, 'server.fileNotFound'],
+  [/^Not a file$/, 'server.notFile'],
+  [/^Not an image$/, 'server.notImage'],
+  [/^Image is too large to preview$/, 'server.imageTooLarge'],
+  [/^path is required$/, 'server.pathRequired'],
 ];
 
 export function translateServerError(message: string): string {

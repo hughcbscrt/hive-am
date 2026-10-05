@@ -8,10 +8,10 @@ Next.js 15 (App Router) + React 19 + TypeScript. Casi todo es **componente de cl
 
 Mapa del enjambre y panel de detalle.
 
-- **Cabecera:** botones **New colony** y **New agent**.
+- **Cabecera:** el título con un icono de ayuda (**?**) que abre un popover con "cómo leer el mapa" (se cierra con Esc, clic fuera o el mismo icono), y los botones **New colony** y **New agent**.
 - **Estadísticas:** agentes, colonias, orquestadores, trabajando ahora y tareas en curso.
 - **Panal:** una celda hexagonal por agente, agrupadas por colonia (ver 11.2).
-- **Panel derecho:** al seleccionar una celda muestra descripción, proveedor, modelo, carpeta efectiva ("· from colony" si es heredada), sesión, equipo (orquestadores), un **selector de colonia** (mueve al agente), botón **Open chat** y, en la esquina superior derecha, el botón de **ajustes** que abre `AgentEditDrawer`. Sin selección explica cómo leer el mapa.
+- **Panel derecho:** al seleccionar una celda muestra descripción, proveedor, modelo, carpeta efectiva ("· from colony" si es heredada), sesión, equipo (orquestadores), un **selector de colonia** (mueve al agente), botón **Open chat** y, en la esquina superior derecha, el botón de **ajustes** que abre `AgentEditDrawer`.
 - **Recent delegations:** últimas 6, se refrescan cada 6 s.
 
 ### Agents (`/agents`)
@@ -20,7 +20,7 @@ Tabla con búsqueda (nombre, descripción, carpeta), filtros por rol y proveedor
 
 ### Agente (`/agents/<id>`)
 
-Selector de agentes + chat + ajustes plegables (ver [documento 10](10-chat-y-visualizacion.md)). El panel de ajustes tiene dos pestañas:
+Selector de agentes + chat + ajustes plegables (ver [documento 10](10-chat-y-visualizacion.md)). En la cabecera, el control **Chat / Cambios** alterna entre la conversación y el [explorador de cambios de git](13-explorador-de-cambios-git.md). El panel de ajustes tiene dos pestañas:
 
 - **Configuration:** `AgentForm` completo con barra inferior *Save changes* / *Discard* y botón *Delete agent* (con confirmación).
 - **Sessions:** conversaciones y tareas delegadas.
@@ -134,6 +134,7 @@ Los selectores son **globales**: un nombre de clase genérico puede chocar con o
 | `.shell` (layout de la app) usada también como modificador de la fila de Shell | La fila de herramienta Shell se volvía enorme y vacía | Renombrado a `.is-shell` |
 | `.empty` (estado vacío) usada como modificador del subtítulo del selector | Las filas del selector se deformaban | Renombrado a `.blank` |
 | `.name-cell span` (descripción) alcanzaba también al avatar `<span class="hex">` | Iniciales grises ilegibles en la tabla de agentes | Acotado a `.name-cell > div > span` |
+| `.split` (diseño de dos paneles de Skills/Tipos, con `display: grid`) usada como modificador de la tabla de diffs | La vista "lado a lado" del explorador quedaba de 340 px | Renombrado a `.is-split` (y `.empty` → `.void`) |
 
 **Regla práctica:** antes de añadir una clase modificadora, busca (`grep`) que el nombre no exista ya en `globals.css`; y acota los selectores de descendientes (`>`) cuando contengan componentes reutilizables.
 
@@ -224,3 +225,11 @@ Convención de claves: `<área>.<elemento>`, por ejemplo `agent.sessions.empty`,
 ### Nota de desarrollo
 
 Con `next dev`, al editar los catálogos el recargado en caliente reinicia el módulo `core.ts`; `I18nProvider` vuelve a sincronizar el idioma en cada render para que la interfaz no quede en un idioma distinto al del selector.
+
+## Tarjeta de información del agente (hover)
+
+Al pasar el mouse (o enfocar con el teclado) sobre un agente en la **lista lateral** (expandida o contraída) o en una celda del **mapa de la colonia**, aparece una tarjeta con su información: nombre, rol y estado, descripción, actividad actual, proveedor y modelo, permisos efectivos, carpeta, colonia, equipo (orquestador) o quién lo dirige (worker), sesión y última actualización.
+
+- `web/components/AgentCard.tsx`: hook `useAgentCard()` (devuelve `bind(id)` y `node`) y la tarjeta, renderizada con `createPortal` en `<body>` y posicionada a la derecha del elemento (a la izquierda si no cabe).
+- Se abre con ~280 ms de retraso (sin retraso al pasar de un agente a otro), se cierra con `Esc`, scroll, redimensionar, clic o al salir. Ignora el puntero y no se muestra en pantallas < 760 px.
+- `web/lib/activity.ts`: `activity()` (antes dentro de `AgentSwitcher`), compartida con la lista.

@@ -5,9 +5,9 @@ import remarkGfm from 'remark-gfm';
 import { Plus, Search, Trash2 } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
-import { Field, Modal, Segmented, useToast } from '@/components/ui';
+import { Field, Modal, useToast } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
-import { fmtNum } from '@/lib/format';
+import { MarkdownEditor } from '@/components/MarkdownEditor';
 
 export default function Skills() {
   const { t } = useI18n();
@@ -68,11 +68,8 @@ export default function Skills() {
               <Field label={t('form.name')} error={err}><input className="input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder={t('skills.name.placeholder')} /></Field>
               <Field label={t('types.description')} hint={t('skills.description.hint')}><input className="input" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
               <div className="field">
-                <div className="row"><label className="label grow">{t('skills.instructions')}</label><Segmented value={mode} onChange={setMode} options={[{ id: 'write', label: t('skills.write') }, { id: 'preview', label: t('skills.preview') }]} /></div>
-                {mode === 'write'
-                  ? <textarea className="textarea mono" rows={16} value={draft.content} onChange={(e) => setDraft({ ...draft, content: e.target.value })} placeholder={t('skills.content.placeholder')} spellCheck={false} />
-                  : <div className="md card-pad" style={{ border: '1px solid var(--line)', borderRadius: 10, minHeight: 280, background: 'var(--surface-2)' }}><ReactMarkdown remarkPlugins={[remarkGfm]}>{draft.content || t('skills.previewEmpty')}</ReactMarkdown></div>}
-                <span className="hint">{t('skills.chars', { count: draft.content.length, n: fmtNum(draft.content.length) })}</span>
+                <label className="label">{t('skills.instructions')}</label>
+                <MarkdownEditor value={draft.content} onChange={(content) => setDraft({ ...draft, content })} placeholder={t('skills.content.placeholder')} />
               </div>
               <div className="row">
                 {current && <button className="btn danger" onClick={() => setDel(true)}><Trash2 size={15} />{t('common.delete')}</button>}
