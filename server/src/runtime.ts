@@ -27,6 +27,13 @@ const st = (id: string): State => {
 export const liveTurn = (id: string) => states.get(id)?.live ?? null;
 export const queueDepth = (id: string) => states.get(id)?.queued ?? 0;
 
+/** How each CLI names the hive delegation tools. OpenCode exposes MCP tools through `tools.<server>.<tool>`. */
+function toolNames(provider: Agent['provider']) {
+  return provider === 'opencode'
+    ? { dispatch: 'tools.hive.dispatch', list: 'tools.hive.list_agents' }
+    : { dispatch: 'mcp__hive__dispatch', list: 'mcp__hive__list_agents' };
+}
+
 export function composeInstructions(a: Agent, delegated = false): string {
   const parts: string[] = [];
 
@@ -49,10 +56,11 @@ export function composeInstructions(a: Agent, delegated = false): string {
   }
 
   if (a.role === 'orchestrator') {
+    const tn = toolNames(a.provider);
     const team = a.worker_ids.map((wid) => agents.get(wid)).filter(Boolean);
     if (team.length) {
       const roster = team.map((w) => `- **${w!.name}**${w!.description ? `: ${w!.description}` : ''}`).join('\n');
-      parts.push(`## Your team\nThese are your subagents — the ONLY agents you can delegate to:\n${roster}\n\nDelegate with the \`dispatch\` tool (mcp__hive__dispatch) instead of doing their work yourself, then synthesize their answers. Each delegation starts a fresh conversation for that subagent, so put all the context it needs in the task. Your team can change at any time: when asked which agents you have or can delegate to, call the \`list_agents\` tool (mcp__hive__list_agents) and report exactly what it returns, never an older list from memory. Never mention or try to use agents outside that list.`);
+      parts.push(`## Your team\nThese are your subagents — the ONLY agents you can delegate to:\n${roster}\n\nDelegate with the \`dispatch\` tool (${tn.dispatch}) instead of doing their work yourself, then synthesize their answers. Always use it: never play a subagent's role yourself, and never use a generic built-in subagent in its place — a subagent is a separate real agent with its own session. Each delegation starts a fresh conversation for that subagent, so put all the context it needs in the task. Your team can change at any time: when asked which agents you have or can delegate to, call the \`list_agents\` tool (${tn.list}) and report exactly what it returns, never an older list from memory. Never mention or try to use agents outside that list.`);
     } else {
       parts.push('## Your team\nYou currently have no subagents connected to you, so you cannot delegate. If asked, say so; do not claim to know other agents.');
     }

@@ -8,6 +8,9 @@ import { withInstructions } from './preamble.js';
 export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> {
   const { agent } = o;
   const args = ['run', '--format', 'json', '--thinking', '--auto'];
+  // `opencode run` normally talks to OpenCode's background service, which ignores the MCP config we pass through
+  // the environment. A private (standalone) server reads it, so orchestrators must run standalone to get `dispatch`.
+  if (o.mcpDispatch) args.splice(1, 0, '--standalone');
   // Sessions created while the folder was wrong (older hive-am builds) would keep running there; start fresh instead.
   const recorded = agent.session_id ? opencodeSessionDir(agent.session_id) : null;
   const resume = agent.session_id && (!recorded || recorded === agent.cwd) ? agent.session_id : null;
