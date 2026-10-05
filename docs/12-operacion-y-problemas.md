@@ -25,7 +25,7 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 
 | # | Limitación | Detalle |
 |---|---|---|
-| 1 | **Kiro no puede orquestar** | No se le inyecta el servidor MCP; sí puede ser worker. |
+| 1 | **Kiro orquesta mediante un perfil generado** | Escribe `~/.kiro/agents/hive-<agentId>.json` por cada orquestador Kiro con subagentes (se queda ahí al borrar el agente). |
 | 2 | **Permisos en OpenCode** | Siempre `--auto`; `plan` (solo lectura) y el resto de permisos **no se aplican** a OpenCode. |
 | 3 | **System prompt en OpenCode/Kiro** | Viaja dentro del mensaje (preámbulo), no como instrucción de sistema del CLI. Se oculta en la interfaz, pero el modelo lo ve como parte del mensaje. |
 | 4 | **Turno en vuelo en un apagón** | Se pierde el turno a medias; la sesión queda intacta y el agente vuelve a `idle` al reiniciar. El mensaje hay que reenviarlo. |
@@ -60,7 +60,7 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 | "This agent has no working folder…" | Sin carpeta propia y sin colonia que la preste | Elegir carpeta en el agente o en su colonia |
 | "Folder does not exist: …" | La ruta no existe (no se expande `~`) | Usar ruta absoluta o el botón **Browse** |
 | Un agente de OpenCode dice trabajar en otra carpeta | Sesiones antiguas registradas con la carpeta del servidor | Ya corregido (`PWD`); esas sesiones se reemplazan por una nueva al siguiente mensaje |
-| Un orquestador no delega | Sin subagentes conectados, es Kiro, o el modelo decidió no hacerlo | Conectar workers (Relations/Team); usar Claude u OpenCode; pedir explícitamente "delega con dispatch a *nombre*" |
+| Un orquestador no delega | Sin subagentes conectados, el modelo decidió no hacerlo | Conectar workers (Relations/Team); pedir explícitamente "delega con dispatch a *nombre*" |
 | El orquestador no ve agentes nuevos | Instrucciones antiguas en la sesión | Ya se reenvían cuando cambia el equipo; si persiste, *New conversation* |
 | El historial sale vacío | El CLI cambió su formato de archivo, o la sesión se borró en el CLI | Revisar el lector correspondiente en `server/src/history/` y el archivo nativo |
 | El costo no aparece | Modelo fuera de las familias conocidas y el CLI no reporta costo | Es esperado |

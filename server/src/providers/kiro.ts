@@ -1,11 +1,21 @@
 import type { StreamEvent, TurnOptions } from '../types.js';
 import { spawnLines, safeJson } from './spawn.js';
 import { withInstructions } from './preamble.js';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { dispatchKiroProfile } from '../mcp-config.js';
 
 /** Kiro CLI: `kiro-cli chat --no-interactive --output-format stream-json`, which streams ACP session updates as JSON lines. */
 export async function* runKiro(o: TurnOptions): AsyncGenerator<StreamEvent> {
   const { agent } = o;
   const args = ['chat', '--no-interactive', '--output-format', 'stream-json'];
+  if (o.mcpDispatch) {   // delegation tools come from a generated agent profile that declares the hive MCP server
+    const name = `hive-${agent.id}`;
+    const dir = join(homedir(), '.kiro', 'agents'); mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, `${name}.json`), JSON.stringify(dispatchKiroProfile(agent.id, name), null, 2));
+    args.push('--agent', name);
+  }
   if (agent.permission !== 'plan') args.push('--trust-all-tools');
   if (agent.session_id) args.push('--resume-id', agent.session_id);
   if (agent.model) args.push('--model', agent.model);

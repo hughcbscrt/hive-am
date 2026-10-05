@@ -31,7 +31,9 @@ export const queueDepth = (id: string) => states.get(id)?.queued ?? 0;
 function toolNames(provider: Agent['provider']) {
   return provider === 'opencode'
     ? { dispatch: 'tools.hive.dispatch', list: 'tools.hive.list_agents' }
-    : { dispatch: 'mcp__hive__dispatch', list: 'mcp__hive__list_agents' };
+    : provider === 'kiro'
+      ? { dispatch: '@hive/dispatch', list: '@hive/list_agents' }
+      : { dispatch: 'mcp__hive__dispatch', list: 'mcp__hive__list_agents' };
 }
 
 export function composeInstructions(a: Agent, delegated = false): string {
