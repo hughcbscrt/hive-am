@@ -43,6 +43,9 @@ export function languageOf(path: string): string | null {
   return EXT[ext] ?? null;
 }
 
+/** Languages where git's hunk context (the nearest line above that looks like a function/heading) is meaningful. */
+export const isCodeFile = (path: string) => { const l = languageOf(path); return !!l && !['markdown', 'yaml', 'json', 'ini', 'xml', 'diff', 'dockerfile', 'makefile'].includes(l); };
+
 export const HIGHLIGHT_MAX_CHARS = 1_200_000;   // above any file the server will send; big ones are highlighted off the main thread
 export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 

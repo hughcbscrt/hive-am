@@ -69,6 +69,8 @@ En la vista previa también se indica si el cambio está **En stage** y/o **Sin 
 | Archivo nuevo sin seguimiento | Todo el contenido como líneas añadidas |
 | Cambio sin texto (p. ej. solo permisos) | "Sin diferencias de texto…" |
 
+**Encabezados de bloque.** Cada bloque de un diff empieza con una fila separadora (`⋯ ⋯ @@ -20,9 +20,10 @@`) sin números de línea. Git le añade el texto de la línea más cercana encima del bloque que "parece" una función; solo se muestra, en gris cursiva, en archivos de **código** (en Markdown, YAML, JSON, INI, XML, Dockerfile y Makefile no significa nada y parecería una línea agregada, así que se oculta).
+
 Además: botón **Copiar ruta**, aviso cuando el diff o el archivo se recortaron por tamaño. Los diffs y los archivos largos se desplazan sin límite de filas (ver [13.11](#1311-rendimiento-con-archivos-grandes)).
 
 ## 13.2 Cuándo se actualiza

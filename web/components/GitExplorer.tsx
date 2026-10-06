@@ -9,7 +9,7 @@ import { buildTree, defaultExpanded, flatten, type Row, type TreeNode } from '@/
 import type { Agent, GitChange, GitChangeStatus, GitDiffResult, GitFileResult } from '@/lib/types';
 import type { useGit } from '@/lib/useGit';
 import { CopyBtn } from './ToolCall';
-import { languageOf } from '@/lib/highlight';
+import { isCodeFile, languageOf } from '@/lib/highlight';
 import { useHighlighted } from '@/lib/useHighlighted';
 import { useGitPrefs } from '@/lib/gitPrefs';
 import { GitSettings } from './GitSettings';
@@ -38,10 +38,11 @@ function FileIcon({ name }: { name: string }) {
 type DiffRowData = { t: 'hunk'; header: string; section: string } | { t: 'line'; l: DiffLine } | { t: 'pair'; r: SplitRow };
 
 /** Flatten the hunks into one list of fixed-height rows (a header row per hunk), ready to be windowed. */
-function buildRows(parsed: ParsedDiff, layout: 'unified' | 'split'): DiffRowData[] {
+function buildRows(parsed: ParsedDiff, layout: 'unified' | 'split', path: string): DiffRowData[] {
   const rows: DiffRowData[] = [];
+  const code = isCodeFile(path);   // in prose / data files git's hunk context is just some earlier line: it would look like diff content
   for (const h of parsed.hunks) {
-    rows.push({ t: 'hunk', header: h.header.replace(/ ?@@ ?.*$/, '').replace(/^(@@ [^@]+@@).*$/, '$1'), section: h.section });
+    rows.push({ t: 'hunk', header: h.header.replace(/ ?@@ ?.*$/, '').replace(/^(@@ [^@]+@@).*$/, '$1'), section: code ? h.section : '' });
     if (layout === 'unified') for (const l of h.lines) rows.push({ t: 'line', l });
     else for (const r of toSplit(h.lines)) rows.push({ t: 'pair', r });
   }
@@ -49,7 +50,15 @@ function buildRows(parsed: ParsedDiff, layout: 'unified' | 'split'): DiffRowData
 }
 
 const DiffRow = memo(function DiffRow({ row, path, ws }: { row: DiffRowData; path: string; ws: boolean }) {
-  if (row.t === 'hunk') return <div className="vl-row hunk"><span className="mono">{row.header}</span>{row.section && <span className="hs"> {row.section}</span>}</div>;
+  if (row.t === 'hunk') {
+    // A separator, not content: the two gutters hold "⋯" and the label stays put while the code scrolls sideways.
+    return (
+      <div className="vl-row hunk">
+        <div className="vl-ln" style={{ left: 0 }}>⋯</div><div className="vl-ln" style={{ left: 'calc(6ch + 16px)' }}>⋯</div>
+        <div className="vl-hl"><span className="rng mono">{row.header}</span>{row.section && <span className="hs" title={row.section}>{row.section}</span>}</div>
+      </div>
+    );
+  }
   if (row.t === 'line') {
     const l = row.l;
     return (
@@ -74,7 +83,7 @@ const DiffRow = memo(function DiffRow({ row, path, ws }: { row: DiffRowData; pat
 /** A diff, windowed like the file view: only the rows on screen exist, so a huge diff costs the same as a small one. */
 function DiffView({ parsed, layout, path }: { parsed: ParsedDiff; layout: 'unified' | 'split'; path: string }) {
   const { whitespace: ws } = useGitPrefs();
-  const rows = useMemo(() => buildRows(parsed, layout), [parsed, layout]);
+  const rows = useMemo(() => buildRows(parsed, layout, path), [parsed, layout, path]);
   const widest = useMemo(() => parsed.hunks.reduce((m, h) => h.lines.reduce((mm, l) => Math.max(mm, l.text.length), m), 0), [parsed]);
   // Unified: two gutters + sign + code, scrolling sideways for long lines. Split: always two equal halves of the screen;
   // a line longer than its half is cut with “…” (full text on hover) — the unified view shows it whole.
