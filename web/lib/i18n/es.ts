@@ -773,5 +773,11 @@ export const es: Record<DictKey, string> = {
   "git.discard.confirm.body_other": "Estos {count} archivos son nuevos (no están en ningún commit), así que descartarlos los elimina por completo. No se pueden recuperar.",
   "git.discard.confirm.rest": "Todos los demás cambios vuelven al último commit.",
   "git.discard.confirm.go": "Eliminar archivos",
+  "git.discard.lines": "Elegir líneas",
+  "git.discard.lines.hint": "Elige líneas agregadas/quitadas de este bloque para descartarlas",
+  "git.discard.lines.all": "Todas",
+  "git.discard.lines.go_one": "Descartar {count} línea",
+  "git.discard.lines.go_other": "Descartar {count} líneas",
+  "git.discard.lines.pick": "Incluir esta línea",
 
 };

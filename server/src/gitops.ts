@@ -303,23 +303,65 @@ export async function gitDiscardFile(cwd: string, rel: string, oldRel?: string):
   });
 }
 
+const hunkRange = (h: string) => /^(@@ [^@]+@@)/.exec(h)?.[1];
+
+/** The diff of one file against HEAD, as its header lines plus the lines of block `index` (verified against `header`). */
+async function hunkOf(root: string, rel: string, index: number, header: string): Promise<{ head: string[]; at: string; body: string[] }> {
+  if (!Number.isInteger(index) || index < 0) throw new GitOpError('Invalid block');
+  const { out } = await run(root, ['diff', 'HEAD', '--no-color', '--no-ext-diff', '-U3', '--', rel], { raw: true });
+  const lines = out.split('\n');
+  const starts = lines.flatMap((l, i) => (l.startsWith('@@ ') ? [i] : []));
+  const stale = () => new GitOpError('The file changed since it was shown: refresh and try again');
+  if (!starts.length || index >= starts.length) throw stale();
+  const at = starts[index]; const stop = starts[index + 1] ?? lines.length;
+  if (!hunkRange(header) || hunkRange(lines[at]) !== hunkRange(header)) throw stale();
+  return { head: lines.slice(0, starts[0]), at: lines[at], body: lines.slice(at + 1, stop).filter((l, i, arr) => !(i === arr.length - 1 && l === '')) };
+}
+
+/** Reverse-apply a patch: to the index and the working tree when the change is staged too, otherwise just the working tree. */
+async function applyReverse(root: string, patch: string) {
+  const text = patch.replace(/\n*$/, '\n');
+  try { await run(root, ['apply', '-R', '--index', '--recount', '--whitespace=nowarn'], { input: text }); }
+  catch { await run(root, ['apply', '-R', '--recount', '--whitespace=nowarn'], { input: text }); }
+}
+
 /** Throw away one block (hunk) of a modified file. `header` must match the block at `index`, or the file changed since it was drawn. */
 export async function gitDiscardHunk(cwd: string, rel: string, index: number, header: string): Promise<GitResult> {
   const { root } = await repoOf(cwd);
   await safePath(cwd, root, rel, true);
-  if (!Number.isInteger(index) || index < 0) throw new GitOpError('Invalid block');
   return exclusive(root, async () => {
-    const { out } = await run(root, ['diff', 'HEAD', '--no-color', '--no-ext-diff', '-U3', '--', rel], { raw: true });
-    const lines = out.split('\n');
-    const starts = lines.flatMap((l, i) => (l.startsWith('@@ ') ? [i] : []));
-    if (!starts.length || index >= starts.length) throw new GitOpError('The file changed since it was shown: refresh and try again');
-    const at = starts[index]; const stop = starts[index + 1] ?? lines.length;
-    const range = (h: string) => /^(@@ [^@]+@@)/.exec(h)?.[1];
-    if (!range(header) || range(lines[at]) !== range(header)) throw new GitOpError('The file changed since it was shown: refresh and try again');
-    const patch = [...lines.slice(0, starts[0]), ...lines.slice(at, stop)].join('\n').replace(/\n*$/, '\n');
-    // Both the index and the working tree when the block is staged too; otherwise just the working tree.
-    try { await run(root, ['apply', '-R', '--index', '--recount', '--whitespace=nowarn'], { input: patch }); }
-    catch { await run(root, ['apply', '-R', '--recount', '--whitespace=nowarn'], { input: patch }); }
+    const h = await hunkOf(root, rel, index, header);
+    await applyReverse(root, [...h.head, h.at, ...h.body].join('\n'));
+    return done('Discarded');
+  });
+}
+
+/**
+ * Throw away only some of the changed lines of a block. `picked` are positions among the block's changed (+/-)
+ * lines, counted from 0. The rest of the block is kept: a kept "+" line becomes plain context in the patch, and a
+ * kept "-" line is left out of it, so reversing the patch only touches what was picked.
+ */
+export async function gitDiscardLines(cwd: string, rel: string, index: number, header: string, picked: number[]): Promise<GitResult> {
+  if (!Array.isArray(picked) || !picked.length) throw new GitOpError('Select at least one line');
+  const { root } = await repoOf(cwd);
+  await safePath(cwd, root, rel, true);
+  const want = new Set(picked.filter((n) => Number.isInteger(n) && n >= 0));
+  return exclusive(root, async () => {
+    const h = await hunkOf(root, rel, index, header);
+    const m = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(h.at); if (!m) throw new GitOpError('Invalid block');
+    const out: string[] = []; let k = -1; let keepMarker = true; let oldN = 0, newN = 0, chosen = 0;
+    for (const l of h.body) {
+      if (l.startsWith('\\')) { if (keepMarker) out.push(l); continue; }   // "\ No newline at end of file" follows its line
+      const c = l[0]; const text = l.slice(1);
+      if (c === ' ') { out.push(l); oldN++; newN++; keepMarker = true; continue; }
+      k++; const on = want.has(k);
+      if (on) { chosen++; out.push(l); if (c === '-') oldN++; else newN++; keepMarker = true; }
+      else if (c === '+') { out.push(' ' + text); oldN++; newN++; keepMarker = true; }   // stays as it is in the file
+      else keepMarker = false;                                                           // a kept deletion: not in the patch
+    }
+    if (!chosen) throw new GitOpError('Select at least one line');
+    if (Math.max(...want) >= k + 1) throw new GitOpError('The file changed since it was shown: refresh and try again');
+    await applyReverse(root, [...h.head, `@@ -${m[1]},${oldN} +${m[2]},${newN} @@`, ...out].join('\n'));
     return done('Discarded');
   });
 }

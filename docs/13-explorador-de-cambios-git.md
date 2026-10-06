@@ -144,7 +144,7 @@ Recuerda que, como el resto de la API, **no tiene autenticación** ([documento 1
 - Muestra diferencias contra `HEAD`: no separa visualmente lo que está en el *stage* de lo que no (solo lo indica con una etiqueta). El commit elige archivos completos, no líneas sueltas.
 - Sin resaltado de sintaxis ni diferencias a nivel de palabra.
 - Los renombres se detectan con la heurística de similitud de git (`-M`).
-- Sin *stash*, *cherry-pick* ni *rebase* interactivo; no hace *force push*. Se puede descartar un archivo o un bloque, pero no **líneas sueltas** dentro de un bloque.
+- Sin *stash*, *cherry-pick* ni *rebase* interactivo; no hace *force push*. Se puede descartar un archivo, un bloque o **líneas sueltas** dentro de un bloque (solo en la vista Unificada).
 - En repositorios enormes el árbol se recorta a 30 000 archivos y la lista visible a 2 000 filas (se avisa; el filtro permite llegar al resto).
 - Los submódulos aparecen como una sola entrada.
 
@@ -247,9 +247,11 @@ Tres niveles, siempre contra el **último commit** (`HEAD`):
 | Botón **Descartar bloque** en el encabezado de cada bloque del diff (solo archivos modificados) | Solo ese bloque | El servidor vuelve a calcular el diff contra `HEAD`, toma el bloque N y lo aplica **al revés** (`git apply -R --index`, y si el *stage* no coincide, solo el árbol de trabajo). Si el encabezado `@@ -a,b +c,d @@` ya no coincide con el bloque N (el archivo cambió desde que se dibujó) se rechaza con "The file changed since it was shown" |
 | Icono de deshacer en la barra | Todo lo que hay cambiado en la carpeta del agente | `git restore --source=HEAD --staged --worktree` y `git clean -f -d`. Desactivado con una fusión o rebase en curso |
 
+**Líneas sueltas.** En el encabezado de cada bloque, **Elegir líneas** (solo vista Unificada, archivos modificados) pone una casilla en cada línea `+` o `−` del bloque; se marcan con la casilla o haciendo clic en la fila. El encabezado pasa a **Todas · Descartar N líneas · Cancelar**. Al descartar, el servidor arma un parche con solo lo marcado: una línea agregada **no** marcada se convierte en contexto (se queda) y una línea quitada **no** marcada se omite del parche (sigue quitada); luego aplica ese parche al revés (`git apply -R --index`, o solo al árbol de trabajo). Ejemplo: en un bloque con `−l4 −l5 −l6 +L5 +L6 +NEW1 +NEW2`, marcar `l4`, `NEW1` y `NEW2` recupera `l4` y quita las dos líneas nuevas, y deja el reemplazo `l5, l6 → L5, L6` tal cual. La posición de cada línea se cuenta entre las líneas **cambiadas** del bloque (desde 0) y el encabezado `@@` se verifica igual que al descartar un bloque.
+
 **Qué pide confirmación.** Solo cuando se van a **eliminar archivos** (los nuevos no están en ningún commit, así que no hay a qué volver): un diálogo "¿Eliminar archivos por completo?" lista los archivos (hasta 8 y "+N más") y avisa de que no se pueden recuperar; si es "descartar todo", añade que lo demás vuelve al último commit. El resto de descartes (modificados, borrados, un bloque) se ejecutan **al instante, sin confirmación ni copia de respaldo**.
 
 Los archivos en **conflicto** no se pueden descartar: se resuelven con el resolvedor o se cancela la fusión ([13.9](#139-resolver-conflictos)).
 
-API: `POST …/git/discard` `{ path, oldPath? }`, `…/discard-hunk` `{ path, index, header }`, `…/discard-all`. Mismas validaciones de ruta y de origen que el resto de acciones.
+API: `POST …/git/discard` `{ path, oldPath? }`, `…/discard-hunk` `{ path, index, header }`, `…/discard-lines` `{ path, index, header, lines[] }`, `…/discard-all`. Mismas validaciones de ruta y de origen que el resto de acciones.
 

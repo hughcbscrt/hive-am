@@ -706,7 +706,7 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .vl-bl, .vl-ln { position: sticky; flex: none; z-index: 2; background: var(--g-gbg); color: var(--g-gfg); overflow: hidden; }
 .vl-bl { left: 0; width: var(--vl-left); padding: 0 10px; box-sizing: border-box; font-size: 11.5px; border-right: 1px solid var(--line); }
 .vl-bl.first { box-shadow: inset 0 1px 0 var(--line); }
-.vl-ln { left: var(--vl-left, 0px); width: 6ch; padding: 0 8px; text-align: right; font-size: 11.5px; user-select: none; }
+.vl-ln { left: var(--vl-left, 0px); box-sizing: content-box; width: 6ch; padding: 0 8px; text-align: right; font-size: 11.5px; user-select: none; }   /* 6ch + 16px: the diff rows offset their second gutter by exactly that */
 .vl-cd { flex: 1; padding: 0 12px; }
 .vl-row.bl-g1 .vl-bl { background: color-mix(in srgb, var(--g-gbg) 82%, var(--g-fg)); }
 
@@ -720,7 +720,7 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .vl-hl { position: sticky; left: calc(12ch + 32px); display: flex; gap: 12px; align-items: center; padding: 0 12px; min-width: 0; }
 .vl-hl .rng { color: var(--g-gfg); white-space: nowrap; } .vl-hl .hs { color: var(--g-gfg); opacity: .75; font-family: var(--font-body); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60ch; }
 .vl-row.split { display: grid; grid-template-columns: calc(6ch + 16px) minmax(0, 1fr) calc(6ch + 16px) minmax(0, 1fr); }
-.vl-row.split .vl-cd { overflow: hidden; text-overflow: ellipsis; } .vl-row.split .vl-ln { position: static; width: auto; }
+.vl-row.split .vl-cd { overflow: hidden; text-overflow: ellipsis; } .vl-row.split .vl-ln { position: static; width: auto; box-sizing: border-box; }
 .vl-row.split .vl-cd.void, .vl-row.split .vl-ln.void { background: repeating-linear-gradient(135deg, var(--g-gbg) 0 6px, var(--g-bg) 6px 12px); }
 .vl-row.split .vl-cd:nth-child(2) { border-right: 1px solid var(--line); }
 
@@ -728,3 +728,11 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .hk-btn { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 1px 9px; border: 1px solid var(--line-strong); border-radius: 99px; background: var(--surface); color: var(--ink-2); font: inherit; font-size: 11.5px; cursor: pointer; opacity: .55; white-space: nowrap; }
 .vl-row.hunk:hover .hk-btn, .hk-btn:hover, .hk-btn:focus-visible { opacity: 1; } .hk-btn:hover { border-color: var(--err); color: var(--err); }
 .gx-dlist { margin: 0; padding: 8px 12px 8px 28px; max-height: 180px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); font-size: 12.5px; }
+.hk-btn.on { opacity: 1; } .hk-btn.danger { border-color: var(--err); color: var(--err); } .hk-btn:disabled { opacity: .4; cursor: default; }
+.hk-btn + .hk-btn { margin-left: 0; } .vl-hl { flex-wrap: nowrap; }
+.vl-row .vl-sg input { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; margin: 0; cursor: pointer; vertical-align: middle; border: 1.5px solid var(--g-gfg); border-radius: 4px; background: var(--g-bg); display: inline-block; position: relative; top: -1px; }
+.vl-row .vl-sg input:hover { border-color: var(--err); }
+.vl-row .vl-sg input:checked { background: var(--err); border-color: var(--err); }
+.vl-row .vl-sg input:checked::after { content: ''; position: absolute; left: 3.5px; top: 0.5px; width: 3px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.vl-row .vl-sg input:focus-visible { outline: 2px solid var(--honey); outline-offset: 1px; }
+.vl-row.picked { outline: 1px solid color-mix(in srgb, var(--err) 70%, transparent); outline-offset: -1px; }

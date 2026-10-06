@@ -775,6 +775,12 @@ export const en = {
   "git.discard.confirm.body_other": "These {count} files are new (they are not in any commit), so discarding them deletes them completely. They cannot be recovered.",
   "git.discard.confirm.rest": "Every other change goes back to the last commit.",
   "git.discard.confirm.go": "Delete files",
+  "git.discard.lines": "Select lines",
+  "git.discard.lines.hint": "Pick individual added/removed lines of this block to discard",
+  "git.discard.lines.all": "All",
+  "git.discard.lines.go_one": "Discard {count} line",
+  "git.discard.lines.go_other": "Discard {count} lines",
+  "git.discard.lines.pick": "Include this line",
 
 };
 
