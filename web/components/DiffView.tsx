@@ -12,13 +12,13 @@ import { VirtualLines } from './VirtualLines';
 export type DiffRowData = { t: 'hunk'; idx: number; header: string; section: string; changed: number } | { t: 'line'; l: DiffLine; hunk: number; k?: number } | { t: 'pair'; r: SplitRow };
 
 /** Flatten the hunks into one list of fixed-height rows (a header row per hunk), ready to be windowed. */
-function buildRows(parsed: ParsedDiff, layout: 'unified' | 'split', path: string): DiffRowData[] {
+function buildRows(parsed: ParsedDiff, layout: 'unified' | 'split', path: string, firstIndex = 0): DiffRowData[] {
   const rows: DiffRowData[] = [];
   const code = isCodeFile(path);   // in prose / data files git's hunk context is just some earlier line: it would look like diff content
   parsed.hunks.forEach((h, idx) => {
-    rows.push({ t: 'hunk', idx, header: hunkRange(h.header), section: code ? h.section : '', changed: h.lines.filter((l) => l.kind !== 'ctx').length });
+    rows.push({ t: 'hunk', idx: idx + firstIndex, header: hunkRange(h.header), section: code ? h.section : '', changed: h.lines.filter((l) => l.kind !== 'ctx').length });
     let k = 0;
-    if (layout === 'unified') for (const l of h.lines) rows.push({ t: 'line', l, hunk: idx, k: l.kind === 'ctx' ? undefined : k++ });
+    if (layout === 'unified') for (const l of h.lines) rows.push({ t: 'line', l, hunk: idx + firstIndex, k: l.kind === 'ctx' ? undefined : k++ });
     else for (const r of toSplit(h.lines)) rows.push({ t: 'pair', r });
   });
   return rows;
@@ -68,9 +68,9 @@ const DiffRow = memo(function DiffRow({ row, path, ws, actions, picking, onPick 
 });
 
 /** A diff, windowed like the file view: only the rows on screen exist, so a huge diff costs the same as a small one. */
-export function DiffView({ parsed, layout, path, cutOff = false, onDiscardHunk, onDiscardLines }: { parsed: ParsedDiff; layout: 'unified' | 'split'; path: string; cutOff?: boolean; onDiscardHunk?: (index: number, header: string) => void; onDiscardLines?: (index: number, header: string, lines: number[]) => void }) {
+export function DiffView({ parsed, layout, path, cutOff = false, firstIndex = 0, onDiscardHunk, onDiscardLines }: { parsed: ParsedDiff; layout: 'unified' | 'split'; path: string; cutOff?: boolean; firstIndex?: number; onDiscardHunk?: (index: number, header: string) => void; onDiscardLines?: (index: number, header: string, lines: number[]) => void }) {
   const { whitespace: ws } = useGitPrefs();
-  const rows = useMemo(() => buildRows(parsed, layout, path), [parsed, layout, path]);
+  const rows = useMemo(() => buildRows(parsed, layout, path, firstIndex), [parsed, layout, path, firstIndex]);
   const widest = useMemo(() => parsed.hunks.reduce((m, h) => h.lines.reduce((mm, l) => Math.max(mm, l.text.length), m), 0), [parsed]);
   // Unified: two gutters + sign + code, scrolling sideways for long lines. Split: always two equal halves of the screen;
   // a line longer than its half is cut with “…” (full text on hover) — the unified view shows it whole.

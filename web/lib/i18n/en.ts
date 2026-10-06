@@ -834,6 +834,9 @@ export const en = {
   "git.res.remote.stash": "Other branch",
   "git.sw.kept_one": "{names} already existed there: your version was kept (it shows as a change)",
   "git.sw.kept_other": "{names} already existed there: your versions were kept (they show as changes)",
+  "git.peek.title": "Change block",
+  "git.peek.hint": "Click to see this change",
+  "git.peek.showDiff": "Show in Diff",
 
 };
 

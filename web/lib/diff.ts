@@ -49,11 +49,15 @@ export interface ChangeMarks {
   lines: Map<number, ChangeKind>;
   /** Removed lines sit between two lines: the number is the line they were removed *before* (lastLine + 1 at the end). */
   removedBefore: Set<number>;
+  /** Index (in the diff) of the block each marked line / removal position belongs to. */
+  blockOfLine: Map<number, number>;
+  blockOfRemoval: Map<number, number>;
 }
 
 export function changeMarks(parsed: ParsedDiff): ChangeMarks {
   const lines = new Map<number, ChangeKind>(); const removedBefore = new Set<number>();
-  for (const h of parsed.hunks) {
+  const blockOfLine = new Map<number, number>(); const blockOfRemoval = new Map<number, number>();
+  parsed.hunks.forEach((h, hi) => {
     let i = 0; const L = h.lines;
     let next = 0;                                  // the file line number the next context line will have
     while (i < L.length) {
@@ -61,11 +65,11 @@ export function changeMarks(parsed: ParsedDiff): ChangeMarks {
       const dels: DiffLine[] = [], adds: DiffLine[] = [];
       while (i < L.length && L[i].kind === 'del') dels.push(L[i++]);
       while (i < L.length && L[i].kind === 'add') adds.push(L[i++]);
-      adds.forEach((a, k) => { if (a.newNo !== undefined) lines.set(a.newNo, k < dels.length ? 'mod' : 'add'); });
+      adds.forEach((a, k) => { if (a.newNo !== undefined) { lines.set(a.newNo, k < dels.length ? 'mod' : 'add'); blockOfLine.set(a.newNo, hi); } });
       const after = adds.length ? (adds[adds.length - 1].newNo ?? 0) + 1 : (L[i]?.newNo ?? next);
-      if (dels.length > adds.length) removedBefore.add(after);   // some removed lines have no replacement
+      if (dels.length > adds.length) { removedBefore.add(after); blockOfRemoval.set(after, hi); }   // some removed lines have no replacement
       next = after;
     }
-  }
-  return { lines, removedBefore };
+  });
+  return { lines, removedBefore, blockOfLine, blockOfRemoval };
 }

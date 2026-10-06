@@ -832,5 +832,8 @@ export const es: Record<DictKey, string> = {
   "git.res.remote.stash": "Rama destino",
   "git.sw.kept_one": "{names} ya existía allí: se quedó tu versión (aparece como un cambio)",
   "git.sw.kept_other": "{names} ya existían allí: se quedaron tus versiones (aparecen como cambios)",
+  "git.peek.title": "Bloque de cambios",
+  "git.peek.hint": "Clic para ver este cambio",
+  "git.peek.showDiff": "Ver en Diferencias",
 
 };
