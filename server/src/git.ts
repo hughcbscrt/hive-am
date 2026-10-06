@@ -1,10 +1,10 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { open, realpath, stat } from 'node:fs/promises';
+import { open, readFile, realpath, stat } from 'node:fs/promises';
 import { extname, isAbsolute, normalize, resolve, sep } from 'node:path';
 
 /**
- * Read-only git access for the explorer. Everything here only *reads*: no command writes to the repository,
+ * Read-only git access for the explorer (writes live in gitops.ts). Everything here only *reads*: no command writes to the repository,
  * and `GIT_OPTIONAL_LOCKS=0` keeps `git status` from touching the index while an agent is working in it.
  */
 const pexec = promisify(execFile);
@@ -37,19 +37,45 @@ export type GitStatus =
       /** Sub-folder of the repository the agent works in ('' when it is the root). Everything is scoped to it. */
       scope: string;
       branch: string | null; detached: boolean;
+      /** `when` is an ISO 8601 date (the UI formats it). */
       head: { sha: string; subject: string; when: string; author: string } | null;
       upstream: { ahead: number; behind: number } | null;
       changes: GitChange[]; truncated: boolean; generatedAt: number;
+      /** A merge or rebase waiting to be finished (conflicts being resolved), and git's prepared merge message. */
+      state: 'merge' | 'rebase' | null; mergeMsg: string;
     };
 
-interface Repo { root: string; scope: string }
+export interface Repo { root: string; scope: string }
 type RepoResult = { ok: true; repo: Repo } | { ok: false; reason: 'no-git' | 'not-repo' | 'error'; message: string };
+
+/** Environment every git child gets: never prompt for credentials or a terminal. */
+export const gitEnv = (extra: Record<string, string> = {}) => ({ ...process.env, GIT_TERMINAL_PROMPT: '0', LC_MESSAGES: 'C', ...extra });
+
+/** `git diff --numstat -z` → added/removed counts per path (null for binary files). Handles renames ("<a>\t<d>\t\0old\0new\0"). */
+export function parseNumstat(out: string): Map<string, { a: number | null; d: number | null }> {
+  const counts = new Map<string, { a: number | null; d: number | null }>();
+  const tok = out.split('\0');
+  for (let i = 0; i < tok.length; i++) {
+    const m = /^(-|\d+)\t(-|\d+)\t(.*)$/.exec(tok[i]); if (!m) continue;
+    const c = { a: m[1] === '-' ? null : Number(m[1]), d: m[2] === '-' ? null : Number(m[2]) };
+    if (m[3] === '') { counts.set(tok[i + 2], c); i += 2; } else counts.set(m[3], c);
+  }
+  return counts;
+}
+
+/** Whether a merge or a rebase is waiting to be finished, and where git keeps its state. */
+export async function repoState(root: string): Promise<{ state: 'merge' | 'rebase' | null; gitDir: string }> {
+  const gitDir = (await git(root, ['rev-parse', '--absolute-git-dir']).catch(() => ({ stdout: '' }))).stdout.trim();
+  const has = (f: string) => (gitDir ? stat(`${gitDir}/${f}`).then(() => true, () => false) : Promise.resolve(false));
+  const [merging, rebaseMerge, rebaseApply] = await Promise.all([has('MERGE_HEAD'), has('rebase-merge'), has('rebase-apply')]);
+  return { state: rebaseMerge || rebaseApply ? 'rebase' : merging ? 'merge' : null, gitDir };
+}
 
 async function git(cwd: string, args: string[], opts: { okCodes?: number[]; maxBuffer?: number; timeout?: number } = {}) {
   try {
     const { stdout } = await pexec('git', ['-c', 'core.quotepath=off', '-c', 'color.ui=never', ...args], {
       cwd, encoding: 'utf8', maxBuffer: opts.maxBuffer ?? 64 * 1024 * 1024, timeout: opts.timeout ?? 20_000,
-      env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0', LC_MESSAGES: 'C' },
+      env: gitEnv({ GIT_OPTIONAL_LOCKS: '0' }),
     });
     return { stdout, code: 0 };
   } catch (e: any) {
@@ -58,7 +84,7 @@ async function git(cwd: string, args: string[], opts: { okCodes?: number[]; maxB
   }
 }
 
-async function findRepo(cwd: string): Promise<RepoResult> {
+export async function findRepo(cwd: string): Promise<RepoResult> {
   try {
     const { stdout } = await git(cwd, ['rev-parse', '--show-toplevel', '--show-prefix']);
     const [root, prefix = ''] = stdout.split('\n');
@@ -73,7 +99,7 @@ async function findRepo(cwd: string): Promise<RepoResult> {
 
 const pathspec = (scope: string) => (scope ? [scope] : ['.']);
 
-async function hasHead(root: string) {
+export async function hasHead(root: string) {
   try { await git(root, ['rev-parse', '--verify', '-q', 'HEAD']); return true; } catch { return false; }
 }
 
@@ -115,18 +141,11 @@ export async function gitStatus(cwd: string): Promise<GitStatus> {
     git(root, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...pathspec(scope)]),
     git(root, ['diff', base, '--numstat', '-z', '-M', '--', ...pathspec(scope)]).catch(() => ({ stdout: '' })),
     git(root, ['symbolic-ref', '--short', '-q', 'HEAD'], { okCodes: [1] }).catch(() => ({ stdout: '' })),
-    git(root, ['log', '-1', '--format=%h%x00%s%x00%cr%x00%an']).catch(() => ({ stdout: '' })),
+    git(root, ['log', '-1', '--format=%h%x00%s%x00%cI%x00%an']).catch(() => ({ stdout: '' })),
     git(root, ['rev-list', '--left-right', '--count', '@{u}...HEAD']).catch(() => ({ stdout: '' })),
   ]);
 
-  // numstat -z: "<add>\t<del>\t<path>\0" or, for renames, "<add>\t<del>\t\0<old>\0<new>\0"
-  const counts = new Map<string, { a: number | null; d: number | null }>();
-  const tok = num.stdout.split('\0');
-  for (let i = 0; i < tok.length; i++) {
-    const m = /^(-|\d+)\t(-|\d+)\t(.*)$/.exec(tok[i]); if (!m) continue;
-    const a = m[1] === '-' ? null : Number(m[1]), d = m[2] === '-' ? null : Number(m[2]);
-    if (m[3] === '') { const next = tok[i + 2]; counts.set(next, { a, d }); i += 2; } else counts.set(m[3], { a, d });
-  }
+  const counts = parseNumstat(num.stdout);
 
   const changes: GitChange[] = [];
   const parts = st.stdout.split('\0');
@@ -154,6 +173,9 @@ export async function gitStatus(cwd: string): Promise<GitStatus> {
   }));
   changes.sort((a, b) => a.path.localeCompare(b.path));
 
+  const { state, gitDir } = await repoState(root);
+  const mergeMsg = state === 'merge' ? (await readFile(`${gitDir}/MERGE_MSG`, 'utf8').catch(() => '')).split('\n').filter((l) => !l.startsWith('#')).join('\n').trim() : '';
+
   const [sha, subject, when, author] = headInfo.stdout.trim().split('\0');
   const [behind, ahead] = up.stdout.trim().split(/\s+/).map(Number);
   const branch = br.stdout.trim() || null;
@@ -161,7 +183,7 @@ export async function gitStatus(cwd: string): Promise<GitStatus> {
     isRepo: true, cwd, root, scope, branch, detached: !branch && !!sha,
     head: sha ? { sha, subject: subject ?? '', when: when ?? '', author: author ?? '' } : null,
     upstream: Number.isFinite(ahead) && Number.isFinite(behind) ? { ahead, behind } : null,
-    changes, truncated: changes.length >= MAX_CHANGES, generatedAt: Date.now(),
+    changes, truncated: changes.length >= MAX_CHANGES, generatedAt: Date.now(), state, mergeMsg,
   };
 }
 
@@ -175,11 +197,11 @@ export async function gitTree(cwd: string): Promise<{ isRepo: false; reason: str
   return { isRepo: true, root, scope, files: all.slice(0, MAX_TREE_FILES), truncated: all.length > MAX_TREE_FILES };
 }
 
-class PathError extends Error {}
+export class PathError extends Error {}
 export const isPathError = (e: unknown): e is PathError => e instanceof PathError;
 
 /** Repo-relative path → absolute path, guaranteed to be inside the agent's own folder (symlinks resolved). */
-async function safePath(cwd: string, root: string, rel: string, mustExist: boolean): Promise<string> {
+export async function safePath(cwd: string, root: string, rel: string, mustExist: boolean): Promise<string> {
   if (!rel || rel.includes('\0') || isAbsolute(rel)) throw new PathError('Invalid path');
   const n = normalize(rel);
   if (n === '..' || n.startsWith('..' + sep) || n === '.') throw new PathError('Invalid path');

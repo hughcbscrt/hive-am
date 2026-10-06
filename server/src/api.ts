@@ -12,6 +12,7 @@ import type { Provider } from './types.js';
 import { sessionStats } from './stats.js';
 import { createReadStream } from 'node:fs';
 import { gitDiff, gitFile, gitImagePath, gitStatus, gitTree, isPathError } from './git.js';
+import { GitOpError, gitBlame, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitUnresolve, type PullMode } from './gitops.js';
 
 const exec = promisify(execFile);
 const PROVIDERS: Record<Provider, { bin: string; label: string }> = {
@@ -136,7 +137,7 @@ route('GET', '/api/agents/:id/sessions', ({ params }) => agents.sessions(params[
 
 // ---- read-only git explorer (scoped to the agent's effective folder) ----
 const agentCwd = (id: string) => { const a = agents.get(id); if (!a) throw notFound('Agent not found'); return resolved(a).cwd; };
-const gitSafe = async <T,>(fn: () => Promise<T>): Promise<T> => { try { return await fn(); } catch (e) { if (isPathError(e)) throw bad(e.message); throw e; } };
+const gitSafe = async <T,>(fn: () => Promise<T>): Promise<T> => { try { return await fn(); } catch (e) { if (isPathError(e) || e instanceof GitOpError) throw bad(e.message); throw e; } };
 const qpath = (url: URL) => { const p = url.searchParams.get('path'); if (!p) throw bad('path is required'); return p; };
 
 route('GET', '/api/agents/:id/git/status', ({ params }) => gitStatus(agentCwd(params[0])));
@@ -149,6 +150,34 @@ route('GET', '/api/agents/:id/git/raw', async ({ params, url, res }) => {
   res.writeHead(200, { 'content-type': img.type, 'content-length': img.size, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'" });
   createReadStream(img.abs).pipe(res);
 });
+
+// ---- git history and actions (writes: commit, pull, push, fetch, branches) ----
+/** The API allows any origin (it is a local tool), so writes also check that the request comes from a local page. */
+function localOnly(req: IncomingMessage) {
+  const origin = req.headers.origin; if (!origin) return;
+  let host = ''; try { host = new URL(origin).hostname; } catch { /* invalid */ }
+  const own = String(req.headers.host ?? '').replace(/:\d+$/, '');
+  if (!['localhost', '127.0.0.1', '[::1]', '::1'].includes(host) && host !== own) throw new HttpError(403, 'Git actions are only allowed from the local app');
+}
+const gitWrite = (path: string, fn: (cwd: string, b: any) => Promise<unknown>) =>
+  route('POST', `/api/agents/:id/git/${path}`, async ({ req, params }) => { localOnly(req); const b = await body(req); return gitSafe(() => fn(agentCwd(params[0]), b)); });
+
+route('GET', '/api/agents/:id/git/log', ({ params, url }) => gitSafe(() => gitLog(agentCwd(params[0]), Number(url.searchParams.get('skip') ?? 0))));
+route('GET', '/api/agents/:id/git/commit', ({ params, url }) => gitSafe(() => gitCommitDetail(agentCwd(params[0]), url.searchParams.get('sha') ?? '')));
+route('GET', '/api/agents/:id/git/commit-diff', ({ params, url }) => gitSafe(() => gitCommitDiff(agentCwd(params[0]), url.searchParams.get('sha') ?? '', qpath(url), url.searchParams.get('old') ?? undefined)));
+route('GET', '/api/agents/:id/git/blame', ({ params, url }) => gitSafe(() => gitBlame(agentCwd(params[0]), qpath(url))));
+route('GET', '/api/agents/:id/git/branches', ({ params }) => gitSafe(() => gitBranches(agentCwd(params[0]))));
+gitWrite('commit', (cwd, b) => gitCommitChanges(cwd, String(b.message ?? ''), Array.isArray(b.paths) ? b.paths.map(String) : []));
+gitWrite('fetch', (cwd) => gitFetch(cwd));
+gitWrite('pull', (cwd, b) => gitPull(cwd, (['ff-only', 'merge', 'rebase'].includes(b.mode) ? b.mode : 'ff-only') as PullMode));
+gitWrite('push', (cwd) => gitPush(cwd));
+gitWrite('switch', (cwd, b) => gitSwitch(cwd, String(b.branch ?? ''), !!b.create));
+gitWrite('merge', (cwd, b) => gitMerge(cwd, String(b.branch ?? '')));
+gitWrite('merge-abort', (cwd) => gitMergeAbort(cwd));
+gitWrite('rebase-continue', (cwd) => gitRebaseContinue(cwd));
+gitWrite('resolve-side', (cwd, b) => gitResolveSide(cwd, String(b.path ?? ''), b.side));
+gitWrite('resolve', (cwd, b) => gitResolveContent(cwd, String(b.path ?? ''), String(b.content ?? ''), !!b.keepMarkers));
+gitWrite('unresolve', (cwd, b) => gitUnresolve(cwd, String(b.path ?? '')));
 
 // ---- sessions across all managed agents ----
 route('GET', '/api/sessions', () => {
