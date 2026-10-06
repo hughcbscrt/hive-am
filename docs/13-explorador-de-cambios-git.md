@@ -62,6 +62,7 @@ En la vista previa también se indica si el cambio está **En stage** y/o **Sin 
 |---|---|
 | Archivo con cambios de texto | Pestaña **Diferencias** (por defecto), en vista **Unificada** o **Lado a lado**, con números de línea y encabezados de bloque (`@@ -1,4 +1,5 @@`) |
 | Archivo sin cambios | Pestaña **Archivo**: su contenido con números de línea |
+| Pestaña **Archivo** de un archivo con cambios | Marcas de lo que cambió desde el último commit: **verde** las líneas agregadas, **azul** las modificadas (las que reemplazan a otras quitadas) y una **línea roja con una flecha** entre dos líneas donde se eliminaron líneas (al final del archivo, bajo la última línea). En un archivo **nuevo**, todo en verde. El margen de los números de línea lleva una barra del mismo color |
 | Imagen (png, jpg, gif, webp, svg, ico, bmp, avif) | La imagen sobre un fondo de cuadros (también si fue modificada) |
 | Archivo binario | Aviso "Archivo binario" (sin texto que mostrar) |
 | Archivo eliminado | En **Archivo**, la versión del último commit con un aviso |

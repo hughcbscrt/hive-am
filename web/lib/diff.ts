@@ -41,3 +41,31 @@ export function toSplit(lines: DiffLine[]): SplitRow[] {
   }
   return rows;
 }
+
+export type ChangeKind = 'add' | 'mod';
+/** Where a file differs from the last commit, by line number of the file as it is now (1-based). */
+export interface ChangeMarks {
+  /** Added lines, and lines that replace removed ones ("mod"). */
+  lines: Map<number, ChangeKind>;
+  /** Removed lines sit between two lines: the number is the line they were removed *before* (lastLine + 1 at the end). */
+  removedBefore: Set<number>;
+}
+
+export function changeMarks(parsed: ParsedDiff): ChangeMarks {
+  const lines = new Map<number, ChangeKind>(); const removedBefore = new Set<number>();
+  for (const h of parsed.hunks) {
+    let i = 0; const L = h.lines;
+    let next = 0;                                  // the file line number the next context line will have
+    while (i < L.length) {
+      if (L[i].kind === 'ctx') { next = (L[i].newNo ?? next) + 1; i++; continue; }
+      const dels: DiffLine[] = [], adds: DiffLine[] = [];
+      while (i < L.length && L[i].kind === 'del') dels.push(L[i++]);
+      while (i < L.length && L[i].kind === 'add') adds.push(L[i++]);
+      adds.forEach((a, k) => { if (a.newNo !== undefined) lines.set(a.newNo, k < dels.length ? 'mod' : 'add'); });
+      const after = adds.length ? (adds[adds.length - 1].newNo ?? 0) + 1 : (L[i]?.newNo ?? next);
+      if (dels.length > adds.length) removedBefore.add(after);   // some removed lines have no replacement
+      next = after;
+    }
+  }
+  return { lines, removedBefore };
+}

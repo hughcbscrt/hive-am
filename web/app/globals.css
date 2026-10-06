@@ -747,3 +747,12 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .gx-sw-warn { padding: 10px 12px; border-radius: 10px; background: var(--honey-soft); border: 1px solid color-mix(in srgb, var(--honey) 50%, transparent); font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
 .gx-stashes { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .gx-stash-head { padding: 10px; border-bottom: 1px solid var(--line); } .gx-stash-head .btn { width: 100%; justify-content: center; gap: 6px; }
+
+/* ---------- change marks in the file view: green added, blue modified, red where lines were removed ---------- */
+.gx { --g-mod: color-mix(in srgb, #3b82f6 16%, var(--g-bg)); --g-modln: color-mix(in srgb, #3b82f6 34%, var(--g-gbg)); }
+.vl-row.m-add .vl-cd { background: var(--g-add); } .vl-row.m-add .vl-ln { background: var(--g-addln); box-shadow: inset 3px 0 0 var(--ok); color: var(--g-fg); }
+.vl-row.m-mod .vl-cd { background: var(--g-mod); } .vl-row.m-mod .vl-ln { background: var(--g-modln); box-shadow: inset 3px 0 0 #3b82f6; color: var(--g-fg); }
+.vl-row.m-delb .vl-ln, .vl-row.m-delb .vl-cd, .vl-row.m-delb .vl-bl { box-shadow: inset 0 2px 0 var(--err); }
+.vl-row.m-dela .vl-ln, .vl-row.m-dela .vl-cd, .vl-row.m-dela .vl-bl { box-shadow: inset 0 -2px 0 var(--err); }
+.vl-row.m-delb .vl-ln::before, .vl-row.m-dela .vl-ln::after { content: ''; position: absolute; left: 0; width: 0; height: 0; border: 4px solid transparent; border-left-color: var(--err); }
+.vl-row.m-delb .vl-ln::before { top: 0; } .vl-row.m-dela .vl-ln::after { bottom: 0; }

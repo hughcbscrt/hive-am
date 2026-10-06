@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, File, FileCode, FileImage, FileText, Folder,
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { fmtBytes, fmtDateTime, fmtNum } from '@/lib/format';
-import { hunkRange, parseDiff, toSplit, type DiffLine, type ParsedDiff, type SplitRow } from '@/lib/diff';
+import { changeMarks, parseDiff, type ChangeMarks } from '@/lib/diff';
 import { buildTree, defaultExpanded, flatten, type Row, type TreeNode } from '@/lib/gitTree';
 import type { Agent, GitChange, GitChangeStatus, GitDiffResult, GitFileResult } from '@/lib/types';
 import type { useGit } from '@/lib/useGit';
@@ -42,7 +42,7 @@ const GUTTER_CH = 6;           // line-number column, in characters
 const BLAME_PX = 210;          // blame column width
 
 /** The file, line by line. Only the rows on screen are in the DOM (see VirtualLines), so size does not matter. */
-function FileView({ f, agent, blame: blameOn, onOpenCommit }: { f: GitFileResult; agent: Agent; blame: boolean; onOpenCommit: (sha: string) => void }) {
+function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew }: { f: GitFileResult; agent: Agent; blame: boolean; onOpenCommit: (sha: string) => void; marks: ChangeMarks | null; allNew: boolean }) {
   const { t } = useI18n();
   const { whitespace: ws } = useGitPrefs();
   const [blame, setBlame] = useState<GitBlame | null>(null);
@@ -76,8 +76,12 @@ function FileView({ f, agent, blame: blameOn, onOpenCommit }: { f: GitFileResult
       <div className="vf-main" style={{ ['--vl-left' as never]: `${left}px` }}>
         <VirtualLines count={html.length} width={`calc(${left}px + ${GUTTER_CH}ch + ${widest}ch + 40px)`} render={(i) => {
           const sha = blame?.lines[i]; const c = sha ? blame!.commits[sha] : undefined; const run = runs?.[i];
+          // What changed since the last commit: green = added, blue = modified, a red edge where lines were removed.
+          const kind = f.source === 'worktree' ? (allNew ? 'add' : marks?.lines.get(i + 1)) : undefined;
+          const delBefore = !!marks && marks.removedBefore.has(i + 1);
+          const delAfter = !!marks && i === html.length - 1 && marks.removedBefore.has(html.length + 1);
           return (
-            <div key={i} className={`vl-row ${run ? `bl-g${run.g}` : ''}`}>
+            <div key={i} className={`vl-row ${run ? `bl-g${run.g}` : ''} ${kind ? `m-${kind}` : ''} ${delBefore ? 'm-delb' : delAfter ? 'm-dela' : ''}`}>
               {blame && (
                 <div className={`vl-bl ${run?.first ? 'first' : ''}`}>
                   {run?.first && c && (c.uncommitted ? <span className="muted">{t('git.blame.uncommitted')}</span>
@@ -124,6 +128,18 @@ function Preview({ agent, path, change, stamp, onOpenCommit, onDiscard, onDiscar
   }, [agent.id, path, view, change?.status, change?.oldPath, stamp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const parsed = useMemo(() => (diff && diff.path === path ? parseDiff(diff.diff) : null), [diff, path]);
+
+  // The File view marks what changed since the last commit. New files are all added; for the rest, read the diff.
+  const [markDiff, setMarkDiff] = useState<GitDiffResult | null>(null);
+  const wholeNew = change?.status === 'untracked' || (change?.status === 'added' && !change.oldPath);
+  useEffect(() => {
+    setMarkDiff(null);
+    if (view !== 'file' || !change || isImage || wholeNew || change.status === 'deleted' || change.status === 'conflict') return;
+    let dead = false;
+    api.get<GitDiffResult>(`/agents/${agent.id}/git/diff?path=${encodeURIComponent(path)}${change.oldPath ? `&old=${encodeURIComponent(change.oldPath)}` : ''}`).then((d) => !dead && setMarkDiff(d)).catch(() => undefined);
+    return () => { dead = true; };
+  }, [agent.id, path, view, change?.status, change?.oldPath, stamp]); // eslint-disable-line react-hooks/exhaustive-deps
+  const marks = useMemo(() => (markDiff && markDiff.path === path ? changeMarks(parseDiff(markDiff.diff)) : null), [markDiff, path]);
   const slash = path.lastIndexOf('/');
   const dir = slash >= 0 ? path.slice(0, slash + 1) : ''; const name = path.slice(slash + 1);
 
@@ -159,7 +175,7 @@ function Preview({ agent, path, change, stamp, onOpenCommit, onDiscard, onDiscar
           ) : null
         ) : isImage && !imgFailed && change?.status !== 'deleted' ? (
           <div className="gx-image"><img src={`/api/agents/${agent.id}/git/raw?path=${encodeURIComponent(path)}&v=${stamp}`} alt={name} onError={() => setImgFailed(true)} /></div>
-        ) : file && file.path === path ? <FileView f={file} agent={agent} blame={blameOn} onOpenCommit={onOpenCommit} /> : isImage && imgFailed ? <p className="gx-note">{t('git.file.binary')}</p> : null}
+        ) : file && file.path === path ? <FileView f={file} agent={agent} blame={blameOn} onOpenCommit={onOpenCommit} marks={marks} allNew={wholeNew} /> : isImage && imgFailed ? <p className="gx-note">{t('git.file.binary')}</p> : null}
       </div>
     </section>
   );
