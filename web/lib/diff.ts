@@ -90,7 +90,11 @@ export function changeMarks(parsed: ParsedDiff): ChangeMarks {
         const after = adds.length ? adds[adds.length - 1].newNo! + 1 : (i < L.length ? at[i] : nxt);
         if (dels.length > adds.length) { removedBefore.add(after); blockOfRemoval.set(after, gi); from = Math.min(from, after); to = Math.max(to, after); }
       }
-      const sl = L.slice(Math.max(0, s - 3), Math.min(L.length - 1, e + 3) + 1);
+      // Context is only unchanged lines, and stops where a neighbouring change begins, so the panel never shows
+      // another change's added/removed lines.
+      let from0 = s; for (let k = 0; k < 3 && from0 > 0 && L[from0 - 1].kind === 'ctx'; k++) from0--;
+      let to0 = e; for (let k = 0; k < 3 && to0 < L.length - 1 && L[to0 + 1].kind === 'ctx'; k++) to0++;
+      const sl = L.slice(from0, to0 + 1);
       const o = sl.filter((l) => l.oldNo !== undefined), n = sl.filter((l) => l.newNo !== undefined);
       groups.push({ from, to, view: { header: `@@ -${o[0]?.oldNo ?? 0},${o.length} +${n[0]?.newNo ?? 0},${n.length} @@`, section: '', lines: sl } });
     }
