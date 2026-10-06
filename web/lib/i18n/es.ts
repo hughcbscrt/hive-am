@@ -786,5 +786,10 @@ export const es: Record<DictKey, string> = {
   "git.discard.all.lines": "En total: +{add} −{del} líneas de cambios.",
   "git.discard.all.warn": "Todo esto se pierde de forma definitiva. No se puede deshacer.",
   "git.discard.all.go": "Descartar todos los cambios",
+  "git.discard.file.title": "¿Descartar los cambios de este archivo?",
+  "git.discard.file.modified": "El archivo vuelve a como está en el último commit{lines}.",
+  "git.discard.file.deleted": "El archivo borrado se restaurará desde el último commit.",
+  "git.discard.file.renamed": "Se deshace el renombrado: el archivo vuelve a su nombre original, {from}.",
+  "git.discard.file.go": "Descartar cambios del archivo",
 
 };

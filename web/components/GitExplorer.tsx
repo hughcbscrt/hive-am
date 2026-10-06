@@ -20,7 +20,7 @@ import { ago } from '@/lib/meta';
 import { dateLocale } from '@/lib/i18n';
 import { Segmented } from './ui';
 import { ConflictResolver } from './ConflictResolver';
-import { ActionButtons, BranchMenu, CommitDialog, DiscardConfirm, type DiscardSummary, HistoryList, NoticeBanner, useGitActions } from './GitActions';
+import { ActionButtons, BranchMenu, CommitDialog, DiscardConfirm, type DiscardFile, type DiscardSummary, HistoryList, NoticeBanner, useGitActions } from './GitActions';
 import type { GitBlame, GitCommitDetail } from '@/lib/types';
 
 const TREE_MAX_ROWS = 2000;   // the file tree is a list of buttons, not windowed: it shows this many and asks for a narrower filter
@@ -265,7 +265,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
   const [commitSel, setCommitSel] = useState<string | null>(null);
   const [commitOpen, setCommitOpen] = useState(false);
   const actions = useGitActions(agent, () => refresh());
-  const [discardAsk, setDiscardAsk] = useState<{ files: string[]; all: boolean; summary?: DiscardSummary; go: () => Promise<boolean> } | null>(null);
+  const [discardAsk, setDiscardAsk] = useState<{ files: string[]; all: boolean; summary?: DiscardSummary; file?: DiscardFile; go: () => Promise<boolean> } | null>(null);
   const prefs = useGitPrefs();
   const seenDirs = useRef<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
@@ -322,12 +322,12 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
 
   // Discarding goes straight through, except when it would delete files that are in no commit: that asks first.
   const doomed = (cs: GitChange[]) => cs.filter((c) => c.status === 'untracked' || (c.status === 'added' && !c.oldPath)).map((c) => c.path);
-  const askOrRun = (files: string[], all: boolean, go: () => Promise<boolean>) => { if (files.length) setDiscardAsk({ files, all, go }); else void go(); };
-  const discardFile = (c: GitChange) => askOrRun(doomed([c]), false, async () => {
+  // Discarding a file always asks too: a new file is deleted, anything else goes back to the last commit.
+  const discardFile = (c: GitChange) => setDiscardAsk({ files: doomed([c]), all: false, file: { path: c.path, status: c.status, oldPath: c.oldPath, add: c.additions ?? 0, del: c.deletions ?? 0 }, go: async () => {
     const ok = await actions.run('discard', t('git.done.discard'), 'discard', { path: c.path, oldPath: c.oldPath });
     if (ok && doomed([c]).length) setSel(null);
     return ok;
-  });
+  } });
   // "Discard all" always asks: it is the one action that can throw away a lot of work in a single click.
   const discardAll = () => {
     const gone = doomed(status.changes);
@@ -426,7 +426,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
           : sel && selChange?.status === 'conflict' ? <ConflictResolver key={sel} agent={agent} path={sel} state={status.state} a={actions} onResolved={() => { void refresh(); }} />
           : sel ? <Preview key={sel} agent={agent} path={sel} change={selChange} stamp={status.generatedAt} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} onDiscard={discardFile} onDiscardHunk={discardHunk} onDiscardLines={discardLines} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
       </div>
-      {discardAsk && <DiscardConfirm files={discardAsk.files} all={discardAsk.all} summary={discardAsk.summary} busy={!!actions.busy} onClose={() => setDiscardAsk(null)} onConfirm={async () => { const go = discardAsk.go; setDiscardAsk(null); await go(); }} />}
+      {discardAsk && <DiscardConfirm files={discardAsk.files} all={discardAsk.all} summary={discardAsk.summary} file={discardAsk.file} busy={!!actions.busy} onClose={() => setDiscardAsk(null)} onConfirm={async () => { const go = discardAsk.go; setDiscardAsk(null); await go(); }} />}
       {commitOpen && <CommitDialog changes={status.changes} a={actions} initialMessage={status.mergeMsg} onClose={() => setCommitOpen(false)} />}
     </div>
   );

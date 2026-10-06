@@ -788,6 +788,11 @@ export const en = {
   "git.discard.all.lines": "In total: +{add} −{del} lines of changes.",
   "git.discard.all.warn": "All of this is lost for good. It cannot be undone.",
   "git.discard.all.go": "Discard all changes",
+  "git.discard.file.title": "Discard this file’s changes?",
+  "git.discard.file.modified": "The file goes back to how it is in the last commit{lines}.",
+  "git.discard.file.deleted": "The deleted file will be restored from the last commit.",
+  "git.discard.file.renamed": "The rename is undone: the file goes back to its original name, {from}.",
+  "git.discard.file.go": "Discard file changes",
 
 };
 

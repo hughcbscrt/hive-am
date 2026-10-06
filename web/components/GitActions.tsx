@@ -6,7 +6,7 @@ import { useI18n } from '@/lib/i18n';
 import { ago } from '@/lib/meta';
 import { useDismiss } from '@/lib/useDismiss';
 import { StatusLetter } from './StatusLetter';
-import type { Agent, GitBranches, GitChange, GitCommitInfo } from '@/lib/types';
+import type { Agent, GitBranches, GitChange, GitChangeStatus, GitCommitInfo } from '@/lib/types';
 import { Modal, useToast } from './ui';
 
 /* ------------------------------------------------------------------ running actions */
@@ -233,12 +233,13 @@ export function HistoryList({ agent, head, sel, onSelect }: { agent: Agent; head
 /* ------------------------------------------------------------------ discard */
 
 export interface DiscardSummary { restore: number; add: number; del: number }
+export interface DiscardFile { path: string; status: GitChangeStatus; oldPath?: string; add: number; del: number }
 
 /**
  * Asked before deleting new files (they are in no commit, so there is nothing to go back to) and, always, before
  * "discard all". For "discard all" it spells out what happens to each kind of file and how many lines are lost.
  */
-export function DiscardConfirm({ files, all, summary, busy, onConfirm, onClose }: { files: string[]; all: boolean; summary?: DiscardSummary; busy: boolean; onConfirm: () => void; onClose: () => void }) {
+export function DiscardConfirm({ files, all, summary, file, busy, onConfirm, onClose }: { files: string[]; all: boolean; summary?: DiscardSummary; file?: DiscardFile; busy: boolean; onConfirm: () => void; onClose: () => void }) {
   const { t } = useI18n();
   const list = (
     <ul className="gx-dlist">
@@ -246,6 +247,20 @@ export function DiscardConfirm({ files, all, summary, busy, onConfirm, onClose }
       {files.length > 8 && <li className="muted">{t('hover.more', { count: files.length - 8 })}</li>}
     </ul>
   );
+  if (!all && file && !files.length) {      // one tracked file: it goes back to the last commit
+    const lines = file.add || file.del ? ` (+${file.add} −${file.del})` : '';
+    return (
+      <Modal title={t('git.discard.file.title')} onClose={onClose}>
+        <p className="gx-file-eff mono">{file.path}</p>
+        <p style={{ margin: 0 }}>{file.status === 'deleted' ? t('git.discard.file.deleted') : file.status === 'renamed' ? t('git.discard.file.renamed', { from: file.oldPath ?? '' }) : t('git.discard.file.modified', { lines })}</p>
+        <p className="gx-lost">{t('git.discard.all.warn')}</p>
+        <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <button className="btn ghost" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn danger" disabled={busy} onClick={onConfirm}>{t('git.discard.file.go')}</button>
+        </div>
+      </Modal>
+    );
+  }
   if (!all) {
     return (
       <Modal title={t('git.discard.confirm.title')} onClose={onClose}>
