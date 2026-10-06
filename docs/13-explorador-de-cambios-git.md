@@ -1,6 +1,6 @@
 # 13. Explorador de cambios (git)
 
-En la pantalla de cada agente, junto a **Chat**, hay una pestaña **Cambios**. Es un **explorador de archivos de solo lectura** de la carpeta en la que trabaja el agente: muestra **todos** los archivos, resalta los que tienen cambios según git y, al seleccionar uno, muestra su **diferencia** o su contenido. **No se puede editar nada** ni ejecutar acciones de git desde ahí.
+En la pantalla de cada agente, junto a **Chat**, hay una pestaña **Cambios**. Es un **explorador de archivos** de la carpeta en la que trabaja el agente: muestra **todos** los archivos, resalta los que tienen cambios según git y, al seleccionar uno, muestra su **diferencia** o su contenido. **El código no se edita** desde ahí, pero sí se pueden hacer las acciones habituales de git (commit, pull, push, fetch, ramas) y consultar el **historial**; ver [13.8](#138-acciones-de-git-e-historial).
 
 ## 13.1 Qué se ve
 
@@ -26,7 +26,7 @@ En la pantalla de cada agente, junto a **Chat**, hay una pestaña **Cambios**. E
 |---|---|
 | `⎇ main  9320d97 ⌄` | **Badge de la rama**, compacto: rama (con puntos suspensivos si es muy larga) + hash corto + `↑n ↓n` si hay commits por delante / por detrás de la rama remota. Es un botón: al pulsarlo **se despliega el detalle** (ver abajo). Con la rama desacoplada muestra "desacoplado en `<sha>`"; sin commits, "sin commits aún" |
 | `N archivos cambiados +A −D` | Resumen de cambios respecto al último commit |
-| 🔒 **Solo lectura** | Recuerda que el explorador no edita |
+| **Ramas · Fetch · Pull · Push · Commit** | Acciones de git ([13.8](#138-acciones-de-git-e-historial)) |
 | ⟳ | Actualizar (el *tooltip* indica la hora de la última lectura) |
 
 Si el agente trabaja en una **subcarpeta** del repositorio, todo se limita a esa subcarpeta y se muestra un aviso ("Mostrando solo `sub/`…").
@@ -92,7 +92,7 @@ El **chat sigue montado** (solo oculto) cuando estás en Cambios: un mensaje a m
 | `git` no está instalado / no está en el `PATH` del servidor | "git no está disponible" |
 | Otro error de git (p. ej. propiedad dudosa de la carpeta) | "No se pudo leer el repositorio" con el texto de git |
 
-## 13.4 API (solo lectura)
+## 13.4 API de lectura
 
 Todas bajo `/api/agents/:id/git/…`, y siempre sobre la **carpeta efectiva** del agente.
 
@@ -108,7 +108,7 @@ Las rutas son **relativas a la raíz del repositorio**.
 
 ## 13.5 Seguridad
 
-El explorador solo **lee** y está pensado para no interferir con el agente:
+Las **lecturas** (explorador, diffs, historial) no escriben nada y están pensadas para no interferir con el agente; las **acciones** que escriben tienen sus propias reglas en [13.8](#138-acciones-de-git-e-historial). Sobre las lecturas:
 
 - **No escribe nada** en el repositorio. Todas las llamadas son comandos de lectura (`status`, `diff`, `ls-files`, `show`, `rev-parse`, `log`, `rev-list`). `GIT_OPTIONAL_LOCKS=0` evita que `git status` toque el índice mientras el agente usa git.
 - Se ejecuta con `execFile` (**sin shell**); las rutas siempre van después de `--`.
@@ -123,19 +123,113 @@ Recuerda que, como el resto de la API, **no tiene autenticación** ([documento 1
 
 | Archivo | Responsabilidad |
 |---|---|
-| `server/src/git.ts` | `gitStatus`, `gitTree`, `gitDiff`, `gitFile`, `gitImagePath`; validación de rutas |
-| `server/src/api.ts` | Las 5 rutas `…/git/*` (la de `raw` escribe su propia respuesta binaria) |
+| `server/src/git.ts` | Lectura: `gitStatus`, `gitTree`, `gitDiff`, `gitFile`, `gitImagePath`; validación de rutas |
+| `server/src/api.ts` | Las rutas `…/git/*` (la de `raw` escribe su propia respuesta binaria) |
 | `web/lib/useGit.ts` | Hook: estado, árbol, refresco y *polling* |
 | `web/lib/gitTree.ts` | Construye el árbol, compacta carpetas, filtra y aplana filas |
 | `web/lib/diff.ts` | Parser de diff unificado y emparejado para la vista lado a lado |
-| `web/components/GitExplorer.tsx` | Barra, árbol y vista previa |
+| `web/components/GitExplorer.tsx` | Barra, árbol, vista previa y vista de un commit |
+| `web/components/ConflictResolver.tsx` · `web/lib/conflicts.ts` | Resolvedor de conflictos y el análisis/aplicación de bloques |
+| `web/components/CodeEditor.tsx` · `Code.tsx` · `GitSettings.tsx` · `web/lib/highlight.ts` · `web/lib/gitPrefs.ts` | Editor con resaltado, código resaltado, ajustes de vista, resaltador y preferencias |
+| `web/components/StatusLetter.tsx` · `web/lib/useDismiss.ts` | Piezas compartidas: la letra de estado (M/A/D/R/U/!/T) y el cierre de popovers con clic fuera o Esc (también lo usa `HelpPopover`) |
+| `web/components/useAgentSettings.tsx` · `DeleteAgentModal.tsx` | Edición y borrado de un agente, compartidos por el chat y Colonia |
+| `web/components/GitActions.tsx` | Botones Fetch/Pull/Push/Commit, menú de ramas, diálogo de commit, lista del historial |
+| `server/src/gitops.ts` | Historial, ramas y acciones que escriben (commit, pull, push, fetch, switch, merge) |
 | `web/app/agents/[id]/page.tsx` | Pestañas **Chat / Cambios** y la insignia |
 
 ## 13.7 Límites conocidos
 
-- Muestra diferencias contra `HEAD`: no separa visualmente lo que está en el *stage* de lo que no (solo lo indica con una etiqueta).
+- Muestra diferencias contra `HEAD`: no separa visualmente lo que está en el *stage* de lo que no (solo lo indica con una etiqueta). El commit elige archivos completos, no líneas sueltas.
 - Sin resaltado de sintaxis ni diferencias a nivel de palabra.
 - Los renombres se detectan con la heurística de similitud de git (`-M`).
-- No muestra historial de commits, *blame* ni ramas; tampoco ofrece acciones (stage, commit, descartar).
+- Sin *stash*, *cherry-pick*, *rebase* interactivo ni descartar cambios; no hace *force push*.
 - En repositorios enormes el árbol se recorta a 30 000 archivos y la lista visible a 2 000 filas (se avisa; el filtro permite llegar al resto).
 - Los submódulos aparecen como una sola entrada.
+
+## 13.8 Acciones de git e historial
+
+Junto al resumen de cambios, la barra ofrece **Ramas**, **Fetch**, **Pull**, **Push** y **Commit**. Pull y Push muestran un contador (`↓n` / `↑n`) con los commits por traer o por enviar; Commit muestra cuántos archivos tienen cambios. Mientras una acción corre, los botones se desactivan y el icono gira. Al terminar aparece un aviso (con la última línea que imprimió git) y el estado se refresca.
+
+| Acción | Qué hace | Detalles |
+|---|---|---|
+| **Commit** | Abre un diálogo con los archivos cambiados (todos marcados), un cuadro de mensaje y los botones **Commit** y **Commit y push** (`Ctrl+Enter` confirma) | Solo se confirma lo **marcado**: `git add -A -- <rutas>` y `git commit -m <mensaje> -- <rutas>` (en el primer commit del repositorio, lo que se acaba de añadir). Los renombres incluyen la ruta vieja. Se ejecutan los *hooks* del repositorio. Con una **fusión en curso** (p. ej. tras resolver un conflicto) git no admite commits parciales, así que se confirma todo lo que esté en el *stage*. |
+| **Fetch** | `git fetch --all --prune` | No toca tus archivos |
+| **Pull** | `git pull --ff-only --no-edit` | Solo avance rápido. Si las ramas **divergieron**, el aviso ofrece **Pull con merge** y **Pull con rebase** |
+| **Push** | `git push`; si la rama aún no tiene *upstream*, `git push -u origin <rama>` | Nunca `--force`. Desactivado con la rama desacoplada |
+| **Ramas** | Menú con búsqueda, ramas **locales** y **remotas**, y un campo para **crear** una rama nueva desde la actual | Clic en una rama = `git switch`; una remota se convierte en rama local que la sigue. El icono de fusión pide confirmación y ejecuta `git merge --no-edit <rama>` |
+| **Cancelar fusión** | `git merge --abort` | Aparece en el aviso cuando una fusión (o pull con merge) termina con **conflictos** |
+
+Si git falla (conflictos, credenciales, cambios locales que impiden cambiar de rama…), se muestra **el texto de git tal cual** en un aviso rojo que se cierra con la X.
+
+**Agente trabajando.** Si el agente está en un turno, aparece una advertencia ("…hacer commit, pull o cambiar de rama ahora puede chocar con sus ediciones"). Las acciones **no se bloquean**: la decisión es tuya.
+
+### Historial
+
+La pestaña **Historial** (junto a *Archivos*) lista los commits de la rama actual, **30 por página** con **Cargar más**: asunto, hash corto, autor, fecha relativa y etiquetas de ramas (`merge` si es un commit de fusión). Se recarga sola cuando `HEAD` cambia. Al elegir un commit se ve su mensaje completo, autor, fecha, la lista de archivos con `+/−` y el diff de cada uno (unificado o lado a lado). Para un commit de **fusión** se muestran los cambios respecto a su primer padre (lo que trajo la fusión). Es ligero: solo se pide una página de commits y, bajo demanda, el diff de **un** archivo.
+
+### API (escritura e historial)
+
+| Ruta | Descripción |
+|---|---|
+| `GET …/git/log?skip=N` | `{ commits[], hasMore }` (30 por página) |
+| `GET …/git/commit?sha=` | Detalle de un commit: mensaje, autor, fecha, archivos (hasta 500) |
+| `GET …/git/commit-diff?sha=&path=&old=` | Diff de un archivo en ese commit |
+| `GET …/git/branches` | `{ current, local[], remote[] }` |
+| `POST …/git/commit` | `{ message, paths[] }` |
+| `POST …/git/fetch` · `…/pull` (`{ mode: 'ff-only' \| 'merge' \| 'rebase' }`) · `…/push` | |
+| `POST …/git/switch` | `{ branch, create? }` |
+| `POST …/git/merge` · `…/merge-abort` | `{ branch }` / sin cuerpo |
+
+Las acciones responden `{ ok: true, output }`; si git falla, `400` con `{ error }` (el texto de git).
+
+### Seguridad de las acciones
+
+- **Sin shell:** `execFile`; el mensaje va como valor de `-m`, las rutas después de `--`, y los nombres de rama se validan con `git check-ref-format` (y no pueden empezar con `-`). Las rutas pasan por la misma validación que las lecturas (dentro de la carpeta del agente, nunca `.git`).
+- **Nunca `--force`**, nunca `--no-verify`, y `GIT_TERMINAL_PROMPT=0` + `ssh -o BatchMode=yes`: si faltan credenciales, git falla en vez de quedarse esperando.
+- **Origen local:** como la API acepta cualquier origen (CORS abierto), las rutas de escritura rechazan (`403`) las peticiones con cabecera `Origin` que no sea `localhost`/`127.0.0.1` o el mismo host. Una página web externa no puede lanzar un commit o un push.
+- **Una escritura a la vez por repositorio:** un cerrojo en el servidor evita choques por doble clic o dos pestañas (`index.lock`).
+- Tiempos máximos: 30 s las acciones locales y 120 s las de red.
+
+## 13.9 Resolver conflictos
+
+Cuando una fusión (o un *pull* con merge o rebase) deja conflictos, aparece una franja **"Fusión en curso"** (o **"Rebase en curso"**) con el número de archivos en conflicto y los botones **Cancelar fusión** (`merge --abort`, o `rebase --abort` si es un rebase). Los archivos en conflicto llevan la letra **!** y, al seleccionarlos, la vista previa es el **resolvedor**:
+
+- **Un bloque por conflicto**, con dos columnas: **Mío (rama actual)** y **Remoto (lo que entra)**, con el nombre de la rama de cada lado. Cada bloque ofrece **Quedarme con lo mío**, **Quedarme con el remoto** y **Quedarme con ambos** (**mío primero** o **remoto primero**). Se pueden mezclar decisiones: el bloque 1 mío, el 2 del remoto, el 3 ambos.
+- **Resultado editable.** Abajo está el archivo completo, siempre editable (con números de línea, el mismo resaltado y los mismos temas del visor). Cada botón de bloque solo reescribe su bloque en ese texto; cualquier cosa se puede corregir a mano (por ejemplo si "ambos" deja código repetido). **No hay detección automática de repetidos**: dos funciones con el mismo nombre pueden estar estructuradas distinto y quitarlas sin que lo decidas sería peligroso. Las líneas de marcadores (`<<<<<<<`, `=======`, `>>>>>>>`) se pintan en otro color.
+- **Todo lo mío / Todo lo del remoto** (`git checkout --ours|--theirs`): toman un lado completo del archivo; si ese lado lo había borrado, el archivo se elimina. Es la única opción para archivos binarios o demasiado grandes.
+- **Marcar como resuelto:** guarda el resultado y hace `git add`. Se rechaza si aún quedan marcadores `<<<<<<<` / `>>>>>>>`.
+- **Restaurar conflicto:** `git checkout -m -- <archivo>` vuelve a poner los marcadores.
+- En un **rebase** git invierte los lados: el resolvedor lo tiene en cuenta ("mío" siempre es el lado con tus commits).
+- Con todos los conflictos resueltos, la franja muestra **Concluir fusión (commit)** (el mensaje viene prellenado con el de git) o **Continuar rebase** (`git rebase --continue`).
+
+API: `POST …/git/resolve-side` `{ path, side: 'ours'|'theirs' }`, `…/resolve` `{ path, content }`, `…/unresolve` `{ path }`, `…/rebase-continue`. Solo se aceptan sobre archivos que git tiene realmente en conflicto, con las mismas validaciones de ruta y de origen que el resto de acciones. El estado (`state: 'merge'|'rebase'|null`, `mergeMsg`) viene en `GET …/git/status`.
+
+## 13.10 Ajustes de la vista de código y blame
+
+**Ajustes** (icono de sliders en la barra, se guardan solo en este navegador: `localStorage` `hive-git-view`):
+
+| Ajuste | Efecto |
+|---|---|
+| **Tema** | Hive (sigue a la app), GitLab Light, GitLab Dark, Solarized Light/Dark, Monokai, Dracula. Cambia el fondo, los números de línea, los colores de añadido/eliminado y la sintaxis |
+| **Mostrar espacios en blanco** | Espacios como `·` y tabuladores como `→`. El carácter real se conserva (los anchos no cambian); el marcador se dibuja encima con CSS |
+| **Ancho del tabulador** | 2, 4 u 8 |
+
+Los ajustes se aplican por igual al **visor de archivos**, a los **diffs** (unificado y lado a lado, también en el historial), a los bloques del resolvedor y al **editor del resultado**, que es un `<textarea>` transparente sobre una capa resaltada (mismo tipo de letra y *scroll*), así que se ve idéntico al visor y conserva el cursor y la selección nativos.
+
+**Resaltado:** `highlight.js` (núcleo + 26 lenguajes, cargados con el resto del código) en `web/lib/highlight.ts`; el lenguaje sale de la extensión (o `Dockerfile`/`Makefile`). Cada línea de un diff se resalta por separado. Por encima de 250 000 caracteres no se resalta.
+
+**Blame:** en la pestaña **Archivo** de un archivo versionado, el botón **Blame** añade una columna con el hash corto, el autor y el tiempo relativo en la primera línea de cada tramo del mismo commit (los tramos alternan de tono). Pasar el cursor muestra el asunto del commit y la fecha; al hacer clic se abre ese commit en **Historial**. Las líneas sin commit dicen "Sin commit". Hasta 5 000 líneas (se avisa). `GET …/git/blame?path=` devuelve `{ commits, lines[] (un hash por línea), truncated }` (`git blame --porcelain -w`).
+
+**Fechas.** En todo el visor (blame, historial, detalle de un commit, información de la rama) las fechas se muestran con diagonales y en orden **día / mes / año** (`06/10/2026, 10:46`), nunca con el mes primero, y con hora de 24 h, en español y en inglés. El servidor entrega las fechas en ISO 8601 y la interfaz las formatea según el idioma (`dateLocale()` en `web/lib/i18n/core.ts`, `fmtDate`/`fmtDateTime` en `web/lib/format.ts`). Los tiempos relativos ("hace 5 min") usan el mismo `ago()` que el resto de la app.
+
+## 13.11 Rendimiento con archivos grandes
+
+Un archivo de miles de líneas (p. ej. un `.pm` de 2 200 líneas / 80 KB) no debe trabar la interfaz. Por eso:
+
+- **Filas virtualizadas** (`web/components/VirtualLines.tsx`): el visor de archivos y el editor del resolvedor solo ponen en el DOM las filas visibles más un margen (~50 en total), con altura fija de 20 px y sin ajuste de línea. Abrir un archivo de 2 185 líneas pasó de ~2 200 filas de tabla a ~56 filas. Ya no existe el límite de 2 000 filas ni el botón "Mostrar todas" del visor de archivos (los **diffs** conservan ese límite).
+- **Resaltado fuera del hilo principal** (`web/lib/useHighlighted.ts`, `highlight.worker.ts`): hasta 15 000 caracteres se resalta al instante; por encima, lo hace un *Web Worker*. Mientras el worker trabaja (y mientras editas), cada línea que no cambió conserva sus colores —se compara desde el principio y desde el final del archivo— y solo las líneas editadas se ven sin color un instante. En el editor, el resaltado espera 150 ms de calma.
+- **Filas baratas:** cada fila recibe la preferencia de "mostrar espacios" ya resuelta (`CodeCell`, sin suscribirse por fila) y los diffs usan filas memorizadas.
+- **Límite de resaltado:** 1,2 M de caracteres (más que cualquier archivo que el servidor envía, 1 MB).
+
+Medido en modo desarrollo con ese archivo: desplazarse por 30 000 px promedia ~23 ms por fotograma; en el editor, cada pulsación pasó de ~350 ms a ~95 ms, de los cuales ~65 ms son del propio `<textarea>` del navegador con 83 KB de texto (un `<textarea>` simple de ese tamaño tarda ~33 ms en actualizar su valor y recalcular el diseño). En una compilación de producción es menor.
+

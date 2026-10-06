@@ -24,7 +24,8 @@ hive-am/
 │       ├── models.ts         # lista de modelos por proveedor (con caché)
 │       ├── pricing.ts        # estimación de costo y suma de uso de tokens
 │       ├── stats.ts          # estadísticas de una sesión (tokens, herramientas, línea de tiempo)
-│       ├── git.ts            # lectura de solo lectura de git para el explorador de cambios
+│       ├── git.ts            # lecturas de git para el explorador de cambios
+│       ├── gitops.ts         # historial, ramas y acciones de git (commit, pull, push…)
 │       ├── mcp-config.ts     # puerto de la API y configuración MCP para Claude/OpenCode
 │       ├── providers/
 │       │   ├── index.ts      # tabla proveedor → runner
@@ -63,7 +64,8 @@ hive-am/
     │   ├── Chat.tsx          # transcripción, vista en vivo, caja de texto
     │   ├── ToolCall.tsx      # render de cada herramienta que usa el agente
     │   ├── StatsBar.tsx      # barra y panel de tokens, costo y herramientas
-    │   ├── GitExplorer.tsx   # pestaña Cambios: árbol con resaltado + visor de diffs (solo lectura)
+    │   ├── GitExplorer.tsx   # pestaña Cambios: árbol con resaltado + visor de diffs
+    │   ├── GitActions.tsx    # botones de git, menú de ramas, diálogo de commit, historial
     │   └── HelpPopover.tsx   # icono de ayuda con popover
     └── lib/
         ├── api.ts            # cliente fetch hacia /api (traduce los errores del servidor)
@@ -96,7 +98,8 @@ No existen aún carpetas de pruebas automatizadas; la verificación se describe 
 | `models.ts` | Modelos disponibles por proveedor; caché de 10 minutos. |
 | `pricing.ts` | Tabla de precios por familia (opus/sonnet/haiku) y utilidades de suma de uso. |
 | `stats.ts` | `sessionStats(mensajes)`: totales de tokens, costo, herramientas, modelos y línea de tiempo por turno. |
-| `git.ts` | Lectura de solo lectura de git (estado, árbol, diff, contenido, imágenes) con validación de rutas; ver [documento 13](13-explorador-de-cambios-git.md). |
+| `gitops.ts` | Historial, ramas y acciones que escriben (commit, pull, push, fetch, switch, merge); ver [documento 13](13-explorador-de-cambios-git.md#138-acciones-de-git-e-historial). |
+| `git.ts` | Lecturas de git (estado, árbol, diff, contenido, imágenes) con validación de rutas; ver [documento 13](13-explorador-de-cambios-git.md). |
 | `mcp-config.ts` | `API_PORT` (variable `HIVE_AM_PORT`, 4400 por defecto) y los objetos de configuración MCP que se entregan a Claude y OpenCode. |
 | `providers/spawn.ts` | `spawnLines`: lanza el CLI, entrega stdout línea a línea, maneja cancelación, errores y `PWD`. |
 | `providers/claude.ts`, `opencode.ts`, `kiro.ts` | Un generador asíncrono por proveedor que produce `StreamEvent`. |
@@ -122,7 +125,8 @@ No existen aún carpetas de pruebas automatizadas; la verificación se describe 
 | `components/Chat.tsx` | Transcripción memoizada, turno en vivo, tarjeta de delegación, caja de texto aislada. |
 | `components/ToolCall.tsx` | Convierte cada llamada a herramienta en una fila legible (`describe`). |
 | `components/StatsBar.tsx` | Resumen de la sesión y panel desplegable. |
-| `components/GitExplorer.tsx` | Pestaña **Cambios**: árbol de archivos con resaltado y visor de diferencias (solo lectura). |
+| `components/GitExplorer.tsx` | Pestaña **Cambios**: árbol de archivos con resaltado, visor de diferencias y vista de un commit. |
+| `components/GitActions.tsx` | Botones Fetch/Pull/Push/Commit, menú de ramas, diálogo de commit e historial. |
 | `lib/store.tsx` | Estado global, WebSocket y reductor de eventos. |
 | `lib/i18n/*` | Traducciones de la interfaz (inglés y español); ver [documento 11](11-frontend.md#118-internacionalización-i18n). |
 

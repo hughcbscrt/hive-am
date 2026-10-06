@@ -67,9 +67,9 @@ Navegador ── WebSocket directo ──▶ ws://<hostname>:4400/ws
 |---|---|
 | `GET /api/sessions` | Todas las sesiones registradas, más `current`, `message_count`, `preview`, `usage`, `cost`, `tool_calls`, `model`. **Lee el historial de cada sesión** en cada llamada. |
 
-### Explorador de cambios (git, solo lectura)
+### Explorador de cambios (git)
 
-Ver el detalle en el [documento 13](13-explorador-de-cambios-git.md#134-api-solo-lectura).
+Lecturas: [documento 13, §13.4](13-explorador-de-cambios-git.md#134-api-de-lectura). Historial y acciones que escriben (commit, pull, push, fetch, ramas): [§13.8](13-explorador-de-cambios-git.md#138-acciones-de-git-e-historial).
 
 | Método y ruta | Respuesta |
 |---|---|
