@@ -217,7 +217,10 @@ export async function gitTree(cwd: string): Promise<{ isRepo: false; reason: str
   // What .gitignore hides, as the top-most entries only: an ignored folder is one entry ("node_modules/"), never
   // expanded here (that could be 100k files); it is listed when opened (see gitList).
   const ign = await git(root, ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory', '--', ...pathspec(scope)]).catch(() => ({ stdout: '' }));
-  const ignored = ign.stdout.split('\0').filter((p) => p && !p.split('/').includes('.git')).sort((a, b) => a.localeCompare(b)).slice(0, MAX_IGNORED);
+  const listed = ign.stdout.split('\0').filter((p) => p && !p.split('/').includes('.git'));
+  // git can list a folder and, separately, files inside it that other patterns also ignore: keep only the outermost.
+  const dirs = listed.filter((p) => p.endsWith('/'));
+  const ignored = listed.filter((p) => !dirs.some((d) => d !== p && p.startsWith(d))).sort((a, b) => a.localeCompare(b)).slice(0, MAX_IGNORED);
   return { isRepo: true, root, scope, files: all.slice(0, MAX_TREE_FILES), truncated: all.length > MAX_TREE_FILES, ignored };
 }
 

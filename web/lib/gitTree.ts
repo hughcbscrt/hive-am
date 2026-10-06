@@ -38,8 +38,10 @@ export function buildTree(files: string[], changes: GitChange[], ignored: string
 
   // Ignored entries: a folder is one dimmed node whose content is fetched when it is opened.
   const addIgnored = (parent: TreeNode, path: string, dir: boolean) => {
+    if (parent.children.some((c) => c.path === path)) return;   // already there (a folder can be both tracked-ish and ignored): never two nodes with one path
     const node: TreeNode = { name: path.slice(path.lastIndexOf('/') + 1), path, type: dir ? 'dir' : 'file', children: [], ignored: true, lazy: dir && !(path in kids), changed: 0, additions: 0, deletions: 0 };
     parent.children.push(node);
+    if (dir) dirs.set(path, node);   // so anything listed inside it lands in this node, not in a second folder
     if (dir) for (const k of kids[path] ?? []) addIgnored(node, `${path}/${k.name}`, k.dir);
   };
   for (const e of ignored) {

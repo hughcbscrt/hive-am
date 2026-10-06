@@ -416,7 +416,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
               const isDir = node.type === 'dir'; const open = isDir && (query || onlyChanged || expanded.has(node.path));
               const c = node.change;
               return (
-                <button key={node.path} data-row data-dir={isDir ? '1' : '0'} data-path={node.path} type="button" role="treeitem" aria-level={depth + 1} aria-expanded={isDir ? !!open : undefined} aria-selected={!isDir && sel === node.path}
+                <button key={`${node.ignored ? 'i:' : ''}${node.path}`} data-row data-dir={isDir ? '1' : '0'} data-path={node.path} type="button" role="treeitem" aria-level={depth + 1} aria-expanded={isDir ? !!open : undefined} aria-selected={!isDir && sel === node.path}
                   className={`gx-row ${isDir ? 'dir' : 'file'} ${node.ignored ? 'ignored' : ''} ${c ? `changed st-${c.status}` : ''} ${!isDir && sel === node.path ? 'sel' : ''} ${isDir && node.changed ? 'has-changes' : ''}`}
                   style={{ paddingLeft: 8 + depth * 14 }} title={node.ignored ? `${node.path} — ${t('git.ignored.hint')}` : node.path}
                   onClick={() => (isDir ? openDir(node) : setSel(node.path))}>
