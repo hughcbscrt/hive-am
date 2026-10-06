@@ -1,8 +1,9 @@
 'use client';
-import { use, useEffect, useMemo, useState } from 'react';
+import { useAgentSettings } from '@/components/useAgentSettings';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, History, RotateCcw, SlidersHorizontal, Trash2, Waypoints } from 'lucide-react';
+import { ArrowLeft, History, RotateCcw, SlidersHorizontal, Waypoints } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
 import { ago, shortPath } from '@/lib/meta';
@@ -11,7 +12,7 @@ import { StatsBar } from '@/components/StatsBar';
 import { AgentSwitcher } from '@/components/AgentSwitcher';
 import { GitExplorer } from '@/components/GitExplorer';
 import { useGit } from '@/lib/useGit';
-import { AgentForm, draftFromAgent, validate, type AgentDraft } from '@/components/AgentForm';
+import { AgentForm } from '@/components/AgentForm';
 import { Hex, Modal, ProviderBadge, RoleChip, StatusChip, useToast } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
 
@@ -31,11 +32,9 @@ function Workspace({ id }: { id: string }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'config' | 'sessions'>('config');
-  const [draft, setDraft] = useState<AgentDraft | null>(null);
   const [sessions, setSessions] = useState<Sess[]>([]);
   const [viewing, setViewing] = useState<string | undefined>(undefined);
-  const [confirm, setConfirm] = useState<'delete' | 'new' | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<'new' | null>(null);
   const [view, setView] = useState<'chat' | 'changes'>('chat');
   const [swCollapsed, setSwCollapsed] = useState(false);
   useEffect(() => { try { setSwCollapsed(localStorage.getItem('hive-switcher-collapsed') === '1'); } catch { /* ignore */ } }, []);
@@ -47,27 +46,15 @@ function Workspace({ id }: { id: string }) {
   useEffect(() => { try { setOpen(localStorage.getItem('hive-cfg-open') === '1'); } catch { /* ignore */ } }, []);
   const toggle = (v: boolean, tb?: 'config' | 'sessions') => { setOpen(v); if (tb) setTab(tb); try { localStorage.setItem('hive-cfg-open', v ? '1' : '0'); } catch { /* ignore */ } };
 
-  useEffect(() => { if (agent && !draft) setDraft(draftFromAgent(agent)); }, [agent, draft]);
+  const settings = useAgentSettings(agent, { onDeleted: () => router.push('/agents') });
+  const { draft, setDraft, errors, dirty, saving } = settings;
   useEffect(() => { if (open && tab === 'sessions') api.get<Sess[]>(`/agents/${id}/sessions`).then(setSessions).catch(() => undefined); }, [open, tab, id, agent?.session_id]);
 
-  const dirty = useMemo(() => !!(agent && draft && JSON.stringify(draftFromAgent(agent)) !== JSON.stringify(draft)), [agent, draft]);
-  const errors = draft ? validate(draft, agents, id, colonies) : {};
 
   if (!agent) return (
     <div className={`ws ${swCollapsed ? 'sw-collapsed' : ''}`}><AgentSwitcher activeId={id} collapsed={swCollapsed} onToggle={toggleSwitcher} /><div className="page">{ready ? <div className="empty"><h3>{t('agent.missing.title')}</h3><p>{t('agent.missing.body')}</p><Link className="btn" href="/agents">{t('agent.missing.back')}</Link></div> : null}</div></div>
   );
 
-  const save = async () => {
-    if (!draft || Object.keys(errors).length) { toast(t('edit.fixFields'), 'err'); return; }
-    setSaving(true);
-    try {
-      const { type_id: _t, ...patch } = draft; void _t;
-      await api.patch(`/agents/${id}`, patch);
-      await refresh(['agents', 'colonies']); setDraft(null);
-      toast(t('agent.changesSaved'));
-    } catch (e) { toast(e instanceof Error ? e.message : t('edit.saveFailed'), 'err'); }
-    setSaving(false);
-  };
   const resume = async (sid: string) => { await api.post(`/agents/${id}/resume-session`, { session_id: sid }); setViewing(undefined); toast(t('agent.resumed')); };
   const direct = sessions.filter((s) => s.kind !== 'delegation');
   const delegated = sessions.filter((s) => s.kind === 'delegation');
@@ -107,13 +94,10 @@ function Workspace({ id }: { id: string }) {
           {tab === 'config' && draft && (
             <>
               <div className="pane"><AgentForm draft={draft} onChange={setDraft} errors={errors} selfId={id} />
-                <hr style={{ border: 0, borderTop: '1px solid var(--line)', width: '100%' }} />
-                <button className="btn danger sm" style={{ alignSelf: 'flex-start' }} onClick={() => setConfirm('delete')}><Trash2 size={14} />{t('agent.delete')}</button>
               </div>
-              <div className="savebar">
-                <span className="muted small grow">{dirty ? t('agent.unsavedChanges') : t('agent.allSaved')}{dirty && agent.status === 'running' ? ` ${t('agent.appliesNextTurn')}` : ''}</span>
-                <button className="btn ghost sm" disabled={!dirty} onClick={() => setDraft(draftFromAgent(agent))}>{t('common.discard')}</button>
-                <button className="btn primary sm" disabled={!dirty || saving} onClick={save}>{saving ? t('common.saving') : t('common.saveChanges')}</button>
+              <div className="savebar col">
+                <span className="muted small">{dirty ? t('agent.unsavedChanges') : t('agent.allSaved')}{dirty && agent.status === 'running' ? ` ${t('agent.appliesNextTurn')}` : ''}</span>
+                <div className="row">{settings.actions({ size: 'sm' })}</div>
               </div>
             </>
           )}
@@ -144,13 +128,7 @@ function Workspace({ id }: { id: string }) {
         </aside>
       )}
 
-      {confirm === 'delete' && (
-        <Modal title={t('agent.deleteTitle', { name: agent.name })} onClose={() => setConfirm(null)}>
-          <p style={{ margin: 0 }} className="muted">{t('agent.deleteBody')}</p>
-          <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn ghost" onClick={() => setConfirm(null)}>{t('agent.keep')}</button>
-            <button className="btn danger" onClick={async () => { await api.del(`/agents/${id}`); await refresh(['agents', 'colonies']); toast(t('agent.deleted')); router.push('/agents'); }}>{t('agent.delete')}</button></div>
-        </Modal>
-      )}
+      {settings.deleteModal}
       {confirm === 'new' && (
         <Modal title={t('agent.newConvTitle')} onClose={() => setConfirm(null)}>
           <p style={{ margin: 0 }} className="muted">{t('agent.newConvBody')}</p>
