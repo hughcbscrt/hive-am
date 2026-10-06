@@ -1,10 +1,10 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { LOCALE_KEY, LOCALES, detectLocale, getLocale, intlLocale, setCurrentLocale, translate, translateServerError, type Locale, type Params } from './core';
+import { LOCALE_KEY, LOCALES, dateLocale, detectLocale, getLocale, intlLocale, setCurrentLocale, translate, translateServerError, type Locale, type Params } from './core';
 import type { MessageKey } from './en';
 
 export type { Locale, MessageKey, Params };
-export { LOCALES, translate, translateServerError, getLocale, intlLocale };
+export { LOCALES, translate, translateServerError, getLocale, intlLocale, dateLocale };
 
 interface Ctx { locale: Locale; setLocale: (l: Locale) => void; t: (key: MessageKey, params?: Params) => string }
 const C = createContext<Ctx | null>(null);

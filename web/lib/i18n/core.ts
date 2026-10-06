@@ -16,6 +16,8 @@ export const getLocale = (): Locale => current;
 export const setCurrentLocale = (l: Locale) => { current = l; };
 /** BCP 47 tag for Intl / toLocale* APIs. */
 export const intlLocale = () => (current === 'es' ? 'es-MX' : 'en-US');
+/** Same, for dates: always day / month / year (English uses en-GB so it is not month-first). */
+export const dateLocale = () => (current === 'es' ? 'es-MX' : 'en-GB');
 
 export type Params = Record<string, string | number>;
 

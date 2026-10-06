@@ -1,5 +1,6 @@
 import type { Permission, Provider } from './types';
-import { intlLocale, translate as t } from './i18n/core';
+import { translate as t } from './i18n/core';
+import { fmtDate } from './format';
 
 /** Names and colours are brand identifiers and are not translated; descriptions come from the message catalogue. */
 export const PROVIDERS: Record<Provider, { label: string; short: string; color: string }> = {
@@ -23,7 +24,7 @@ export function ago(ts: number | null | undefined): string {
   const m = Math.round(s / 60); if (m < 60) return t('time.minutesAgo', { count: m });
   const h = Math.round(m / 60); if (h < 24) return t('time.hoursAgo', { count: h });
   const d = Math.round(h / 24); if (d < 30) return t('time.daysAgo', { count: d });
-  return new Date(ts).toLocaleDateString(intlLocale());
+  return fmtDate(ts);
 }
 
 export const shortPath = (p: string) => p.replace(/^\/home\/[^/]+/, '~');

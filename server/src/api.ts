@@ -11,7 +11,9 @@ import { listModels } from './models.js';
 import type { Provider } from './types.js';
 import { sessionStats } from './stats.js';
 import { createReadStream } from 'node:fs';
-import { gitDiff, gitFile, gitImagePath, gitStatus, gitTree, isPathError } from './git.js';
+import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git.js';
+import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './gitswitch.js';
+import { GitOpError, gitBlame, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitUnresolve, type PullMode } from './gitops.js';
 
 const exec = promisify(execFile);
 const PROVIDERS: Record<Provider, { bin: string; label: string }> = {
@@ -136,10 +138,11 @@ route('GET', '/api/agents/:id/sessions', ({ params }) => agents.sessions(params[
 
 // ---- read-only git explorer (scoped to the agent's effective folder) ----
 const agentCwd = (id: string) => { const a = agents.get(id); if (!a) throw notFound('Agent not found'); return resolved(a).cwd; };
-const gitSafe = async <T,>(fn: () => Promise<T>): Promise<T> => { try { return await fn(); } catch (e) { if (isPathError(e)) throw bad(e.message); throw e; } };
+const gitSafe = async <T,>(fn: () => Promise<T>): Promise<T> => { try { return await fn(); } catch (e) { if (isPathError(e) || e instanceof GitOpError) throw bad(e.message); throw e; } };
 const qpath = (url: URL) => { const p = url.searchParams.get('path'); if (!p) throw bad('path is required'); return p; };
 
 route('GET', '/api/agents/:id/git/status', ({ params }) => gitStatus(agentCwd(params[0])));
+route('GET', '/api/agents/:id/git/ls', ({ params, url }) => gitSafe(() => gitList(agentCwd(params[0]), qpath(url))));
 route('GET', '/api/agents/:id/git/tree', ({ params }) => gitTree(agentCwd(params[0])));
 route('GET', '/api/agents/:id/git/diff', ({ params, url }) => gitSafe(() => gitDiff(agentCwd(params[0]), qpath(url), url.searchParams.get('old') ?? undefined)));
 route('GET', '/api/agents/:id/git/file', ({ params, url }) => gitSafe(() => gitFile(agentCwd(params[0]), qpath(url))));
@@ -149,6 +152,60 @@ route('GET', '/api/agents/:id/git/raw', async ({ params, url, res }) => {
   res.writeHead(200, { 'content-type': img.type, 'content-length': img.size, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'" });
   createReadStream(img.abs).pipe(res);
 });
+
+// ---- git history and actions (writes: commit, pull, push, fetch, branches) ----
+/** The API allows any origin (it is a local tool), so writes also check that the request comes from a local page. */
+function localOnly(req: IncomingMessage) {
+  const origin = req.headers.origin; if (!origin) return;
+  let host = ''; try { host = new URL(origin).hostname; } catch { /* invalid */ }
+  const own = String(req.headers.host ?? '').replace(/:\d+$/, '');
+  if (!['localhost', '127.0.0.1', '[::1]', '::1'].includes(host) && host !== own) throw new HttpError(403, 'Git actions are only allowed from the local app');
+}
+const gitWrite = (path: string, fn: (cwd: string, b: any) => Promise<unknown>) =>
+  route('POST', `/api/agents/:id/git/${path}`, async ({ req, params }) => { localOnly(req); const b = await body(req); return gitSafe(() => fn(agentCwd(params[0]), b)); });
+
+route('GET', '/api/agents/:id/git/log', ({ params, url }) => gitSafe(() => gitLog(agentCwd(params[0]), Number(url.searchParams.get('skip') ?? 0))));
+route('GET', '/api/agents/:id/git/commit', ({ params, url }) => gitSafe(() => gitCommitDetail(agentCwd(params[0]), url.searchParams.get('sha') ?? '')));
+route('GET', '/api/agents/:id/git/commit-diff', ({ params, url }) => gitSafe(() => gitCommitDiff(agentCwd(params[0]), url.searchParams.get('sha') ?? '', qpath(url), url.searchParams.get('old') ?? undefined)));
+route('GET', '/api/agents/:id/git/blame', ({ params, url }) => gitSafe(() => gitBlame(agentCwd(params[0]), qpath(url))));
+// Smart switch: what would happen, plus which other agents are working in the same repository right now (a switch
+// moves their files too).
+route('GET', '/api/agents/:id/git/switch-plan', async ({ params, url }) => {
+  const cwd = agentCwd(params[0]);
+  const plan = await gitSafe(() => planSwitch(cwd, url.searchParams.get('branch') ?? ''));
+  const here = await findRepo(cwd);
+  const others: { id: string; name: string }[] = [];
+  if (here.ok) for (const a of agents.list()) {
+    if (a.id === params[0] || !(a.status === 'running' || liveTurn(a.id))) continue;
+    const there = await findRepo(resolved(a).cwd);
+    if (there.ok && there.repo.root === here.repo.root) others.push({ id: a.id, name: a.name });
+  }
+  return { ...plan, others, selfRunning: agents.get(params[0])?.status === 'running' };
+});
+route('GET', '/api/agents/:id/git/stashes', ({ params }) => gitSafe(() => listStashes(agentCwd(params[0]))));
+route('GET', '/api/agents/:id/git/stash', ({ params, url }) => gitSafe(() => stashDetail(agentCwd(params[0]), url.searchParams.get('sha') ?? '')));
+route('GET', '/api/agents/:id/git/branches', ({ params }) => gitSafe(() => gitBranches(agentCwd(params[0]))));
+gitWrite('commit', (cwd, b) => gitCommitChanges(cwd, String(b.message ?? ''), Array.isArray(b.paths) ? b.paths.map(String) : []));
+gitWrite('fetch', (cwd) => gitFetch(cwd));
+gitWrite('pull', (cwd, b) => gitPull(cwd, (['ff-only', 'merge', 'rebase'].includes(b.mode) ? b.mode : 'ff-only') as PullMode));
+gitWrite('push', (cwd) => gitPush(cwd));
+gitWrite('switch', (cwd, b) => gitSwitch(cwd, String(b.branch ?? ''), !!b.create));
+gitWrite('merge', (cwd, b) => gitMerge(cwd, String(b.branch ?? '')));
+gitWrite('merge-abort', (cwd) => gitMergeAbort(cwd));
+gitWrite('switch-smart', (cwd, b) => smartSwitch(cwd, String(b.branch ?? '')));
+gitWrite('smart-finish', (cwd) => smartFinish(cwd));
+gitWrite('smart-cancel', (cwd) => smartCancel(cwd));
+gitWrite('stash-save', (cwd, b) => stashSave(cwd, String(b.message ?? '')));
+gitWrite('stash-apply', (cwd, b) => stashApply(cwd, String(b.sha ?? ''), !!b.pop));
+gitWrite('stash-drop', (cwd, b) => stashDrop(cwd, String(b.sha ?? '')));
+gitWrite('discard', (cwd, b) => gitDiscardFile(cwd, String(b.path ?? ''), b.oldPath ? String(b.oldPath) : undefined));
+gitWrite('discard-hunk', (cwd, b) => gitDiscardHunk(cwd, String(b.path ?? ''), Number(b.index), String(b.header ?? '')));
+gitWrite('discard-lines', (cwd, b) => gitDiscardLines(cwd, String(b.path ?? ''), Number(b.index), String(b.header ?? ''), Array.isArray(b.lines) ? b.lines.map(Number) : []));
+gitWrite('discard-all', (cwd) => gitDiscardAll(cwd));
+gitWrite('rebase-continue', (cwd) => gitRebaseContinue(cwd));
+gitWrite('resolve-side', (cwd, b) => gitResolveSide(cwd, String(b.path ?? ''), b.side));
+gitWrite('resolve', (cwd, b) => gitResolveContent(cwd, String(b.path ?? ''), String(b.content ?? ''), !!b.keepMarkers));
+gitWrite('unresolve', (cwd, b) => gitUnresolve(cwd, String(b.path ?? '')));
 
 // ---- sessions across all managed agents ----
 route('GET', '/api/sessions', () => {

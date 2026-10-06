@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Plus, Settings2, SlidersHorizontal } from 'lucide-react';
+import { ArrowRight, Plus, Settings2, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
 import { PROVIDERS, ago, shortPath } from '@/lib/meta';
@@ -10,6 +10,7 @@ import { Hex, ProviderBadge, RoleChip, StatusChip, useToast } from '@/components
 import { NewAgentDrawer } from '@/components/NewAgentDrawer';
 import { ColonyEditor } from '@/components/ColonyEditor';
 import { AgentEditDrawer } from '@/components/AgentEditDrawer';
+import { DeleteAgentModal } from '@/components/DeleteAgentModal';
 import { HelpPopover } from '@/components/HelpPopover';
 import { useAgentCard } from '@/components/AgentCard';
 import { useI18n } from '@/lib/i18n';
@@ -93,7 +94,13 @@ export default function Colony() {
   const k = avail ? Math.min(1, (avail - 24) / fullW) : 1;
   const pos = new Map<string, { x: number; y: number }>();
   for (const c of clusters) for (const cell of c.cells) if (cell.agent) pos.set(cell.agent.id, { x: cell.x + margin, y: cell.y + margin });
+  const [deleting, setDeleting] = useState<string | null>(null);
   const selected = agents.find((a) => a.id === sel) ?? null;
+  useEffect(() => {
+    if (!sel) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) setSel(null); };
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
+  }, [sel]);
   // Connections of the agent under the cursor, or else the selected one, are emphasised; everything else recedes.
   const focus = hover ?? sel;
   const links = agents.filter((a) => a.role === 'orchestrator').flatMap((q) => q.worker_ids.map((w) => ({ from: q.id, to: w })));
@@ -215,11 +222,10 @@ export default function Colony() {
           </div>
         </div>
 
-        <aside className="side">
           {selected ? (
-            <div className="card card-pad col" style={{ gap: 14, position: 'relative' }}>
-              <button className="btn ghost icon sm card-corner" onClick={() => setEditingAgent(selected.id)} aria-label={t('colony.settingsFor', { name: selected.name })} title={t('colony.agentSettings')}><SlidersHorizontal size={17} /></button>
-              <div className="row gap-l" style={{ paddingRight: 30 }}><Hex agent={selected} size="lg" /><div className="grow"><h2 style={{ fontSize: 22 }}>{selected.name}</h2><div className="row gap-s wrap" style={{ marginTop: 6 }}><RoleChip role={selected.role} /><StatusChip status={selected.status} /></div></div></div>
+            <aside className="side-float card card-pad col" style={{ gap: 14 }} aria-label={selected.name}>
+              <div className="card-corner row gap-s"><button className="btn ghost icon sm" onClick={() => setEditingAgent(selected.id)} aria-label={t('colony.settingsFor', { name: selected.name })} title={t('colony.agentSettings')}><SlidersHorizontal size={17} /></button><button className="btn ghost icon sm" onClick={() => setSel(null)} aria-label={t('common.close')} title={`${t('common.close')} (Esc)`}><X size={16} /></button></div>
+              <div className="row gap-l" style={{ paddingRight: 70 }}><Hex agent={selected} size="lg" /><div className="grow"><h2 style={{ fontSize: 22 }}>{selected.name}</h2><div className="row gap-s wrap" style={{ marginTop: 6 }}><RoleChip role={selected.role} /><StatusChip status={selected.status} /></div></div></div>
               {selected.description && <p style={{ margin: 0 }}>{selected.description}</p>}
               <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 14px', fontSize: 13.5 }}>
                 <dt className="muted">{t('form.provider')}</dt><dd style={{ margin: 0 }}><ProviderBadge provider={selected.provider} /></dd>
@@ -233,22 +239,25 @@ export default function Colony() {
                   <option value="">{t('common.noColony')}</option>{colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <Link className="btn primary" href={`/agents/${selected.id}`}>{t('colony.openChat')} <ArrowRight size={16} /></Link>
-            </div>
+              <div className="row">
+                <Link className="btn primary grow" href={`/agents/${selected.id}`}>{t('colony.openChat')} <ArrowRight size={16} /></Link>
+                <button className="btn danger icon" onClick={() => setDeleting(selected.id)} aria-label={t('agent.delete')} title={t('agent.delete')}><Trash2 size={16} /></button>
+              </div>
+            </aside>
           ) : null}
-          <div className="card card-pad">
+      </div>
+      <div className="card card-pad recent">
             <div className="row" style={{ marginBottom: 6 }}><div className="eyebrow grow">{t('colony.recent')}</div></div>
             {feed.length === 0 ? <p className="muted small" style={{ margin: 0 }}>{t('colony.recentEmpty')}</p> :
-              feed.slice(0, 6).map((d) => (
+              <div className="recent-grid">{feed.slice(0, 6).map((d) => (
                 <div key={d.id} className="feed-item">
                   <i className={`dot ${d.status === 'running' ? 'run' : d.status === 'done' ? 'ok' : 'err'}`} style={{ marginTop: 7 }} />
                   <div><b>{name(d.from_id)}</b> → <b>{name(d.to_id)}</b><div className="muted small" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.task}</div><div className="muted" style={{ fontSize: 12 }}>{ago(d.created_at)}</div></div>
                 </div>
-              ))}
-          </div>
-        </aside>
+              ))}</div>}
       </div>
       {card.node}
+      {deleting && agents.find((a) => a.id === deleting) && <DeleteAgentModal agent={agents.find((a) => a.id === deleting)!} onClose={() => setDeleting(null)} onDeleted={() => setSel(null)} />}
       {creating && <NewAgentDrawer presetColonyId={creating.colonyId} onClose={() => setCreating(null)} onCreated={(id) => setSel(id)} />}
       {editingAgent && agents.find((a) => a.id === editingAgent) && <AgentEditDrawer key={editingAgent} agent={agents.find((a) => a.id === editingAgent)!} onClose={() => setEditingAgent(null)} />}
       {editing && <ColonyEditor colony={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />}

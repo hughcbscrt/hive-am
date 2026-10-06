@@ -1,4 +1,4 @@
-import { intlLocale } from './i18n/core';
+import { dateLocale, intlLocale } from './i18n/core';
 
 /** Plain number in the current language (thousands separators). */
 export const fmtNum = (n: number) => n.toLocaleString(intlLocale());
@@ -18,3 +18,8 @@ export function fmtBytes(n: number): string {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 10 * 1024 ? 1 : 0)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
+
+/** "06/10/2026": day / month / year in every language. */
+export const fmtDate = (ts: number | string) => new Date(ts).toLocaleDateString(dateLocale(), { day: '2-digit', month: '2-digit', year: 'numeric' });
+/** "06/10/2026, 10:46" (24 h). */
+export const fmtDateTime = (ts: number | string) => new Date(ts).toLocaleString(dateLocale(), { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });

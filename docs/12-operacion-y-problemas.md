@@ -11,7 +11,7 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 | CORS | `Access-Control-Allow-Origin: *`. Cualquier página que abras en tu navegador podría hacer peticiones a `http://127.0.0.1:4400`. Dado que la API permite ejecutar agentes con acceso a tu máquina, **no navegues sitios no confiables mientras hive-am esté en marcha** o restringe el origen (ver mejoras). |
 | Qué puede hacer un agente | Lo que permita su permiso y el CLI: `bypassPermissions` ejecuta cualquier comando sin preguntar; `acceptEdits` edita archivos libremente. Úsalos en carpetas de confianza. |
 | Explorador de carpetas | `GET /api/fs/dirs` lista subcarpetas de cualquier ruta legible. |
-| Explorador de cambios (git) | Solo lectura y limitado a la carpeta del agente; rechaza rutas fuera de ella (también por enlaces simbólicos) y cualquier ruta con `.git`. Detalle en el [documento 13](13-explorador-de-cambios-git.md#135-seguridad). |
+| Explorador de cambios (git) | Las lecturas no escriben nada; las acciones (commit, pull, push, ramas) nunca fuerzan ni omiten *hooks* y rechazan peticiones que no vengan de la propia app. Todo limitado a la carpeta del agente; rechaza rutas fuera de ella (también por enlaces simbólicos) y cualquier ruta con `.git`. Detalle en el [documento 13](13-explorador-de-cambios-git.md#135-seguridad). |
 | Secretos | hive-am no guarda credenciales. Los CLIs usan su propia sesión. La base de datos contiene tus prompts y skills en texto plano. |
 | Lectores de historial | Validan los ids de sesión (Claude: `^[\w-]+$`; Kiro: UUID) y abren la base de OpenCode en solo lectura. |
 

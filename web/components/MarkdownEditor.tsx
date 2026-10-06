@@ -28,10 +28,10 @@ function prefixLines(v: string, s: number, e: number, prefix: (i: number) => str
 
 const BULLET = /^\s*[-*+] (\[[ x]\] )?/, ORDERED = /^\s*\d+\. /, HEADING = /^#{1,6} /, QUOTE = /^> ?/;
 
-export function MarkdownEditor({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+export function MarkdownEditor({ value, onChange, placeholder, defaultView = 'split', minHeight = 340, fill = false }: { value: string; onChange: (v: string) => void; placeholder?: string; defaultView?: 'split' | 'write' | 'preview'; minHeight?: number; fill?: boolean }) {
   const { t } = useI18n();
   const ta = useRef<HTMLTextAreaElement>(null);
-  const [view, setView] = useState<'split' | 'write' | 'preview'>('split');
+  const [view, setView] = useState<'split' | 'write' | 'preview'>(defaultView);
 
   const apply = (fn: (v: string, s: number, e: number) => Edit) => {
     const el = ta.current; if (!el) return;
@@ -86,7 +86,7 @@ export function MarkdownEditor({ value, onChange, placeholder }: { value: string
 
   const words = value.trim() ? value.trim().split(/\s+/).length : 0;
   return (
-    <div className="mde">
+    <div className={`mde${fill ? ' fill' : ''}`}>
       <div className="mde-bar" role="toolbar" aria-label={t('md.toolbar')}>
         {actions.map((a) => (
           <button key={a.id} type="button" className="mde-btn" title={a.keys ? `${a.label} (Ctrl+${a.keys})` : a.label} aria-label={a.label} onMouseDown={(e) => e.preventDefault()} onClick={a.run} disabled={view === 'preview'}>{a.icon}</button>
@@ -98,8 +98,8 @@ export function MarkdownEditor({ value, onChange, placeholder }: { value: string
           ))}
         </div>
       </div>
-      <div className={`mde-body v-${view}`}>
-        {view !== 'preview' && <textarea ref={ta} className="mde-text mono" value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKey} placeholder={placeholder} spellCheck={false} />}
+      <div className={`mde-body v-${view}`} style={{ minHeight }}>
+        {view !== 'preview' && <textarea ref={ta} className="mde-text mono" style={{ minHeight }} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKey} placeholder={placeholder} spellCheck={false} />}
         {view !== 'write' && <div className="mde-prev md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{value || t('skills.previewEmpty')}</ReactMarkdown></div>}
       </div>
       <div className="mde-foot muted">{t('md.stats', { words, chars: value.length })} · {t('md.tips')}</div>

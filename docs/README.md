@@ -20,7 +20,7 @@ Esta carpeta describe el proyecto completo: cómo está organizado, cómo se eje
 | 10 | [Chat y visualización](10-chat-y-visualizacion.md) | Cómo se muestra la conversación, herramientas, tokens y costos |
 | 11 | [Frontend](11-frontend.md) | Páginas, componentes, estado, estilos y tema |
 | 12 | [Operación y solución de problemas](12-operacion-y-problemas.md) | Seguridad, límites conocidos, diagnóstico, cómo probar |
-| 13 | [Explorador de cambios (git)](13-explorador-de-cambios-git.md) | Pestaña **Cambios**: árbol de archivos con resaltado y visor de diferencias de solo lectura |
+| 13 | [Explorador de cambios (git)](13-explorador-de-cambios-git.md) | Pestaña **Cambios**: árbol de archivos con resaltado y visor de diferencias, historial y acciones de git (commit, pull, push, ramas) |
 
 ## Lectura recomendada
 
