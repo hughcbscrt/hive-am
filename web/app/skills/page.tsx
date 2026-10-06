@@ -1,7 +1,5 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { Plus, Search, Trash2 } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
@@ -16,7 +14,6 @@ export default function Skills() {
   const [sel, setSel] = useState<string | 'new' | null>(null);
   const [q, setQ] = useState('');
   const [draft, setDraft] = useState({ name: '', description: '', content: '' });
-  const [mode, setMode] = useState<'write' | 'preview'>('write');
   const [usage, setUsage] = useState<Record<string, { agents: number; types: number }>>({});
   const [err, setErr] = useState('');
   const [del, setDel] = useState(false);
@@ -26,7 +23,7 @@ export default function Skills() {
   useEffect(() => {
     if (sel === 'new') setDraft({ name: '', description: '', content: '' });
     else { const s = skills.find((x) => x.id === sel); if (s) setDraft({ name: s.name, description: s.description, content: s.content }); }
-    setErr(''); setMode('write');
+    setErr('');
   }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const list = useMemo(() => skills.filter((s) => !q || `${s.name} ${s.description}`.toLowerCase().includes(q.toLowerCase())), [skills, q]);
@@ -43,42 +40,47 @@ export default function Skills() {
   };
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <div><h1>{t('nav.skills')}</h1><p>{t('skills.subtitle')}</p></div>
-        <button className="btn primary" onClick={() => setSel('new')}><Plus size={16} />{t('skills.new')}</button>
-      </div>
+    <div className="page full">
       {ready && !skills.length && sel !== 'new' ? (
-        <div className="empty"><h3>{t('skills.empty.title')}</h3><p>{t('skills.empty.body')}</p><button className="btn primary" onClick={() => setSel('new')}><Plus size={16} />{t('skills.empty.create')}</button></div>
+        <div className="empty" style={{ margin: 36 }}><h3>{t('skills.empty.title')}</h3><p>{t('skills.empty.body')}</p><button className="btn primary" onClick={() => setSel('new')}><Plus size={16} />{t('skills.empty.create')}</button></div>
       ) : (
-        <div className="split">
-          <div className="card listcard">
-            <div style={{ padding: 12, borderBottom: '1px solid var(--line)' }}><div className="search"><Search size={16} /><input className="input" placeholder={t('skills.search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('skills.search')} /></div></div>
-            {sel === 'new' && <button className="listitem" aria-current="true"><b>{t('skills.new')}</b><span className="muted small">{t('skills.unsaved')}</span></button>}
-            {list.map((s) => (
-              <button key={s.id} className="listitem" aria-current={sel === s.id} onClick={() => setSel(s.id)}>
-                <b>{s.name}</b><span className="muted small" style={{ display: 'block' }}>{s.description || t('common.noDescription')}</span>
-                <span className="muted" style={{ fontSize: 12 }}>{t('skills.nAgents', { count: usage[s.id]?.agents ?? 0 })} · {t('skills.nTypes', { count: usage[s.id]?.types ?? 0 })}</span>
-              </button>
-            ))}
-            {!list.length && sel !== 'new' && <p className="muted small" style={{ padding: 16 }}>{t('skills.noMatch', { query: q })}</p>}
-          </div>
-          {sel && (
-            <div className="card card-pad col" style={{ gap: 16 }}>
-              <Field label={t('form.name')} error={err}><input className="input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder={t('skills.name.placeholder')} /></Field>
-              <Field label={t('types.description')} hint={t('skills.description.hint')}><input className="input" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
-              <div className="field">
-                <label className="label">{t('skills.instructions')}</label>
-                <MarkdownEditor value={draft.content} onChange={(content) => setDraft({ ...draft, content })} placeholder={t('skills.content.placeholder')} />
-              </div>
-              <div className="row">
-                {current && <button className="btn danger" onClick={() => setDel(true)}><Trash2 size={15} />{t('common.delete')}</button>}
-                <span className="grow" />
-                {dirty && <button className="btn ghost" onClick={() => setSel(sel === 'new' ? (skills[0]?.id ?? null) : sel)}>{t('common.discard')}</button>}
-                <button className="btn primary" disabled={!dirty} onClick={save}>{sel === 'new' ? t('skills.create') : t('skills.save')}</button>
-              </div>
+        <div className="sk-ws">
+          <aside className="switcher" aria-label={t('nav.skills')}>
+            <div className="switcher-head">
+              <div className="row"><b style={{ fontFamily: 'var(--font-display)', fontSize: 16 }} className="grow">{t('nav.skills')}</b>
+                <button className="btn ghost icon sm" onClick={() => setSel('new')} aria-label={t('skills.new')} title={t('skills.new')}><Plus size={16} /></button></div>
+              <div className="search"><Search size={15} /><input className="input" placeholder={t('skills.search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('skills.search')} /></div>
             </div>
-          )}
+            <div className="switcher-list">
+              {sel === 'new' && <button className="sk-item" aria-current="true"><b>{t('skills.new')}</b><span className="muted small">{t('skills.unsaved')}</span></button>}
+              {list.map((s) => (
+                <button key={s.id} className="sk-item" aria-current={sel === s.id} onClick={() => setSel(s.id)}>
+                  <b>{s.name}</b><span className="sk-desc">{s.description || t('common.noDescription')}</span>
+                  <span className="sk-meta">{t('skills.nAgents', { count: usage[s.id]?.agents ?? 0 })} · {t('skills.nTypes', { count: usage[s.id]?.types ?? 0 })}</span>
+                </button>
+              ))}
+              {!list.length && sel !== 'new' && <p className="muted small" style={{ padding: 16 }}>{t('skills.noMatch', { query: q })}</p>}
+            </div>
+          </aside>
+          {sel ? (
+            <section className="sk-main">
+              <header className="sk-head">
+                <div className="sk-fields">
+                  <Field label={t('form.name')} error={err}><input className="input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder={t('skills.name.placeholder')} /></Field>
+                  <Field label={t('types.description')} hint={t('skills.description.hint')}><input className="input" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
+                </div>
+                <div className="sk-actions">
+                  {current && <button className="btn danger" onClick={() => setDel(true)}><Trash2 size={15} />{t('common.delete')}</button>}
+                  {dirty && <button className="btn ghost" onClick={() => setSel(sel === 'new' ? (skills[0]?.id ?? null) : sel)}>{t('common.discard')}</button>}
+                  <button className="btn primary" disabled={!dirty} onClick={save}>{sel === 'new' ? t('skills.create') : t('skills.save')}</button>
+                </div>
+              </header>
+              <div className="sk-editor">
+                <label className="label">{t('skills.instructions')}</label>
+                <MarkdownEditor fill value={draft.content} onChange={(content) => setDraft({ ...draft, content })} placeholder={t('skills.content.placeholder')} />
+              </div>
+            </section>
+          ) : <section className="sk-main sk-none"><p className="muted">{t('skills.subtitle')}</p></section>}
         </div>
       )}
       {del && current && (

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { Plus, Trash2 } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
@@ -69,7 +70,7 @@ export default function Types() {
           <Field label={t('form.provider')}><ProviderPicker value={draft.provider} onChange={(p) => setDraft({ ...draft, provider: p, model: '' })} providers={providers} /></Field>
           <ModelField provider={draft.provider} value={draft.model} onChange={(v) => set('model', v)} />
           <PermissionField value={draft.permission} onChange={(v) => set('permission', v)} />
-          <Field label={t('form.systemPrompt')} hint={t('types.chars', { count: draft.system_prompt.length, n: fmtNum(draft.system_prompt.length) })}><textarea className="textarea mono" rows={9} value={draft.system_prompt} onChange={(e) => set('system_prompt', e.target.value)} spellCheck={false} /></Field>
+          <Field label={t('form.systemPrompt')} hint={t('types.chars', { count: draft.system_prompt.length, n: fmtNum(draft.system_prompt.length) })}><MarkdownEditor value={draft.system_prompt} onChange={(v) => set('system_prompt', v)} minHeight={260} /></Field>
           <Field label={t('form.skills')}><SkillPicker skills={skills} value={draft.skill_ids} onChange={(v) => set('skill_ids', v)} /></Field>
         </Drawer>
       )}

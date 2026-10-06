@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
+import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { Check } from 'lucide-react';
 import { useI18n, translate as tr } from '@/lib/i18n';
 import { fmtNum } from '@/lib/format';
@@ -78,7 +79,7 @@ export function AgentForm({ draft, onChange, errors, selfId, showType = true, fo
         <InheritRow colony={colony} on={inh('prompt')} onChange={(v) => toggle('prompt', v)} label={t('inherit.context')} value={`${colony.system_prompt.trim().slice(0, 90)}${colony.system_prompt.trim().length > 90 ? '…' : ''}`} note={t('inherit.context.note')} />
       )}
       <Field label={inh('prompt') || colony?.system_prompt ? t('form.ownPrompt') : t('form.systemPrompt')} hint={t('form.promptHint', { count: draft.system_prompt.length, n: fmtNum(draft.system_prompt.length) })}>
-        <textarea className="textarea mono" rows={9} value={draft.system_prompt} onChange={(e) => set('system_prompt', e.target.value)} placeholder={t('form.prompt.placeholder')} spellCheck={false} />
+        <MarkdownEditor value={draft.system_prompt} onChange={(v) => set('system_prompt', v)} placeholder={t('form.prompt.placeholder')} defaultView="write" minHeight={220} />
       </Field>
       {colony && colony.inherit.skills && colony.skill_ids.length > 0 && (
         <InheritRow colony={colony} on={inh('skills')} onChange={(v) => toggle('skills', v)} label={t('inherit.skills')} value={colony.skill_ids.map((id) => skills.find((s) => s.id === id)?.name).filter(Boolean).join(', ')} note={t('inherit.skills.note')} />

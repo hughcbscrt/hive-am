@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
+import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { Check, Trash2 } from 'lucide-react';
 import { Drawer, Field, FolderPicker, Modal, PermissionField, SkillPicker, useToast } from './ui';
 import { useHive } from '@/lib/store';
@@ -34,13 +35,14 @@ export function ColonyEditor({ colony, onClose }: { colony?: Colony; onClose: ()
   const requestSave = () => {
     if (!d.name.trim()) { setErr(t('colony.err.name')); return; }
     if (colonies.some((c) => c.id !== colony?.id && c.name.toLowerCase() === d.name.trim().toLowerCase())) { setErr(t('colony.err.nameTaken')); return; }
+    if (!/^#[0-9a-f]{6}$/i.test(d.color)) { setErr(t('colony.err.color')); return; }
     setErr(''); setAsking(true);
   };
 
   const save = async (inherit: InheritFlags) => {
     setBusy(true);
     try {
-      const body = { ...d, name: d.name.trim(), inherit };
+      const body = { ...d, name: d.name.trim(), color: d.color.toLowerCase(), inherit };
       if (colony) await api.patch(`/colonies/${colony.id}`, body); else await api.post('/colonies', body);
       await refresh(['agents', 'colonies']);
       toast(colony ? t('colony.saved') : t('colony.created')); onClose();
@@ -52,11 +54,20 @@ export function ColonyEditor({ colony, onClose }: { colony?: Colony; onClose: ()
       <Drawer title={colony ? t('colony.editTitle', { name: colony.name }) : t('colony.newTitle')} subtitle={t('colony.subtitle')} onClose={onClose}
         footer={<>{colony && <button className="btn danger" style={{ marginRight: 'auto' }} onClick={() => setConfirmDel(true)}><Trash2 size={15} />{t('common.delete')}</button>}<button className="btn ghost" onClick={onClose}>{t('common.cancel')}</button><button className="btn primary" onClick={requestSave}>{colony ? t('colony.save') : t('colony.create')}</button></>}>
         <Field label={t('form.name')} error={err}><input className="input" value={d.name} onChange={(e) => set('name', e.target.value)} placeholder={t('colony.name.placeholder')} autoFocus /></Field>
-        <Field label={t('colony.color')}><div className="swatches">{COLONY_COLORS.map((c) => <button key={c} type="button" className="swatch" style={{ '--c': c } as any} aria-pressed={d.color === c} aria-label={t('colony.colorOption', { color: c })} onClick={() => set('color', c)} />)}</div></Field>
+        <Field label={t('colony.color')}>
+          <div className="swatches">
+            {COLONY_COLORS.map((c) => <button key={c} type="button" className="swatch" style={{ '--c': c } as any} aria-pressed={d.color.toLowerCase() === c} aria-label={t('colony.colorOption', { color: c })} onClick={() => set('color', c)} />)}
+            <label className={`swatch custom ${COLONY_COLORS.includes(d.color.toLowerCase()) ? '' : 'on'}`} style={{ '--c': /^#[0-9a-f]{6}$/i.test(d.color) ? d.color : 'transparent' } as any} title={t('colony.colorCustom')}>
+              <input type="color" value={/^#[0-9a-f]{6}$/i.test(d.color) ? d.color : '#2f8f5b'} onChange={(e) => set('color', e.target.value)} aria-label={t('colony.colorCustom')} />
+            </label>
+            <input className="input hex-input mono" value={d.color} maxLength={7} spellCheck={false} aria-label={t('colony.colorHex')} placeholder="#2f8f5b"
+              onChange={(e) => { const v = e.target.value.trim(); set('color', v.startsWith('#') || !v ? v : `#${v}`); }} />
+          </div>
+        </Field>
         <FolderPicker value={d.cwd} onChange={(v) => set('cwd', v)} />
         <PermissionField value={d.permission} onChange={(v) => set('permission', v)} />
         <Field label={t('inherit.context')} hint={t('colony.context.hint')}>
-          <textarea className="textarea mono" rows={6} value={d.system_prompt} onChange={(e) => set('system_prompt', e.target.value)} placeholder={t('colony.context.placeholder')} spellCheck={false} />
+          <MarkdownEditor value={d.system_prompt} onChange={(v) => set('system_prompt', v)} placeholder={t('colony.context.placeholder')} defaultView="write" minHeight={160} />
         </Field>
         <Field label={t('form.skills')}><SkillPicker skills={skills} value={d.skill_ids} onChange={(v) => set('skill_ids', v)} /></Field>
         <Field label={t('colony.members')} hint={t('colony.members.hint')}>
