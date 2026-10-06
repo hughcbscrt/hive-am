@@ -1,8 +1,6 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { rm } from 'node:fs/promises';
 import { GitOpError, done, exclusive, repoOf, run, validBranch, type GitResult } from './gitops.js';
-import { PathError, SMART_PREFIX, hasHead, repoState, safePath, smartStash } from './git.js';
+import { SMART_PREFIX, hasHead, repoState, safePath, smartStash } from './git.js';
 
 /**
  * Smart branch switch (like JetBrains): carry local changes to another branch, and when that is not possible,
@@ -66,45 +64,23 @@ export async function planSwitch(cwd: string, branch: string): Promise<SwitchPla
   return { from, to: branch, carried: ch.tracked.size + ch.untracked.size, overlap, collisions };
 }
 
-/** The two versions of a file that exists on both sides, as a diff: "−" is the other branch's, "+" is yours. */
-export async function collisionDiff(cwd: string, rel: string, branch: string): Promise<{ path: string; diff: string; binary: boolean }> {
-  const { root } = await repoOf(cwd);
-  const abs = await safePath(cwd, root, rel, true);
-  const target = await resolveTarget(root, branch);
-  const theirs = (await run(root, ['show', `${target}:${rel}`], { raw: true }).catch(() => ({ out: null as string | null }))).out;
-  if (theirs === null) throw new PathError('That file does not exist on the other branch');
-  const mine = await readFile(abs);
-  if (mine.subarray(0, 8000).includes(0) || theirs.includes('\0')) return { path: rel, diff: '', binary: true };
-  const dir = await mkdtemp(join(tmpdir(), 'hive-am-cmp-'));
-  try {
-    const t = join(dir, 'theirs'); await writeFile(t, theirs);
-    const { out } = await run(root, ['diff', '--no-index', '--no-color', '--no-ext-diff', '-U3', '--', t, abs], { okCodes: [1], raw: true });
-    const text = out.split(t.slice(1)).join(rel).split(abs.slice(1)).join(rel);
-    return { path: rel, diff: text.length > 600_000 ? text.slice(0, 600_000) : text, binary: false };
-  } finally { await rm(dir, { recursive: true, force: true }); }
+export interface SmartResult extends GitResult {
+  pending: 'conflicts' | null;
+  /** New files of yours that already existed on the other branch: your version was kept (as a change to that file). */
+  kept: string[];
 }
 
-export type SwitchMode = 'smart' | 'force';
-export interface SmartResult extends GitResult { pending: 'conflicts' | null }
-
 /**
- * mode "force": switch and throw away whatever stands in the way.
- * mode "smart": save every local change in a stash, switch, and reapply it. `keep` decides, for each new file of
- * yours that already exists on the other branch, which version stays ("mine" overwrites it as a change, "theirs"
- * drops yours). Conflicts while reapplying are not an error: they are left for the resolver and the stash is kept.
+ * Switch branches carrying every local change: save them in a stash (new files included), switch, and reapply.
+ * Real conflicts are not an error: they are left for the conflict resolver and the stash is kept until they are
+ * resolved. A new file of yours that already exists on the other branch stays as yours — it shows up as a change to
+ * that file, so the other version is one "discard" away.
  */
-export async function smartSwitch(cwd: string, branch: string, mode: SwitchMode, keep: Record<string, 'mine' | 'theirs'> = {}): Promise<SmartResult> {
+export async function smartSwitch(cwd: string, branch: string): Promise<SmartResult> {
   const { root } = await repoOf(cwd);
   const plan = await planSwitch(cwd, branch);
   return exclusive(root, async () => {
-    if (mode === 'force') { await run(root, ['switch', '-f', branch]); return { ...done(`Switched to ${branch}`), pending: null }; }
-    if (mode !== 'smart') throw new GitOpError('Unknown switch mode');
     if ((await smartStash(root)) || (await repoState(root)).state) throw new GitOpError('Finish or cancel the switch in progress first');
-    for (const p of plan.collisions) if (keep[p] !== 'mine' && keep[p] !== 'theirs') throw new GitOpError(`Choose which version of ${p} to keep`);
-
-    // New files of yours that already exist on the other branch go into the stash like everything else (so cancelling
-    // gets them back). The only special step is at reapply time: the other branch's copy must be out of the way
-    // or git refuses to restore yours; afterwards "theirs" puts that copy back and "mine" leaves yours as a change.
     const dirty = (await run(root, ['status', '--porcelain=v1', '--untracked-files=all'], { raw: true })).out.trim().length > 0;
     let stashed = false;
     if (dirty) { await run(root, ['stash', 'push', '-u', '-m', `${SMART_PREFIX}${plan.from} -> ${branch}`]); stashed = true; }
@@ -116,6 +92,7 @@ export async function smartSwitch(cwd: string, branch: string, mode: SwitchMode,
     }
     let pending: SmartResult['pending'] = null; let out = `Switched to ${branch}`;
     if (stashed) {
+      // The other branch's copy of a file you also created must be out of the way, or git refuses to restore yours.
       for (const p of plan.collisions) await rm(await safePath(cwd, root, p, false), { force: true });
       try { out = (await run(root, ['stash', 'pop'])).out || out; }
       catch (e) {
@@ -123,9 +100,8 @@ export async function smartSwitch(cwd: string, branch: string, mode: SwitchMode,
         if (!/conflict/i.test(msg)) throw new GitOpError(`Your changes are saved in a stash (“${SMART_PREFIX}${plan.from} -> ${branch}”) but could not be reapplied:\n${msg}`);
         pending = 'conflicts'; out = msg;
       }
-      for (const p of plan.collisions) if (keep[p] === 'theirs') await run(root, ['checkout', '--', p]).catch(() => undefined);
     }
-    return { ...done(out), pending };
+    return { ...done(out), pending, kept: plan.collisions };
   });
 }
 
@@ -202,10 +178,10 @@ export async function stashApply(cwd: string, sha: string, pop: boolean): Promis
   const { root } = await repoOf(cwd);
   return exclusive(root, async () => {
     const ref = await refOf(root, sha);
-    try { return { ...done((await run(root, ['stash', pop ? 'pop' : 'apply', ref])).out), pending: null }; }
+    try { return { ...done((await run(root, ['stash', pop ? 'pop' : 'apply', ref])).out), pending: null, kept: [] }; }
     catch (e) {
       const msg = e instanceof GitOpError ? e.message : String(e);
-      if (/conflict/i.test(msg)) return { ...done(msg), pending: 'conflicts' };   // left for the resolver; the stash stays
+      if (/conflict/i.test(msg)) return { ...done(msg), pending: 'conflicts', kept: [] };   // left for the resolver; the stash stays
       throw e;
     }
   });

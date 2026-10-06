@@ -22,10 +22,11 @@ export function useGitActions(agent: Agent, refresh: () => Promise<unknown> | un
   const run = async (key: string, doneMsg: string, path: string, body: object = {}): Promise<boolean> => {
     setBusy(key); setNotice(null);
     try {
-      const r = await api.post<{ output: string; pending?: string | null }>(`/agents/${agent.id}/git/${path}`, body);
+      const r = await api.post<{ output: string; pending?: string | null; kept?: string[] }>(`/agents/${agent.id}/git/${path}`, body);
       const first = (r.output ?? '').split('\n').filter(Boolean).pop() ?? '';
       // Conflicts while bringing changes back are not a failure: they are resolved in the explorer.
-      toast(r.pending === 'conflicts' ? `${doneMsg} — ${t('git.pending.conflicts')}` : first && first.length < 90 ? `${doneMsg} — ${first}` : doneMsg);
+      const extra = [r.pending === 'conflicts' ? t('git.pending.conflicts') : '', r.kept?.length ? t('git.sw.kept', { count: r.kept.length, names: r.kept.slice(0, 3).join(', ') }) : ''].filter(Boolean).join(' — ');
+      toast(extra ? `${doneMsg} — ${extra}` : first && first.length < 90 ? `${doneMsg} — ${first}` : doneMsg);
       await refresh();
       return true;
     } catch (e) {

@@ -12,7 +12,7 @@ import type { Provider } from './types.js';
 import { sessionStats } from './stats.js';
 import { createReadStream } from 'node:fs';
 import { findRepo, gitDiff, gitFile, gitImagePath, gitStatus, gitTree, isPathError } from './git.js';
-import { collisionDiff, listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave, type SwitchMode } from './gitswitch.js';
+import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './gitswitch.js';
 import { GitOpError, gitBlame, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitUnresolve, type PullMode } from './gitops.js';
 
 const exec = promisify(execFile);
@@ -181,7 +181,6 @@ route('GET', '/api/agents/:id/git/switch-plan', async ({ params, url }) => {
   }
   return { ...plan, others, selfRunning: agents.get(params[0])?.status === 'running' };
 });
-route('GET', '/api/agents/:id/git/collision-diff', ({ params, url }) => gitSafe(() => collisionDiff(agentCwd(params[0]), qpath(url), url.searchParams.get('branch') ?? '')));
 route('GET', '/api/agents/:id/git/stashes', ({ params }) => gitSafe(() => listStashes(agentCwd(params[0]))));
 route('GET', '/api/agents/:id/git/stash', ({ params, url }) => gitSafe(() => stashDetail(agentCwd(params[0]), url.searchParams.get('sha') ?? '')));
 route('GET', '/api/agents/:id/git/branches', ({ params }) => gitSafe(() => gitBranches(agentCwd(params[0]))));
@@ -192,7 +191,7 @@ gitWrite('push', (cwd) => gitPush(cwd));
 gitWrite('switch', (cwd, b) => gitSwitch(cwd, String(b.branch ?? ''), !!b.create));
 gitWrite('merge', (cwd, b) => gitMerge(cwd, String(b.branch ?? '')));
 gitWrite('merge-abort', (cwd) => gitMergeAbort(cwd));
-gitWrite('switch-smart', (cwd, b) => smartSwitch(cwd, String(b.branch ?? ''), b.mode as SwitchMode, b.keep && typeof b.keep === 'object' ? b.keep : {}));
+gitWrite('switch-smart', (cwd, b) => smartSwitch(cwd, String(b.branch ?? '')));
 gitWrite('smart-finish', (cwd) => smartFinish(cwd));
 gitWrite('smart-cancel', (cwd) => smartCancel(cwd));
 gitWrite('stash-save', (cwd, b) => stashSave(cwd, String(b.message ?? '')));

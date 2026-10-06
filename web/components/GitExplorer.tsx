@@ -245,13 +245,14 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
 
   const selChange = sel ? changeOf.get(sel) : undefined;
 
-  // Switching: git carries your changes over by itself when nothing clashes. Only when something does (or other agents
-  // are working in this repository) is there a dialog.
+  // Switching happens directly: git carries clean changes over and anything else goes through a stash and the conflict
+  // resolver. The one question is when other agents are working in this repository.
+  const doSwitch = (plan: SwitchPlan) => actions.run('switch', plan.carried ? t('git.done.switchCarried', { branch: plan.to, count: plan.carried }) : t('git.done.switch', { branch: plan.to }),
+    plan.overlap.length || plan.collisions.length ? 'switch-smart' : 'switch', { branch: plan.to });
   const requestSwitch = async (branch: string) => {
     try {
       const plan = await api.get<SwitchPlan>(`/agents/${agent.id}/git/switch-plan?branch=${encodeURIComponent(branch)}`);
-      if (plan.overlap.length || plan.collisions.length || plan.others.length || plan.selfRunning) setSwitchPlan(plan);
-      else await actions.run('switch', plan.carried ? t('git.done.switchCarried', { branch, count: plan.carried }) : t('git.done.switch', { branch }), 'switch', { branch });
+      if (plan.others.length || plan.selfRunning) setSwitchPlan(plan); else await doSwitch(plan);
     } catch (e) { actions.setNotice({ title: t('git.notice.failed', { action: t('git.done.switch', { branch }) }), text: e instanceof Error ? e.message : 'error', diverged: false }); }
   };
 
@@ -368,7 +369,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
           : sel && selChange?.status === 'conflict' ? <ConflictResolver key={sel} agent={agent} path={sel} state={status.state} a={actions} onResolved={() => { void refresh(); }} />
           : sel ? <Preview key={sel} agent={agent} path={sel} change={selChange} stamp={status.generatedAt} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} onDiscard={discardFile} onDiscardHunk={discardHunk} onDiscardLines={discardLines} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
       </div>
-      {switchPlan && <SwitchDialog agent={agent} plan={switchPlan} a={actions} onClose={() => setSwitchPlan(null)} />}
+      {switchPlan && <SwitchDialog agent={agent} plan={switchPlan} a={actions} onClose={() => setSwitchPlan(null)} onGo={() => { const p = switchPlan; setSwitchPlan(null); void doSwitch(p); }} />}
       {saveStash && <SaveStashDialog a={actions} onClose={() => setSaveStash(false)} />}
       {cancelSmart && status.stash && (
         <Modal title={t('git.state.cancelStash.title')} onClose={() => setCancelSmart(false)}>
