@@ -14,7 +14,7 @@ const LOCAL_TIMEOUT = 30_000;
 const NET_TIMEOUT = 120_000;
 const LOG_PAGE = 30;
 
-function run(cwd: string, args: string[], o: { network?: boolean; okCodes?: number[]; env?: Record<string, string>; input?: string; raw?: boolean } = {}): Promise<{ out: string; code: number }> {
+export function run(cwd: string, args: string[], o: { network?: boolean; okCodes?: number[]; env?: Record<string, string>; input?: string; raw?: boolean } = {}): Promise<{ out: string; code: number }> {
   return new Promise((resolve, reject) => {
     const child = execFile('git', ['-c', 'core.quotepath=off', '-c', 'color.ui=never', ...args], {
       cwd, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: o.network ? NET_TIMEOUT : LOCAL_TIMEOUT,
@@ -32,7 +32,7 @@ function run(cwd: string, args: string[], o: { network?: boolean; okCodes?: numb
   });
 }
 
-async function repoOf(cwd: string): Promise<Repo> {
+export async function repoOf(cwd: string): Promise<Repo> {
   const f = await findRepo(cwd);
   if (!f.ok) throw new GitOpError(f.message);
   return f.repo;
@@ -40,7 +40,7 @@ async function repoOf(cwd: string): Promise<Repo> {
 
 /** One write at a time per repository (double clicks, or two tabs) so we never fight over index.lock. */
 const locks = new Map<string, Promise<unknown>>();
-async function exclusive<T>(root: string, fn: () => Promise<T>): Promise<T> {
+export async function exclusive<T>(root: string, fn: () => Promise<T>): Promise<T> {
   const prev = locks.get(root) ?? Promise.resolve();
   const next = prev.catch(() => undefined).then(fn);
   locks.set(root, next);
@@ -48,7 +48,7 @@ async function exclusive<T>(root: string, fn: () => Promise<T>): Promise<T> {
 }
 
 const SHA = /^[0-9a-f]{4,40}$/i;
-async function validBranch(root: string, name: string) {
+export async function validBranch(root: string, name: string) {
   if (!name || name.startsWith('-') || name.includes('\0')) throw new GitOpError('Invalid branch name');
   await run(root, ['check-ref-format', '--branch', name]).catch(() => { throw new GitOpError(`"${name}" is not a valid branch name`); });
 }
@@ -152,7 +152,7 @@ export async function gitBranches(cwd: string): Promise<GitBranches> {
 /* ------------------------------------------------------------------ writes */
 
 export interface GitResult { ok: true; output: string }
-const done = (output: string): GitResult => ({ ok: true, output });
+export const done = (output: string): GitResult => ({ ok: true, output });
 
 export async function gitCommitChanges(cwd: string, message: string, paths: string[]): Promise<GitResult> {
   const msg = message.trim();

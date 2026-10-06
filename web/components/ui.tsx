@@ -63,9 +63,9 @@ export function Drawer({ title, subtitle, onClose, children, footer }: { title: 
     </>
   );
 }
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => { const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [onClose]);
-  return (<><div className="scrim" onClick={onClose} /><div className="modal" role="dialog" aria-modal aria-label={title}><h3 style={{ fontSize: 20 }}>{title}</h3>{children}</div></>);
+  return (<><div className="scrim" onClick={onClose} /><div className={`modal${wide ? ' wide' : ''}`} role="dialog" aria-modal aria-label={title}><h3 style={{ fontSize: 20 }}>{title}</h3>{children}</div></>);
 }
 export function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: ReactNode }) {
   return <div className="field"><label>{label}</label>{children}{error ? <span className="field-err">{error}</span> : hint ? <span className="hint">{hint}</span> : null}</div>;

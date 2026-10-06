@@ -42,7 +42,9 @@ export type GitStatus =
       upstream: { ahead: number; behind: number } | null;
       changes: GitChange[]; truncated: boolean; generatedAt: number;
       /** A merge or rebase waiting to be finished (conflicts being resolved), and git's prepared merge message. */
-      state: 'merge' | 'rebase' | null; mergeMsg: string;
+      state: 'merge' | 'rebase' | 'stash' | null; mergeMsg: string;
+      /** Set with state 'stash': a smart branch switch whose saved changes are still being brought back. */
+      stash: SmartStash | null;
     };
 
 export interface Repo { root: string; scope: string }
@@ -61,6 +63,22 @@ export function parseNumstat(out: string): Map<string, { a: number | null; d: nu
     if (m[3] === '') { counts.set(tok[i + 2], c); i += 2; } else counts.set(m[3], c);
   }
   return counts;
+}
+
+/** Marker in the message of the stash a smart branch switch creates. */
+export const SMART_PREFIX = 'hive-am smart switch: ';
+export interface SmartStash { ref: string; sha: string; from: string; to: string }
+
+/** The stash left behind by a smart switch that has not been fully reapplied (a successful reapply drops it). */
+export async function smartStash(root: string): Promise<SmartStash | null> {
+  const { stdout } = await git(root, ['stash', 'list', '--format=%gd%x1f%H%x1f%gs']).catch(() => ({ stdout: '' }));
+  for (const line of stdout.split('\n')) {
+    const [ref, sha, subject] = line.split('\x1f');
+    const i = subject?.indexOf(SMART_PREFIX) ?? -1; if (i < 0) continue;
+    const m = /^(\S+) -> (\S+)$/.exec(subject.slice(i + SMART_PREFIX.length).trim());
+    if (m) return { ref, sha, from: m[1], to: m[2] };
+  }
+  return null;
 }
 
 /** Whether a merge or a rebase is waiting to be finished, and where git keeps its state. */
@@ -173,7 +191,9 @@ export async function gitStatus(cwd: string): Promise<GitStatus> {
   }));
   changes.sort((a, b) => a.path.localeCompare(b.path));
 
-  const { state, gitDir } = await repoState(root);
+  const rs = await repoState(root); const gitDir = rs.gitDir;
+  const smart = rs.state ? null : await smartStash(root);
+  const state = rs.state ?? (smart ? 'stash' as const : null);
   const mergeMsg = state === 'merge' ? (await readFile(`${gitDir}/MERGE_MSG`, 'utf8').catch(() => '')).split('\n').filter((l) => !l.startsWith('#')).join('\n').trim() : '';
 
   const [sha, subject, when, author] = headInfo.stdout.trim().split('\0');
@@ -183,7 +203,7 @@ export async function gitStatus(cwd: string): Promise<GitStatus> {
     isRepo: true, cwd, root, scope, branch, detached: !branch && !!sha,
     head: sha ? { sha, subject: subject ?? '', when: when ?? '', author: author ?? '' } : null,
     upstream: Number.isFinite(ahead) && Number.isFinite(behind) ? { ahead, behind } : null,
-    changes, truncated: changes.length >= MAX_CHANGES, generatedAt: Date.now(), state, mergeMsg,
+    changes, truncated: changes.length >= MAX_CHANGES, generatedAt: Date.now(), state, mergeMsg, stash: smart,
   };
 }
 

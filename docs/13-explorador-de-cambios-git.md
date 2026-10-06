@@ -158,7 +158,7 @@ Junto al resumen de cambios, la barra ofrece **Ramas**, **Fetch**, **Pull**, **P
 | **Fetch** | `git fetch --all --prune` | No toca tus archivos |
 | **Pull** | `git pull --ff-only --no-edit` | Solo avance rápido. Si las ramas **divergieron**, el aviso ofrece **Pull con merge** y **Pull con rebase** |
 | **Push** | `git push`; si la rama aún no tiene *upstream*, `git push -u origin <rama>` | Nunca `--force`. Desactivado con la rama desacoplada |
-| **Ramas** | Menú con búsqueda, ramas **locales** y **remotas**, y un campo para **crear** una rama nueva desde la actual | Clic en una rama = `git switch`; una remota se convierte en rama local que la sigue. El icono de fusión pide confirmación y ejecuta `git merge --no-edit <rama>` |
+| **Ramas** | Menú con búsqueda, ramas **locales** y **remotas**, y un campo para **crear** una rama nueva desde la actual | Clic en una rama = cambio de rama, **inteligente si hace falta** ([13.13](#1313-cambio-inteligente-de-rama-y-stashes)); una remota se convierte en rama local que la sigue. El icono de fusión pide confirmación y ejecuta `git merge --no-edit <rama>` |
 | **Cancelar fusión** | `git merge --abort` | Aparece en el aviso cuando una fusión (o pull con merge) termina con **conflictos** |
 
 Si git falla (conflictos, credenciales, cambios locales que impiden cambiar de rama…), se muestra **el texto de git tal cual** en un aviso rojo que se cierra con la X.
@@ -270,4 +270,27 @@ API: `POST …/git/discard` `{ path, oldPath? }`, `…/discard-hunk` `{ path, in
 - **Vista de archivo:** se muestra solo el primer 1 MB ("Archivo grande: se muestra solo la primera parte").
 - **Blame:** hasta 5 000 líneas.
 - **Resaltado:** archivos de más de 15 000 caracteres se resaltan en un worker; por encima de 1,2 M de caracteres no se resaltan.
+
+## 13.13 Cambio inteligente de rama y stashes
+
+### Cambiar de rama sin perder lo que tienes sin commit
+
+`git switch` ya **lleva tus cambios** a la otra rama cuando ninguno de los archivos que modificaste es distinto entre las dos ramas. Cuando algo choca, git se niega. Al hacer clic en una rama, el servidor primero calcula un **plan** (`GET …/git/switch-plan?branch=`): cuántos cambios viajan, qué archivos tuyos son también distintos en la rama destino (`overlap`), qué archivos **nuevos** tuyos ya existen allí (`collisions`) y qué **otros agentes están trabajando ahora mismo en el mismo repositorio**.
+
+- **Nada choca y nadie más trabaja:** cambia directo y avisa "Ahora en X; N cambios vinieron contigo".
+- **Algo choca, o hay otro agente trabajando:** aparece el diálogo "¿Cambiar a X?" con: los cambios que viajan, el **aviso del agente** (un cambio de rama modifica los archivos que está editando), la lista de archivos en conflicto y, para cada **archivo nuevo que ya existe en la rama destino**, el botón **Comparar** (un diff: `−` versión de la otra rama, `+` tu versión) y la elección **Quedarme con el mío / Quedarme con el de X**. Opciones: **Cambio inteligente**, **Forzar cambio** (descarta todos tus cambios sin commit en archivos versionados y los archivos nuevos que estorben) y **Cancelar**. Sin choques (solo el aviso de otros agentes) el botón es "Cambiar de todos modos".
+
+**Cambio inteligente** (`POST …/git/switch-smart`): (1) `git stash push -u -m "hive-am smart switch: A -> B"` (incluye archivos nuevos); (2) `git switch B` (si falla, se reaplica el stash y se devuelve el error); (3) quita de la rama destino las copias de los archivos que chocan para que git pueda restaurar los tuyos; (4) `git stash pop`; (5) para cada archivo marcado "el de X" restaura la versión de la otra rama; los marcados "el mío" se quedan como una **modificación** de ese archivo. Un conflicto al reaplicar **no es un error**: los archivos quedan con marcadores, el stash se conserva y aparece la franja **"Cambio inteligente en curso A → B"**.
+
+- **Resolver:** con el resolvedor de siempre (aquí "Mío" son tus cambios guardados y "Rama destino" la otra). Con todo resuelto, **Terminar** quita el *stage* (un stash reaplicado no queda en stage) y borra el stash (`POST …/git/smart-finish`).
+- **Cancelar cambio inteligente** (`…/smart-cancel`, con confirmación): borra los archivos nuevos que el reaplicado ya restauró, `git reset --hard`, vuelve a la rama original y reaplica el stash: tus cambios quedan **exactamente como estaban**. Lo que editaste mientras resolvías se pierde.
+- Si algo falla a la mitad el stash se conserva y el mensaje dice dónde está (por eso lleva un nombre claro).
+
+### Gestor de stashes
+
+Pestaña **Stashes · N** (junto a Archivos e Historial). Lista cada stash (mensaje, rama, cuándo; los de un cambio inteligente llevan la etiqueta "cambio inteligente") y a la derecha muestra sus archivos —también los **nuevos**— con el diff. Botones: **Guardar cambios en un stash** (con mensaje opcional; incluye archivos nuevos y deja el árbol limpio), **Aplicar** (conserva el stash), **Aplicar y borrar** y **Borrar** (con confirmación explícita). Un conflicto al aplicar se resuelve con el resolvedor. Cada operación recibe el hash del stash (no su posición) y se rechaza si ya no existe.
+
+API: `GET …/git/stashes`, `…/git/stash?sha=`, `…/git/collision-diff?path=&branch=`; `POST …/git/switch-smart` `{ branch, mode: 'smart'|'force', keep: { ruta: 'mine'|'theirs' } }`, `…/smart-finish`, `…/smart-cancel`, `…/stash-save`, `…/stash-apply` `{ sha, pop }`, `…/stash-drop`. Estado en `GET …/git/status`: `state: 'stash'` y `stash: { ref, sha, from, to }`. Las mismas protecciones de siempre (rutas dentro de la carpeta, origen local, una escritura a la vez).
+
+**Límites:** un stash reaplicado no conserva el *stage* (queda todo sin stage); el aviso de agentes cuenta solo los que están **trabajando** en ese momento y comparten repositorio (no solo carpeta); los archivos ignorados por `.gitignore` no viajan con el stash.
 

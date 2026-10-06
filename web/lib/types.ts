@@ -70,7 +70,7 @@ export type GitStatus =
       isRepo: true; cwd: string; root: string; scope: string; branch: string | null; detached: boolean;
       head: { sha: string; subject: string; when: string; author: string } | null;
       upstream: { ahead: number; behind: number } | null;
-      changes: GitChange[]; truncated: boolean; generatedAt: number; state: 'merge' | 'rebase' | null; mergeMsg: string;
+      changes: GitChange[]; truncated: boolean; generatedAt: number; state: 'merge' | 'rebase' | 'stash' | null; mergeMsg: string; stash: { ref: string; sha: string; from: string; to: string } | null;
     };
 export type GitTree = { isRepo: false; reason: string; message: string } | { isRepo: true; root: string; scope: string; files: string[]; truncated: boolean };
 export interface GitDiffResult { path: string; diff: string; truncated: boolean; binary: boolean }
@@ -81,3 +81,7 @@ export interface GitCommitFile { path: string; oldPath?: string; status: 'modifi
 export interface GitCommitDetail { sha: string; author: string; email: string; date: string; message: string; files: GitCommitFile[]; truncated: boolean }
 export interface GitBranches { current: string | null; local: { name: string; upstream: string | null; date: string; subject: string }[]; remote: { name: string; date: string; subject: string }[] }
 export interface GitBlame { path: string; commits: Record<string, { short: string; author: string; time: number; summary: string; uncommitted: boolean }>; lines: string[]; truncated: boolean }
+
+export interface SwitchPlan { from: string; to: string; carried: number; overlap: string[]; collisions: string[]; others: { id: string; name: string }[]; selfRunning: boolean }
+export interface StashItem { sha: string; message: string; branch: string; date: string; smart: boolean }
+export interface StashDetail { sha: string; untrackedSha: string | null; untracked: string[] }

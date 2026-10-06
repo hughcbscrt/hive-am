@@ -11,7 +11,8 @@ import { listModels } from './models.js';
 import type { Provider } from './types.js';
 import { sessionStats } from './stats.js';
 import { createReadStream } from 'node:fs';
-import { gitDiff, gitFile, gitImagePath, gitStatus, gitTree, isPathError } from './git.js';
+import { findRepo, gitDiff, gitFile, gitImagePath, gitStatus, gitTree, isPathError } from './git.js';
+import { collisionDiff, listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave, type SwitchMode } from './gitswitch.js';
 import { GitOpError, gitBlame, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitUnresolve, type PullMode } from './gitops.js';
 
 const exec = promisify(execFile);
@@ -166,6 +167,23 @@ route('GET', '/api/agents/:id/git/log', ({ params, url }) => gitSafe(() => gitLo
 route('GET', '/api/agents/:id/git/commit', ({ params, url }) => gitSafe(() => gitCommitDetail(agentCwd(params[0]), url.searchParams.get('sha') ?? '')));
 route('GET', '/api/agents/:id/git/commit-diff', ({ params, url }) => gitSafe(() => gitCommitDiff(agentCwd(params[0]), url.searchParams.get('sha') ?? '', qpath(url), url.searchParams.get('old') ?? undefined)));
 route('GET', '/api/agents/:id/git/blame', ({ params, url }) => gitSafe(() => gitBlame(agentCwd(params[0]), qpath(url))));
+// Smart switch: what would happen, plus which other agents are working in the same repository right now (a switch
+// moves their files too).
+route('GET', '/api/agents/:id/git/switch-plan', async ({ params, url }) => {
+  const cwd = agentCwd(params[0]);
+  const plan = await gitSafe(() => planSwitch(cwd, url.searchParams.get('branch') ?? ''));
+  const here = await findRepo(cwd);
+  const others: { id: string; name: string }[] = [];
+  if (here.ok) for (const a of agents.list()) {
+    if (a.id === params[0] || !(a.status === 'running' || liveTurn(a.id))) continue;
+    const there = await findRepo(resolved(a).cwd);
+    if (there.ok && there.repo.root === here.repo.root) others.push({ id: a.id, name: a.name });
+  }
+  return { ...plan, others, selfRunning: agents.get(params[0])?.status === 'running' };
+});
+route('GET', '/api/agents/:id/git/collision-diff', ({ params, url }) => gitSafe(() => collisionDiff(agentCwd(params[0]), qpath(url), url.searchParams.get('branch') ?? '')));
+route('GET', '/api/agents/:id/git/stashes', ({ params }) => gitSafe(() => listStashes(agentCwd(params[0]))));
+route('GET', '/api/agents/:id/git/stash', ({ params, url }) => gitSafe(() => stashDetail(agentCwd(params[0]), url.searchParams.get('sha') ?? '')));
 route('GET', '/api/agents/:id/git/branches', ({ params }) => gitSafe(() => gitBranches(agentCwd(params[0]))));
 gitWrite('commit', (cwd, b) => gitCommitChanges(cwd, String(b.message ?? ''), Array.isArray(b.paths) ? b.paths.map(String) : []));
 gitWrite('fetch', (cwd) => gitFetch(cwd));
@@ -174,6 +192,12 @@ gitWrite('push', (cwd) => gitPush(cwd));
 gitWrite('switch', (cwd, b) => gitSwitch(cwd, String(b.branch ?? ''), !!b.create));
 gitWrite('merge', (cwd, b) => gitMerge(cwd, String(b.branch ?? '')));
 gitWrite('merge-abort', (cwd) => gitMergeAbort(cwd));
+gitWrite('switch-smart', (cwd, b) => smartSwitch(cwd, String(b.branch ?? ''), b.mode as SwitchMode, b.keep && typeof b.keep === 'object' ? b.keep : {}));
+gitWrite('smart-finish', (cwd) => smartFinish(cwd));
+gitWrite('smart-cancel', (cwd) => smartCancel(cwd));
+gitWrite('stash-save', (cwd, b) => stashSave(cwd, String(b.message ?? '')));
+gitWrite('stash-apply', (cwd, b) => stashApply(cwd, String(b.sha ?? ''), !!b.pop));
+gitWrite('stash-drop', (cwd, b) => stashDrop(cwd, String(b.sha ?? '')));
 gitWrite('discard', (cwd, b) => gitDiscardFile(cwd, String(b.path ?? ''), b.oldPath ? String(b.oldPath) : undefined));
 gitWrite('discard-hunk', (cwd, b) => gitDiscardHunk(cwd, String(b.path ?? ''), Number(b.index), String(b.header ?? '')));
 gitWrite('discard-lines', (cwd, b) => gitDiscardLines(cwd, String(b.path ?? ''), Number(b.index), String(b.header ?? ''), Array.isArray(b.lines) ? b.lines.map(Number) : []));

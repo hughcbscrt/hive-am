@@ -22,9 +22,10 @@ export function useGitActions(agent: Agent, refresh: () => Promise<unknown> | un
   const run = async (key: string, doneMsg: string, path: string, body: object = {}): Promise<boolean> => {
     setBusy(key); setNotice(null);
     try {
-      const r = await api.post<{ output: string }>(`/agents/${agent.id}/git/${path}`, body);
+      const r = await api.post<{ output: string; pending?: string | null }>(`/agents/${agent.id}/git/${path}`, body);
       const first = (r.output ?? '').split('\n').filter(Boolean).pop() ?? '';
-      toast(first && first.length < 90 ? `${doneMsg} — ${first}` : doneMsg);
+      // Conflicts while bringing changes back are not a failure: they are resolved in the explorer.
+      toast(r.pending === 'conflicts' ? `${doneMsg} — ${t('git.pending.conflicts')}` : first && first.length < 90 ? `${doneMsg} — ${first}` : doneMsg);
       await refresh();
       return true;
     } catch (e) {
@@ -73,7 +74,7 @@ export function ActionButtons({ a, ahead, behind, detached, changeCount, onCommi
 
 /* ------------------------------------------------------------------ branches */
 
-export function BranchMenu({ agent, a, current }: { agent: Agent; a: GitActions; current: string | null }) {
+export function BranchMenu({ agent, a, current, onSwitch }: { agent: Agent; a: GitActions; current: string | null; onSwitch: (branch: string) => void }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<GitBranches | null>(null);
@@ -116,7 +117,7 @@ export function BranchMenu({ agent, a, current }: { agent: Agent; a: GitActions;
             {local.length > 0 && <div className="gx-brhead">{t('git.br.local')}</div>}
             {local.map((b) => (
               <div key={b.name} className={`gx-br ${b.name === current ? 'cur' : ''}`}>
-                <button className="grow" disabled={b.name === current || !!a.busy} onClick={() => void go('switch', t('git.done.switch', { branch: b.name }), 'switch', { branch: b.name })} title={t('git.br.switchTo', { branch: b.name })}>
+                <button className="grow" disabled={b.name === current || !!a.busy} onClick={() => { setOpen(false); onSwitch(b.name); }} title={t('git.br.switchTo', { branch: b.name })}>
                   <span className="nm">{b.name === current && <Check size={13} />}{b.name}</span><span className="sub">{b.subject} · {ago(Date.parse(b.date))}</span>
                 </button>
                 {b.name !== current && <button className="btn ghost icon sm" disabled={!!a.busy} onClick={() => setMerge(b.name)} aria-label={t('git.br.merge', { branch: current ?? '' })} title={t('git.br.merge', { branch: current ?? '' })}><GitMerge size={14} /></button>}
@@ -125,7 +126,7 @@ export function BranchMenu({ agent, a, current }: { agent: Agent; a: GitActions;
             {remote.length > 0 && <div className="gx-brhead">{t('git.br.remote')}</div>}
             {remote.map((b) => (
               <div key={b.name} className="gx-br">
-                <button className="grow" disabled={!!a.busy} onClick={() => { const short = b.name.split('/').slice(1).join('/'); void go('switch', t('git.done.switch', { branch: short }), 'switch', { branch: short }); }} title={t('git.br.switchTo', { branch: b.name })}>
+                <button className="grow" disabled={!!a.busy} onClick={() => { const short = b.name.split('/').slice(1).join('/'); setOpen(false); onSwitch(short); }} title={t('git.br.switchTo', { branch: b.name })}>
                   <span className="nm">{b.name}</span><span className="sub">{b.subject} · {ago(Date.parse(b.date))}</span>
                 </button>
                 <button className="btn ghost icon sm" disabled={!!a.busy} onClick={() => setMerge(b.name)} aria-label={t('git.br.merge', { branch: current ?? '' })} title={t('git.br.merge', { branch: current ?? '' })}><GitMerge size={14} /></button>

@@ -16,7 +16,7 @@ import { Code } from './Code';
  * mixed and then fixed by hand (for example if "both" leaves repeated code).
  * In a rebase git swaps the sides, so "mine" is whichever side holds your own commits.
  */
-export function ConflictResolver({ agent, path, state, a, onResolved }: { agent: Agent; path: string; state: 'merge' | 'rebase' | null; a: GitActions; onResolved: () => void }) {
+export function ConflictResolver({ agent, path, state, a, onResolved }: { agent: Agent; path: string; state: 'merge' | 'rebase' | 'stash' | null; a: GitActions; onResolved: () => void }) {
   const { t } = useI18n();
   const [file, setFile] = useState<GitFileResult | null>(null);
   const [text, setText] = useState('');
@@ -32,7 +32,7 @@ export function ConflictResolver({ agent, path, state, a, onResolved }: { agent:
   }, [agent.id, path, load]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const blocks = useMemo(() => parseConflicts(text), [text]);
-  const mineIsOurs = state !== 'rebase';
+  const mineIsOurs = state !== 'rebase' && state !== 'stash';   // rebase and stash reapply: your changes are the incoming side
   const side = (b: 'mine' | 'remote'): 'ours' | 'theirs' => ((b === 'mine') === mineIsOurs ? 'ours' : 'theirs');
   const text_ = (c: 'mine' | 'remote' | 'both-mine' | 'both-remote'): Choice =>
     c === 'both-mine' ? (mineIsOurs ? 'ours-theirs' : 'theirs-ours') : c === 'both-remote' ? (mineIsOurs ? 'theirs-ours' : 'ours-theirs') : side(c);
@@ -45,7 +45,7 @@ export function ConflictResolver({ agent, path, state, a, onResolved }: { agent:
   const restore = async () => { if (await a.run('unresolve', t('git.res.restored'), 'unresolve', { path })) setLoad((n) => n + 1); };
 
   const slash = path.lastIndexOf('/'); const dir = slash >= 0 ? path.slice(0, slash + 1) : ''; const name = path.slice(slash + 1);
-  const label = (l: string) => (!l || l === 'HEAD' || l === 'ours' || l === 'theirs' ? '' : l);
+  const label = (l: string) => (!l || ['HEAD', 'ours', 'theirs', 'Updated upstream', 'Stashed changes'].includes(l) ? '' : l);
 
   return (
     <section className="gx-preview gx-resolver" aria-label={path}>
@@ -74,7 +74,7 @@ export function ConflictResolver({ agent, path, state, a, onResolved }: { agent:
                       const lines = side(who) === 'ours' ? b.ours : b.theirs; const lbl = label(side(who) === 'ours' ? b.oursLabel : b.theirsLabel);
                       return (
                         <div key={who} className={`gx-rside ${who}`}>
-                          <div className="gx-rhead"><span>{who === 'mine' ? t('git.res.mine') : t('git.res.remote')}</span>{lbl && <i className="ref">{lbl}</i>}</div>
+                          <div className="gx-rhead"><span>{who === 'mine' ? (state === 'stash' ? t('git.res.mine.stash') : t('git.res.mine')) : (state === 'stash' ? t('git.res.remote.stash') : t('git.res.remote'))}</span>{lbl && <i className="ref">{lbl}</i>}</div>
                           <pre>{lines.length ? <Code text={lines.join('\n')} path={path} /> : <span className="muted">{t('git.res.empty')}</span>}</pre>
                           <button className="btn sm" onClick={() => setText((x) => applyChoice(x, i, text_(who)))}>{who === 'mine' ? t('git.res.keepMine') : t('git.res.keepRemote')}</button>
                         </div>
