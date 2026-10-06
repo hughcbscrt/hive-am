@@ -232,20 +232,43 @@ export function HistoryList({ agent, head, sel, onSelect }: { agent: Agent; head
 
 /* ------------------------------------------------------------------ discard */
 
-/** Asked only when discarding would delete files for good (new files are not in any commit, so there is nothing to go back to). */
-export function DiscardConfirm({ files, all, busy, onConfirm, onClose }: { files: string[]; all: boolean; busy: boolean; onConfirm: () => void; onClose: () => void }) {
+export interface DiscardSummary { restore: number; add: number; del: number }
+
+/**
+ * Asked before deleting new files (they are in no commit, so there is nothing to go back to) and, always, before
+ * "discard all". For "discard all" it spells out what happens to each kind of file and how many lines are lost.
+ */
+export function DiscardConfirm({ files, all, summary, busy, onConfirm, onClose }: { files: string[]; all: boolean; summary?: DiscardSummary; busy: boolean; onConfirm: () => void; onClose: () => void }) {
   const { t } = useI18n();
+  const list = (
+    <ul className="gx-dlist">
+      {files.slice(0, 8).map((f) => <li key={f} className="mono">{f}</li>)}
+      {files.length > 8 && <li className="muted">{t('hover.more', { count: files.length - 8 })}</li>}
+    </ul>
+  );
+  if (!all) {
+    return (
+      <Modal title={t('git.discard.confirm.title')} onClose={onClose}>
+        <p className="muted" style={{ margin: 0 }}>{t('git.discard.confirm.body', { count: files.length })}</p>
+        {list}
+        <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <button className="btn ghost" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn danger" disabled={busy} onClick={onConfirm}>{t('git.discard.confirm.go')}</button>
+        </div>
+      </Modal>
+    );
+  }
   return (
-    <Modal title={t('git.discard.confirm.title')} onClose={onClose}>
-      <p className="muted" style={{ margin: 0 }}>{t('git.discard.confirm.body', { count: files.length })}</p>
-      <ul className="gx-dlist">
-        {files.slice(0, 8).map((f) => <li key={f} className="mono">{f}</li>)}
-        {files.length > 8 && <li className="muted">{t('hover.more', { count: files.length - 8 })}</li>}
+    <Modal title={t('git.discard.all.title')} onClose={onClose}>
+      <ul className="gx-effects">
+        {summary && summary.restore > 0 && <li>{t('git.discard.all.restore', { count: summary.restore })}</li>}
+        {files.length > 0 && <li className="bad"><b>{t('git.discard.all.delete', { count: files.length })}</b>{list}</li>}
       </ul>
-      {all && <p className="muted small" style={{ margin: 0 }}>{t('git.discard.confirm.rest')}</p>}
+      {summary && <p className="muted small" style={{ margin: 0 }}>{t('git.discard.all.lines', { add: summary.add, del: summary.del })}</p>}
+      <p className="gx-lost">{t('git.discard.all.warn')}</p>
       <div className="row" style={{ justifyContent: 'flex-end' }}>
         <button className="btn ghost" onClick={onClose}>{t('common.cancel')}</button>
-        <button className="btn danger" disabled={busy} onClick={onConfirm}>{t('git.discard.confirm.go')}</button>
+        <button className="btn danger" disabled={busy} onClick={onConfirm}>{t('git.discard.all.go')}</button>
       </div>
     </Modal>
   );

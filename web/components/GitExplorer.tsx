@@ -20,7 +20,7 @@ import { ago } from '@/lib/meta';
 import { dateLocale } from '@/lib/i18n';
 import { Segmented } from './ui';
 import { ConflictResolver } from './ConflictResolver';
-import { ActionButtons, BranchMenu, CommitDialog, DiscardConfirm, HistoryList, NoticeBanner, useGitActions } from './GitActions';
+import { ActionButtons, BranchMenu, CommitDialog, DiscardConfirm, type DiscardSummary, HistoryList, NoticeBanner, useGitActions } from './GitActions';
 import type { GitBlame, GitCommitDetail } from '@/lib/types';
 
 const TREE_MAX_ROWS = 2000;   // the file tree is a list of buttons, not windowed: it shows this many and asks for a narrower filter
@@ -265,7 +265,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
   const [commitSel, setCommitSel] = useState<string | null>(null);
   const [commitOpen, setCommitOpen] = useState(false);
   const actions = useGitActions(agent, () => refresh());
-  const [discardAsk, setDiscardAsk] = useState<{ files: string[]; all: boolean; go: () => Promise<boolean> } | null>(null);
+  const [discardAsk, setDiscardAsk] = useState<{ files: string[]; all: boolean; summary?: DiscardSummary; go: () => Promise<boolean> } | null>(null);
   const prefs = useGitPrefs();
   const seenDirs = useRef<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
@@ -328,7 +328,12 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
     if (ok && doomed([c]).length) setSel(null);
     return ok;
   });
-  const discardAll = () => askOrRun(doomed(status.changes), true, async () => { const ok = await actions.run('discard-all', t('git.done.discard'), 'discard-all'); if (ok) setSel(null); return ok; });
+  // "Discard all" always asks: it is the one action that can throw away a lot of work in a single click.
+  const discardAll = () => {
+    const gone = doomed(status.changes);
+    setDiscardAsk({ files: gone, all: true, summary: { restore: status.changes.length - gone.length, add: totals.add, del: totals.del },
+      go: async () => { const ok = await actions.run('discard-all', t('git.done.discard'), 'discard-all'); if (ok) setSel(null); return ok; } });
+  };
   const discardHunk = (path: string, index: number, header: string) => void actions.run('discard-hunk', t('git.done.discard'), 'discard-hunk', { path, index, header });
   const discardLines = (path: string, index: number, header: string, lines: number[]) => void actions.run('discard-lines', t('git.done.discard'), 'discard-lines', { path, index, header, lines });
   const upd = new Date(status.generatedAt).toLocaleTimeString(dateLocale());
@@ -421,7 +426,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
           : sel && selChange?.status === 'conflict' ? <ConflictResolver key={sel} agent={agent} path={sel} state={status.state} a={actions} onResolved={() => { void refresh(); }} />
           : sel ? <Preview key={sel} agent={agent} path={sel} change={selChange} stamp={status.generatedAt} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} onDiscard={discardFile} onDiscardHunk={discardHunk} onDiscardLines={discardLines} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
       </div>
-      {discardAsk && <DiscardConfirm files={discardAsk.files} all={discardAsk.all} busy={!!actions.busy} onClose={() => setDiscardAsk(null)} onConfirm={async () => { const go = discardAsk.go; setDiscardAsk(null); await go(); }} />}
+      {discardAsk && <DiscardConfirm files={discardAsk.files} all={discardAsk.all} summary={discardAsk.summary} busy={!!actions.busy} onClose={() => setDiscardAsk(null)} onConfirm={async () => { const go = discardAsk.go; setDiscardAsk(null); await go(); }} />}
       {commitOpen && <CommitDialog changes={status.changes} a={actions} initialMessage={status.mergeMsg} onClose={() => setCommitOpen(false)} />}
     </div>
   );

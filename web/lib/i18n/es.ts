@@ -771,7 +771,6 @@ export const es: Record<DictKey, string> = {
   "git.discard.confirm.title": "¿Eliminar archivos por completo?",
   "git.discard.confirm.body_one": "Este archivo es nuevo (no está en ningún commit), así que descartarlo lo elimina por completo. No se puede recuperar.",
   "git.discard.confirm.body_other": "Estos {count} archivos son nuevos (no están en ningún commit), así que descartarlos los elimina por completo. No se pueden recuperar.",
-  "git.discard.confirm.rest": "Todos los demás cambios vuelven al último commit.",
   "git.discard.confirm.go": "Eliminar archivos",
   "git.discard.lines": "Elegir líneas",
   "git.discard.lines.hint": "Elige líneas agregadas/quitadas de este bloque para descartarlas",
@@ -779,5 +778,13 @@ export const es: Record<DictKey, string> = {
   "git.discard.lines.go_one": "Descartar {count} línea",
   "git.discard.lines.go_other": "Descartar {count} líneas",
   "git.discard.lines.pick": "Incluir esta línea",
+  "git.discard.all.title": "¿Descartar todos los cambios?",
+  "git.discard.all.restore_one": "{count} archivo con cambios vuelve al último commit.",
+  "git.discard.all.restore_other": "{count} archivos con cambios vuelven al último commit.",
+  "git.discard.all.delete_one": "{count} archivo nuevo (no está en ningún commit) se ELIMINARÁ por completo:",
+  "git.discard.all.delete_other": "{count} archivos nuevos (no están en ningún commit) se ELIMINARÁN por completo:",
+  "git.discard.all.lines": "En total: +{add} −{del} líneas de cambios.",
+  "git.discard.all.warn": "Todo esto se pierde de forma definitiva. No se puede deshacer.",
+  "git.discard.all.go": "Descartar todos los cambios",
 
 };

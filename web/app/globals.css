@@ -736,3 +736,8 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .vl-row .vl-sg input:checked::after { content: ''; position: absolute; left: 3.5px; top: 0.5px; width: 3px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .vl-row .vl-sg input:focus-visible { outline: 2px solid var(--honey); outline-offset: 1px; }
 .vl-row.picked { outline: 1px solid color-mix(in srgb, var(--err) 70%, transparent); outline-offset: -1px; }
+.gx-effects { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; }
+.gx-effects > li { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.gx-effects > li.bad { border-color: color-mix(in srgb, var(--err) 55%, var(--line)); background: color-mix(in srgb, var(--err) 8%, var(--surface)); }
+.gx-effects .gx-dlist { margin-top: 8px; }
+.gx-lost { margin: 0; font-weight: 700; color: var(--err); font-size: 13.5px; }

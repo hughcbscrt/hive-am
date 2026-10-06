@@ -773,7 +773,6 @@ export const en = {
   "git.discard.confirm.title": "Delete files completely?",
   "git.discard.confirm.body_one": "This file is new (it is not in any commit), so discarding it deletes it completely. It cannot be recovered.",
   "git.discard.confirm.body_other": "These {count} files are new (they are not in any commit), so discarding them deletes them completely. They cannot be recovered.",
-  "git.discard.confirm.rest": "Every other change goes back to the last commit.",
   "git.discard.confirm.go": "Delete files",
   "git.discard.lines": "Select lines",
   "git.discard.lines.hint": "Pick individual added/removed lines of this block to discard",
@@ -781,6 +780,14 @@ export const en = {
   "git.discard.lines.go_one": "Discard {count} line",
   "git.discard.lines.go_other": "Discard {count} lines",
   "git.discard.lines.pick": "Include this line",
+  "git.discard.all.title": "Discard all changes?",
+  "git.discard.all.restore_one": "{count} file with changes goes back to the last commit.",
+  "git.discard.all.restore_other": "{count} files with changes go back to the last commit.",
+  "git.discard.all.delete_one": "{count} new file (it is not in any commit) will be DELETED completely:",
+  "git.discard.all.delete_other": "{count} new files (they are not in any commit) will be DELETED completely:",
+  "git.discard.all.lines": "In total: +{add} −{del} lines of changes.",
+  "git.discard.all.warn": "All of this is lost for good. It cannot be undone.",
+  "git.discard.all.go": "Discard all changes",
 
 };
 
