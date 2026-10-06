@@ -84,7 +84,7 @@ export async function gitCommitDetail(cwd: string, sha: string): Promise<GitComm
   const [meta, names, nums] = await Promise.all([
     run(root, ['show', '-s', '--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%B', sha]),
     run(root, ['diff-tree', '-r', '-M', '--name-status', '-z', '--no-commit-id', ...range]),
-    run(root, ['diff-tree', '-r', '-M', '--numstat', '-z', '--no-commit-id', ...range]),
+    run(root, ['diff-tree', '-r', '-M', '--histogram', '--numstat', '-z', '--no-commit-id', ...range]),
   ]);
   const counts = parseNumstat(nums.out);
   const files: GitCommitFile[] = [];
@@ -105,8 +105,8 @@ export async function gitCommitDiff(cwd: string, sha: string, rel: string, oldRe
   await safePath(cwd, root, rel, false); if (oldRel) await safePath(cwd, root, oldRel, false);
   const isMerge = await isMergeCommit(root, sha);
   const { out } = await run(root, isMerge
-    ? ['diff', '--no-color', '--no-ext-diff', '-M', '-U3', `${sha}^1`, sha, '--', ...(oldRel ? [oldRel, rel] : [rel])]
-    : ['show', '--no-color', '--no-ext-diff', '--format=', '-M', '-U3', sha, '--', ...(oldRel ? [oldRel, rel] : [rel])]);
+    ? ['diff', '--histogram', '--no-color', '--no-ext-diff', '-M', '-U3', `${sha}^1`, sha, '--', ...(oldRel ? [oldRel, rel] : [rel])]
+    : ['show', '--histogram', '--no-color', '--no-ext-diff', '--format=', '-M', '-U3', sha, '--', ...(oldRel ? [oldRel, rel] : [rel])]);
   const MAX = 600_000;
   return { path: rel, diff: out.length > MAX ? out.slice(0, MAX) : out, truncated: out.length > MAX, binary: /^Binary files .* differ$/m.test(out) || /^GIT binary patch/m.test(out) };
 }
@@ -308,7 +308,7 @@ const hunkRange = (h: string) => /^(@@ [^@]+@@)/.exec(h)?.[1];
 /** The diff of one file against HEAD, as its header lines plus the lines of block `index` (verified against `header`). */
 async function hunkOf(root: string, rel: string, index: number, header: string): Promise<{ head: string[]; at: string; body: string[] }> {
   if (!Number.isInteger(index) || index < 0) throw new GitOpError('Invalid block');
-  const { out } = await run(root, ['diff', 'HEAD', '--no-color', '--no-ext-diff', '-U3', '--', rel], { raw: true });
+  const { out } = await run(root, ['diff', 'HEAD', '--histogram', '--no-color', '--no-ext-diff', '-U3', '--', rel], { raw: true });   // same algorithm as the diff the explorer draws, so block numbers agree
   const lines = out.split('\n');
   const starts = lines.flatMap((l, i) => (l.startsWith('@@ ') ? [i] : []));
   const stale = () => new GitOpError('The file changed since it was shown: refresh and try again');

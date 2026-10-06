@@ -157,7 +157,7 @@ export async function gitStatus(cwd: string): Promise<GitStatus> {
 
   const [st, num, br, headInfo, up] = await Promise.all([
     git(root, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...pathspec(scope)]),
-    git(root, ['diff', base, '--numstat', '-z', '-M', '--', ...pathspec(scope)]).catch(() => ({ stdout: '' })),
+    git(root, ['diff', base, '--histogram', '--numstat', '-z', '-M', '--', ...pathspec(scope)]).catch(() => ({ stdout: '' })),
     git(root, ['symbolic-ref', '--short', '-q', 'HEAD'], { okCodes: [1] }).catch(() => ({ stdout: '' })),
     git(root, ['log', '-1', '--format=%h%x00%s%x00%cI%x00%an']).catch(() => ({ stdout: '' })),
     git(root, ['rev-list', '--left-right', '--count', '@{u}...HEAD']).catch(() => ({ stdout: '' })),
@@ -258,7 +258,7 @@ export async function gitDiff(cwd: string, rel: string, oldRel?: string): Promis
     out = r.stdout.split(`a/${abs.slice(1)}`).join(`a/${rel}`).split(`b/${abs.slice(1)}`).join(`b/${rel}`);
   } else {
     const base = (await hasHead(root)) ? 'HEAD' : EMPTY_TREE;
-    const r = await git(root, ['diff', base, '--no-color', '--no-ext-diff', '-M', '-U3', '--', ...(oldRel ? [oldRel, rel] : [rel])], { maxBuffer: 16 * 1024 * 1024 });
+    const r = await git(root, ['diff', base, '--histogram', '--no-color', '--no-ext-diff', '-M', '-U3', '--', ...(oldRel ? [oldRel, rel] : [rel])], { maxBuffer: 16 * 1024 * 1024 });
     out = r.stdout;
   }
   const truncated = out.length > MAX_DIFF_CHARS;
