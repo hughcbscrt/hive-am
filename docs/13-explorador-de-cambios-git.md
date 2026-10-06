@@ -69,7 +69,7 @@ En la vista previa también se indica si el cambio está **En stage** y/o **Sin 
 | Archivo nuevo sin seguimiento | Todo el contenido como líneas añadidas |
 | Cambio sin texto (p. ej. solo permisos) | "Sin diferencias de texto…" |
 
-Además: botón **Copiar ruta**, aviso cuando el diff o el archivo se recortaron por tamaño y botón **Mostrar todas las N filas** cuando hay más de 2 000.
+Además: botón **Copiar ruta**, aviso cuando el diff o el archivo se recortaron por tamaño. Los diffs y los archivos largos se desplazan sin límite de filas (ver [13.11](#1311-rendimiento-con-archivos-grandes)).
 
 ## 13.2 Cuándo se actualiza
 
@@ -226,10 +226,11 @@ Los ajustes se aplican por igual al **visor de archivos**, a los **diffs** (unif
 
 Un archivo de miles de líneas (p. ej. un `.pm` de 2 200 líneas / 80 KB) no debe trabar la interfaz. Por eso:
 
-- **Filas virtualizadas** (`web/components/VirtualLines.tsx`): el visor de archivos y el editor del resolvedor solo ponen en el DOM las filas visibles más un margen (~50 en total), con altura fija de 20 px y sin ajuste de línea. Abrir un archivo de 2 185 líneas pasó de ~2 200 filas de tabla a ~56 filas. Ya no existe el límite de 2 000 filas ni el botón "Mostrar todas" del visor de archivos (los **diffs** conservan ese límite).
+- **Filas virtualizadas** (`web/components/VirtualLines.tsx`): el visor de archivos y el editor del resolvedor solo ponen en el DOM las filas visibles más un margen (~50 en total), con altura fija de 20 px y sin ajuste de línea. Abrir un archivo de 2 185 líneas pasó de ~2 200 filas de tabla a ~56 filas. Los **diffs** (unificado y lado a lado, también en el historial) funcionan igual: un diff de ~2 900 filas pone ~60 en el DOM. Ya no existe el límite de 2 000 filas ni el botón "Mostrar todas".
 - **Resaltado fuera del hilo principal** (`web/lib/useHighlighted.ts`, `highlight.worker.ts`): hasta 15 000 caracteres se resalta al instante; por encima, lo hace un *Web Worker*. Mientras el worker trabaja (y mientras editas), cada línea que no cambió conserva sus colores —se compara desde el principio y desde el final del archivo— y solo las líneas editadas se ven sin color un instante. En el editor, el resaltado espera 150 ms de calma.
 - **Filas baratas:** cada fila recibe la preferencia de "mostrar espacios" ya resuelta (`CodeCell`, sin suscribirse por fila) y los diffs usan filas memorizadas.
 - **Límite de resaltado:** 1,2 M de caracteres (más que cualquier archivo que el servidor envía, 1 MB).
 
 Medido en modo desarrollo con ese archivo: desplazarse por 30 000 px promedia ~23 ms por fotograma; en el editor, cada pulsación pasó de ~350 ms a ~95 ms, de los cuales ~65 ms son del propio `<textarea>` del navegador con 83 KB de texto (un `<textarea>` simple de ese tamaño tarda ~33 ms en actualizar su valor y recalcular el diseño). En una compilación de producción es menor.
 
+**Lado a lado con líneas largas.** Para poder virtualizar, las filas no se parten en varias líneas: en la vista **Unificada** las líneas largas se recorren con la barra horizontal; en **Lado a lado** cada mitad ocupa exactamente la mitad de la pantalla y una línea más larga se corta con «…» (el texto completo aparece al pasar el cursor, y la vista unificada la muestra entera).

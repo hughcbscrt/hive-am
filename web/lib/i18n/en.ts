@@ -607,8 +607,6 @@ export const en = {
   "git.diff.binary": "Binary file — there is no text diff to show.",
   "git.diff.empty": "No textual differences (for example, only the file mode changed).",
   "git.diff.truncated": "The diff was too large and is shown only in part.",
-  "git.diff.showAll_one": "Show {n} row",
-  "git.diff.showAll_other": "Show all {n} rows",
   "git.file.binary": "Binary file — it can’t be previewed.",
   "git.file.empty": "Empty file.",
   "git.file.deleted": "Deleted from the working tree — showing the version from the last commit.",

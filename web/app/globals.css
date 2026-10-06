@@ -501,24 +501,6 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .gx-banner { padding: 7px 16px; font-size: 12.5px; background: var(--honey-soft); border-bottom: 1px solid var(--line); }
 .gx-body { flex: 1; min-height: 0; overflow: auto; }
 .gx-meta { padding: 6px 16px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); font-family: var(--font-mono); }
-.gx-diffwrap { min-width: 100%; width: max-content; }
-.gx-diffwrap.is-split { width: 100%; min-width: 0; }
-.difftable { border-collapse: collapse; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.55; width: 100%; background: var(--g-bg); color: var(--g-fg); tab-size: var(--g-tab, 4); -moz-tab-size: var(--g-tab, 4); }
-.difftable td { padding: 0; vertical-align: top; }
-.difftable .ln { width: 1%; min-width: 46px; padding: 0 8px; text-align: right; color: var(--g-gfg); user-select: none; background: var(--g-gbg); font-size: 11.5px; }
-.difftable .sg { width: 18px; text-align: center; color: var(--muted); user-select: none; }
-.difftable .cd { padding: 0 12px; white-space: pre; }
-.difftable tr.add td:not(.ln) { background: var(--g-add); } .difftable tr.add .ln { background: var(--g-addln); color: var(--g-fg); }
-.difftable tr.del td:not(.ln) { background: var(--g-del); } .difftable tr.del .ln { background: var(--g-delln); color: var(--g-fg); }
-.difftable tr.add .sg { color: var(--ok); font-weight: 800; } .difftable tr.del .sg { color: var(--err); font-weight: 800; }
-.difftable tr.hunk td { background: var(--g-hunk); color: var(--g-gfg); padding: 3px 12px; font-size: 12px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.difftable tr.hunk .hs { color: var(--g-fg); }
-.difftable.is-split { table-layout: fixed; width: 100%; } .difftable.is-split .ln { width: 52px; } .difftable.is-split .cd { white-space: pre-wrap; word-break: break-all; width: calc(50% - 52px); }
-.difftable.is-split td.add { background: var(--g-add); } .difftable.is-split td.del { background: var(--g-del); }
-.difftable.is-split td.ln.add { background: var(--g-addln); } .difftable.is-split td.ln.del { background: var(--g-delln); }
-.difftable.is-split td.void { background: repeating-linear-gradient(135deg, var(--g-gbg) 0 6px, var(--g-bg) 6px 12px); }
-.difftable.is-split tr:not(.hunk) td.cd:nth-child(2) { border-right: 1px solid var(--line); }
-.difftable.is-file .cd { padding-left: 14px; }
 .gx-image { padding: 20px; display: grid; place-items: center; min-height: 220px; background: repeating-conic-gradient(var(--bg-deep) 0 25%, var(--surface) 0 50%) 0 0 / 18px 18px; }
 .gx-image img { max-width: 100%; max-height: 70vh; box-shadow: var(--shadow); background: #fff; border-radius: 4px; }
 .spin { animation: spin 0.9s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
@@ -647,8 +629,8 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .gx-rside { --sc: var(--ok); border: 1px solid color-mix(in srgb, var(--sc) 45%, var(--line)); border-radius: 9px; background: var(--surface); display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .gx-rside.remote { --sc: var(--p-opencode); }
 .gx-rhead { display: flex; gap: 6px; align-items: center; padding: 5px 9px; font-size: 11.5px; font-weight: 700; background: color-mix(in srgb, var(--sc) 14%, var(--surface)); color: color-mix(in srgb, var(--sc) 60%, var(--ink)); }
-.gx-rside pre { margin: 0; padding: 8px 10px; font-family: var(--font-mono); font-size: 12px; max-height: 150px; overflow: auto; white-space: pre; flex: 1; }
-.gx-rside .btn { margin: 0 8px 8px; align-self: flex-start; }
+.gx-rside pre { margin: 0; padding: 10px 12px 12px; font-family: var(--font-mono); font-size: 12px; max-height: 150px; overflow: auto; white-space: pre; flex: 1; }
+.gx-rside .btn { margin: 4px 12px 12px; align-self: flex-start; }
 .gx-rboth { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .gx-rresult { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 10px 14px 4px; }
 .gx-rfoot { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line); }
@@ -669,8 +651,8 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .gx[data-gx-theme='monokai'] { --g-bg: #272822; --g-fg: #f8f8f2; --g-gbg: #2d2e27; --g-gfg: #75715e; --g-add: #2f3a1f; --g-addln: #3f5226; --g-del: #42232a; --g-delln: #5c2f39; --g-hunk: #33342b; --g-comment: #75715e; --g-keyword: #f92672; --g-string: #e6db74; --g-number: #ae81ff; --g-fn: #a6e22e; --g-type: #66d9ef; --g-attr: #fd971f; --g-meta: #75715e; --g-sel: #5a5a1c; color-scheme: dark; }
 .gx[data-gx-theme='dracula'] { --g-bg: #282a36; --g-fg: #f8f8f2; --g-gbg: #21222c; --g-gfg: #6272a4; --g-add: #1f3a2a; --g-addln: #2a5039; --g-del: #3f2230; --g-delln: #5c2c40; --g-hunk: #303347; --g-comment: #6272a4; --g-keyword: #ff79c6; --g-string: #f1fa8c; --g-number: #bd93f9; --g-fn: #50fa7b; --g-type: #8be9fd; --g-attr: #ffb86c; --g-meta: #6272a4; --g-sel: #5c5a22; color-scheme: dark; }
 
-/* the code surfaces follow the theme (the .difftable rules above read these tokens) */
-.gx .gx-body, .gx .gx-diffwrap { background: var(--g-bg); color: var(--g-fg); }
+/* the code surfaces follow the theme */
+.gx .gx-body { background: var(--g-bg); color: var(--g-fg); }
 .gx .hljs-comment, .gx .hljs-quote { color: var(--g-comment); font-style: italic; }
 .gx .hljs-keyword, .gx .hljs-selector-tag, .gx .hljs-literal, .gx .hljs-section, .gx .hljs-doctag, .gx .hljs-name, .gx .hljs-strong { color: var(--g-keyword); }
 .gx .hljs-string, .gx .hljs-regexp, .gx .hljs-addition, .gx .hljs-template-variable, .gx .hljs-symbol, .gx .hljs-bullet { color: var(--g-string); }
@@ -714,8 +696,8 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .gx-rside pre { background: var(--g-bg); color: var(--g-fg); tab-size: var(--g-tab, 4); }
 
 /* ---------- virtualised file view (only the visible rows are in the DOM) ---------- */
-.gx-body:has(> .vf) { overflow: hidden; }
-.vf { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--g-bg); color: var(--g-fg); }
+.gx-body:has(> .vf) { overflow: hidden; display: flex; flex-direction: column; }
+.vf { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--g-bg); color: var(--g-fg); }
 .vf-main { flex: 1; min-height: 0; position: relative; }
 .vl { position: absolute; inset: 0; overflow: auto; font-family: var(--font-mono); font-size: 12.5px; line-height: 20px; tab-size: var(--g-tab, 4); -moz-tab-size: var(--g-tab, 4); }
 .vl-space { position: relative; }
@@ -727,3 +709,14 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .vl-ln { left: var(--vl-left, 0px); width: 6ch; padding: 0 8px; text-align: right; font-size: 11.5px; user-select: none; }
 .vl-cd { flex: 1; padding: 0 12px; }
 .vl-row.bl-g1 .vl-bl { background: color-mix(in srgb, var(--g-gbg) 82%, var(--g-fg)); }
+
+/* diff rows (same windowed layout as the file view) */
+.vl-sg { flex: none; width: 18px; text-align: center; color: var(--g-gfg); user-select: none; }
+.vl-row.add .vl-sg { color: var(--ok); font-weight: 800; } .vl-row.del .vl-sg { color: var(--err); font-weight: 800; }
+.vl-row.add .vl-ln, .vl-ln.add { background: var(--g-addln); color: var(--g-fg); } .vl-row.add .vl-cd, .vl-row.add .vl-sg, .vl-cd.add { background: var(--g-add); }
+.vl-row.del .vl-ln, .vl-ln.del { background: var(--g-delln); color: var(--g-fg); } .vl-row.del .vl-cd, .vl-row.del .vl-sg, .vl-cd.del { background: var(--g-del); }
+.vl-row.hunk { background: var(--g-hunk); color: var(--g-gfg); padding: 0 12px; align-items: center; font-size: 12px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); box-sizing: border-box; } .vl-row.hunk .hs { color: var(--g-fg); }
+.vl-row.split { display: grid; grid-template-columns: calc(6ch + 16px) minmax(0, 1fr) calc(6ch + 16px) minmax(0, 1fr); }
+.vl-row.split .vl-cd { overflow: hidden; text-overflow: ellipsis; } .vl-row.split .vl-ln { position: static; width: auto; }
+.vl-row.split .vl-cd.void, .vl-row.split .vl-ln.void { background: repeating-linear-gradient(135deg, var(--g-gbg) 0 6px, var(--g-bg) 6px 12px); }
+.vl-row.split .vl-cd:nth-child(2) { border-right: 1px solid var(--line); }

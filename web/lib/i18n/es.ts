@@ -605,8 +605,6 @@ export const es: Record<DictKey, string> = {
   "git.diff.binary": "Archivo binario: no hay diferencias de texto que mostrar.",
   "git.diff.empty": "Sin diferencias de texto (por ejemplo, solo cambió el modo del archivo).",
   "git.diff.truncated": "La diferencia era demasiado grande y se muestra solo en parte.",
-  "git.diff.showAll_one": "Mostrar {n} fila",
-  "git.diff.showAll_other": "Mostrar las {n} filas",
   "git.file.binary": "Archivo binario: no se puede previsualizar.",
   "git.file.empty": "Archivo vacío.",
   "git.file.deleted": "Eliminado del árbol de trabajo: se muestra la versión del último commit.",

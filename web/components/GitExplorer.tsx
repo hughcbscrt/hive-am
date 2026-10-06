@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, File, FileCode, FileImage, FileText, Folder,
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { fmtBytes, fmtDateTime, fmtNum } from '@/lib/format';
-import { parseDiff, toSplit, type ParsedDiff } from '@/lib/diff';
+import { parseDiff, toSplit, type DiffLine, type ParsedDiff, type SplitRow } from '@/lib/diff';
 import { buildTree, defaultExpanded, flatten, type Row, type TreeNode } from '@/lib/gitTree';
 import type { Agent, GitChange, GitChangeStatus, GitDiffResult, GitFileResult } from '@/lib/types';
 import type { useGit } from '@/lib/useGit';
@@ -23,8 +23,8 @@ import { ConflictResolver } from './ConflictResolver';
 import { ActionButtons, BranchMenu, CommitDialog, HistoryList, NoticeBanner, useGitActions } from './GitActions';
 import type { GitBlame, GitCommitDetail } from '@/lib/types';
 
+const TREE_MAX_ROWS = 2000;   // the file tree is a list of buttons, not windowed: it shows this many and asks for a narrower filter
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|ico|bmp|avif)$/i;
-const MAX_ROWS = 2000;
 
 function FileIcon({ name }: { name: string }) {
   if (IMAGE.test(name)) return <FileImage size={15} />;
@@ -35,44 +35,59 @@ function FileIcon({ name }: { name: string }) {
 
 /* ------------------------------------------------------------------ preview */
 
-function DiffView({ parsed, layout, path }: { parsed: ParsedDiff; layout: 'unified' | 'split'; path: string }) {
-  const { t } = useI18n();
-  const { whitespace: ws } = useGitPrefs();
-  const [all, setAll] = useState(false);
-  const total = parsed.hunks.reduce((n, h) => n + h.lines.length, 0);
-  let budget = all ? Infinity : MAX_ROWS;
-  const hunks = parsed.hunks.map((h) => { const lines = h.lines.slice(0, Math.max(0, budget)); budget -= lines.length; return { ...h, lines }; }).filter((h) => h.lines.length);
+type DiffRowData = { t: 'hunk'; header: string; section: string } | { t: 'line'; l: DiffLine } | { t: 'pair'; r: SplitRow };
+
+/** Flatten the hunks into one list of fixed-height rows (a header row per hunk), ready to be windowed. */
+function buildRows(parsed: ParsedDiff, layout: 'unified' | 'split'): DiffRowData[] {
+  const rows: DiffRowData[] = [];
+  for (const h of parsed.hunks) {
+    rows.push({ t: 'hunk', header: h.header.replace(/ ?@@ ?.*$/, '').replace(/^(@@ [^@]+@@).*$/, '$1'), section: h.section });
+    if (layout === 'unified') for (const l of h.lines) rows.push({ t: 'line', l });
+    else for (const r of toSplit(h.lines)) rows.push({ t: 'pair', r });
+  }
+  return rows;
+}
+
+const DiffRow = memo(function DiffRow({ row, path, ws }: { row: DiffRowData; path: string; ws: boolean }) {
+  if (row.t === 'hunk') return <div className="vl-row hunk"><span className="mono">{row.header}</span>{row.section && <span className="hs"> {row.section}</span>}</div>;
+  if (row.t === 'line') {
+    const l = row.l;
+    return (
+      <div className={`vl-row ${l.kind}`}>
+        <div className="vl-ln" style={{ left: 0 }}>{l.oldNo ?? ''}</div><div className="vl-ln" style={{ left: 'calc(6ch + 16px)' }}>{l.newNo ?? ''}</div>
+        <div className="vl-sg">{l.kind === 'add' ? '+' : l.kind === 'del' ? '−' : ''}</div>
+        <div className="vl-cd"><CodeLine text={l.text} path={path} ws={ws} /></div>
+      </div>
+    );
+  }
+  const { left, right } = row.r;
   return (
-    <div className={`gx-diffwrap is-${layout}`}>
+    <div className="vl-row split">
+      <div className={`vl-ln ${left?.kind ?? 'void'}`} style={{ left: 0 }}>{left?.oldNo ?? ''}</div>
+      <div className={`vl-cd ${left?.kind ?? 'void'}`} title={left && left.text.length > 60 ? left.text : undefined}>{left ? <CodeLine text={left.text} path={path} ws={ws} /> : null}</div>
+      <div className={`vl-ln ${right?.kind ?? 'void'}`}>{right?.newNo ?? ''}</div>
+      <div className={`vl-cd ${right?.kind ?? 'void'}`} title={right && right.text.length > 60 ? right.text : undefined}>{right ? <CodeLine text={right.text} path={path} ws={ws} /> : null}</div>
+    </div>
+  );
+});
+
+/** A diff, windowed like the file view: only the rows on screen exist, so a huge diff costs the same as a small one. */
+function DiffView({ parsed, layout, path }: { parsed: ParsedDiff; layout: 'unified' | 'split'; path: string }) {
+  const { whitespace: ws } = useGitPrefs();
+  const rows = useMemo(() => buildRows(parsed, layout), [parsed, layout]);
+  const widest = useMemo(() => parsed.hunks.reduce((m, h) => h.lines.reduce((mm, l) => Math.max(mm, l.text.length), m), 0), [parsed]);
+  // Unified: two gutters + sign + code, scrolling sideways for long lines. Split: always two equal halves of the screen;
+  // a line longer than its half is cut with “…” (full text on hover) — the unified view shows it whole.
+  const width = layout === 'unified' ? `calc(12ch + 32px + 18px + ${widest}ch + 24px)` : undefined;
+  return (
+    <div className={`vf is-${layout}`} style={{ ['--vl-left' as never]: '0px' }}>
       {parsed.meta.length > 0 && <div className="gx-meta">{parsed.meta.join(' · ')}</div>}
-      <table className={`difftable is-${layout}`}>
-        <tbody>
-          {hunks.map((h, hi) => (
-            <HunkRows key={hi} h={h} layout={layout} path={path} ws={ws} />
-          ))}
-        </tbody>
-      </table>
-      {!all && total > MAX_ROWS && <button className="btn sm" style={{ margin: 12 }} onClick={() => setAll(true)}>{t('git.diff.showAll', { count: total, n: fmtNum(total) })}</button>}
+      <div className="vf-main">
+        <VirtualLines count={rows.length} width={width} render={(i) => <DiffRow key={i} row={rows[i]} path={path} ws={ws} />} />
+      </div>
     </div>
   );
 }
-
-const HunkRows = memo(function HunkRows({ h, layout, path, ws }: { h: ParsedDiff['hunks'][number]; layout: 'unified' | 'split'; path: string; ws: boolean }) {
-  const head = (
-    <tr className="hunk"><td colSpan={layout === 'split' ? 4 : 4}><span className="mono">{h.header.replace(/ ?@@ ?.*$/, '').replace(/^(@@ [^@]+@@).*$/, '$1')}</span>{h.section && <span className="hs"> {h.section}</span>}</td></tr>
-  );
-  if (layout === 'unified') {
-    return (<>{head}{h.lines.map((l, i) => (
-      <tr key={i} className={l.kind}><td className="ln">{l.oldNo ?? ''}</td><td className="ln">{l.newNo ?? ''}</td><td className="sg">{l.kind === 'add' ? '+' : l.kind === 'del' ? '−' : ''}</td><td className="cd"><CodeLine text={l.text} path={path} ws={ws} /></td></tr>
-    ))}</>);
-  }
-  return (<>{head}{toSplit(h.lines).map((r, i) => (
-    <tr key={i}>
-      <td className={`ln ${r.left?.kind ?? 'void'}`}>{r.left?.oldNo ?? ''}</td><td className={`cd ${r.left?.kind ?? 'void'}`}>{r.left ? <CodeLine text={r.left.text} path={path} ws={ws} /> : null}</td>
-      <td className={`ln ${r.right?.kind ?? 'void'}`}>{r.right?.newNo ?? ''}</td><td className={`cd ${r.right?.kind ?? 'void'}`}>{r.right ? <CodeLine text={r.right.text} path={path} ws={ws} /> : null}</td>
-    </tr>
-  ))}</>);
-});
 
 const GUTTER_CH = 6;           // line-number column, in characters
 const BLAME_PX = 210;          // blame column width
@@ -237,7 +252,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
   useEffect(() => { if (root && sel === null && repo?.changes.length) setSel((repo.changes.find((c) => c.status === 'conflict') ?? repo.changes[0]).path); }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows: Row[] = useMemo(() => (root ? flatten(root, expanded, { query, onlyChanged }) : []), [root, expanded, query, onlyChanged]);
-  const shown = rows.slice(0, MAX_ROWS);
+  const shown = rows.slice(0, TREE_MAX_ROWS);
 
   const toggle = (p: string) => setExpanded((e) => { const n = new Set(e); if (n.has(p)) n.delete(p); else n.add(p); return n; });
   const onKey = (e: React.KeyboardEvent) => {
