@@ -255,3 +255,19 @@ Los archivos en **conflicto** no se pueden descartar: se resuelven con el resolv
 
 API: `POST …/git/discard` `{ path, oldPath? }`, `…/discard-hunk` `{ path, index, header }`, `…/discard-lines` `{ path, index, header, lines[] }`, `…/discard-all`. Mismas validaciones de ruta y de origen que el resto de acciones.
 
+**Medido con archivos grandes** (modo desarrollo; archivo de 2 193 líneas / 83 KB con ~730 líneas modificadas):
+
+| Caso | Resultado |
+|---|---|
+| Un solo bloque de ~1 456 líneas cambiadas: elegir líneas, "Todas", alternar una | 17–28 ms por acción |
+| Descartar 1 455 de esas 1 456 líneas (cliente + servidor + refresco) | ~134 ms |
+| 145 bloques pequeños: desplazarse / descartar un bloque | ~4 ms por paso / ~111 ms |
+| Archivo de 2,2 MB con un diff de 3,7 MB | abre en ~0,5 s, ~55 filas en el DOM |
+| Vista de archivo de 2,2 MB | abre en ~0,8 s, desplazamiento ~4 ms por paso |
+
+**Límites con archivos enormes:**
+- **Diff:** el servidor corta el diff a 600 000 caracteres y la interfaz avisa ("el diff era demasiado grande y se muestra solo en parte"). Como el último bloque puede quedar incompleto, en ese caso se **ocultan** sus botones de descartar bloque / elegir líneas (descartar sobre un bloque cortado aplicaría el bloque real completo, no lo visible). Los demás bloques y el botón **Descartar** del archivo siguen disponibles.
+- **Vista de archivo:** se muestra solo el primer 1 MB ("Archivo grande: se muestra solo la primera parte").
+- **Blame:** hasta 5 000 líneas.
+- **Resaltado:** archivos de más de 15 000 caracteres se resaltan en un worker; por encima de 1,2 M de caracteres no se resaltan.
+

@@ -95,7 +95,7 @@ const DiffRow = memo(function DiffRow({ row, path, ws, actions, picking, onPick 
 });
 
 /** A diff, windowed like the file view: only the rows on screen exist, so a huge diff costs the same as a small one. */
-function DiffView({ parsed, layout, path, onDiscardHunk, onDiscardLines }: { parsed: ParsedDiff; layout: 'unified' | 'split'; path: string; onDiscardHunk?: (index: number, header: string) => void; onDiscardLines?: (index: number, header: string, lines: number[]) => void }) {
+function DiffView({ parsed, layout, path, cutOff = false, onDiscardHunk, onDiscardLines }: { parsed: ParsedDiff; layout: 'unified' | 'split'; path: string; cutOff?: boolean; onDiscardHunk?: (index: number, header: string) => void; onDiscardLines?: (index: number, header: string, lines: number[]) => void }) {
   const { whitespace: ws } = useGitPrefs();
   const rows = useMemo(() => buildRows(parsed, layout, path), [parsed, layout, path]);
   const widest = useMemo(() => parsed.hunks.reduce((m, h) => h.lines.reduce((mm, l) => Math.max(mm, l.text.length), m), 0), [parsed]);
@@ -118,7 +118,7 @@ function DiffView({ parsed, layout, path, onDiscardHunk, onDiscardLines }: { par
     <div className={`vf is-${layout}`} style={{ ['--vl-left' as never]: '0px' }}>
       {parsed.meta.length > 0 && <div className="gx-meta">{parsed.meta.join(' · ')}</div>}
       <div className="vf-main">
-        <VirtualLines count={rows.length} width={width} render={(i) => { const r = rows[i]; const mine = r.t === 'line' && picking?.hunk === r.hunk; return <DiffRow key={i} row={r} path={path} ws={ws} actions={r.t === 'hunk' ? actions : undefined} picking={r.t === 'hunk' || mine ? picking : undefined} onPick={mine ? toggle : undefined} />; }} />
+        <VirtualLines count={rows.length} width={width} render={(i) => { const r = rows[i]; const mine = r.t === 'line' && picking?.hunk === r.hunk; return <DiffRow key={i} row={r} path={path} ws={ws} actions={r.t === 'hunk' && !(cutOff && r.idx === parsed.hunks.length - 1) ? actions : undefined} picking={r.t === 'hunk' || mine ? picking : undefined} onPick={mine ? toggle : undefined} />; }} />
       </div>
     </div>
   );
@@ -241,7 +241,7 @@ function Preview({ agent, path, change, stamp, onOpenCommit, onDiscard, onDiscar
           parsed ? (
             parsed.binary ? <p className="gx-note">{t('git.diff.binary')}</p>
               : parsed.hunks.length === 0 ? <p className="gx-note">{t('git.diff.empty')}</p>
-              : (<>{diff?.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<DiffView parsed={parsed} layout={layout} path={path} onDiscardHunk={change?.status === 'modified' ? (i, h) => onDiscardHunk(path, i, h) : undefined} onDiscardLines={change?.status === 'modified' ? (i, h, lines) => onDiscardLines(path, i, h, lines) : undefined} /></>)
+              : (<>{diff?.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<DiffView parsed={parsed} layout={layout} path={path} cutOff={!!diff?.truncated} onDiscardHunk={change?.status === 'modified' ? (i, h) => onDiscardHunk(path, i, h) : undefined} onDiscardLines={change?.status === 'modified' ? (i, h, lines) => onDiscardLines(path, i, h, lines) : undefined} /></>)
           ) : null
         ) : isImage && !imgFailed && change?.status !== 'deleted' ? (
           <div className="gx-image"><img src={`/api/agents/${agent.id}/git/raw?path=${encodeURIComponent(path)}&v=${stamp}`} alt={name} onError={() => setImgFailed(true)} /></div>
