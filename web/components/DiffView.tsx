@@ -1,5 +1,5 @@
 'use client';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ListChecks, Undo2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { hunkRange, toSplit, type DiffLine, type ParsedDiff, type SplitRow } from '@/lib/diff';
@@ -72,9 +72,35 @@ export function DiffView({ parsed, layout, path, cutOff = false, firstIndex = 0,
   const { whitespace: ws } = useGitPrefs();
   const rows = useMemo(() => buildRows(parsed, layout, path, firstIndex), [parsed, layout, path, firstIndex]);
   const widest = useMemo(() => parsed.hunks.reduce((m, h) => h.lines.reduce((mm, l) => Math.max(mm, l.text.length), m), 0), [parsed]);
-  // Unified: two gutters + sign + code, scrolling sideways for long lines. Split: always two equal halves of the screen;
-  // a line longer than its half is cut with “…” (full text on hover) — the unified view shows it whole.
+  // Unified: two gutters + sign + code, scrolling sideways for long lines.
+  // Split: two equal halves of the screen that scroll sideways *together*: the code of every row slides by the same
+  // amount (--hx), driven by a bar under the diff (and by shift/trackpad wheel). Short lines never need the bar.
   const width = layout === 'unified' ? `calc(12ch + 32px + 18px + ${widest}ch + 24px)` : undefined;
+  const box = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
+  const [slide, setSlide] = useState({ max: 0, track: 0 });   // how far the code can slide, and the bar's width, in px
+  useEffect(() => {
+    const el = box.current; if (!el || layout !== 'split') { setSlide({ max: 0, track: 0 }); return; }
+    const measure = () => {
+      const probe = el.querySelector('.vl'); if (!probe) return;
+      const ctx = document.createElement('canvas').getContext('2d'); if (!ctx) return;
+      ctx.font = getComputedStyle(probe).font;
+      const ch = ctx.measureText('0').width;
+      const gutter = 6 * ch + 16, half = (el.clientWidth - 2 * gutter) / 2;
+      setSlide({ max: Math.max(0, Math.ceil(widest * ch + 24 - half)), track: el.clientWidth });
+    };
+    measure(); const ro = new ResizeObserver(measure); ro.observe(el);
+    return () => ro.disconnect();
+  }, [layout, widest, rows.length]);
+  useEffect(() => { if (bar.current) bar.current.scrollLeft = 0; box.current?.style.setProperty('--hx', '0px'); }, [parsed, layout]);
+  useEffect(() => {      // sideways wheel / shift+wheel moves the bar (a native listener: React's are passive)
+    const el = box.current; if (!el || layout !== 'split') return;
+    const wheel = (e: WheelEvent) => {
+      const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0;
+      if (dx && bar.current) { e.preventDefault(); bar.current.scrollLeft += dx; }
+    };
+    el.addEventListener('wheel', wheel, { passive: false }); return () => el.removeEventListener('wheel', wheel);
+  }, [layout]);
   // Picking individual lines is a mode of one block at a time (unified view only).
   const [picking, setPicking] = useState<Picking | null>(null);
   useEffect(() => { setPicking(null); }, [parsed, layout]);
@@ -88,11 +114,16 @@ export function DiffView({ parsed, layout, path, cutOff = false, firstIndex = 0,
     discardPicked: (hunk, header) => { if (picking && onDiscardLines) { const lines = [...picking.picked].sort((a, b) => a - b); setPicking(null); onDiscardLines(hunk, header, lines); } },
   } : undefined;
   return (
-    <div className={`vf is-${layout}`} style={{ ['--vl-left' as never]: '0px' }}>
+    <div className={`vf is-${layout}`} ref={box} style={{ ['--vl-left' as never]: '0px', ['--hx' as never]: '0px' }}>
       {parsed.meta.length > 0 && <div className="gx-meta">{parsed.meta.join(' · ')}</div>}
       <div className="vf-main">
         <VirtualLines count={rows.length} width={width} render={(i) => { const r = rows[i]; const mine = r.t === 'line' && picking?.hunk === r.hunk; return <DiffRow key={i} row={r} path={path} ws={ws} actions={r.t === 'hunk' && !(cutOff && r.idx === parsed.hunks.length - 1) ? actions : undefined} picking={r.t === 'hunk' || mine ? picking : undefined} onPick={mine ? toggle : undefined} />; }} />
       </div>
+      {layout === 'split' && slide.max > 0 && (
+        <div className="hbar" ref={bar} onScroll={(e) => box.current?.style.setProperty('--hx', `${e.currentTarget.scrollLeft}px`)} aria-label="Scroll sideways">
+          <div style={{ width: slide.track + slide.max, height: 1 }} />
+        </div>
+      )}
     </div>
   );
 }

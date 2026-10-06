@@ -237,7 +237,7 @@ Un archivo de miles de líneas (p. ej. un `.pm` de 2 200 líneas / 80 KB) no deb
 
 Medido en modo desarrollo con ese archivo: desplazarse por 30 000 px promedia ~23 ms por fotograma; en el editor, cada pulsación pasó de ~350 ms a ~95 ms, de los cuales ~65 ms son del propio `<textarea>` del navegador con 83 KB de texto (un `<textarea>` simple de ese tamaño tarda ~33 ms en actualizar su valor y recalcular el diseño). En una compilación de producción es menor.
 
-**Lado a lado con líneas largas.** Para poder virtualizar, las filas no se parten en varias líneas: en la vista **Unificada** las líneas largas se recorren con la barra horizontal; en **Lado a lado** cada mitad ocupa exactamente la mitad de la pantalla y una línea más larga se corta con «…» (el texto completo aparece al pasar el cursor, y la vista unificada la muestra entera).
+**Lado a lado con líneas largas.** Para poder virtualizar, las filas no se parten en varias líneas: en la vista **Unificada** las líneas largas se recorren con la barra horizontal; en **Lado a lado** cada mitad ocupa exactamente la mitad de la pantalla y **las dos se desplazan juntas** hacia los lados: el código de todas las filas se desliza la misma cantidad mientras los números de línea quedan fijos. Debajo del diff hay una barra horizontal (aparece solo si alguna línea no cabe en su mitad); también mueve el desplazamiento horizontal del *trackpad* o `Shift` + rueda.
 
 ## 13.12 Descartar cambios
 
