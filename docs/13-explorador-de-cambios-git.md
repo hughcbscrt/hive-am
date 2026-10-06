@@ -144,7 +144,7 @@ Recuerda que, como el resto de la API, **no tiene autenticación** ([documento 1
 - Muestra diferencias contra `HEAD`: no separa visualmente lo que está en el *stage* de lo que no (solo lo indica con una etiqueta). El commit elige archivos completos, no líneas sueltas.
 - Sin resaltado de sintaxis ni diferencias a nivel de palabra.
 - Los renombres se detectan con la heurística de similitud de git (`-M`).
-- Sin *stash*, *cherry-pick*, *rebase* interactivo ni descartar cambios; no hace *force push*.
+- Sin *stash*, *cherry-pick* ni *rebase* interactivo; no hace *force push*. Se puede descartar un archivo o un bloque, pero no **líneas sueltas** dentro de un bloque.
 - En repositorios enormes el árbol se recorta a 30 000 archivos y la lista visible a 2 000 filas (se avisa; el filtro permite llegar al resto).
 - Los submódulos aparecen como una sola entrada.
 
@@ -236,3 +236,20 @@ Un archivo de miles de líneas (p. ej. un `.pm` de 2 200 líneas / 80 KB) no deb
 Medido en modo desarrollo con ese archivo: desplazarse por 30 000 px promedia ~23 ms por fotograma; en el editor, cada pulsación pasó de ~350 ms a ~95 ms, de los cuales ~65 ms son del propio `<textarea>` del navegador con 83 KB de texto (un `<textarea>` simple de ese tamaño tarda ~33 ms en actualizar su valor y recalcular el diseño). En una compilación de producción es menor.
 
 **Lado a lado con líneas largas.** Para poder virtualizar, las filas no se parten en varias líneas: en la vista **Unificada** las líneas largas se recorren con la barra horizontal; en **Lado a lado** cada mitad ocupa exactamente la mitad de la pantalla y una línea más larga se corta con «…» (el texto completo aparece al pasar el cursor, y la vista unificada la muestra entera).
+
+## 13.12 Descartar cambios
+
+Tres niveles, siempre contra el **último commit** (`HEAD`):
+
+| Dónde | Qué descarta | Cómo |
+|---|---|---|
+| Botón **Descartar** en la cabecera del archivo | Todos los cambios de ese archivo | Modificado / borrado / cambio de tipo: `git restore --source=HEAD --staged --worktree`. Renombrado: restaura el nombre original y quita el nuevo. Nuevo sin versionar: lo **elimina** (`git clean -f`). Nuevo ya en el *stage*: lo **elimina** (`git rm -f`) |
+| Botón **Descartar bloque** en el encabezado de cada bloque del diff (solo archivos modificados) | Solo ese bloque | El servidor vuelve a calcular el diff contra `HEAD`, toma el bloque N y lo aplica **al revés** (`git apply -R --index`, y si el *stage* no coincide, solo el árbol de trabajo). Si el encabezado `@@ -a,b +c,d @@` ya no coincide con el bloque N (el archivo cambió desde que se dibujó) se rechaza con "The file changed since it was shown" |
+| Icono de deshacer en la barra | Todo lo que hay cambiado en la carpeta del agente | `git restore --source=HEAD --staged --worktree` y `git clean -f -d`. Desactivado con una fusión o rebase en curso |
+
+**Qué pide confirmación.** Solo cuando se van a **eliminar archivos** (los nuevos no están en ningún commit, así que no hay a qué volver): un diálogo "¿Eliminar archivos por completo?" lista los archivos (hasta 8 y "+N más") y avisa de que no se pueden recuperar; si es "descartar todo", añade que lo demás vuelve al último commit. El resto de descartes (modificados, borrados, un bloque) se ejecutan **al instante, sin confirmación ni copia de respaldo**.
+
+Los archivos en **conflicto** no se pueden descartar: se resuelven con el resolvedor o se cancela la fusión ([13.9](#139-resolver-conflictos)).
+
+API: `POST …/git/discard` `{ path, oldPath? }`, `…/discard-hunk` `{ path, index, header }`, `…/discard-all`. Mismas validaciones de ruta y de origen que el resto de acciones.
+

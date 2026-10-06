@@ -760,4 +760,18 @@ export const es: Record<DictKey, string> = {
   "git.blame.uncommitted": "Sin commit",
   "git.blame.truncated": "El blame muestra solo las primeras {count} líneas.",
 
+  // ---- discard changes ----
+  "git.discard": "Descartar",
+  "git.discard.hint": "Descarta los cambios de este archivo",
+  "git.discard.hunk": "Descartar bloque",
+  "git.discard.hunk.hint": "Descarta solo este bloque de cambios",
+  "git.discard.all": "Descartar todos los cambios",
+  "git.discard.all.blocked": "Primero termina o cancela la fusión/rebase",
+  "git.done.discard": "Cambios descartados",
+  "git.discard.confirm.title": "¿Eliminar archivos por completo?",
+  "git.discard.confirm.body_one": "Este archivo es nuevo (no está en ningún commit), así que descartarlo lo elimina por completo. No se puede recuperar.",
+  "git.discard.confirm.body_other": "Estos {count} archivos son nuevos (no están en ningún commit), así que descartarlos los elimina por completo. No se pueden recuperar.",
+  "git.discard.confirm.rest": "Todos los demás cambios vuelven al último commit.",
+  "git.discard.confirm.go": "Eliminar archivos",
+
 };

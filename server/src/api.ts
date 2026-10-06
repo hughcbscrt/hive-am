@@ -12,7 +12,7 @@ import type { Provider } from './types.js';
 import { sessionStats } from './stats.js';
 import { createReadStream } from 'node:fs';
 import { gitDiff, gitFile, gitImagePath, gitStatus, gitTree, isPathError } from './git.js';
-import { GitOpError, gitBlame, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitUnresolve, type PullMode } from './gitops.js';
+import { GitOpError, gitBlame, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitUnresolve, type PullMode } from './gitops.js';
 
 const exec = promisify(execFile);
 const PROVIDERS: Record<Provider, { bin: string; label: string }> = {
@@ -174,6 +174,9 @@ gitWrite('push', (cwd) => gitPush(cwd));
 gitWrite('switch', (cwd, b) => gitSwitch(cwd, String(b.branch ?? ''), !!b.create));
 gitWrite('merge', (cwd, b) => gitMerge(cwd, String(b.branch ?? '')));
 gitWrite('merge-abort', (cwd) => gitMergeAbort(cwd));
+gitWrite('discard', (cwd, b) => gitDiscardFile(cwd, String(b.path ?? ''), b.oldPath ? String(b.oldPath) : undefined));
+gitWrite('discard-hunk', (cwd, b) => gitDiscardHunk(cwd, String(b.path ?? ''), Number(b.index), String(b.header ?? '')));
+gitWrite('discard-all', (cwd) => gitDiscardAll(cwd));
 gitWrite('rebase-continue', (cwd) => gitRebaseContinue(cwd));
 gitWrite('resolve-side', (cwd, b) => gitResolveSide(cwd, String(b.path ?? ''), b.side));
 gitWrite('resolve', (cwd, b) => gitResolveContent(cwd, String(b.path ?? ''), String(b.content ?? ''), !!b.keepMarkers));

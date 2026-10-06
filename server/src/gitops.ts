@@ -14,19 +14,21 @@ const LOCAL_TIMEOUT = 30_000;
 const NET_TIMEOUT = 120_000;
 const LOG_PAGE = 30;
 
-function run(cwd: string, args: string[], o: { network?: boolean; okCodes?: number[]; env?: Record<string, string> } = {}): Promise<{ out: string; code: number }> {
+function run(cwd: string, args: string[], o: { network?: boolean; okCodes?: number[]; env?: Record<string, string>; input?: string; raw?: boolean } = {}): Promise<{ out: string; code: number }> {
   return new Promise((resolve, reject) => {
-    execFile('git', ['-c', 'core.quotepath=off', '-c', 'color.ui=never', ...args], {
+    const child = execFile('git', ['-c', 'core.quotepath=off', '-c', 'color.ui=never', ...args], {
       cwd, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: o.network ? NET_TIMEOUT : LOCAL_TIMEOUT,
       env: gitEnv({ GIT_SSH_COMMAND: process.env.GIT_SSH_COMMAND ?? 'ssh -o BatchMode=yes -o ConnectTimeout=15', ...o.env }),
     }, (err: any, stdout, stderr) => {
-      const out = `${stdout ?? ''}${stderr ? (stdout ? '\n' : '') + stderr : ''}`.trim();
+      const joined = `${stdout ?? ''}${stderr ? (stdout ? '\n' : '') + stderr : ''}`;
+      const out = o.raw ? String(stdout ?? '') : joined.trim();
       if (!err) return resolve({ out, code: 0 });
       if (typeof err.code === 'number' && (o.okCodes ?? []).includes(err.code)) return resolve({ out: String(stdout ?? ''), code: err.code });
       if (err.killed) return reject(new GitOpError(`git ${args[0]} timed out`));
       if (err.code === 'ENOENT') return reject(new GitOpError('git is not installed or not in PATH'));
       reject(new GitOpError((out || err.message || 'git failed').slice(-1500)));
     });
+    if (o.input !== undefined) child.stdin?.end(o.input);
   });
 }
 
@@ -268,4 +270,68 @@ export async function gitUnresolve(cwd: string, rel: string): Promise<GitResult>
   const { root } = await repoOf(cwd);
   await safePath(cwd, root, rel, false);
   return exclusive(root, async () => done((await run(root, ['checkout', '-m', '--', rel])).out || 'Conflict restored'));
+}
+
+/* ------------------------------------------------------------------ discarding changes */
+
+const scopeSpec = (scope: string) => (scope ? scope : '.');
+
+/**
+ * Throw away the changes to one file: modified / deleted / typechanged files go back to the last commit (index and
+ * working tree); a new file that is not in a commit has nothing to go back to, so it is deleted; a rename is undone.
+ * Conflicted files are refused (use the conflict resolver).
+ */
+export async function gitDiscardFile(cwd: string, rel: string, oldRel?: string): Promise<GitResult> {
+  const { root } = await repoOf(cwd);
+  await safePath(cwd, root, rel, false);
+  if (oldRel) await safePath(cwd, root, oldRel, false);
+  return exclusive(root, async () => {
+    const parts = (await run(root, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', rel], { raw: true })).out.split('\0');
+    const e = parts[0]; if (!e || e.length < 4) throw new GitOpError('There is nothing to discard in that file');
+    const x = e[0], y = e[1];
+    if (x === 'U' || y === 'U' || (x === 'A' && y === 'A') || (x === 'D' && y === 'D')) throw new GitOpError('That file has a merge conflict: resolve it, or abort the merge');
+    if (x === '?' && y === '?') { await run(root, ['clean', '-f', '--', rel]); return done('Deleted'); }
+    // A rename (the explorer passes the original path; asking git about the new name alone only shows an added file): bring the original back, drop the new name.
+    if (oldRel && (x === 'A' || x === 'R' || x === 'C')) {
+      await run(root, ['restore', '--source=HEAD', '--staged', '--worktree', '--', oldRel]);
+      await run(root, ['rm', '-f', '-q', '--ignore-unmatch', '--', rel]);
+      return done('Discarded');
+    }
+    if (x === 'A') { await run(root, ['rm', '-f', '-q', '--', rel]); return done('Deleted'); }
+    await run(root, ['restore', '--source=HEAD', '--staged', '--worktree', '--', rel]);
+    return done('Discarded');
+  });
+}
+
+/** Throw away one block (hunk) of a modified file. `header` must match the block at `index`, or the file changed since it was drawn. */
+export async function gitDiscardHunk(cwd: string, rel: string, index: number, header: string): Promise<GitResult> {
+  const { root } = await repoOf(cwd);
+  await safePath(cwd, root, rel, true);
+  if (!Number.isInteger(index) || index < 0) throw new GitOpError('Invalid block');
+  return exclusive(root, async () => {
+    const { out } = await run(root, ['diff', 'HEAD', '--no-color', '--no-ext-diff', '-U3', '--', rel], { raw: true });
+    const lines = out.split('\n');
+    const starts = lines.flatMap((l, i) => (l.startsWith('@@ ') ? [i] : []));
+    if (!starts.length || index >= starts.length) throw new GitOpError('The file changed since it was shown: refresh and try again');
+    const at = starts[index]; const stop = starts[index + 1] ?? lines.length;
+    const range = (h: string) => /^(@@ [^@]+@@)/.exec(h)?.[1];
+    if (!range(header) || range(lines[at]) !== range(header)) throw new GitOpError('The file changed since it was shown: refresh and try again');
+    const patch = [...lines.slice(0, starts[0]), ...lines.slice(at, stop)].join('\n').replace(/\n*$/, '\n');
+    // Both the index and the working tree when the block is staged too; otherwise just the working tree.
+    try { await run(root, ['apply', '-R', '--index', '--recount', '--whitespace=nowarn'], { input: patch }); }
+    catch { await run(root, ['apply', '-R', '--recount', '--whitespace=nowarn'], { input: patch }); }
+    return done('Discarded');
+  });
+}
+
+/** Throw away every change in the agent's folder: tracked files go back to the last commit and new files are deleted. */
+export async function gitDiscardAll(cwd: string): Promise<GitResult> {
+  const { root, scope } = await repoOf(cwd);
+  return exclusive(root, async () => {
+    if ((await repoState(root)).state) throw new GitOpError('Finish or abort the merge/rebase first');
+    if (await hasHead(root)) await run(root, ['restore', '--source=HEAD', '--staged', '--worktree', '--', scopeSpec(scope)]);
+    else await run(root, ['rm', '-r', '-f', '-q', '--cached', '--ignore-unmatch', '--', scopeSpec(scope)]);
+    await run(root, ['clean', '-f', '-d', '--', scopeSpec(scope)]);
+    return done('Discarded');
+  });
 }

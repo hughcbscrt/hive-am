@@ -762,6 +762,20 @@ export const en = {
   "git.blame.uncommitted": "Not committed",
   "git.blame.truncated": "Blame shows the first {count} lines only.",
 
+  // ---- discard changes ----
+  "git.discard": "Discard",
+  "git.discard.hint": "Throw away this file’s changes",
+  "git.discard.hunk": "Discard block",
+  "git.discard.hunk.hint": "Throw away just this block of changes",
+  "git.discard.all": "Discard all changes",
+  "git.discard.all.blocked": "Finish or abort the merge/rebase first",
+  "git.done.discard": "Changes discarded",
+  "git.discard.confirm.title": "Delete files completely?",
+  "git.discard.confirm.body_one": "This file is new (it is not in any commit), so discarding it deletes it completely. It cannot be recovered.",
+  "git.discard.confirm.body_other": "These {count} files are new (they are not in any commit), so discarding them deletes them completely. They cannot be recovered.",
+  "git.discard.confirm.rest": "Every other change goes back to the last commit.",
+  "git.discard.confirm.go": "Delete files",
+
 };
 
 export type DictKey = keyof typeof en;

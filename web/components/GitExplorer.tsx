@@ -1,10 +1,10 @@
 'use client';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, File, FileCode, FileImage, FileText, Folder, FolderOpen, GitBranch, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, File, FileCode, FileImage, FileText, Folder, FolderOpen, GitBranch, RefreshCw, Search, Undo2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { fmtBytes, fmtDateTime, fmtNum } from '@/lib/format';
-import { parseDiff, toSplit, type DiffLine, type ParsedDiff, type SplitRow } from '@/lib/diff';
+import { hunkRange, parseDiff, toSplit, type DiffLine, type ParsedDiff, type SplitRow } from '@/lib/diff';
 import { buildTree, defaultExpanded, flatten, type Row, type TreeNode } from '@/lib/gitTree';
 import type { Agent, GitChange, GitChangeStatus, GitDiffResult, GitFileResult } from '@/lib/types';
 import type { useGit } from '@/lib/useGit';
@@ -20,7 +20,7 @@ import { ago } from '@/lib/meta';
 import { dateLocale } from '@/lib/i18n';
 import { Segmented } from './ui';
 import { ConflictResolver } from './ConflictResolver';
-import { ActionButtons, BranchMenu, CommitDialog, HistoryList, NoticeBanner, useGitActions } from './GitActions';
+import { ActionButtons, BranchMenu, CommitDialog, DiscardConfirm, HistoryList, NoticeBanner, useGitActions } from './GitActions';
 import type { GitBlame, GitCommitDetail } from '@/lib/types';
 
 const TREE_MAX_ROWS = 2000;   // the file tree is a list of buttons, not windowed: it shows this many and asks for a narrower filter
@@ -35,27 +35,29 @@ function FileIcon({ name }: { name: string }) {
 
 /* ------------------------------------------------------------------ preview */
 
-type DiffRowData = { t: 'hunk'; header: string; section: string } | { t: 'line'; l: DiffLine } | { t: 'pair'; r: SplitRow };
+type DiffRowData = { t: 'hunk'; idx: number; header: string; section: string } | { t: 'line'; l: DiffLine } | { t: 'pair'; r: SplitRow };
 
 /** Flatten the hunks into one list of fixed-height rows (a header row per hunk), ready to be windowed. */
 function buildRows(parsed: ParsedDiff, layout: 'unified' | 'split', path: string): DiffRowData[] {
   const rows: DiffRowData[] = [];
   const code = isCodeFile(path);   // in prose / data files git's hunk context is just some earlier line: it would look like diff content
-  for (const h of parsed.hunks) {
-    rows.push({ t: 'hunk', header: h.header.replace(/ ?@@ ?.*$/, '').replace(/^(@@ [^@]+@@).*$/, '$1'), section: code ? h.section : '' });
+  parsed.hunks.forEach((h, idx) => {
+    rows.push({ t: 'hunk', idx, header: hunkRange(h.header), section: code ? h.section : '' });
     if (layout === 'unified') for (const l of h.lines) rows.push({ t: 'line', l });
     else for (const r of toSplit(h.lines)) rows.push({ t: 'pair', r });
-  }
+  });
   return rows;
 }
 
-const DiffRow = memo(function DiffRow({ row, path, ws }: { row: DiffRowData; path: string; ws: boolean }) {
+const DiffRow = memo(function DiffRow({ row, path, ws, onDiscard }: { row: DiffRowData; path: string; ws: boolean; onDiscard?: (index: number, header: string) => void }) {
+  const { t } = useI18n();
   if (row.t === 'hunk') {
     // A separator, not content: the two gutters hold "⋯" and the label stays put while the code scrolls sideways.
     return (
       <div className="vl-row hunk">
         <div className="vl-ln" style={{ left: 0 }}>⋯</div><div className="vl-ln" style={{ left: 'calc(6ch + 16px)' }}>⋯</div>
-        <div className="vl-hl"><span className="rng mono">{row.header}</span>{row.section && <span className="hs" title={row.section}>{row.section}</span>}</div>
+        <div className="vl-hl"><span className="rng mono">{row.header}</span>{row.section && <span className="hs" title={row.section}>{row.section}</span>}
+          {onDiscard && <button type="button" className="hk-btn" title={t('git.discard.hunk.hint')} onClick={() => onDiscard(row.idx, row.header)}><Undo2 size={12} />{t('git.discard.hunk')}</button>}</div>
       </div>
     );
   }
@@ -81,7 +83,7 @@ const DiffRow = memo(function DiffRow({ row, path, ws }: { row: DiffRowData; pat
 });
 
 /** A diff, windowed like the file view: only the rows on screen exist, so a huge diff costs the same as a small one. */
-function DiffView({ parsed, layout, path }: { parsed: ParsedDiff; layout: 'unified' | 'split'; path: string }) {
+function DiffView({ parsed, layout, path, onDiscardHunk }: { parsed: ParsedDiff; layout: 'unified' | 'split'; path: string; onDiscardHunk?: (index: number, header: string) => void }) {
   const { whitespace: ws } = useGitPrefs();
   const rows = useMemo(() => buildRows(parsed, layout, path), [parsed, layout, path]);
   const widest = useMemo(() => parsed.hunks.reduce((m, h) => h.lines.reduce((mm, l) => Math.max(mm, l.text.length), m), 0), [parsed]);
@@ -92,7 +94,7 @@ function DiffView({ parsed, layout, path }: { parsed: ParsedDiff; layout: 'unifi
     <div className={`vf is-${layout}`} style={{ ['--vl-left' as never]: '0px' }}>
       {parsed.meta.length > 0 && <div className="gx-meta">{parsed.meta.join(' · ')}</div>}
       <div className="vf-main">
-        <VirtualLines count={rows.length} width={width} render={(i) => <DiffRow key={i} row={rows[i]} path={path} ws={ws} />} />
+        <VirtualLines count={rows.length} width={width} render={(i) => <DiffRow key={i} row={rows[i]} path={path} ws={ws} onDiscard={rows[i].t === 'hunk' ? onDiscardHunk : undefined} />} />
       </div>
     </div>
   );
@@ -154,7 +156,7 @@ function FileView({ f, agent, blame: blameOn, onOpenCommit }: { f: GitFileResult
   );
 }
 
-function Preview({ agent, path, change, stamp, onOpenCommit }: { agent: Agent; path: string; change?: GitChange; stamp: number; onOpenCommit: (sha: string) => void }) {
+function Preview({ agent, path, change, stamp, onOpenCommit, onDiscard, onDiscardHunk }: { agent: Agent; path: string; change?: GitChange; stamp: number; onOpenCommit: (sha: string) => void; onDiscard: (c: GitChange) => void; onDiscardHunk: (path: string, index: number, header: string) => void }) {
   const { t } = useI18n();
   const [blameOn, setBlameOn] = useState(false);
   // Text changes open on their diff; images (and unchanged files) open on the file itself.
@@ -205,6 +207,7 @@ function Preview({ agent, path, change, stamp, onOpenCommit }: { agent: Agent; p
             const on = blameOn && view === 'file';
             return <button type="button" className={`btn sm ${on ? 'primary' : ''}`} aria-pressed={on} title={t('git.blame.hint')} onClick={() => { if (view !== 'file') { setView('file'); setBlameOn(true); } else setBlameOn((x) => !x); }}>{t('git.blame')}</button>;
           })()}
+          {change && change.status !== 'conflict' && <button type="button" className="btn sm" title={t('git.discard.hint')} onClick={() => onDiscard(change)}><Undo2 size={14} />{t('git.discard')}</button>}
           <CopyBtn text={path} label={t('git.copyPath')} />
         </div>
       </header>
@@ -214,7 +217,7 @@ function Preview({ agent, path, change, stamp, onOpenCommit }: { agent: Agent; p
           parsed ? (
             parsed.binary ? <p className="gx-note">{t('git.diff.binary')}</p>
               : parsed.hunks.length === 0 ? <p className="gx-note">{t('git.diff.empty')}</p>
-              : (<>{diff?.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<DiffView parsed={parsed} layout={layout} path={path} /></>)
+              : (<>{diff?.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<DiffView parsed={parsed} layout={layout} path={path} onDiscardHunk={change?.status === 'modified' ? (i, h) => onDiscardHunk(path, i, h) : undefined} /></>)
           ) : null
         ) : isImage && !imgFailed && change?.status !== 'deleted' ? (
           <div className="gx-image"><img src={`/api/agents/${agent.id}/git/raw?path=${encodeURIComponent(path)}&v=${stamp}`} alt={name} onError={() => setImgFailed(true)} /></div>
@@ -238,6 +241,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
   const [commitSel, setCommitSel] = useState<string | null>(null);
   const [commitOpen, setCommitOpen] = useState(false);
   const actions = useGitActions(agent, () => refresh());
+  const [discardAsk, setDiscardAsk] = useState<{ files: string[]; all: boolean; go: () => Promise<boolean> } | null>(null);
   const prefs = useGitPrefs();
   const seenDirs = useRef<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
@@ -291,6 +295,17 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
   }
 
   const selChange = sel ? changeOf.get(sel) : undefined;
+
+  // Discarding goes straight through, except when it would delete files that are in no commit: that asks first.
+  const doomed = (cs: GitChange[]) => cs.filter((c) => c.status === 'untracked' || (c.status === 'added' && !c.oldPath)).map((c) => c.path);
+  const askOrRun = (files: string[], all: boolean, go: () => Promise<boolean>) => { if (files.length) setDiscardAsk({ files, all, go }); else void go(); };
+  const discardFile = (c: GitChange) => askOrRun(doomed([c]), false, async () => {
+    const ok = await actions.run('discard', t('git.done.discard'), 'discard', { path: c.path, oldPath: c.oldPath });
+    if (ok && doomed([c]).length) setSel(null);
+    return ok;
+  });
+  const discardAll = () => askOrRun(doomed(status.changes), true, async () => { const ok = await actions.run('discard-all', t('git.done.discard'), 'discard-all'); if (ok) setSel(null); return ok; });
+  const discardHunk = (path: string, index: number, header: string) => void actions.run('discard-hunk', t('git.done.discard'), 'discard-hunk', { path, index, header });
   const upd = new Date(status.generatedAt).toLocaleTimeString(dateLocale());
 
   return (
@@ -308,6 +323,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
         <span className="gx-sum">{status.changes.length === 0 ? <span className="muted">{t('git.clean')}</span> : <><b>{t('git.summary', { count: status.changes.length })}</b> <i className="add">+{fmtNum(totals.add)}</i> <i className="del">−{fmtNum(totals.del)}</i></>}</span>
         <BranchMenu agent={agent} a={actions} current={status.branch} />
         <ActionButtons a={actions} ahead={status.upstream?.ahead ?? 0} behind={status.upstream?.behind ?? 0} detached={!status.branch} changeCount={status.changes.length} onCommit={() => setCommitOpen(true)} />
+        <button className="btn ghost icon sm" disabled={!!actions.busy || status.changes.length === 0 || !!status.state} onClick={discardAll} aria-label={t('git.discard.all')} title={status.state ? t('git.discard.all.blocked') : t('git.discard.all')}><Undo2 size={15} /></button>
         <GitSettings />
         <button className="btn ghost icon sm" onClick={() => void refresh()} aria-label={t('git.refresh')} title={`${t('git.refresh')} · ${t('git.updated', { time: upd })}`}><RefreshCw size={15} className={loading ? 'spin' : ''} /></button>
       </div>
@@ -378,8 +394,9 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
 
         {mode === 'history' ? (commitSel ? <CommitPreview key={commitSel} agent={agent} sha={commitSel} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.hist.select')}</p></div></div>)
           : sel && selChange?.status === 'conflict' ? <ConflictResolver key={sel} agent={agent} path={sel} state={status.state} a={actions} onResolved={() => { void refresh(); }} />
-          : sel ? <Preview key={sel} agent={agent} path={sel} change={selChange} stamp={status.generatedAt} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
+          : sel ? <Preview key={sel} agent={agent} path={sel} change={selChange} stamp={status.generatedAt} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} onDiscard={discardFile} onDiscardHunk={discardHunk} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
       </div>
+      {discardAsk && <DiscardConfirm files={discardAsk.files} all={discardAsk.all} busy={!!actions.busy} onClose={() => setDiscardAsk(null)} onConfirm={async () => { const go = discardAsk.go; setDiscardAsk(null); await go(); }} />}
       {commitOpen && <CommitDialog changes={status.changes} a={actions} initialMessage={status.mergeMsg} onClose={() => setCommitOpen(false)} />}
     </div>
   );

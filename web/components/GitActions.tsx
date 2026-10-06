@@ -229,3 +229,24 @@ export function HistoryList({ agent, head, sel, onSelect }: { agent: Agent; head
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ discard */
+
+/** Asked only when discarding would delete files for good (new files are not in any commit, so there is nothing to go back to). */
+export function DiscardConfirm({ files, all, busy, onConfirm, onClose }: { files: string[]; all: boolean; busy: boolean; onConfirm: () => void; onClose: () => void }) {
+  const { t } = useI18n();
+  return (
+    <Modal title={t('git.discard.confirm.title')} onClose={onClose}>
+      <p className="muted" style={{ margin: 0 }}>{t('git.discard.confirm.body', { count: files.length })}</p>
+      <ul className="gx-dlist">
+        {files.slice(0, 8).map((f) => <li key={f} className="mono">{f}</li>)}
+        {files.length > 8 && <li className="muted">{t('hover.more', { count: files.length - 8 })}</li>}
+      </ul>
+      {all && <p className="muted small" style={{ margin: 0 }}>{t('git.discard.confirm.rest')}</p>}
+      <div className="row" style={{ justifyContent: 'flex-end' }}>
+        <button className="btn ghost" onClick={onClose}>{t('common.cancel')}</button>
+        <button className="btn danger" disabled={busy} onClick={onConfirm}>{t('git.discard.confirm.go')}</button>
+      </div>
+    </Modal>
+  );
+}

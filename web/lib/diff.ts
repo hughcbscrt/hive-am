@@ -23,6 +23,9 @@ export function parseDiff(text: string): ParsedDiff {
   return out;
 }
 
+/** The "@@ -20,9 +20,10 @@" part of a hunk header (git appends a context line after it). */
+export const hunkRange = (header: string) => /^(@@ [^@]+@@)/.exec(header)?.[1] ?? header;
+
 export interface SplitRow { left?: DiffLine; right?: DiffLine }
 
 /** Side-by-side rows: each run of removals is paired with the additions that follow it. */
