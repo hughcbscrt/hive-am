@@ -73,3 +73,18 @@ export function changeMarks(parsed: ParsedDiff): ChangeMarks {
   });
   return { lines, removedBefore, blockOfLine, blockOfRemoval };
 }
+
+/**
+ * The lines of the file (1-based) that a block's changes cover, from its first changed line to its last. Removed lines
+ * count as the line they were removed before. Context lines around the block are not included.
+ */
+export function blockExtent(h: Hunk): { from: number; to: number } {
+  let next = 0, from = Infinity, to = -Infinity;
+  for (const l of h.lines) {
+    if (l.kind === 'ctx') { next = (l.newNo ?? next) + 1; continue; }
+    const n = l.kind === 'add' ? (l.newNo ?? next) : next;
+    from = Math.min(from, n); to = Math.max(to, n);
+    if (l.kind === 'add') next = n + 1;
+  }
+  return Number.isFinite(from) ? { from, to } : { from: 0, to: 0 };
+}

@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, File, FileCode, FileImage, FileText, Folder,
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { fmtBytes, fmtDateTime, fmtNum } from '@/lib/format';
-import { changeMarks, hunkRange, parseDiff, type ChangeMarks, type Hunk } from '@/lib/diff';
+import { blockExtent, changeMarks, hunkRange, parseDiff, type ChangeMarks, type Hunk } from '@/lib/diff';
 import { buildTree, defaultExpanded, flatten, type Row, type TreeNode } from '@/lib/gitTree';
 import type { Agent, GitChange, GitChangeStatus, GitDiffResult, GitFileResult } from '@/lib/types';
 import type { useGit } from '@/lib/useGit';
@@ -39,14 +39,14 @@ function FileIcon({ name }: { name: string }) {
 /* ------------------------------------------------------------------ preview */
 
 /** The block of the diff behind a change mark, shown under the marked line. */
-function ChangePeek({ path, hunk, index, onClose, onShowDiff, onDiscard }: { path: string; hunk: Hunk; index: number; onClose: () => void; onShowDiff: () => void; onDiscard?: () => void }) {
+function ChangePeek({ path, hunk, index, extent, onClose, onShowDiff, onDiscard }: { path: string; hunk: Hunk; index: number; extent: { from: number; to: number } | null; onClose: () => void; onShowDiff: () => void; onDiscard?: () => void }) {
   const { t } = useI18n();
   const parsed = useMemo(() => ({ meta: [], hunks: [hunk], binary: false }), [hunk]);
   const rows = hunk.lines.length + 1;
   return (
     <div className="vl-peek" role="dialog" aria-label={t('git.peek.title')} onClick={(e) => e.stopPropagation()}>
       <div className="vl-peek-head">
-        <b>{t('git.peek.title')}</b><span className="muted mono small grow">{hunkRange(hunk.header)}</span>
+        <b>{extent ? (extent.from === extent.to ? t('git.peek.line', { n: extent.from }) : t('git.peek.lines', { from: extent.from, to: extent.to })) : t('git.peek.title')}</b><span className="muted mono small grow">{hunkRange(hunk.header)}</span>
         <button type="button" className="btn ghost sm" onClick={onShowDiff}>{t('git.peek.showDiff')}</button>
         {onDiscard && <button type="button" className="btn ghost sm danger" onClick={onDiscard}><Undo2 size={13} />{t('git.discard.hunk')}</button>}
         <button type="button" className="btn ghost icon sm" onClick={onClose} aria-label={t('common.close')}><X size={14} /></button>
@@ -63,6 +63,8 @@ const BLAME_PX = 210;          // blame column width
 function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, hunks, allNew, onDiscardHunk, onShowDiff }: { f: GitFileResult; agent: Agent; blame: boolean; onOpenCommit: (sha: string) => void; marks: ChangeMarks | null; hunks: Hunk[]; allNew: boolean; onDiscardHunk?: (index: number, header: string) => void; onShowDiff: () => void }) {
   // Clicking a change mark opens that block of the diff right under it.
   const [peek, setPeek] = useState<{ row: number; block: number } | null>(null);
+  // The lines the open block covers, so they can be outlined in the file (clamped: a removal at the very end sits on the last line).
+  const extent = useMemo(() => { if (!peek || !hunks[peek.block]) return null; const e = blockExtent(hunks[peek.block]); return { from: e.from, to: Math.min(e.to, f.content.split('\n').length) }; }, [peek, hunks, f.content]);
   useEffect(() => { setPeek(null); }, [f.path, marks]);
   useEffect(() => {
     if (!peek) return;
@@ -100,7 +102,7 @@ function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, hunks, allNew
       {blameErr && <div className="gx-banner">{blameErr}</div>}
       {blame?.truncated && <div className="gx-banner">{t('git.blame.truncated', { count: blame.lines.length })}</div>}
       <div className="vf-main" style={{ ['--vl-left' as never]: `${left}px` }}>
-        <VirtualLines count={html.length} width={`calc(${left}px + ${GUTTER_CH}ch + ${widest}ch + 40px)`} overlay={peek && hunks[peek.block] ? { top: (peek.row + 1) * ROW_H, node: <ChangePeek path={f.path} hunk={hunks[peek.block]} index={peek.block} onClose={() => setPeek(null)} onShowDiff={onShowDiff} onDiscard={onDiscardHunk ? () => { onDiscardHunk(peek.block, hunks[peek.block].header); setPeek(null); } : undefined} /> } : undefined} render={(i) => {
+        <VirtualLines count={html.length} width={`calc(${left}px + ${GUTTER_CH}ch + ${widest}ch + 40px)`} overlay={peek && hunks[peek.block] ? { top: (extent && extent.to - (peek.row + 1) <= 25 ? Math.max(extent.to, peek.row + 1) : peek.row + 1) * ROW_H, node: <ChangePeek path={f.path} hunk={hunks[peek.block]} index={peek.block} extent={extent} onClose={() => setPeek(null)} onShowDiff={onShowDiff} onDiscard={onDiscardHunk ? () => { onDiscardHunk(peek.block, hunks[peek.block].header); setPeek(null); } : undefined} /> } : undefined} render={(i) => {
           const sha = blame?.lines[i]; const c = sha ? blame!.commits[sha] : undefined; const run = runs?.[i];
           // What changed since the last commit: green = added, blue = modified, a red edge where lines were removed.
           const kind = f.source === 'worktree' ? (allNew ? 'add' : marks?.lines.get(i + 1)) : undefined;
@@ -108,7 +110,7 @@ function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, hunks, allNew
           const delAfter = !!marks && i === html.length - 1 && marks.removedBefore.has(html.length + 1);
           const block = !marks || f.source !== 'worktree' ? undefined : marks.blockOfLine.get(i + 1) ?? (delBefore ? marks.blockOfRemoval.get(i + 1) : delAfter ? marks.blockOfRemoval.get(html.length + 1) : undefined);
           return (
-            <div key={i} className={`vl-row ${run ? `bl-g${run.g}` : ''} ${kind ? `m-${kind}` : ''} ${delBefore ? 'm-delb' : delAfter ? 'm-dela' : ''} ${block !== undefined ? 'has-peek' : ''} ${peek?.row === i ? 'peeked' : ''}`}
+            <div key={i} className={`vl-row ${run ? `bl-g${run.g}` : ''} ${kind ? `m-${kind}` : ''} ${delBefore ? 'm-delb' : delAfter ? 'm-dela' : ''} ${block !== undefined ? 'has-peek' : ''} ${extent && i + 1 >= extent.from && i + 1 <= extent.to ? 'in-peek' : ''}`}
               onClick={block !== undefined ? (e) => { if ((e.target as HTMLElement).closest('.bl-btn')) return; if (!(e.target as HTMLElement).closest('.vl-ln') && !window.getSelection()?.isCollapsed) return; setPeek(peek?.row === i ? null : { row: i, block }); } : undefined}
               title={block !== undefined ? t('git.peek.hint') : undefined}>
               {blame && (

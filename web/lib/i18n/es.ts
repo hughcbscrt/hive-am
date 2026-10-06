@@ -835,5 +835,7 @@ export const es: Record<DictKey, string> = {
   "git.peek.title": "Bloque de cambios",
   "git.peek.hint": "Clic para ver este cambio",
   "git.peek.showDiff": "Ver en Diferencias",
+  "git.peek.lines": "Bloque de cambios · líneas {from}–{to}",
+  "git.peek.line": "Bloque de cambios · línea {n}",
 
 };

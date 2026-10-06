@@ -759,7 +759,9 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 
 /* ---------- change peek: the diff block behind a mark, under the marked line ---------- */
 .vl-row.has-peek .vl-ln { cursor: pointer; } .vl-row.has-peek.m-add .vl-cd, .vl-row.has-peek.m-mod .vl-cd { cursor: pointer; }
-.vl-row.has-peek:hover .vl-ln { filter: brightness(1.25); } .vl-row.peeked .vl-ln { outline: 2px solid var(--honey); outline-offset: -2px; }
+.vl-row.has-peek:hover .vl-ln { filter: brightness(1.25); } /* the lines the open block covers: a honey band with a bar on its left */
+.vl-row.in-peek .vl-cd { position: relative; } .vl-row.in-peek .vl-cd::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: color-mix(in srgb, var(--honey) 16%, transparent); }
+.vl-row.in-peek .vl-ln { background-image: linear-gradient(var(--honey), var(--honey)); background-size: 4px 100%; background-repeat: no-repeat; background-position: left; }
 .vl-peekwrap { position: absolute; left: 0; right: 0; z-index: 4; pointer-events: none; }
 .vl-peek { pointer-events: auto; position: sticky; left: 64px; width: min(880px, calc(var(--vl-vw, 900px) - 90px)); margin: 4px 0 8px; border: 1px solid var(--honey); border-radius: 10px; background: var(--g-bg, var(--surface)); box-shadow: 0 14px 34px -12px rgba(0, 0, 0, .5); overflow: hidden; font-family: var(--font-body); white-space: normal; }
 .vl-peek-head { display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 12px; background: var(--surface-2); border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--ink); }

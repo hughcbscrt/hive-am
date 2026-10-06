@@ -837,6 +837,8 @@ export const en = {
   "git.peek.title": "Change block",
   "git.peek.hint": "Click to see this change",
   "git.peek.showDiff": "Show in Diff",
+  "git.peek.lines": "Change block · lines {from}–{to}",
+  "git.peek.line": "Change block · line {n}",
 
 };
 
