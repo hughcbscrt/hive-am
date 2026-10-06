@@ -836,9 +836,11 @@ export const en = {
   "git.sw.kept_other": "{names} already existed there: your versions were kept (they show as changes)",
   "git.peek.title": "Change block",
   "git.peek.hint": "Click to see this change",
-  "git.peek.showDiff": "Show in Diff",
   "git.peek.lines": "Change block · lines {from}–{to}",
   "git.peek.line": "Change block · line {n}",
+  "git.peek.prev": "Previous change",
+  "git.peek.next": "Next change",
+  "git.peek.count": "{n} of {total}",
 
 };
 

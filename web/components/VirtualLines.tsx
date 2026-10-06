@@ -8,7 +8,7 @@ export const ROW_H = 20;   // px; every virtualised code row (and the editor's t
  * thousands of lines costs the same as one with fifty. Rows must all be ROW_H tall and must not wrap.
  * `width` (a CSS length) reserves the horizontal scroll range, since off-screen rows are not measured.
  */
-export function VirtualLines({ count, width, render, overscan = 20, overlay }: { count: number; width?: string; render: (i: number) => ReactNode; overscan?: number; overlay?: { top: number; node: ReactNode } }) {
+export function VirtualLines({ count, width, render, overscan = 20, overlay, reveal }: { count: number; width?: string; render: (i: number) => ReactNode; overscan?: number; overlay?: { top: number; node: ReactNode }; reveal?: { row: number; key: number } }) {
   const box = useRef<HTMLDivElement>(null);
   const raf = useRef(0);
   const [view, setView] = useState({ top: 0, h: 800, w: 900 });
@@ -22,6 +22,12 @@ export function VirtualLines({ count, width, render, overscan = 20, overlay }: {
     const ro = new ResizeObserver(measure); ro.observe(el); measure();
     return () => { ro.disconnect(); cancelAnimationFrame(raf.current); };
   }, [measure]);
+  // Scroll a row into view (only if it is not already comfortably on screen).
+  useEffect(() => {
+    const el = box.current; if (!el || !reveal) return;
+    const top = reveal.row * ROW_H;
+    if (top < el.scrollTop + 20 || top > el.scrollTop + el.clientHeight - 200) el.scrollTop = Math.max(0, top - Math.round(el.clientHeight * 0.2));
+  }, [reveal?.key]); // eslint-disable-line react-hooks/exhaustive-deps
   // A different file (or a shorter one) must not leave the view scrolled past the end.
   useEffect(() => { const el = box.current; if (el && el.scrollTop > count * ROW_H) { el.scrollTop = 0; measure(); } }, [count, measure]);
 

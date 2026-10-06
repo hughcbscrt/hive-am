@@ -834,8 +834,10 @@ export const es: Record<DictKey, string> = {
   "git.sw.kept_other": "{names} ya existían allí: se quedaron tus versiones (aparecen como cambios)",
   "git.peek.title": "Bloque de cambios",
   "git.peek.hint": "Clic para ver este cambio",
-  "git.peek.showDiff": "Ver en Diferencias",
   "git.peek.lines": "Bloque de cambios · líneas {from}–{to}",
   "git.peek.line": "Bloque de cambios · línea {n}",
+  "git.peek.prev": "Cambio anterior",
+  "git.peek.next": "Siguiente cambio",
+  "git.peek.count": "{n} de {total}",
 
 };
