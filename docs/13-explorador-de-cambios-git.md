@@ -298,3 +298,5 @@ API: `GET …/git/stashes`, `…/git/stash?sha=`; `POST …/git/switch-smart`, `
 
 **Límites:** un stash reaplicado no conserva el *stage* (queda todo sin stage); el aviso de agentes cuenta solo los que están **trabajando** en ese momento y comparten repositorio; los archivos ignorados por `.gitignore` no viajan con el stash.
 
+**Qué cuenta como "un cambio" al recorrerlos.** git agrupa en un mismo bloque (*hunk*) los cambios que están a menos de 7 líneas, así que un archivo con 23 tramos de líneas cambiadas puede salir como 4 bloques. Los editores (VS Code, JetBrains) recorren los cambios individuales, y el visor hace lo mismo: un **cambio** es un tramo de líneas agregadas/quitadas, y dos tramos solo se unen cuando entre ellos hay únicamente **líneas en blanco** (en VS Code se unen igual). Ejemplo medido: un archivo de Go con 23 tramos y 4 bloques de git sale con **13** cambios (VS Code muestra 12; su algoritmo de diff es otro y puede alinear distinto algunas líneas). El panel muestra cada cambio con 3 líneas de contexto, no el bloque entero de git, y su título indica las líneas exactas.
+

@@ -43,48 +43,57 @@ export function toSplit(lines: DiffLine[]): SplitRow[] {
 }
 
 export type ChangeKind = 'add' | 'mod';
+/** One change you can walk to: a run of changed lines (runs separated only by blank lines count as one, like VS Code). */
+export interface ChangeGroup {
+  /** First and last file line (1-based) it covers; removed lines count as the line they were removed before. */
+  from: number; to: number;
+  /** The diff lines of the change with 3 lines of context, as a block of its own, to show in the peek. */
+  view: Hunk;
+}
 /** Where a file differs from the last commit, by line number of the file as it is now (1-based). */
 export interface ChangeMarks {
   /** Added lines, and lines that replace removed ones ("mod"). */
   lines: Map<number, ChangeKind>;
   /** Removed lines sit between two lines: the number is the line they were removed *before* (lastLine + 1 at the end). */
   removedBefore: Set<number>;
-  /** Index (in the diff) of the block each marked line / removal position belongs to. */
+  /** Index (in `groups`) of the change each marked line / removal position belongs to. */
   blockOfLine: Map<number, number>;
   blockOfRemoval: Map<number, number>;
-}
-
-export function changeMarks(parsed: ParsedDiff): ChangeMarks {
-  const lines = new Map<number, ChangeKind>(); const removedBefore = new Set<number>();
-  const blockOfLine = new Map<number, number>(); const blockOfRemoval = new Map<number, number>();
-  parsed.hunks.forEach((h, hi) => {
-    let i = 0; const L = h.lines;
-    let next = 0;                                  // the file line number the next context line will have
-    while (i < L.length) {
-      if (L[i].kind === 'ctx') { next = (L[i].newNo ?? next) + 1; i++; continue; }
-      const dels: DiffLine[] = [], adds: DiffLine[] = [];
-      while (i < L.length && L[i].kind === 'del') dels.push(L[i++]);
-      while (i < L.length && L[i].kind === 'add') adds.push(L[i++]);
-      adds.forEach((a, k) => { if (a.newNo !== undefined) { lines.set(a.newNo, k < dels.length ? 'mod' : 'add'); blockOfLine.set(a.newNo, hi); } });
-      const after = adds.length ? (adds[adds.length - 1].newNo ?? 0) + 1 : (L[i]?.newNo ?? next);
-      if (dels.length > adds.length) { removedBefore.add(after); blockOfRemoval.set(after, hi); }   // some removed lines have no replacement
-      next = after;
-    }
-  });
-  return { lines, removedBefore, blockOfLine, blockOfRemoval };
+  groups: ChangeGroup[];
 }
 
 /**
- * The lines of the file (1-based) that a block's changes cover, from its first changed line to its last. Removed lines
- * count as the line they were removed before. Context lines around the block are not included.
+ * git joins changes that are less than 7 lines apart into one block, but editors (VS Code, JetBrains) walk the
+ * individual changes. So changes are the runs of added/removed lines; only blank lines between two runs merge them.
  */
-export function blockExtent(h: Hunk): { from: number; to: number } {
-  let next = 0, from = Infinity, to = -Infinity;
-  for (const l of h.lines) {
-    if (l.kind === 'ctx') { next = (l.newNo ?? next) + 1; continue; }
-    const n = l.kind === 'add' ? (l.newNo ?? next) : next;
-    from = Math.min(from, n); to = Math.max(to, n);
-    if (l.kind === 'add') next = n + 1;
+export function changeMarks(parsed: ParsedDiff): ChangeMarks {
+  const lines = new Map<number, ChangeKind>(); const removedBefore = new Set<number>();
+  const blockOfLine = new Map<number, number>(); const blockOfRemoval = new Map<number, number>();
+  const groups: ChangeGroup[] = [];
+  for (const h of parsed.hunks) {
+    const L = h.lines;
+    // The file line number each diff line sits at (for a removed line: the line that follows it).
+    const at: number[] = []; let nxt = Number(/\+(\d+)/.exec(h.header)?.[1] ?? 1);
+    for (let i = 0; i < L.length; i++) { at[i] = nxt; if (L[i].kind !== 'del') nxt = (L[i].newNo ?? nxt) + 1; }
+    const runs: [number, number][] = [];
+    for (let i = 0; i < L.length;) { if (L[i].kind === 'ctx') { i++; continue; } const st = i; while (i < L.length && L[i].kind !== 'ctx') i++; runs.push([st, i - 1]); }
+    const merged: [number, number][] = [];
+    for (const r of runs) { const last = merged[merged.length - 1]; if (last && L.slice(last[1] + 1, r[0]).every((l) => l.text.trim() === '')) last[1] = r[1]; else merged.push([r[0], r[1]]); }
+    for (const [s, e] of merged) {
+      const gi = groups.length; let from = Infinity, to = -Infinity;
+      for (let i = s; i <= e;) {
+        if (L[i].kind === 'ctx') { i++; continue; }
+        const dels: DiffLine[] = [], adds: DiffLine[] = [];
+        while (i <= e && L[i].kind === 'del') dels.push(L[i++]);
+        while (i <= e && L[i].kind === 'add') adds.push(L[i++]);
+        adds.forEach((a, k) => { const n = a.newNo!; lines.set(n, k < dels.length ? 'mod' : 'add'); blockOfLine.set(n, gi); from = Math.min(from, n); to = Math.max(to, n); });
+        const after = adds.length ? adds[adds.length - 1].newNo! + 1 : (i < L.length ? at[i] : nxt);
+        if (dels.length > adds.length) { removedBefore.add(after); blockOfRemoval.set(after, gi); from = Math.min(from, after); to = Math.max(to, after); }
+      }
+      const sl = L.slice(Math.max(0, s - 3), Math.min(L.length - 1, e + 3) + 1);
+      const o = sl.filter((l) => l.oldNo !== undefined), n = sl.filter((l) => l.newNo !== undefined);
+      groups.push({ from, to, view: { header: `@@ -${o[0]?.oldNo ?? 0},${o.length} +${n[0]?.newNo ?? 0},${n.length} @@`, section: '', lines: sl } });
+    }
   }
-  return Number.isFinite(from) ? { from, to } : { from: 0, to: 0 };
+  return { lines, removedBefore, blockOfLine, blockOfRemoval, groups };
 }

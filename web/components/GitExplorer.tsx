@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, ChevronUp, File, FileCode, FileImage, FileTe
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { fmtBytes, fmtDateTime, fmtNum } from '@/lib/format';
-import { blockExtent, changeMarks, hunkRange, parseDiff, type ChangeMarks, type Hunk } from '@/lib/diff';
+import { changeMarks, hunkRange, parseDiff, type ChangeGroup, type ChangeMarks, type Hunk } from '@/lib/diff';
 import { buildTree, defaultExpanded, flatten, type Row, type TreeNode } from '@/lib/gitTree';
 import type { Agent, GitChange, GitChangeStatus, GitDiffResult, GitFileResult } from '@/lib/types';
 import type { useGit } from '@/lib/useGit';
@@ -61,11 +61,12 @@ const GUTTER_CH = 6;           // line-number column, in characters
 const BLAME_PX = 210;          // blame column width
 
 /** The file, line by line. Only the rows on screen are in the DOM (see VirtualLines), so size does not matter. */
-function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, hunks, allNew }: { f: GitFileResult; agent: Agent; blame: boolean; onOpenCommit: (sha: string) => void; marks: ChangeMarks | null; hunks: Hunk[]; allNew: boolean }) {
+function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew }: { f: GitFileResult; agent: Agent; blame: boolean; onOpenCommit: (sha: string) => void; marks: ChangeMarks | null; allNew: boolean }) {
+  const groups: ChangeGroup[] = marks?.groups ?? [];
   // Clicking a change mark opens that block of the diff right under it.
   const [peek, setPeek] = useState<{ row: number; block: number } | null>(null);
   // The lines the open block covers, so they can be outlined in the file (clamped: a removal at the very end sits on the last line).
-  const extents = useMemo(() => { const n = f.content.split('\n').length; return hunks.map((h) => { const e = blockExtent(h); return { from: Math.min(e.from, n), to: Math.min(e.to, n) }; }); }, [hunks, f.content]);
+  const extents = useMemo(() => { const n = f.content.split('\n').length; return groups.map((g) => ({ from: Math.min(g.from, n), to: Math.min(g.to, n) })); }, [groups, f.content]);
   const extent = peek ? extents[peek.block] ?? null : null;
   const [reveal, setReveal] = useState<{ row: number; key: number } | undefined>();
   /** Walk the changes in file order: open the previous / next block and scroll to it. */
@@ -75,7 +76,7 @@ function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, hunks, allNew
     if (!peek) return;
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setPeek(null);
-      else if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); const to = peek.block + (e.key === 'ArrowDown' ? 1 : -1); if (to >= 0 && to < hunks.length) goTo(to); }
+      else if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); const to = peek.block + (e.key === 'ArrowDown' ? 1 : -1); if (to >= 0 && to < groups.length) goTo(to); }
     };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
   }, [peek]);
@@ -110,7 +111,7 @@ function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, hunks, allNew
       {blameErr && <div className="gx-banner">{blameErr}</div>}
       {blame?.truncated && <div className="gx-banner">{t('git.blame.truncated', { count: blame.lines.length })}</div>}
       <div className="vf-main" style={{ ['--vl-left' as never]: `${left}px` }}>
-        <VirtualLines count={html.length} width={`calc(${left}px + ${GUTTER_CH}ch + ${widest}ch + 40px)`} overlay={peek && hunks[peek.block] ? { top: (extent && extent.to - (peek.row + 1) <= 25 ? Math.max(extent.to, peek.row + 1) : peek.row + 1) * ROW_H, node: <ChangePeek path={f.path} hunk={hunks[peek.block]} index={peek.block} extent={extent} onClose={() => setPeek(null)} total={hunks.length} onGo={goTo} /> } : undefined} reveal={reveal} render={(i) => {
+        <VirtualLines count={html.length} width={`calc(${left}px + ${GUTTER_CH}ch + ${widest}ch + 40px)`} overlay={peek && groups[peek.block] ? { top: (extent && extent.to - (peek.row + 1) <= 25 ? Math.max(extent.to, peek.row + 1) : peek.row + 1) * ROW_H, node: <ChangePeek path={f.path} hunk={groups[peek.block].view} index={peek.block} extent={extent} onClose={() => setPeek(null)} total={groups.length} onGo={goTo} /> } : undefined} reveal={reveal} render={(i) => {
           const sha = blame?.lines[i]; const c = sha ? blame!.commits[sha] : undefined; const run = runs?.[i];
           // What changed since the last commit: green = added, blue = modified, a red edge where lines were removed.
           const kind = f.source === 'worktree' ? (allNew ? 'add' : marks?.lines.get(i + 1)) : undefined;
@@ -215,7 +216,7 @@ function Preview({ agent, path, change, stamp, onOpenCommit, onDiscard, onDiscar
           ) : null
         ) : isImage && !imgFailed && change?.status !== 'deleted' ? (
           <div className="gx-image"><img src={`/api/agents/${agent.id}/git/raw?path=${encodeURIComponent(path)}&v=${stamp}`} alt={name} onError={() => setImgFailed(true)} /></div>
-        ) : file && file.path === path ? <FileView f={file} agent={agent} blame={blameOn} onOpenCommit={onOpenCommit} marks={marks} hunks={markParsed?.hunks ?? []} allNew={wholeNew} /> : isImage && imgFailed ? <p className="gx-note">{t('git.file.binary')}</p> : null}
+        ) : file && file.path === path ? <FileView f={file} agent={agent} blame={blameOn} onOpenCommit={onOpenCommit} marks={marks} allNew={wholeNew} /> : isImage && imgFailed ? <p className="gx-note">{t('git.file.binary')}</p> : null}
       </div>
     </section>
   );
