@@ -6,6 +6,10 @@ export interface TreeNode {
   type: 'dir' | 'file';
   children: TreeNode[];
   change?: GitChange;
+  /** Hidden by .gitignore. Folders are listed lazily, one level at a time, when opened. */
+  ignored?: boolean;
+  /** An ignored folder whose content has not been loaded yet. */
+  lazy?: boolean;
   /** Changed files at or below this node. */
   changed: number;
   additions: number;
@@ -13,7 +17,7 @@ export interface TreeNode {
 }
 
 /** Builds the folder tree from the flat list of files, merging in changes (deleted/renamed paths included). */
-export function buildTree(files: string[], changes: GitChange[]): TreeNode {
+export function buildTree(files: string[], changes: GitChange[], ignored: string[] = [], kids: Record<string, { name: string; dir: boolean }[]> = {}): TreeNode {
   const byPath = new Map(changes.map((c) => [c.path, c]));
   const all = new Set(files); for (const c of changes) all.add(c.path);
 
@@ -30,6 +34,18 @@ export function buildTree(files: string[], changes: GitChange[]): TreeNode {
     const i = p.lastIndexOf('/');
     const parent = dirOf(i < 0 ? '' : p.slice(0, i));
     parent.children.push({ name: p.slice(i + 1), path: p, type: 'file', children: [], change: byPath.get(p), changed: byPath.has(p) ? 1 : 0, additions: byPath.get(p)?.additions ?? 0, deletions: byPath.get(p)?.deletions ?? 0 });
+  }
+
+  // Ignored entries: a folder is one dimmed node whose content is fetched when it is opened.
+  const addIgnored = (parent: TreeNode, path: string, dir: boolean) => {
+    const node: TreeNode = { name: path.slice(path.lastIndexOf('/') + 1), path, type: dir ? 'dir' : 'file', children: [], ignored: true, lazy: dir && !(path in kids), changed: 0, additions: 0, deletions: 0 };
+    parent.children.push(node);
+    if (dir) for (const k of kids[path] ?? []) addIgnored(node, `${path}/${k.name}`, k.dir);
+  };
+  for (const e of ignored) {
+    const dir = e.endsWith('/'); const path = dir ? e.slice(0, -1) : e;
+    const i = path.lastIndexOf('/');
+    addIgnored(dirOf(i < 0 ? '' : path.slice(0, i)), path, dir);
   }
 
   const finish = (n: TreeNode): void => {
@@ -77,7 +93,7 @@ export function flatten(root: TreeNode, expanded: Set<string>, f: Filters): Row[
 export function defaultExpanded(root: TreeNode, totalFiles: number): Set<string> {
   const open = new Set<string>();
   const walk = (n: TreeNode) => {
-    for (const c of n.children) if (c.type === 'dir') { if (totalFiles <= 40 || c.changed > 0) open.add(c.path); walk(c); }
+    for (const c of n.children) if (c.type === 'dir' && !c.ignored) { if (totalFiles <= 40 || c.changed > 0) open.add(c.path); walk(c); }
   };
   walk(root);
   return open;

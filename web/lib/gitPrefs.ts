@@ -2,7 +2,7 @@
 import { useSyncExternalStore } from 'react';
 
 /** How code looks in the changes explorer (viewer, diffs and the conflict editor). Stored only in this browser. */
-export interface GitPrefs { theme: string; whitespace: boolean; tabSize: 2 | 4 | 8 }
+export interface GitPrefs { theme: string; whitespace: boolean; tabSize: 2 | 4 | 8; showIgnored: boolean }
 export const GIT_THEMES: { id: string; label: string; dark: boolean; swatch: [string, string, string, string] }[] = [
   { id: 'app', label: 'Hive', dark: false, swatch: ['#f6f4ee', '#9a6a00', '#2f8f5b', '#2f5bea'] },
   { id: 'gitlab-light', label: 'GitLab Light', dark: false, swatch: ['#ffffff', '#a31515', '#0451a5', '#6f42c1'] },
@@ -13,7 +13,7 @@ export const GIT_THEMES: { id: string; label: string; dark: boolean; swatch: [st
   { id: 'dracula', label: 'Dracula', dark: true, swatch: ['#282a36', '#ff79c6', '#f1fa8c', '#8be9fd'] },
 ];
 const KEY = 'hive-git-view';
-const DEFAULTS: GitPrefs = { theme: 'app', whitespace: false, tabSize: 4 };
+const DEFAULTS: GitPrefs = { theme: 'app', whitespace: false, tabSize: 4, showIgnored: true };
 
 let cache: GitPrefs = DEFAULTS;
 let loaded = false;

@@ -839,5 +839,9 @@ export const es: Record<DictKey, string> = {
   "git.peek.prev": "Cambio anterior",
   "git.peek.next": "Siguiente cambio",
   "git.peek.count": "{n} de {total}",
+  "git.set.ignored": "Mostrar archivos ignorados",
+  "git.set.ignored.hint": "Lo que oculta .gitignore (node_modules, build, .env…) aparece atenuado; las carpetas se abren un nivel a la vez",
+  "git.ignored.hint": "Ignorado por git",
+  "git.ignored.chip": "Ignorado",
 
 };

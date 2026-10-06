@@ -24,7 +24,7 @@ import { ConflictResolver } from './ConflictResolver';
 import { SwitchDialog } from './SwitchDialog';
 import { SaveStashDialog, StashList, StashPreview } from './StashManager';
 import { ActionButtons, BranchMenu, CommitDialog, DiscardConfirm, type DiscardFile, type DiscardSummary, HistoryList, NoticeBanner, useGitActions } from './GitActions';
-import type { GitBlame, GitCommitDetail, StashItem, SwitchPlan } from '@/lib/types';
+import type { GitBlame, GitCommitDetail, GitListing, StashItem, SwitchPlan } from '@/lib/types';
 
 const TREE_MAX_ROWS = 2000;   // the file tree is a list of buttons, not windowed: it shows this many and asks for a narrower filter
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|ico|bmp|avif)$/i;
@@ -141,7 +141,7 @@ function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew }: { f
   );
 }
 
-function Preview({ agent, path, change, stamp, onOpenCommit, onDiscard, onDiscardHunk, onDiscardLines }: { agent: Agent; path: string; change?: GitChange; stamp: number; onOpenCommit: (sha: string) => void; onDiscard: (c: GitChange) => void; onDiscardHunk: (path: string, index: number, header: string) => void; onDiscardLines: (path: string, index: number, header: string, lines: number[]) => void }) {
+function Preview({ agent, path, ignored = false, change, stamp, onOpenCommit, onDiscard, onDiscardHunk, onDiscardLines }: { agent: Agent; path: string; ignored?: boolean; change?: GitChange; stamp: number; onOpenCommit: (sha: string) => void; onDiscard: (c: GitChange) => void; onDiscardHunk: (path: string, index: number, header: string) => void; onDiscardLines: (path: string, index: number, header: string, lines: number[]) => void }) {
   const { t } = useI18n();
   const [blameOn, setBlameOn] = useState(false);
   // Text changes open on their diff; images (and unchanged files) open on the file itself.
@@ -192,6 +192,7 @@ function Preview({ agent, path, change, stamp, onOpenCommit, onDiscard, onDiscar
       <header className="gx-phead">
         <div className="gx-ptitle">
           <span className="gx-path mono" title={path}><span className="dir">{dir}</span><b>{name}</b></span>
+          {ignored && <span className="gx-chip soft" title={t('git.ignored.hint')}>{t('git.ignored.chip')}</span>}
           {change && <span className={`gx-chip st-${change.status}`}>{t(`git.status.${change.status}`)}</span>}
           {change?.staged && <span className="gx-chip soft">{t('git.staged')}</span>}
           {change?.unstaged && change.status !== 'untracked' && <span className="gx-chip soft">{t('git.unstaged')}</span>}
@@ -201,7 +202,7 @@ function Preview({ agent, path, change, stamp, onOpenCommit, onDiscard, onDiscar
         <div className="gx-ptools">
           {change && <Segmented value={view} onChange={setView} options={[{ id: 'diff', label: t('git.view.diff') }, { id: 'file', label: t('git.view.file') }]} />}
           {view === 'diff' && change && <Segmented value={layout} onChange={setLayout} options={[{ id: 'unified', label: t('git.layout.unified') }, { id: 'split', label: t('git.layout.split') }]} />}
-          {!isImage && change?.status !== 'deleted' && change?.status !== 'untracked' && change?.status !== 'conflict' && (() => {
+          {!isImage && !ignored && change?.status !== 'deleted' && change?.status !== 'untracked' && change?.status !== 'conflict' && (() => {
             const on = blameOn && view === 'file';
             return <button type="button" className={`btn sm ${on ? 'primary' : ''}`} aria-pressed={on} title={t('git.blame.hint')} onClick={() => { if (view !== 'file') { setView('file'); setBlameOn(true); } else setBlameOn((x) => !x); }}>{t('git.blame')}</button>;
           })()}
@@ -251,7 +252,12 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
 
   const repo = status && status.isRepo ? status : null;
   const files = tree && tree.isRepo ? tree.files : null;
-  const root = useMemo(() => (repo && files ? buildTree(files, repo.changes) : null), [repo, files]);
+  const ignoredTop = tree && tree.isRepo ? tree.ignored : null;
+  const [ignoredKids, setIgnoredKids] = useState<Record<string, { name: string; dir: boolean }[]>>({});
+  useEffect(() => { setIgnoredKids({}); }, [agent.id, agent.effective.cwd]);
+  const root = useMemo(() => (repo && files ? buildTree(files, repo.changes, prefs.showIgnored ? ignoredTop ?? [] : [], ignoredKids) : null), [repo, files, ignoredTop, ignoredKids, prefs.showIgnored]);
+  // Is a path hidden by .gitignore? (it is, or sits inside, one of the ignored entries)
+  const isIgnored = useMemo(() => { const tops = (ignoredTop ?? []).map((e) => e.replace(/\/$/, '')); return (p: string) => tops.some((t) => p === t || p.startsWith(`${t}/`)); }, [ignoredTop]);
   const changeOf = useMemo(() => new Map((repo?.changes ?? []).map((c) => [c.path, c])), [repo]);
   const totals = useMemo(() => (repo?.changes ?? []).reduce((a, c) => ({ add: a.add + (c.additions ?? 0), del: a.del + (c.deletions ?? 0) }), { add: 0, del: 0 }), [repo]);
 
@@ -277,6 +283,13 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
   const shown = rows.slice(0, TREE_MAX_ROWS);
 
   const toggle = (p: string) => setExpanded((e) => { const n = new Set(e); if (n.has(p)) n.delete(p); else n.add(p); return n; });
+  /** Opening an ignored folder lists it first (one level; they can hold 100k files). */
+  const openDir = (node: TreeNode) => {
+    toggle(node.path);
+    if (node.ignored && node.lazy && !(node.path in ignoredKids)) {
+      api.get<GitListing>(`/agents/${agent.id}/git/ls?path=${encodeURIComponent(node.path)}`).then((l) => setIgnoredKids((k) => ({ ...k, [node.path]: l.entries }))).catch(() => setIgnoredKids((k) => ({ ...k, [node.path]: [] })));
+    }
+  };
   const onKey = (e: React.KeyboardEvent) => {
     const btns = [...(listRef.current?.querySelectorAll<HTMLElement>('[data-row]') ?? [])];
     const i = btns.indexOf(document.activeElement as HTMLElement);
@@ -285,7 +298,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
     else if (i >= 0 && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
       const el = btns[i]; if (el.dataset.dir !== '1') return;
       const open = el.getAttribute('aria-expanded') === 'true';
-      if ((e.key === 'ArrowRight' && !open) || (e.key === 'ArrowLeft' && open)) { e.preventDefault(); toggle(el.dataset.path!); }
+      if ((e.key === 'ArrowRight' && !open) || (e.key === 'ArrowLeft' && open)) { e.preventDefault(); el.click(); }
     }
   };
 
@@ -404,9 +417,9 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
               const c = node.change;
               return (
                 <button key={node.path} data-row data-dir={isDir ? '1' : '0'} data-path={node.path} type="button" role="treeitem" aria-level={depth + 1} aria-expanded={isDir ? !!open : undefined} aria-selected={!isDir && sel === node.path}
-                  className={`gx-row ${isDir ? 'dir' : 'file'} ${c ? `changed st-${c.status}` : ''} ${!isDir && sel === node.path ? 'sel' : ''} ${isDir && node.changed ? 'has-changes' : ''}`}
-                  style={{ paddingLeft: 8 + depth * 14 }} title={node.path}
-                  onClick={() => (isDir ? toggle(node.path) : setSel(node.path))}>
+                  className={`gx-row ${isDir ? 'dir' : 'file'} ${node.ignored ? 'ignored' : ''} ${c ? `changed st-${c.status}` : ''} ${!isDir && sel === node.path ? 'sel' : ''} ${isDir && node.changed ? 'has-changes' : ''}`}
+                  style={{ paddingLeft: 8 + depth * 14 }} title={node.ignored ? `${node.path} — ${t('git.ignored.hint')}` : node.path}
+                  onClick={() => (isDir ? openDir(node) : setSel(node.path))}>
                   <span className="chev">{isDir ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</span>
                   <span className="ico">{isDir ? (open ? <FolderOpen size={15} /> : <Folder size={15} />) : <FileIcon name={node.name} />}</span>
                   <span className="nm">{node.name}</span>
@@ -427,7 +440,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
         {mode === 'stashes' ? (stashes?.find((x) => x.sha === stashSel) ? <StashPreview key={stashSel} agent={agent} stash={stashes.find((x) => x.sha === stashSel)!} a={actions} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.stash.empty')}</p></div></div>)
           : mode === 'history' ? (commitSel ? <CommitPreview key={commitSel} agent={agent} sha={commitSel} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.hist.select')}</p></div></div>)
           : sel && selChange?.status === 'conflict' ? <ConflictResolver key={sel} agent={agent} path={sel} state={status.state} a={actions} onResolved={() => { void refresh(); }} />
-          : sel ? <Preview key={sel} agent={agent} path={sel} change={selChange} stamp={status.generatedAt} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} onDiscard={discardFile} onDiscardHunk={discardHunk} onDiscardLines={discardLines} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
+          : sel ? <Preview key={sel} agent={agent} path={sel} ignored={isIgnored(sel)} change={selChange} stamp={status.generatedAt} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} onDiscard={discardFile} onDiscardHunk={discardHunk} onDiscardLines={discardLines} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
       </div>
       {switchPlan && <SwitchDialog agent={agent} plan={switchPlan} a={actions} onClose={() => setSwitchPlan(null)} onGo={() => { const p = switchPlan; setSwitchPlan(null); void doSwitch(p); }} />}
       {saveStash && <SaveStashDialog a={actions} onClose={() => setSaveStash(false)} />}

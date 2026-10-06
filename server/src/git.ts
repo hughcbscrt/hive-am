@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { open, readFile, realpath, stat } from 'node:fs/promises';
+import { open, readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { extname, isAbsolute, normalize, resolve, sep } from 'node:path';
 
 /**
@@ -208,13 +208,33 @@ export async function gitStatus(cwd: string): Promise<GitStatus> {
 }
 
 /** Every file the repository knows about in the agent's folder: tracked + untracked, minus what .gitignore hides. */
-export async function gitTree(cwd: string): Promise<{ isRepo: false; reason: string; message: string } | { isRepo: true; root: string; scope: string; files: string[]; truncated: boolean }> {
+export async function gitTree(cwd: string): Promise<{ isRepo: false; reason: string; message: string } | { isRepo: true; root: string; scope: string; files: string[]; truncated: boolean; ignored: string[] }> {
   const found = await findRepo(cwd);
   if (!found.ok) return { isRepo: false, reason: found.reason, message: found.message };
   const { root, scope } = found.repo;
   const { stdout } = await git(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...pathspec(scope)]);
   const all = [...new Set(stdout.split('\0').filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  return { isRepo: true, root, scope, files: all.slice(0, MAX_TREE_FILES), truncated: all.length > MAX_TREE_FILES };
+  // What .gitignore hides, as the top-most entries only: an ignored folder is one entry ("node_modules/"), never
+  // expanded here (that could be 100k files); it is listed when opened (see gitList).
+  const ign = await git(root, ['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--directory', '--', ...pathspec(scope)]).catch(() => ({ stdout: '' }));
+  const ignored = ign.stdout.split('\0').filter((p) => p && !p.split('/').includes('.git')).sort((a, b) => a.localeCompare(b)).slice(0, MAX_IGNORED);
+  return { isRepo: true, root, scope, files: all.slice(0, MAX_TREE_FILES), truncated: all.length > MAX_TREE_FILES, ignored };
+}
+
+const MAX_IGNORED = 5_000;
+const MAX_LISTED = 5_000;
+
+/** The direct children of an **ignored** folder (the explorer opens them one level at a time). */
+export async function gitList(cwd: string, rel: string): Promise<{ path: string; entries: { name: string; dir: boolean }[]; truncated: boolean }> {
+  const found = await findRepo(cwd);
+  if (!found.ok) throw new PathError(found.message);
+  const { root } = found.repo;
+  const abs = await safePath(cwd, root, rel.replace(/\/+$/, ''), true);
+  // Only folders git ignores: this must never turn into a general directory browser.
+  try { await git(root, ['check-ignore', '-q', '--', rel.replace(/\/+$/, '') + '/']); } catch { throw new PathError('That folder is not ignored by git'); }
+  const entries = (await readdir(abs, { withFileTypes: true })).filter((d) => d.name !== '.git')
+    .map((d) => ({ name: d.name, dir: d.isDirectory() })).sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1));
+  return { path: rel.replace(/\/+$/, ''), entries: entries.slice(0, MAX_LISTED), truncated: entries.length > MAX_LISTED };
 }
 
 export class PathError extends Error {}

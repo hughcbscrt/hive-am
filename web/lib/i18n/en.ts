@@ -841,6 +841,10 @@ export const en = {
   "git.peek.prev": "Previous change",
   "git.peek.next": "Next change",
   "git.peek.count": "{n} of {total}",
+  "git.set.ignored": "Show ignored files",
+  "git.set.ignored.hint": "What .gitignore hides (node_modules, build, .env…) appears dimmed; folders open one level at a time",
+  "git.ignored.hint": "Ignored by git",
+  "git.ignored.chip": "Ignored",
 
 };
 

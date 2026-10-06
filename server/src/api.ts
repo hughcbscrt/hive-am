@@ -11,7 +11,7 @@ import { listModels } from './models.js';
 import type { Provider } from './types.js';
 import { sessionStats } from './stats.js';
 import { createReadStream } from 'node:fs';
-import { findRepo, gitDiff, gitFile, gitImagePath, gitStatus, gitTree, isPathError } from './git.js';
+import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git.js';
 import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './gitswitch.js';
 import { GitOpError, gitBlame, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitUnresolve, type PullMode } from './gitops.js';
 
@@ -142,6 +142,7 @@ const gitSafe = async <T,>(fn: () => Promise<T>): Promise<T> => { try { return a
 const qpath = (url: URL) => { const p = url.searchParams.get('path'); if (!p) throw bad('path is required'); return p; };
 
 route('GET', '/api/agents/:id/git/status', ({ params }) => gitStatus(agentCwd(params[0])));
+route('GET', '/api/agents/:id/git/ls', ({ params, url }) => gitSafe(() => gitList(agentCwd(params[0]), qpath(url))));
 route('GET', '/api/agents/:id/git/tree', ({ params }) => gitTree(agentCwd(params[0])));
 route('GET', '/api/agents/:id/git/diff', ({ params, url }) => gitSafe(() => gitDiff(agentCwd(params[0]), qpath(url), url.searchParams.get('old') ?? undefined)));
 route('GET', '/api/agents/:id/git/file', ({ params, url }) => gitSafe(() => gitFile(agentCwd(params[0]), qpath(url))));

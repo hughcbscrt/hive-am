@@ -72,7 +72,7 @@ export type GitStatus =
       upstream: { ahead: number; behind: number } | null;
       changes: GitChange[]; truncated: boolean; generatedAt: number; state: 'merge' | 'rebase' | 'stash' | null; mergeMsg: string; stash: { ref: string; sha: string; from: string; to: string } | null;
     };
-export type GitTree = { isRepo: false; reason: string; message: string } | { isRepo: true; root: string; scope: string; files: string[]; truncated: boolean };
+export type GitTree = { isRepo: false; reason: string; message: string } | { isRepo: true; root: string; scope: string; files: string[]; truncated: boolean; ignored: string[] };
 export interface GitDiffResult { path: string; diff: string; truncated: boolean; binary: boolean }
 export interface GitFileResult { path: string; size: number; binary: boolean; truncated: boolean; content: string; source: 'worktree' | 'head' }
 
@@ -85,3 +85,4 @@ export interface GitBlame { path: string; commits: Record<string, { short: strin
 export interface SwitchPlan { from: string; to: string; carried: number; overlap: string[]; collisions: string[]; others: { id: string; name: string }[]; selfRunning: boolean }
 export interface StashItem { sha: string; message: string; branch: string; date: string; smart: boolean }
 export interface StashDetail { sha: string; untrackedSha: string | null; untracked: string[] }
+export interface GitListing { path: string; entries: { name: string; dir: boolean }[]; truncated: boolean }

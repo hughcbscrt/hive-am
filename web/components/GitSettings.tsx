@@ -28,6 +28,7 @@ export function GitSettings() {
             ))}
           </div>
           <label className="gx-opt"><input type="checkbox" checked={prefs.whitespace} onChange={(e) => setGitPrefs({ whitespace: e.target.checked })} /><span><b>{t('git.set.whitespace')}</b><small>{t('git.set.whitespace.hint')}</small></span></label>
+          <label className="gx-opt"><input type="checkbox" checked={prefs.showIgnored} onChange={(e) => setGitPrefs({ showIgnored: e.target.checked })} /><span><b>{t('git.set.ignored')}</b><small>{t('git.set.ignored.hint')}</small></span></label>
           <div className="gx-opt"><span><b>{t('git.set.tab')}</b></span>
             <div className="seg" role="group">{([2, 4, 8] as const).map((n) => <button key={n} type="button" aria-pressed={prefs.tabSize === n} onClick={() => setGitPrefs({ tabSize: n })}>{n}</button>)}</div></div>
           <p className="small muted" style={{ margin: 0 }}>{t('git.set.note')}</p>
