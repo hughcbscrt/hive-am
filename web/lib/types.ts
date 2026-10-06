@@ -70,8 +70,14 @@ export type GitStatus =
       isRepo: true; cwd: string; root: string; scope: string; branch: string | null; detached: boolean;
       head: { sha: string; subject: string; when: string; author: string } | null;
       upstream: { ahead: number; behind: number } | null;
-      changes: GitChange[]; truncated: boolean; generatedAt: number;
+      changes: GitChange[]; truncated: boolean; generatedAt: number; state: 'merge' | 'rebase' | null; mergeMsg: string;
     };
 export type GitTree = { isRepo: false; reason: string; message: string } | { isRepo: true; root: string; scope: string; files: string[]; truncated: boolean };
 export interface GitDiffResult { path: string; diff: string; truncated: boolean; binary: boolean }
 export interface GitFileResult { path: string; size: number; binary: boolean; truncated: boolean; content: string; source: 'worktree' | 'head' }
+
+export interface GitCommitInfo { sha: string; short: string; author: string; date: string; subject: string; refs: string[]; merge: boolean }
+export interface GitCommitFile { path: string; oldPath?: string; status: 'modified' | 'added' | 'deleted' | 'renamed' | 'typechange'; additions: number | null; deletions: number | null }
+export interface GitCommitDetail { sha: string; author: string; email: string; date: string; message: string; files: GitCommitFile[]; truncated: boolean }
+export interface GitBranches { current: string | null; local: { name: string; upstream: string | null; date: string; subject: string }[]; remote: { name: string; date: string; subject: string }[] }
+export interface GitBlame { path: string; commits: Record<string, { short: string; author: string; time: number; summary: string; uncommitted: boolean }>; lines: string[]; truncated: boolean }

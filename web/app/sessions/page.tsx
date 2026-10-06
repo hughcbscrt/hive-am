@@ -10,7 +10,7 @@ import { PROVIDERS, ago, shortPath } from '@/lib/meta';
 import { fmtCost, fmtTokens, totalTokens } from '@/lib/format';
 import type { ChatMessage, Provider, SessionRow } from '@/lib/types';
 import { ProviderBadge, Segmented } from '@/components/ui';
-import { intlLocale, useI18n } from '@/lib/i18n';
+import { dateLocale, useI18n } from '@/lib/i18n';
 
 export default function Sessions() {
   const { t, locale } = useI18n();
@@ -30,7 +30,7 @@ export default function Sessions() {
   const list = useMemo(() => (rows ?? []).filter((r) => (prov === 'all' || r.provider === prov) && (!q || `${r.agent_name} ${r.preview} ${r.cwd}`.toLowerCase().includes(q.toLowerCase()))), [rows, q, prov]);
   const byDay = useMemo(() => {
     const g = new Map<string, SessionRow[]>();
-    for (const r of list) { const k = new Date(r.last_seen).toLocaleDateString(intlLocale(), { weekday: 'long', month: 'short', day: 'numeric' }); g.set(k, [...(g.get(k) ?? []), r]); }
+    for (const r of list) { const k = new Date(r.last_seen).toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'short' }); g.set(k, [...(g.get(k) ?? []), r]); }
     return [...g.entries()];
   }, [list, locale]);
   const agent = sel && agents.find((a) => a.id === sel.agent_id);

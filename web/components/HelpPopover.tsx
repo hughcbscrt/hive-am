@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { CircleHelp } from 'lucide-react';
+import { useDismiss } from '@/lib/useDismiss';
 
 /**
  * A help icon that opens a small explanatory popover. Closes with Escape, a click outside or the icon again;
@@ -12,14 +13,7 @@ export function HelpPopover({ label, title, children }: { label: string; title: 
   const button = useRef<HTMLButtonElement>(null);
   const id = useId();
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (root.current && !root.current.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); button.current?.focus(); } };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [open]);
+  useDismiss(open, root, () => setOpen(false), () => button.current?.focus());
 
   return (
     <span className="help" ref={root}>

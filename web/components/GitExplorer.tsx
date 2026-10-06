@@ -1,32 +1,43 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, File, FileCode, FileImage, FileText, Folder, FolderOpen, GitBranch, Lock, RefreshCw, Search } from 'lucide-react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronRight, File, FileCode, FileImage, FileText, Folder, FolderOpen, GitBranch, RefreshCw, Search } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { fmtBytes, fmtNum } from '@/lib/format';
+import { fmtBytes, fmtDateTime, fmtNum } from '@/lib/format';
 import { parseDiff, toSplit, type ParsedDiff } from '@/lib/diff';
 import { buildTree, defaultExpanded, flatten, type Row, type TreeNode } from '@/lib/gitTree';
 import type { Agent, GitChange, GitChangeStatus, GitDiffResult, GitFileResult } from '@/lib/types';
 import type { useGit } from '@/lib/useGit';
 import { CopyBtn } from './ToolCall';
+import { languageOf } from '@/lib/highlight';
+import { useHighlighted } from '@/lib/useHighlighted';
+import { useGitPrefs } from '@/lib/gitPrefs';
+import { GitSettings } from './GitSettings';
+import { CodeCell, CodeLine } from './Code';
+import { VirtualLines } from './VirtualLines';
+import { StatusLetter } from './StatusLetter';
+import { ago } from '@/lib/meta';
+import { dateLocale } from '@/lib/i18n';
 import { Segmented } from './ui';
+import { ConflictResolver } from './ConflictResolver';
+import { ActionButtons, BranchMenu, CommitDialog, HistoryList, NoticeBanner, useGitActions } from './GitActions';
+import type { GitBlame, GitCommitDetail } from '@/lib/types';
 
-const LETTER: Record<GitChangeStatus, string> = { modified: 'M', added: 'A', deleted: 'D', renamed: 'R', untracked: 'U', conflict: '!', typechange: 'T' };
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|ico|bmp|avif)$/i;
-const CODE = /\.(tsx?|jsx?|mjs|cjs|py|go|rs|java|kt|c|h|cpp|cs|rb|php|sh|css|scss|html|vue|svelte|sql|json|ya?ml|toml)$/i;
 const MAX_ROWS = 2000;
 
 function FileIcon({ name }: { name: string }) {
   if (IMAGE.test(name)) return <FileImage size={15} />;
-  if (CODE.test(name)) return <FileCode size={15} />;
   if (/\.(md|mdx|txt|rst)$/i.test(name)) return <FileText size={15} />;
+  if (languageOf(name)) return <FileCode size={15} />;
   return <File size={15} />;
 }
 
 /* ------------------------------------------------------------------ preview */
 
-function DiffView({ parsed, layout }: { parsed: ParsedDiff; layout: 'unified' | 'split' }) {
+function DiffView({ parsed, layout, path }: { parsed: ParsedDiff; layout: 'unified' | 'split'; path: string }) {
   const { t } = useI18n();
+  const { whitespace: ws } = useGitPrefs();
   const [all, setAll] = useState(false);
   const total = parsed.hunks.reduce((n, h) => n + h.lines.length, 0);
   let budget = all ? Infinity : MAX_ROWS;
@@ -37,7 +48,7 @@ function DiffView({ parsed, layout }: { parsed: ParsedDiff; layout: 'unified' | 
       <table className={`difftable is-${layout}`}>
         <tbody>
           {hunks.map((h, hi) => (
-            <HunkRows key={hi} h={h} layout={layout} />
+            <HunkRows key={hi} h={h} layout={layout} path={path} ws={ws} />
           ))}
         </tbody>
       </table>
@@ -46,43 +57,82 @@ function DiffView({ parsed, layout }: { parsed: ParsedDiff; layout: 'unified' | 
   );
 }
 
-function HunkRows({ h, layout }: { h: ParsedDiff['hunks'][number]; layout: 'unified' | 'split' }) {
+const HunkRows = memo(function HunkRows({ h, layout, path, ws }: { h: ParsedDiff['hunks'][number]; layout: 'unified' | 'split'; path: string; ws: boolean }) {
   const head = (
     <tr className="hunk"><td colSpan={layout === 'split' ? 4 : 4}><span className="mono">{h.header.replace(/ ?@@ ?.*$/, '').replace(/^(@@ [^@]+@@).*$/, '$1')}</span>{h.section && <span className="hs"> {h.section}</span>}</td></tr>
   );
   if (layout === 'unified') {
     return (<>{head}{h.lines.map((l, i) => (
-      <tr key={i} className={l.kind}><td className="ln">{l.oldNo ?? ''}</td><td className="ln">{l.newNo ?? ''}</td><td className="sg">{l.kind === 'add' ? '+' : l.kind === 'del' ? '−' : ''}</td><td className="cd">{l.text || ' '}</td></tr>
+      <tr key={i} className={l.kind}><td className="ln">{l.oldNo ?? ''}</td><td className="ln">{l.newNo ?? ''}</td><td className="sg">{l.kind === 'add' ? '+' : l.kind === 'del' ? '−' : ''}</td><td className="cd"><CodeLine text={l.text} path={path} ws={ws} /></td></tr>
     ))}</>);
   }
   return (<>{head}{toSplit(h.lines).map((r, i) => (
     <tr key={i}>
-      <td className={`ln ${r.left?.kind ?? 'void'}`}>{r.left?.oldNo ?? ''}</td><td className={`cd ${r.left?.kind ?? 'void'}`}>{r.left?.text ?? ''}</td>
-      <td className={`ln ${r.right?.kind ?? 'void'}`}>{r.right?.newNo ?? ''}</td><td className={`cd ${r.right?.kind ?? 'void'}`}>{r.right?.text ?? ''}</td>
+      <td className={`ln ${r.left?.kind ?? 'void'}`}>{r.left?.oldNo ?? ''}</td><td className={`cd ${r.left?.kind ?? 'void'}`}>{r.left ? <CodeLine text={r.left.text} path={path} ws={ws} /> : null}</td>
+      <td className={`ln ${r.right?.kind ?? 'void'}`}>{r.right?.newNo ?? ''}</td><td className={`cd ${r.right?.kind ?? 'void'}`}>{r.right ? <CodeLine text={r.right.text} path={path} ws={ws} /> : null}</td>
     </tr>
   ))}</>);
-}
+});
 
-function FileView({ f }: { f: GitFileResult }) {
+const GUTTER_CH = 6;           // line-number column, in characters
+const BLAME_PX = 210;          // blame column width
+
+/** The file, line by line. Only the rows on screen are in the DOM (see VirtualLines), so size does not matter. */
+function FileView({ f, agent, blame: blameOn, onOpenCommit }: { f: GitFileResult; agent: Agent; blame: boolean; onOpenCommit: (sha: string) => void }) {
   const { t } = useI18n();
-  const [all, setAll] = useState(false);
-  const lines = useMemo(() => f.content.split('\n'), [f.content]);
-  if (lines.length && lines[lines.length - 1] === '') lines.pop();
+  const { whitespace: ws } = useGitPrefs();
+  const [blame, setBlame] = useState<GitBlame | null>(null);
+  const [blameErr, setBlameErr] = useState<string | null>(null);
+  const lines = useHighlighted(f.content, f.path);
+  const html = useMemo(() => (lines.length && lines[lines.length - 1] === '' ? lines.slice(0, -1) : lines), [lines]);
+  const widest = useMemo(() => f.content.split('\n').reduce((m, l) => Math.max(m, l.length), 0), [f.content]);
+
+  useEffect(() => {
+    if (!blameOn || f.source !== 'worktree') { setBlame(null); setBlameErr(null); return; }
+    let dead = false;
+    api.get<GitBlame>(`/agents/${agent.id}/git/blame?path=${encodeURIComponent(f.path)}`).then((b) => { if (!dead) { setBlame(b); setBlameErr(null); } }).catch((e) => !dead && setBlameErr(e instanceof Error ? e.message : t('git.loadError')));
+    return () => { dead = true; };
+  }, [blameOn, agent.id, f.path, f.source]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Blame: label only the first line of each run of lines from the same commit, and tint alternate runs.
+  const runs = useMemo(() => {
+    if (!blame) return null;
+    let g = -1; return blame.lines.map((sha, i) => { const first = sha !== blame.lines[i - 1]; if (first) g++; return { first, g: g % 2 }; });
+  }, [blame]);
+
   if (f.binary) return <p className="gx-note">{t('git.file.binary')}</p>;
-  if (lines.length === 0) return <p className="gx-note">{t('git.file.empty')}</p>;
-  const shown = all ? lines : lines.slice(0, MAX_ROWS);
+  if (html.length === 0) return <p className="gx-note">{t('git.file.empty')}</p>;
+  const left = blame ? BLAME_PX : 0;
   return (
-    <div className="gx-diffwrap">
+    <div className="vf">
       {f.source === 'head' && <div className="gx-banner">{t('git.file.deleted')}</div>}
       {f.truncated && <div className="gx-banner">{t('git.file.truncated')}</div>}
-      <table className="difftable is-file"><tbody>{shown.map((l, i) => <tr key={i}><td className="ln">{i + 1}</td><td className="cd">{l || ' '}</td></tr>)}</tbody></table>
-      {!all && lines.length > MAX_ROWS && <button className="btn sm" style={{ margin: 12 }} onClick={() => setAll(true)}>{t('git.file.showAll', { count: lines.length, n: fmtNum(lines.length) })}</button>}
+      {blameErr && <div className="gx-banner">{blameErr}</div>}
+      {blame?.truncated && <div className="gx-banner">{t('git.blame.truncated', { count: blame.lines.length })}</div>}
+      <div className="vf-main" style={{ ['--vl-left' as never]: `${left}px` }}>
+        <VirtualLines count={html.length} width={`calc(${left}px + ${GUTTER_CH}ch + ${widest}ch + 40px)`} render={(i) => {
+          const sha = blame?.lines[i]; const c = sha ? blame!.commits[sha] : undefined; const run = runs?.[i];
+          return (
+            <div key={i} className={`vl-row ${run ? `bl-g${run.g}` : ''}`}>
+              {blame && (
+                <div className={`vl-bl ${run?.first ? 'first' : ''}`}>
+                  {run?.first && c && (c.uncommitted ? <span className="muted">{t('git.blame.uncommitted')}</span>
+                    : <button type="button" className="bl-btn" title={`${c.summary}\n${c.author} · ${fmtDateTime(c.time)}`} onClick={() => onOpenCommit(sha!)}><span className="mono sha">{c.short}</span><span className="who">{c.author}</span><span className="when">{ago(c.time)}</span></button>)}
+                </div>
+              )}
+              <div className="vl-ln">{i + 1}</div>
+              <div className="vl-cd"><CodeCell html={html[i]} ws={ws} /></div>
+            </div>
+          );
+        }} />
+      </div>
     </div>
   );
 }
 
-function Preview({ agent, path, change, stamp }: { agent: Agent; path: string; change?: GitChange; stamp: number }) {
+function Preview({ agent, path, change, stamp, onOpenCommit }: { agent: Agent; path: string; change?: GitChange; stamp: number; onOpenCommit: (sha: string) => void }) {
   const { t } = useI18n();
+  const [blameOn, setBlameOn] = useState(false);
   // Text changes open on their diff; images (and unchanged files) open on the file itself.
   const wantDiff = !!change && !IMAGE.test(path);
   const [view, setView] = useState<'diff' | 'file'>(wantDiff ? 'diff' : 'file');
@@ -127,6 +177,10 @@ function Preview({ agent, path, change, stamp }: { agent: Agent; path: string; c
         <div className="gx-ptools">
           {change && <Segmented value={view} onChange={setView} options={[{ id: 'diff', label: t('git.view.diff') }, { id: 'file', label: t('git.view.file') }]} />}
           {view === 'diff' && change && <Segmented value={layout} onChange={setLayout} options={[{ id: 'unified', label: t('git.layout.unified') }, { id: 'split', label: t('git.layout.split') }]} />}
+          {!isImage && change?.status !== 'deleted' && change?.status !== 'untracked' && change?.status !== 'conflict' && (() => {
+            const on = blameOn && view === 'file';
+            return <button type="button" className={`btn sm ${on ? 'primary' : ''}`} aria-pressed={on} title={t('git.blame.hint')} onClick={() => { if (view !== 'file') { setView('file'); setBlameOn(true); } else setBlameOn((x) => !x); }}>{t('git.blame')}</button>;
+          })()}
           <CopyBtn text={path} label={t('git.copyPath')} />
         </div>
       </header>
@@ -136,11 +190,11 @@ function Preview({ agent, path, change, stamp }: { agent: Agent; path: string; c
           parsed ? (
             parsed.binary ? <p className="gx-note">{t('git.diff.binary')}</p>
               : parsed.hunks.length === 0 ? <p className="gx-note">{t('git.diff.empty')}</p>
-              : (<>{diff?.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<DiffView parsed={parsed} layout={layout} /></>)
+              : (<>{diff?.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<DiffView parsed={parsed} layout={layout} path={path} /></>)
           ) : null
         ) : isImage && !imgFailed && change?.status !== 'deleted' ? (
           <div className="gx-image"><img src={`/api/agents/${agent.id}/git/raw?path=${encodeURIComponent(path)}&v=${stamp}`} alt={name} onError={() => setImgFailed(true)} /></div>
-        ) : file && file.path === path ? <FileView f={file} /> : isImage && imgFailed ? <p className="gx-note">{t('git.file.binary')}</p> : null}
+        ) : file && file.path === path ? <FileView f={file} agent={agent} blame={blameOn} onOpenCommit={onOpenCommit} /> : isImage && imgFailed ? <p className="gx-note">{t('git.file.binary')}</p> : null}
       </div>
     </section>
   );
@@ -149,13 +203,18 @@ function Preview({ agent, path, change, stamp }: { agent: Agent; path: string; c
 /* ------------------------------------------------------------------ explorer */
 
 export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<typeof useGit> }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const { status, tree, loading, error, refresh } = git;
   const [sel, setSel] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [mode, setMode] = useState<'files' | 'history'>('files');
+  const [commitSel, setCommitSel] = useState<string | null>(null);
+  const [commitOpen, setCommitOpen] = useState(false);
+  const actions = useGitActions(agent, () => refresh());
+  const prefs = useGitPrefs();
   const seenDirs = useRef<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -175,7 +234,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
     record(root);
     if (want.size) setExpanded((e) => new Set([...e, ...want]));
   }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (root && sel === null && repo?.changes.length) setSel(repo.changes[0].path); }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (root && sel === null && repo?.changes.length) setSel((repo.changes.find((c) => c.status === 'conflict') ?? repo.changes[0]).path); }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const rows: Row[] = useMemo(() => (root ? flatten(root, expanded, { query, onlyChanged }) : []), [root, expanded, query, onlyChanged]);
   const shown = rows.slice(0, MAX_ROWS);
@@ -208,10 +267,10 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
   }
 
   const selChange = sel ? changeOf.get(sel) : undefined;
-  const upd = new Date(status.generatedAt).toLocaleTimeString(locale === 'es' ? 'es-MX' : 'en-US');
+  const upd = new Date(status.generatedAt).toLocaleTimeString(dateLocale());
 
   return (
-    <div className="gx">
+    <div className="gx" data-gx-theme={prefs.theme} style={{ ['--g-tab' as never]: prefs.tabSize }}>
       <div className="gx-bar">
         {/* The branch and last commit can be long: the chip stays compact and opens the full details below. */}
         <button type="button" className="gx-branch" aria-expanded={infoOpen} aria-controls="gx-info" title={t('git.info.toggle')} onClick={() => setInfoOpen((o) => !o)}>
@@ -223,7 +282,9 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
         </button>
         <span className="grow" />
         <span className="gx-sum">{status.changes.length === 0 ? <span className="muted">{t('git.clean')}</span> : <><b>{t('git.summary', { count: status.changes.length })}</b> <i className="add">+{fmtNum(totals.add)}</i> <i className="del">−{fmtNum(totals.del)}</i></>}</span>
-        <span className="gx-lock" title={t('git.readOnlyHint')}><Lock size={12} />{t('git.readOnly')}</span>
+        <BranchMenu agent={agent} a={actions} current={status.branch} />
+        <ActionButtons a={actions} ahead={status.upstream?.ahead ?? 0} behind={status.upstream?.behind ?? 0} detached={!status.branch} changeCount={status.changes.length} onCommit={() => setCommitOpen(true)} />
+        <GitSettings />
         <button className="btn ghost icon sm" onClick={() => void refresh()} aria-label={t('git.refresh')} title={`${t('git.refresh')} · ${t('git.updated', { time: upd })}`}><RefreshCw size={15} className={loading ? 'spin' : ''} /></button>
       </div>
       {infoOpen && (
@@ -234,14 +295,31 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
             <div><dt>{t('git.info.commit')}</dt><dd className="mono">{status.head.sha}<CopyBtn text={status.head.sha} label={t('git.info.copySha')} /></dd></div>
             <div><dt>{t('git.info.message')}</dt><dd className="msg">{status.head.subject || <span className="muted">—</span>}</dd></div>
             <div><dt>{t('git.info.author')}</dt><dd>{status.head.author}</dd></div>
-            <div><dt>{t('git.info.when')}</dt><dd>{status.head.when}</dd></div>
+            <div><dt>{t('git.info.when')}</dt><dd>{fmtDateTime(status.head.when)} <span className="muted">· {ago(Date.parse(status.head.when))}</span></dd></div>
           </>) : <div><dt>{t('git.info.commit')}</dt><dd className="muted">{t('git.noCommits')}</dd></div>}
         </dl>
       )}
+      {agent.status === 'running' && <div className="gx-warn">{t('git.warn.running', { name: agent.name })}</div>}
+      {status.state && (() => {
+        const left = status.changes.filter((c) => c.status === 'conflict');
+        return (
+          <div className="gx-state" role="status">
+            <b>{status.state === 'merge' ? t('git.state.merge') : t('git.state.rebase')}</b>
+            <span className="grow">{left.length > 0 ? t('git.state.conflicts', { count: left.length }) : t('git.state.ready')}</span>
+            {left.length === 0 && (status.state === 'merge'
+              ? <button className="btn primary sm" disabled={!!actions.busy} onClick={() => setCommitOpen(true)}>{t('git.state.finishMerge')}</button>
+              : <button className="btn primary sm" disabled={!!actions.busy} onClick={() => void actions.run('continue', t('git.done.rebaseContinue'), 'rebase-continue')}>{t('git.state.continueRebase')}</button>)}
+            <button className="btn sm danger" disabled={!!actions.busy} onClick={() => void actions.run('abort', t('git.done.mergeAbort'), 'merge-abort')}>{status.state === 'merge' ? t('git.state.abortMerge') : t('git.state.abortRebase')}</button>
+          </div>
+        );
+      })()}
+      <NoticeBanner a={actions} />
       {status.scope && <div className="gx-scope">{t('git.scope', { path: status.scope })}</div>}
 
       <div className="gx-main">
         <aside className="gx-tree" aria-label={t('git.filesLabel')}>
+          <div className="gx-tabs"><Segmented value={mode} onChange={setMode} options={[{ id: 'files', label: t('git.tab.files') }, { id: 'history', label: t('git.tab.history') }]} /></div>
+          {mode === 'history' ? <HistoryList agent={agent} head={status.head?.sha} sel={commitSel} onSelect={setCommitSel} /> : (<>
           <div className="gx-filter">
             <div className="search"><Search size={14} /><input className="input" placeholder={t('git.filterPlaceholder')} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t('git.filterPlaceholder')} /></div>
             <Segmented value={onlyChanged ? 'changed' : 'all'} onChange={(v) => setOnlyChanged(v === 'changed')} options={[{ id: 'all', label: t('git.filter.all') }, { id: 'changed', label: `${t('git.filter.changed')}${status.changes.length ? ` · ${status.changes.length}` : ''}` }]} />
@@ -263,7 +341,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
                   {isDir && node.changed > 0 && <span className="dirdot" title={t('git.dirChanged', { count: node.changed })}>{node.changed}</span>}
                   {c && (<span className="meta">
                     {(c.additions !== null || c.deletions !== null) && <span className="gx-counts sm"><i className="add">+{c.additions ?? 0}</i><i className="del">−{c.deletions ?? 0}</i></span>}
-                    <span className={`stl st-${c.status}`} title={t(`git.status.${c.status}`)}>{LETTER[c.status]}</span>
+                    <StatusLetter status={c.status} titled />
                   </span>)}
                 </button>
               );
@@ -271,10 +349,72 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
             {rows.length > shown.length && <p className="gx-note">{t('git.rowsCapped', { count: shown.length })}</p>}
             {tree?.isRepo && tree.truncated && <p className="gx-note">{t('git.treeTruncated', { count: tree.files.length })}</p>}
           </div>
+          </>)}
         </aside>
 
-        {sel ? <Preview key={sel} agent={agent} path={sel} change={selChange} stamp={status.generatedAt} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
+        {mode === 'history' ? (commitSel ? <CommitPreview key={commitSel} agent={agent} sha={commitSel} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.hist.select')}</p></div></div>)
+          : sel && selChange?.status === 'conflict' ? <ConflictResolver key={sel} agent={agent} path={sel} state={status.state} a={actions} onResolved={() => { void refresh(); }} />
+          : sel ? <Preview key={sel} agent={agent} path={sel} change={selChange} stamp={status.generatedAt} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
       </div>
+      {commitOpen && <CommitDialog changes={status.changes} a={actions} initialMessage={status.mergeMsg} onClose={() => setCommitOpen(false)} />}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ commit preview (history) */
+
+function CommitPreview({ agent, sha }: { agent: Agent; sha: string }) {
+  const { t } = useI18n();
+  const [d, setD] = useState<GitCommitDetail | null>(null);
+  const [file, setFile] = useState<string | null>(null);
+  const [diff, setDiff] = useState<GitDiffResult | null>(null);
+  const [layout, setLayout] = useState<'unified' | 'split'>('unified');
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let dead = false; setD(null); setFile(null); setDiff(null); setErr(null);
+    api.get<GitCommitDetail>(`/agents/${agent.id}/git/commit?sha=${sha}`).then((x) => { if (dead) return; setD(x); setFile(x.files[0]?.path ?? null); }).catch((e) => !dead && setErr(e instanceof Error ? e.message : t('git.loadError')));
+    return () => { dead = true; };
+  }, [agent.id, sha]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const f = d?.files.find((x) => x.path === file);
+  useEffect(() => {
+    if (!f) { setDiff(null); return; }
+    let dead = false; setDiff(null);
+    api.get<GitDiffResult>(`/agents/${agent.id}/git/commit-diff?sha=${sha}&path=${encodeURIComponent(f.path)}${f.oldPath ? `&old=${encodeURIComponent(f.oldPath)}` : ''}`).then((x) => !dead && setDiff(x)).catch((e) => !dead && setErr(e instanceof Error ? e.message : t('git.loadError')));
+    return () => { dead = true; };
+  }, [agent.id, sha, f?.path, f?.oldPath]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const parsed = useMemo(() => (diff && f && diff.path === f.path ? parseDiff(diff.diff) : null), [diff, f]);
+  if (err) return <section className="gx-preview"><p className="gx-note err">{err}</p></section>;
+  if (!d) return <section className="gx-preview"><p className="gx-note">{t('git.loading')}</p></section>;
+  const [subject, ...rest] = d.message.split('\n');
+  const body = rest.join('\n').trim();
+  return (
+    <section className="gx-preview gx-commitview" aria-label={subject}>
+      <header className="gx-chead">
+        <h3>{subject}</h3>
+        {body && <pre className="gx-cbody">{body}</pre>}
+        <div className="muted small row gap-s wrap"><span className="mono">{d.sha.slice(0, 10)}</span><CopyBtn text={d.sha} label={t('git.info.copySha')} /><span>· {d.author} · {fmtDateTime(d.date)}</span>
+          <span>· {t('git.hist.files', { count: d.files.length })}</span></div>
+      </header>
+      {d.files.length === 0 ? <p className="gx-note">{t('git.hist.noFiles')}</p> : (
+        <div className="gx-cfilelist" role="listbox">
+          {d.files.map((x) => (
+            <button key={x.path} role="option" aria-selected={file === x.path} className={`gx-cfile ${file === x.path ? 'sel' : ''}`} onClick={() => setFile(x.path)} title={x.oldPath ? `${x.oldPath} → ${x.path}` : x.path}>
+              <StatusLetter status={x.status} /><span className="mono nm">{x.path}</span>
+              {(x.additions !== null || x.deletions !== null) && <span className="gx-counts sm"><i className="add">+{x.additions ?? 0}</i><i className="del">−{x.deletions ?? 0}</i></span>}
+            </button>
+          ))}
+        </div>
+      )}
+      {f && (<>
+        <div className="gx-ptools" style={{ padding: '6px 14px' }}><Segmented value={layout} onChange={setLayout} options={[{ id: 'unified', label: t('git.layout.unified') }, { id: 'split', label: t('git.layout.split') }]} /></div>
+        <div className="gx-body">
+          {!parsed ? <p className="gx-note">{t('git.loading')}</p> : parsed.binary ? <p className="gx-note">{t('git.diff.binary')}</p> : parsed.hunks.length === 0 ? <p className="gx-note">{t('git.diff.empty')}</p>
+            : (<>{diff?.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<DiffView parsed={parsed} layout={layout} path={f!.path} /></>)}
+        </div>
+      </>)}
+    </section>
   );
 }
