@@ -43,7 +43,7 @@ export function toSplit(lines: DiffLine[]): SplitRow[] {
 }
 
 export type ChangeKind = 'add' | 'mod';
-/** One change you can walk to: a run of changed lines (runs separated only by unimportant lines count as one). */
+/** One change you can walk to: a run of changed lines. */
 export interface ChangeGroup {
   /** First and last file line (1-based) it covers; removed lines count as the line they were removed before. */
   from: number; to: number;
@@ -64,10 +64,9 @@ export interface ChangeMarks {
 
 /**
  * git joins changes that are less than 7 lines apart into one block, but editors (VS Code, JetBrains) walk the
- * individual changes. So changes are the runs of added/removed lines, and two runs merge when everything between them is
- * unimportant: blank or at most a few characters (`}`, `})`, `);`), as JetBrains does.
+ * individual changes, so a change is a run of added/removed lines. (The diff itself uses git's histogram algorithm,
+ * which aligns lines the way JetBrains does and splits changes alike.)
  */
-const UNIMPORTANT_CHARS = 4;
 export function changeMarks(parsed: ParsedDiff): ChangeMarks {
   const lines = new Map<number, ChangeKind>(); const removedBefore = new Set<number>();
   const blockOfLine = new Map<number, number>(); const blockOfRemoval = new Map<number, number>();
@@ -79,8 +78,7 @@ export function changeMarks(parsed: ParsedDiff): ChangeMarks {
     for (let i = 0; i < L.length; i++) { at[i] = nxt; if (L[i].kind !== 'del') nxt = (L[i].newNo ?? nxt) + 1; }
     const runs: [number, number][] = [];
     for (let i = 0; i < L.length;) { if (L[i].kind === 'ctx') { i++; continue; } const st = i; while (i < L.length && L[i].kind !== 'ctx') i++; runs.push([st, i - 1]); }
-    const merged: [number, number][] = [];
-    for (const r of runs) { const last = merged[merged.length - 1]; if (last && L.slice(last[1] + 1, r[0]).every((l) => l.text.replace(/\s/g, '').length <= UNIMPORTANT_CHARS)) last[1] = r[1]; else merged.push([r[0], r[1]]); }
+    const merged = runs;   // every run of added/removed lines is a change
     for (const [s, e] of merged) {
       const gi = groups.length; let from = Infinity, to = -Infinity;
       for (let i = s; i <= e;) {
