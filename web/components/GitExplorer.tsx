@@ -68,9 +68,12 @@ function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew }: { f
   // The lines the open block covers, so they can be outlined in the file (clamped: a removal at the very end sits on the last line).
   const extents = useMemo(() => { const n = f.content.split('\n').length; return groups.map((g) => ({ from: Math.min(g.from, n), to: Math.min(g.to, n) })); }, [groups, f.content]);
   const extent = peek ? extents[peek.block] ?? null : null;
-  const [reveal, setReveal] = useState<{ row: number; key: number } | undefined>();
+  const [reveal, setReveal] = useState<{ top: number; bottom: number; key: number } | undefined>();
+  // Where the peek of a change goes (below its last line, or below the first one for very long changes) and how tall it is.
+  const peekTop = (g: ChangeGroup, row: number) => { const e = { from: g.from, to: Math.min(g.to, f.content.split('\n').length) }; return (e.to - (row + 1) <= 25 ? Math.max(e.to, row + 1) : row + 1) * ROW_H; };
+  const peekHeight = (g: ChangeGroup) => 34 + Math.min((g.view.lines.length + 1) * ROW_H + 4, 260) + 14;
   /** Walk the changes in file order: open the previous / next block and scroll to it. */
-  const goTo = (block: number) => { const e = extents[block]; if (!e) return; setPeek({ row: Math.max(0, e.from - 1), block }); setReveal({ row: Math.max(0, e.from - 1), key: Date.now() }); };
+  const goTo = (block: number) => { const e = extents[block]; if (!e) return; const row = Math.max(0, e.from - 1); setPeek({ row, block }); setReveal({ top: row * ROW_H, bottom: peekTop(groups[block], row) + peekHeight(groups[block]), key: Date.now() }); };
   useEffect(() => { setPeek(null); }, [f.path, marks]);
   useEffect(() => {
     if (!peek) return;
@@ -111,7 +114,7 @@ function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew }: { f
       {blameErr && <div className="gx-banner">{blameErr}</div>}
       {blame?.truncated && <div className="gx-banner">{t('git.blame.truncated', { count: blame.lines.length })}</div>}
       <div className="vf-main" style={{ ['--vl-left' as never]: `${left}px` }}>
-        <VirtualLines count={html.length} width={`calc(${left}px + ${GUTTER_CH}ch + ${widest}ch + 40px)`} overlay={peek && groups[peek.block] ? { top: (extent && extent.to - (peek.row + 1) <= 25 ? Math.max(extent.to, peek.row + 1) : peek.row + 1) * ROW_H, node: <ChangePeek path={f.path} hunk={groups[peek.block].view} index={peek.block} extent={extent} onClose={() => setPeek(null)} total={groups.length} onGo={goTo} /> } : undefined} reveal={reveal} render={(i) => {
+        <VirtualLines count={html.length} width={`calc(${left}px + ${GUTTER_CH}ch + ${widest}ch + 40px)`} overlay={peek && groups[peek.block] ? { top: peekTop(groups[peek.block], peek.row), node: <ChangePeek path={f.path} hunk={groups[peek.block].view} index={peek.block} extent={extent} onClose={() => setPeek(null)} total={groups.length} onGo={goTo} /> } : undefined} reveal={reveal} render={(i) => {
           const sha = blame?.lines[i]; const c = sha ? blame!.commits[sha] : undefined; const run = runs?.[i];
           // What changed since the last commit: green = added, blue = modified, a red edge where lines were removed.
           const kind = f.source === 'worktree' ? (allNew ? 'add' : marks?.lines.get(i + 1)) : undefined;
@@ -120,7 +123,7 @@ function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew }: { f
           const block = !marks || f.source !== 'worktree' ? undefined : marks.blockOfLine.get(i + 1) ?? (delBefore ? marks.blockOfRemoval.get(i + 1) : delAfter ? marks.blockOfRemoval.get(html.length + 1) : undefined);
           return (
             <div key={i} className={`vl-row ${run ? `bl-g${run.g}` : ''} ${kind ? `m-${kind}` : ''} ${delBefore ? 'm-delb' : delAfter ? 'm-dela' : ''} ${block !== undefined ? 'has-peek' : ''} ${extent && i + 1 >= extent.from && i + 1 <= extent.to ? 'in-peek' : ''}`}
-              onClick={block !== undefined ? (e) => { if ((e.target as HTMLElement).closest('.bl-btn')) return; if (!(e.target as HTMLElement).closest('.vl-ln') && !window.getSelection()?.isCollapsed) return; setPeek(peek?.row === i ? null : { row: i, block }); } : undefined}
+              onClick={block !== undefined ? (e) => { if ((e.target as HTMLElement).closest('.bl-btn')) return; if (!(e.target as HTMLElement).closest('.vl-ln') && !window.getSelection()?.isCollapsed) return; if (peek?.row === i) { setPeek(null); return; } setPeek({ row: i, block }); setReveal({ top: i * ROW_H, bottom: peekTop(groups[block], i) + peekHeight(groups[block]), key: Date.now() }); } : undefined}
               title={block !== undefined ? t('git.peek.hint') : undefined}>
               {blame && (
                 <div className={`vl-bl ${run?.first ? 'first' : ''}`}>
