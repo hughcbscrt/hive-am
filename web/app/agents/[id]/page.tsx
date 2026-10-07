@@ -3,7 +3,7 @@ import { useAgentSettings } from '@/components/useAgentSettings';
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, History, RotateCcw, SlidersHorizontal, Waypoints } from 'lucide-react';
+import { ArrowLeft, History, Maximize2, Minimize2, RotateCcw, SlidersHorizontal, Waypoints } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
 import { ago, shortPath } from '@/lib/meta';
@@ -17,6 +17,9 @@ import { Hex, Modal, ProviderBadge, RoleChip, StatusChip, useToast } from '@/com
 import { useI18n } from '@/lib/i18n';
 
 interface Sess { session_id: string; first_seen: number; last_seen: number; kind: 'direct' | 'delegation'; from_name: string | null; task: string | null }
+
+const CFG_MIN = 340, CFG_DEFAULT = 400;
+const maxCfg = () => Math.max(CFG_MIN, window.innerWidth - 80);
 
 export default function AgentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -44,6 +47,19 @@ function Workspace({ id }: { id: string }) {
   const changedCount = git.status && git.status.isRepo ? git.status.changes.length : 0;
 
   useEffect(() => { try { setOpen(localStorage.getItem('hive-cfg-open') === '1'); } catch { /* ignore */ } }, []);
+  const [cfgW, setCfgW] = useState(CFG_DEFAULT);
+  useEffect(() => { try { const w = Number(localStorage.getItem('hive-cfg-width')); if (w >= CFG_MIN) setCfgW(Math.min(w, maxCfg())); } catch { /* ignore */ } }, []);
+  const saveCfgW = (w: number) => { try { localStorage.setItem('hive-cfg-width', String(Math.round(w))); } catch { /* ignore */ } };
+  const cfgWide = cfgW > CFG_DEFAULT + 40;
+  const toggleCfgW = () => { const w = cfgWide ? CFG_DEFAULT : Math.min(maxCfg(), Math.round(window.innerWidth / 2)); setCfgW(w); saveCfgW(w); };
+  const dragCfg = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const el = e.currentTarget; el.setPointerCapture(e.pointerId);
+    let w = cfgW;
+    const move = (ev: PointerEvent) => { w = Math.min(maxCfg(), Math.max(CFG_MIN, window.innerWidth - ev.clientX)); setCfgW(w); };
+    const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); saveCfgW(w); };
+    el.addEventListener('pointermove', move); el.addEventListener('pointerup', up);
+  };
   const toggle = (v: boolean, tb?: 'config' | 'sessions') => { setOpen(v); if (tb) setTab(tb); try { localStorage.setItem('hive-cfg-open', v ? '1' : '0'); } catch { /* ignore */ } };
 
   const settings = useAgentSettings(agent, { onDeleted: () => router.push('/agents') });
@@ -60,7 +76,7 @@ function Workspace({ id }: { id: string }) {
   const delegated = sessions.filter((s) => s.kind === 'delegation');
 
   return (
-    <div className={`ws ${open ? 'with-config' : ''} ${swCollapsed ? 'sw-collapsed' : ''}`}>
+    <div className={`ws ${open ? 'with-config' : ''} ${swCollapsed ? 'sw-collapsed' : ''}`} style={{ '--cfg': `${cfgW}px` } as React.CSSProperties}>
       <AgentSwitcher activeId={id} collapsed={swCollapsed} onToggle={toggleSwitcher} />
       <section className="ws-chat">
         <header className="ws-head">
@@ -86,10 +102,12 @@ function Workspace({ id }: { id: string }) {
 
       {open && (
         <aside className="ws-side">
+          <div className="ws-grip" onPointerDown={dragCfg} onDoubleClick={toggleCfgW} role="separator" aria-orientation="vertical" aria-label={t('drawer.resize')} title={t('drawer.resize')} />
           <div className="tabs" role="tablist" style={{ padding: '0 12px', position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 2 }}>
             <button className="tab" role="tab" aria-selected={tab === 'config'} onClick={() => setTab('config')}>{t('agent.tab.config')}</button>
             <button className="tab" role="tab" aria-selected={tab === 'sessions'} onClick={() => setTab('sessions')}>{t('nav.sessions')}</button>
-            <button className="btn ghost sm" style={{ marginLeft: 'auto', alignSelf: 'center' }} onClick={() => toggle(false)}>{t('common.hide')}</button>
+            <button className="btn ghost icon sm" style={{ marginLeft: 'auto', alignSelf: 'center' }} onClick={toggleCfgW} aria-label={cfgWide ? t('drawer.shrink') : t('drawer.expand')} title={cfgWide ? t('drawer.shrink') : t('drawer.expand')}>{cfgWide ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
+            <button className="btn ghost sm" style={{ alignSelf: 'center' }} onClick={() => toggle(false)}>{t('common.hide')}</button>
           </div>
           {tab === 'config' && draft && (
             <>

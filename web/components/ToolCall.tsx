@@ -144,3 +144,59 @@ export function ToolCall({ tool, streaming }: { tool: Tool; streaming?: boolean 
     </details>
   );
 }
+
+
+export interface ChangedFile { path: string; created: boolean; added: number; removed: number; hunks: { old: string; new: string }[]; content?: string }
+const WRITES = ['write', 'fswrite', 'create', 'writefile'];
+const EDITS = ['edit', 'strreplace', 'strreplaceeditor', 'patch', 'replace', 'multiedit'];
+const nl = (v: unknown) => (typeof v === 'string' && v ? v.split('\n').length : 0);
+
+/** Files the agent wrote or edited in a reply (successful calls only), one row per path. */
+export function changedFiles(blocks: Block[]): ChangedFile[] {
+  const out = new Map<string, ChangedFile>();
+  for (const b of blocks) {
+    if (b.type !== 'tool' || b.error) continue;
+    const input = (b.input && typeof b.input === 'object' ? b.input : {}) as Obj;
+    const n = (/^mcp__.+?__(.+)$/.exec(b.name)?.[1] ?? b.name).toLowerCase().replace(/[^a-z]/g, '');
+    const isWrite = WRITES.includes(n); if (!isWrite && !EDITS.includes(n)) continue;
+    const path = str(pick(input, 'file_path', 'filePath', 'path')); if (!path) continue;
+    const edits: Obj[] = Array.isArray(input.edits) ? input.edits : [input];
+    const added = isWrite ? nl(pick(input, 'content', 'file_text', 'text')) : edits.reduce((a, e) => a + nl(pick(e, 'new_string', 'newString', 'new_str')), 0);
+    const removed = isWrite ? 0 : edits.reduce((a, e) => a + nl(pick(e, 'old_string', 'oldString', 'old_str')), 0);
+    const prev = out.get(path);
+    const hunks = [...(prev?.hunks ?? [])];
+    if (!isWrite) for (const e of edits) hunks.push({ old: str(pick(e, 'old_string', 'oldString', 'old_str')), new: str(pick(e, 'new_string', 'newString', 'new_str')) });
+    out.set(path, { path, created: (prev?.created ?? false) || isWrite, added: (prev?.added ?? 0) + added, removed: (prev?.removed ?? 0) + removed, hunks, content: isWrite ? str(pick(input, 'content', 'file_text', 'text')) : prev?.content });
+  }
+  return [...out.values()];
+}
+
+export function ChangedFiles({ blocks }: { blocks: Block[] }) {
+  const { t } = useI18n();
+  const files = changedFiles(blocks);
+  if (!files.length) return null;
+  return (
+    <details className="fold changed" open={files.length <= 5}>
+      <summary><FilePen size={14} />{t('chat.changedFiles', { count: files.length })}<ChevronRight size={14} className="chev" /></summary>
+      <div className="cf-list">
+        {files.map((f) => (
+          <details key={f.path} className="cf-file">
+            <summary>
+              <ChevronRight size={12} className="chev" />
+              <code title={f.path}>{tilde(f.path)}</code>
+              <span className="cf-meta">
+                {f.created && <em>{t('chat.fileWritten')}</em>}
+                {f.added > 0 && <span className="cf-add">+{f.added}</span>}
+                {f.removed > 0 && <span className="cf-del">−{f.removed}</span>}
+              </span>
+            </summary>
+            <div className="cf-body">
+              {f.hunks.map((h, i) => <Diff key={i} oldText={h.old} newText={h.new} />)}
+              {f.content !== undefined && f.hunks.length === 0 && <pre className="codebox">{f.content.slice(0, 6000)}{f.content.length > 6000 ? '\n…' : ''}</pre>}
+            </div>
+          </details>
+        ))}
+      </div>
+    </details>
+  );
+}

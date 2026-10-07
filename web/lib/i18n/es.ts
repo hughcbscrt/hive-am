@@ -94,6 +94,9 @@ export const es: Record<DictKey, string> = {
   // ---- common ----
   "common.cancel": "Cancelar",
   "common.close": "Cerrar",
+  "drawer.resize": "Arrastra para ajustar el ancho · doble clic para ampliar",
+  "drawer.expand": "Ampliar panel",
+  "drawer.shrink": "Reducir panel",
   "common.back": "Atrás",
   "common.saving": "Guardando…",
   "common.delete": "Eliminar",
@@ -340,6 +343,8 @@ export const es: Record<DictKey, string> = {
   "chat.tools_other": "{count} herramientas",
   "chat.contextPct": "contexto {pct}%",
   "chat.thought": "Proceso de razonamiento",
+  "chat.changedFiles": "Archivos modificados ({count})",
+  "chat.fileWritten": "nuevo",
   "chat.readOnly": "Estás leyendo una sesión anterior. Hazla la actual para continuarla.",
   "chat.queuePlaceholder": "Encola un mensaje de seguimiento…",
   "chat.placeholder": "Escribe a {name}",

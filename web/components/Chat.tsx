@@ -8,7 +8,7 @@ import { useHive } from '@/lib/store';
 import { ago } from '@/lib/meta';
 import type { Agent, Block, ChatMessage } from '@/lib/types';
 import { Hex, useToast } from './ui';
-import { ToolCall, ToolsOpen } from './ToolCall';
+import { ChangedFiles, ToolCall, ToolsOpen } from './ToolCall';
 import { fmtCost, fmtDur, fmtTokens, totalTokens } from '@/lib/format';
 import { translateServerError, useI18n } from '@/lib/i18n';
 
@@ -86,6 +86,7 @@ const Blocks = memo(function Blocks({ blocks, streaming }: { blocks: Block[]; st
         );
         return <ToolCall key={i} tool={b} streaming={streaming} />;
       })}
+      <ChangedFiles blocks={blocks} />
     </>
   );
 });

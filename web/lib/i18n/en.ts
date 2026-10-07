@@ -96,6 +96,9 @@ export const en = {
   // ---- common ----
   "common.cancel": "Cancel",
   "common.close": "Close",
+  "drawer.resize": "Drag to resize · double-click to expand",
+  "drawer.expand": "Expand panel",
+  "drawer.shrink": "Shrink panel",
   "common.back": "Back",
   "common.saving": "Saving…",
   "common.delete": "Delete",
@@ -342,6 +345,8 @@ export const en = {
   "chat.tools_other": "{count} tools",
   "chat.contextPct": "context {pct}%",
   "chat.thought": "Thought process",
+  "chat.changedFiles": "Files changed ({count})",
+  "chat.fileWritten": "written",
   "chat.readOnly": "You’re reading an older session. Make it current to continue it.",
   "chat.queuePlaceholder": "Queue a follow-up…",
   "chat.placeholder": "Message {name}",

@@ -1,6 +1,6 @@
 'use client';
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { Check, ChevronLeft, Folder, X } from 'lucide-react';
+import { createContext, useCallback, useContext, useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { Check, ChevronLeft, Folder, Maximize2, Minimize2, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { PROVIDERS, initials, permissions, providerBlurb } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n';
@@ -46,15 +46,33 @@ export function RoleChip({ role }: { role: Agent['role'] }) {
 }
 
 /* ---------- containers ---------- */
+const DRAWER_MIN = 420, DRAWER_DEFAULT = 560, DRAWER_KEY = 'hive-am.drawerWidth';
+const maxDrawer = () => Math.max(DRAWER_MIN, window.innerWidth - 80);
+/** Side panel the user can widen: drag its left edge or use the expand button. The width is remembered. */
 export function Drawer({ title, subtitle, onClose, children, footer }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
   const { t } = useI18n();
+  const [width, setWidth] = useState(DRAWER_DEFAULT);
+  useEffect(() => { try { const w = Number(localStorage.getItem(DRAWER_KEY)); if (w >= DRAWER_MIN) setWidth(Math.min(w, maxDrawer())); } catch { /* storage unavailable */ } }, []);
+  const save = (w: number) => { try { localStorage.setItem(DRAWER_KEY, String(Math.round(w))); } catch { /* storage unavailable */ } };
+  const wide = width > DRAWER_DEFAULT + 40;
+  const toggle = () => { const w = wide ? DRAWER_DEFAULT : Math.min(maxDrawer(), 1100); setWidth(w); save(w); };
+  const drag = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const el = e.currentTarget; el.setPointerCapture(e.pointerId);
+    let w = width;
+    const move = (ev: PointerEvent) => { w = Math.min(maxDrawer(), Math.max(DRAWER_MIN, window.innerWidth - ev.clientX)); setWidth(w); };
+    const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); save(w); };
+    el.addEventListener('pointermove', move); el.addEventListener('pointerup', up);
+  };
   useEffect(() => { const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [onClose]);
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <aside className="drawer" role="dialog" aria-modal aria-label={title}>
+      <aside className="drawer" role="dialog" aria-modal aria-label={title} style={{ width: `min(${width}px, 100vw)` }}>
+        <div className="drawer-grip" onPointerDown={drag} onDoubleClick={toggle} role="separator" aria-orientation="vertical" aria-label={t('drawer.resize')} title={t('drawer.resize')} />
         <header>
           <div className="grow"><h2>{title}</h2>{subtitle && <p className="muted small" style={{ margin: '4px 0 0' }}>{subtitle}</p>}</div>
+          <button className="btn ghost icon" onClick={toggle} aria-label={wide ? t('drawer.shrink') : t('drawer.expand')} title={wide ? t('drawer.shrink') : t('drawer.expand')}>{wide ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</button>
           <button className="btn ghost icon" onClick={onClose} aria-label={t('common.close')}><X size={18} /></button>
         </header>
         <div className="body">{children}</div>
