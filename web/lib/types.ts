@@ -23,6 +23,15 @@ export interface AgentType {
 }
 export interface Skill { id: string; name: string; description: string; content: string; created_at: number; updated_at: number }
 export interface ProviderInfo { id: Provider; label: string; installed: boolean; version: string }
+export type ChannelKind = 'telegram' | 'slack';
+export interface ConnectionStatus { state: 'connecting' | 'connected' | 'error' | 'stopped'; detail?: string; lastEventAt?: number }
+export interface AllowedUser { id: string; name?: string; admin?: boolean }
+/** A connection as the server sends it: credentials arrive as `{ set, hint }`, never as the value. */
+export interface Connection {
+  id: string; kind: ChannelKind; name: string; agent_id: string | null; enabled: boolean; created_at: number;
+  config: Record<string, any>; allowed: AllowedUser[]; status: ConnectionStatus; thread_count: number;
+}
+export interface ConnectionThread { id: string; external_key: string; title: string; last_user: string | null; last_activity: number; created_at: number }
 export interface ModelInfo { id: string; label: string }
 
 export interface Usage { input: number; output: number; cacheRead: number; cacheWrite: number; reasoning: number; credits?: number; contextPct?: number }

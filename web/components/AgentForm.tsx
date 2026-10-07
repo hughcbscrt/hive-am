@@ -42,7 +42,8 @@ export function AgentForm({ draft, onChange, errors, selfId, showType = true, fo
   draft: AgentDraft; onChange: (d: AgentDraft) => void; errors: ReturnType<typeof validate>; selfId?: string; showType?: boolean; focusName?: boolean;
 }) {
   const { t } = useI18n();
-  const { skills, providers, agents, types, colonies } = useHive();
+  const { skills, providers, agents, types, colonies, connections } = useHive();
+  const linked = useMemo(() => connections.filter((c) => c.agent_id === selfId && c.enabled), [connections, selfId]);
   const colony = colonies.find((c) => c.id === draft.colony_id);
   const inh = (f: InheritField) => follows(draft, colony, f);
   const toggle = (f: InheritField, on: boolean) => onChange({ ...draft, overrides: on ? draft.overrides.filter((x) => x !== f) : [...new Set([...draft.overrides, f])] });
@@ -72,7 +73,8 @@ export function AgentForm({ draft, onChange, errors, selfId, showType = true, fo
       <Field label={t('form.provider')}><ProviderPicker value={draft.provider} onChange={(p) => onChange({ ...draft, provider: p, model: '' })} providers={providers} /></Field>
       <ModelField provider={draft.provider} value={draft.model} onChange={(v) => set('model', v)} />
       {colony && colony.inherit.permission && <InheritRow colony={colony} on={inh('permission')} onChange={(v) => toggle('permission', v)} label={t('inherit.permissions')} value={permissionLabel(colony.permission)} />}
-      {!inh('permission') && <PermissionField value={draft.permission} onChange={(v) => set('permission', v)} />}
+      {!inh('permission') && <PermissionField value={draft.permission} onChange={(v) => set('permission', v)} locked={linked.length ? ['plan'] : []} />}
+      {linked.length > 0 && <p className="hint" style={{ margin: 0 }}><b>{t('form.connections')}:</b> {t('form.connections.hint', { names: linked.map((c) => c.name).join(', ') })}</p>}
       {colony && colony.inherit.cwd && colony.cwd && <InheritRow colony={colony} on={inh('cwd')} onChange={(v) => toggle('cwd', v)} label={t('field.folder')} value={shortPath(colony.cwd)} mono />}
       {!(inh('cwd') && colony?.cwd) && <FolderPicker value={draft.cwd} onChange={(v) => set('cwd', v)} error={errors.cwd} />}
       {colony && colony.inherit.prompt && colony.system_prompt.trim() && (

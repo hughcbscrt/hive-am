@@ -1,6 +1,6 @@
 'use client';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { Bot, Check, ChevronRight, Copy, FilePen, FilePlus, FileText, Globe, ListChecks, Search, Terminal, Waypoints, Wrench } from 'lucide-react';
+import { Bot, Check, ChevronRight, Copy, FilePen, FilePlus, FileText, Globe, ListChecks, MessageSquare, Search, Terminal, Waypoints, Wrench } from 'lucide-react';
 import { fmtDur } from '@/lib/format';
 import { translate as tr, useI18n } from '@/lib/i18n';
 import type { Block } from '@/lib/types';
@@ -50,6 +50,14 @@ export function describe(tool: Tool): Described {
   const mcp = /^mcp__([^_]+(?:_[^_]+)*)__(.+)$/.exec(raw);
   const n = (mcp ? mcp[2] : raw).toLowerCase().replace(/[^a-z]/g, '');
 
+  // OpenCode runs MCP tools from inside a code block: `await tools.hive.channel_reply({ text: "…" })`.
+  const wrapped = typeof input.code === 'string' ? /tools\.hive\.channel_reply\(\s*\{\s*text\s*:\s*("(?:[^"\\]|\\.)*")/.exec(input.code) : null;
+  let wrappedText: string | undefined;
+  if (wrapped) { try { wrappedText = JSON.parse(wrapped[1]); } catch { /* not a plain string: fall through to the code view */ } }
+  if (n.endsWith('channelreply') || wrappedText !== undefined) {
+    const text = wrappedText ?? str(input.text);
+    return { icon: <MessageSquare size={14} />, label: tr('tool.channelReply'), summary: text.replace(/\s+/g, ' ').slice(0, 140), body: <pre className="codebox pre-wrap">{text}</pre> };
+  }
   if (mcp?.[1] === 'hive' && mcp[2] === 'dispatch')
     return { icon: <Waypoints size={14} />, label: tr('tool.delegate'), summary: `${str(input.agent)} — ${str(input.task).slice(0, 90)}`, body: <Kv rows={[[tr('tool.k.subagent'), <b key="a">{str(input.agent)}</b>], [tr('tool.k.task'), <span key="t" className="pre-wrap">{str(input.task)}</span>]]} /> };
   if (mcp?.[1] === 'hive') return { icon: <Waypoints size={14} />, label: tr('tool.roster'), summary: '', body: null };

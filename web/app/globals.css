@@ -789,3 +789,16 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 
 /* sideways bar for the side-by-side diff: it only carries the scroll position, the rows slide with --hx */
 .hbar { flex: none; overflow-x: auto; overflow-y: hidden; height: 14px; border-top: 1px solid var(--line); background: var(--g-gbg, var(--surface-2)); }
+
+/* ---- messages that arrived from Telegram / Slack ---- */
+.bubble.channel { background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 16px 16px 4px 16px; }
+.bubble.channel .chhead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+.bubble.channel .chhead b { color: var(--ink-2); }
+.bubble.channel .chhead .chfrom { margin-left: auto; font-weight: 600; color: var(--ink-2); }
+.bubble.channel .chbody { white-space: pre-wrap; word-break: break-word; }
+.seg button:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ---- connections ---- */
+.conn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.conncard { display: flex; flex-direction: column; gap: 10px; cursor: pointer; font: inherit; color: inherit; text-align: left; }
+.conncard:hover { border-color: var(--honey); }

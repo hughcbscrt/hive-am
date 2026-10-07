@@ -88,8 +88,8 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 export function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: ReactNode }) {
   return <div className="field"><label>{label}</label>{children}{error ? <span className="field-err">{error}</span> : hint ? <span className="hint">{hint}</span> : null}</div>;
 }
-export function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { id: T; label: string }[] }) {
-  return <div className="seg" role="group">{options.map((o) => <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)}>{o.label}</button>)}</div>;
+export function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { id: T; label: string; disabled?: boolean; title?: string }[] }) {
+  return <div className="seg" role="group">{options.map((o) => <button key={o.id} type="button" aria-pressed={value === o.id} disabled={o.disabled} title={o.title} onClick={() => onChange(o.id)}>{o.label}</button>)}</div>;
 }
 
 /* ---------- domain pickers ---------- */
@@ -124,12 +124,12 @@ export function ModelField({ provider, value, onChange }: { provider: Provider; 
   );
 }
 
-export function PermissionField({ value, onChange }: { value: Permission; onChange: (v: Permission) => void }) {
+export function PermissionField({ value, onChange, locked = [] }: { value: Permission; onChange: (v: Permission) => void; locked?: Permission[] }) {
   const { t } = useI18n();
   const list = permissions();
   return (
     <Field label={t('permission.title')} hint={list.find((p) => p.id === value)?.hint}>
-      <Segmented value={value} onChange={onChange} options={list.map((p) => ({ id: p.id, label: p.label }))} />
+      <Segmented value={value} onChange={onChange} options={list.map((p) => ({ id: p.id, label: p.label, disabled: locked.includes(p.id), title: locked.includes(p.id) ? t('permission.lockedByConnection') : undefined }))} />
     </Field>
   );
 }

@@ -9,6 +9,7 @@ import { ago } from '@/lib/meta';
 import type { Agent, Block, ChatMessage } from '@/lib/types';
 import { Hex, useToast } from './ui';
 import { ChangedFiles, ToolCall, ToolsOpen } from './ToolCall';
+import { UserBubble } from './UserBubble';
 import { fmtCost, fmtDur, fmtTokens, totalTokens } from '@/lib/format';
 import { translateServerError, useI18n } from '@/lib/i18n';
 
@@ -100,7 +101,7 @@ const History = memo(function History({ msgs, agent }: { msgs: ChatMessage[]; ag
   return (
     <>
       {list.map((m: Reply) => m.role === 'user' ? (
-        <div key={m.id} className="msg user"><div className="bubble">{m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join('')}</div></div>
+        <UserBubble key={m.id} text={m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join('')} />
       ) : (
         <div key={m.id} className="msg assistant">
           <div className="who"><Hex agent={agent} size="sm" />{agent.name}<span className="stamp">{m.ts ? ago(m.ts) : ''}</span></div>
@@ -203,7 +204,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
             </div>
           )}
           <History msgs={msgs} agent={agent} />
-          {showPending && !turn?.prompt && <div className="msg user"><div className="bubble">{pending}</div></div>}
+          {showPending && !turn?.prompt && <UserBubble text={pending ?? ''} />}
           {turn && (
             <>
               {turn.source === 'dispatch' ? (
@@ -213,7 +214,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
                   <span className="hint">{t('chat.delegatedNote')}</span>
                 </div>
               ) : !msgs.some((m) => m.role === 'user' && m.blocks.some((b) => b.type === 'text' && b.text.trim() === turn.prompt.trim())) && (
-                <div className="msg user"><div className="bubble">{turn.prompt}</div></div>
+                <UserBubble text={turn.prompt} />
               )}
               <div className="msg assistant">
                 <div className="who"><Hex agent={agent} size="sm" />{agent.name}</div>

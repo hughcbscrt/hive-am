@@ -27,6 +27,9 @@ Selector de agentes + chat + ajustes plegables (ver [documento 10](10-chat-y-vis
 
 Cabecera: volver a Colony, avatar, nombre, rol, proveedor, modelo, estado, **New conversation** (con confirmación) y **Settings**.
 
+### Connections (`/connections`)
+Tarjetas de las conexiones externas con su estado en vivo (se refresca cada 5 s) y un panel lateral para crearlas o editarlas. Detalle en el [documento 14](14-conexiones-externas.md).
+
 ### Types (`/types`)
 
 Tarjetas de tipos (rol, proveedor, modelo, nº de skills, nº de agentes que lo usan) con **Edit** (panel lateral) y **Create agent**. El editor incluye selector de proveedor, modelo, permisos, prompt (monoespaciado, con contador de caracteres) y skills.
