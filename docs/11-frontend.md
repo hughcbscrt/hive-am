@@ -78,7 +78,7 @@ Un solo contexto React (`useHive()`), sin librerías de estado. Contiene los dat
 |---|---|
 | `Hex` | Avatar hexagonal con iniciales; color del proveedor, o miel si es orquestador; tamaños `sm`, normal, `lg` |
 | `ProviderBadge`, `StatusChip`, `RoleChip` | Etiquetas pequeñas de proveedor, estado y rol |
-| `Drawer` / `Modal` | Panel lateral y diálogo; se cierran con Esc o clic en el fondo |
+| `Drawer` / `Modal` | Panel lateral y diálogo; se cierran con Esc o clic en el fondo. El `Drawer` es **ampliable**: botón de ampliar en su cabecera (560 px ↔ 1100 px), borde izquierdo arrastrable (mín. 420 px, máx. pantalla − 80 px) y doble clic para alternar; el ancho se recuerda en `localStorage` (`hive-am.drawerWidth`) y lo comparten todos los paneles (crear y editar agente, etc.) |
 | `Field`, `Segmented` | Campo con etiqueta, ayuda y error; control segmentado |
 | `ProviderPicker` | Tres tarjetas con indicador de instalado |
 | `ModelField` | Texto libre con sugerencias del proveedor |

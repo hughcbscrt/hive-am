@@ -4,17 +4,18 @@ Este documento describe **qué se muestra** en la conversación con un agente, *
 
 ## 10.1 Distribución de la pantalla del agente
 
-`app/agents/[id]/page.tsx` organiza tres columnas dentro del área principal:
+`app/agents/[id]/page.tsx` organiza dos columnas dentro del área principal, y un panel de ajustes que **flota encima**:
 
 ```
-┌ barra lateral ┬ selector de agentes ┬ chat ─────────────────────────┬ ajustes (opcional) ┐
-│ (navegación)  │ AgentSwitcher       │ cabecera + StatsBar            │ Configuration      │
-│ 220 px        │ 290 px (o 68 px)    │ transcripción                  │ Sessions           │
-│               │                     │ caja de texto                  │ 400 px             │
-└───────────────┴─────────────────────┴────────────────────────────────┴────────────────────┘
+┌ barra lateral ┬ selector de agentes ┬ chat ─────────────────────────────────────┐
+│ (navegación)  │ AgentSwitcher       │ cabecera + StatsBar     ┌ ajustes (flota) ┤
+│ 220 px        │ 290 px (o 68 px)    │ transcripción           │ Configuration   │
+│               │                     │ caja de texto           │ Sessions        │
+└───────────────┴─────────────────────┴─────────────────────────┴─────────────────┘
 ```
 
 - El panel de **ajustes** está oculto por defecto; el botón **Settings** de la cabecera lo muestra (un punto indica cambios sin guardar). Su estado se recuerda en `localStorage` (`hive-cfg-open`).
+- El panel es `position: fixed` a la derecha: **no encoge el chat**, se dibuja encima con sombra. Mide 400 px por defecto. El botón de ampliar (junto a *Hide*) lo lleva a la **mitad de la pantalla** y de vuelta; también se arrastra su borde izquierdo (o doble clic para alternar). Mínimo 340 px, máximo ancho de pantalla − 80 px. El ancho se recuerda en `localStorage` (`hive-cfg-width`).
 - La página se monta con `key={id}`: al cambiar de agente desde el selector se reinicia todo el estado local (borrador, pestaña, sesión en lectura).
 
 ### Selector de agentes (`AgentSwitcher`)
@@ -70,6 +71,7 @@ Encabezado con avatar, nombre y "hace cuánto", seguido de **bloques** en orden:
 | `text` | Markdown (`react-markdown` + `remark-gfm`: tablas, listas, código, enlaces). No se permite HTML crudo. Cada bloque de texto está memoizado y solo se vuelve a procesar si cambia su texto |
 | `thinking` | Fila plegable **"Thought process"** (en vivo y siendo el último bloque: "Thinking…") con el razonamiento en cursiva |
 | `tool` | Fila de herramienta (ver 10.4) |
+| *(resumen)* | Al final de la respuesta, **"Files changed (N)"** (ver 10.4) |
 
 #### Agrupación de respuestas (`coalesce`)
 
@@ -128,6 +130,15 @@ El nombre se normaliza a minúsculas sin símbolos (p. ej. `str_replace` → `st
 | *Otras* | cualquier otra | Primer parámetro | JSON de los parámetros |
 
 **Salida** (todas): sección *Output* con el texto devuelto, recortado a 12 000 caracteres (con aviso "(truncated)"); alto máximo con scroll; "(no output)" si está vacía.
+
+### Archivos modificados (`ChangedFiles`)
+
+Al final de cada respuesta (también en vivo, mientras el agente trabaja) se muestra un bloque plegable **Files changed (N)** con un renglón por archivo que el agente escribió o editó (`changedFiles()` en `ToolCall.tsx`). Está abierto si son 5 archivos o menos.
+
+- Cuenta solo llamadas **sin error** de escritura (`write`, `fswrite`, `create`, `writefile`) y edición (`edit`, `strreplace`, `strreplaceeditor`, `patch`, `replace`, `multiedit`); varias ediciones del mismo archivo se suman en un renglón.
+- Cada renglón muestra la ruta, la marca *written* si el agente escribió el archivo completo, y `+N` / `−N` líneas añadidas y quitadas.
+- Cada archivo se **despliega** para ver sus cambios: un bloque rojo/verde por edición (lo quitado y lo añadido) o, si fue una escritura completa, el contenido (máx. 6000 caracteres).
+- Los datos salen de los parámetros de la herramienta, no de `git diff`: pueden diferir de lo que muestre el [explorador de cambios](13-explorador-de-cambios-git.md) y no traen líneas de contexto ni números de línea.
 
 ### Expandir y contraer
 

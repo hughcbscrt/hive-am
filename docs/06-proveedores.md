@@ -76,7 +76,7 @@ Si el proceso termina sin evento `result`, se emite un `done` simple.
 **Comando** (el prompt va como **último argumento**):
 
 ```bash
-opencode run --format json --thinking --auto \
+opencode run --standalone --format json --thinking --auto \
   [-s <session_id>] [-m <proveedor/modelo>] "<prompt (con preámbulo si aplica)>"
 ```
 
@@ -86,9 +86,10 @@ opencode run --format json --thinking --auto \
 | Modelo | `-m` con formato `proveedor/modelo`, p. ej. `opencode/…`. |
 | Reanudación | `-s <id>` **solo si** la carpeta registrada por OpenCode para esa sesión (`session_v2.directory`) coincide con la carpeta del agente (o si no se puede saber). Si no coincide (sesiones creadas con versiones anteriores de hive-am que se registraron en la carpeta equivocada), se **inicia una sesión nueva**. |
 | Instrucciones | Sin flag de system prompt: se envían como preámbulo en el mensaje (ver 6.6). |
-| Delegación | Variable de entorno `OPENCODE_CONFIG_CONTENT` con el servidor MCP `hive`. |
+| Configuración por turno | Siempre `--standalone` (servidor privado que sí lee la configuración del entorno) y la variable `OPENCODE_CONFIG_CONTENT` con `permission.question = "deny"`. Los turnos no son interactivos: la herramienta `question` de OpenCode se descartaba y el proceso terminaba con código 1 ("The user dismissed this question"). Denegada, el agente hace la pregunta como texto normal del chat. |
+| Delegación | La misma variable `OPENCODE_CONFIG_CONTENT` añade el servidor MCP `hive` (solo orquestadores con subagentes). |
 | Id de sesión | Campo `sessionID` de cualquier evento. |
-| Servicio en segundo plano | `opencode run` usa el servicio de OpenCode; por eso importa el manejo de `exit` descrito en 6.2. |
+| Servicio en segundo plano | Sin `--standalone`, `opencode run` usaría el servicio de OpenCode y no leería la configuración del entorno; con él cada turno levanta un servidor privado. El manejo de `exit` de 6.2 sigue aplicando. |
 
 **Traducción de eventos**
 
