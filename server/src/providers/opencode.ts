@@ -21,7 +21,7 @@ export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> 
 
   // Turns are non-interactive: OpenCode's `question` tool would be dismissed and end the turn with exit code 1, so
   // deny it and the agent asks in plain text instead.
-  const config = { permission: { question: 'deny' }, ...(o.mcpDispatch ? dispatchMcpConfigOpencode(agent.id) : {}) };
+  const config = { permission: { question: 'deny' }, ...(o.mcpCaps.length ? dispatchMcpConfigOpencode(agent.id, o.mcpCaps) : {}) };
   const env: Record<string, string> = { OPENCODE_CONFIG_CONTENT: JSON.stringify(config) };
 
   const seen = new Map<string, number>();

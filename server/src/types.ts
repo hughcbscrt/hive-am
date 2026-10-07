@@ -115,7 +115,7 @@ export interface TurnOptions {
   instructions: string;
   /** The session already received older instructions; send the new ones before this message. */
   refreshInstructions?: boolean;
-  /** Present when the orchestrator may dispatch to workers. */
-  mcpDispatch: boolean;
+  /** Hive MCP tool groups this agent gets (`dispatch`, `channel`); empty means no hive MCP at all. */
+  mcpCaps: string[];
   signal: AbortSignal;
 }

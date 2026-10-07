@@ -10,10 +10,10 @@ import { dispatchKiroProfile } from '../mcp-config.js';
 export async function* runKiro(o: TurnOptions): AsyncGenerator<StreamEvent> {
   const { agent } = o;
   const args = ['chat', '--no-interactive', '--output-format', 'stream-json'];
-  if (o.mcpDispatch) {   // delegation tools come from a generated agent profile that declares the hive MCP server
+  if (o.mcpCaps.length) {   // delegation tools come from a generated agent profile that declares the hive MCP server
     const name = `hive-${agent.id}`;
     const dir = join(homedir(), '.kiro', 'agents'); mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, `${name}.json`), JSON.stringify(dispatchKiroProfile(agent.id, name), null, 2));
+    writeFileSync(join(dir, `${name}.json`), JSON.stringify(dispatchKiroProfile(agent.id, name, o.mcpCaps), null, 2));
     args.push('--agent', name);
   }
   if (agent.permission !== 'plan') args.push('--trust-all-tools');

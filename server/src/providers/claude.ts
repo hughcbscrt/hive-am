@@ -12,10 +12,10 @@ export async function* runClaude(o: TurnOptions): AsyncGenerator<StreamEvent> {
   if (agent.session_id) args.push('--resume', agent.session_id);
   if (agent.model) args.push('--model', agent.model);
   if (o.instructions) args.push('--append-system-prompt', o.instructions);
-  if (o.mcpDispatch) {
+  if (o.mcpCaps.length) {
     const dir = join(DATA_DIR, 'mcp'); mkdirSync(dir, { recursive: true });
     const file = join(dir, `${agent.id}.json`);
-    writeFileSync(file, JSON.stringify(dispatchMcpConfig(agent.id)));
+    writeFileSync(file, JSON.stringify(dispatchMcpConfig(agent.id, o.mcpCaps)));
     args.push('--mcp-config', file, '--allowedTools', 'mcp__hive');
   }
 

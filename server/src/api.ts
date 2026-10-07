@@ -4,7 +4,11 @@ import { promisify } from 'node:util';
 import { readdirSync, statSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { agents, colonies, dispatches, resolved, skills, types } from './db.js';
+import { agents, colonies, db, dispatches, resolved, skills, types } from './db.js';
+import { ChannelError, channelReply, connectionStatus, startConnection, stopConnection, testConnection } from './connections/manager.js';
+import { mergeConfig, publicConnection } from './connections/public.js';
+import { channelPermissionError } from './connections/rules.js';
+import { connections, threads } from './connections/store.js';
 import { dispatch, liveTurn, notifyAgentsChanged, queueDepth, sendTurn, stopAgent } from './runtime.js';
 import { readHistory } from './history/index.js';
 import { listModels } from './models.js';
@@ -89,7 +93,12 @@ route('PATCH', '/api/agents/:id', async ({ req, params }) => {
   const cur = agents.get(params[0]); if (!cur) throw notFound('Agent not found');
   if (p.name && p.name.toLowerCase() !== cur.name.toLowerCase() && agents.byName(p.name)) throw bad(`An agent named "${p.name}" already exists`);
   // Changing provider invalidates the native session pointer. (A changed folder is detected when the next turn starts.)
-  const a = agents.update(params[0], p)!;
+  // All-or-nothing: a change that would leave a linked agent in Plan mode is rolled back.
+  const a = db.transaction(() => {
+    const u = agents.update(params[0], p)!;
+    const why = channelPermissionError(u.id); if (why) throw bad(why);
+    return u;
+  })();
   if (p.provider && p.provider !== cur.provider) agents.setSession(a, null);
   if (!agents.get(a.id)!.effective.cwd) throw bad('Choose a working folder, or keep inheriting the colony’s folder.');
   notifyAgentsChanged();
@@ -282,7 +291,11 @@ route('PATCH', '/api/colonies/:id', async ({ req, params }) => {
   const p = await body(req); validateColony(p, true);
   const cur = colonies.get(params[0]); if (!cur) throw notFound('Colony not found');
   if (p.name && p.name.toLowerCase() !== cur.name.toLowerCase() && colonies.list().some((c) => c.name.toLowerCase() === p.name.trim().toLowerCase())) throw bad(`A colony named "${p.name}" already exists`);
-  const c = colonies.update(params[0], p.name ? { ...p, name: p.name.trim() } : p)!;
+  const c = db.transaction(() => {
+    const u = colonies.update(params[0], p.name ? { ...p, name: p.name.trim() } : p)!;
+    for (const id of u.agent_ids) { const why = channelPermissionError(id); if (why) throw bad(why); }
+    return u;
+  })();
   notifyAgentsChanged();
   return c;
 });
@@ -290,6 +303,65 @@ route('DELETE', '/api/colonies/:id', ({ params }) => {
   if (!colonies.remove(params[0])) throw notFound('Colony not found');
   notifyAgentsChanged();
   return { ok: true };
+});
+
+// ---- external connections ----
+const KINDS = ['telegram', 'slack'] as const;
+const REQUIRED: Record<string, string[]> = { telegram: ['token'], slack: ['bot_token', 'app_token'] };
+function validateConnection(kind: string, config: Record<string, any>, agentId: string | null | undefined, enabled: boolean) {
+  const missing = (REQUIRED[kind] ?? []).filter((k) => typeof config[k] !== 'string' || !config[k].trim());
+  if (missing.length) throw bad(`Missing: ${missing.join(', ')}`);
+  if (config.on_silent !== undefined && !['notice', 'send_text', 'ignore'].includes(config.on_silent)) throw bad('on_silent must be notice, send_text or ignore');
+  if (agentId) {
+    const a = agents.get(agentId); if (!a) throw bad('That agent no longer exists');
+    if (enabled && a.effective.permission === 'plan') throw bad(`"${a.name}" is in Plan mode and cannot reply. Give it "Edit files" permission first.`);
+  }
+}
+const cleanAllowed = (v: unknown) => (Array.isArray(v) ? v : []).map((u: any) => ({ id: String(u?.id ?? '').trim(), name: u?.name ? String(u.name) : undefined, admin: !!u?.admin })).filter((u) => u.id);
+
+route('GET', '/api/connections', () => connections.list().map(publicConnection));
+route('POST', '/api/connections', async ({ req }) => {
+  const p = await body(req);
+  if (!KINDS.includes(p.kind)) throw bad(`Kind must be one of: ${KINDS.join(', ')}`);
+  const name = String(p.name ?? '').trim(); if (!name) throw bad('Name is required');
+  if (connections.list().some((c) => c.name.toLowerCase() === name.toLowerCase())) throw bad(`A connection named "${name}" already exists`);
+  const config = mergeConfig({}, p.config); const enabled = p.enabled !== false;
+  validateConnection(p.kind, config, p.agent_id, enabled);
+  const c = connections.create({ kind: p.kind, name, agent_id: p.agent_id || null, config, allowed: cleanAllowed(p.allowed), enabled });
+  await startConnection(c.id); notifyAgentsChanged();
+  return publicConnection(connections.get(c.id)!);
+});
+route('PATCH', '/api/connections/:id', async ({ req, params }) => {
+  const p = await body(req);
+  const cur = connections.get(params[0]); if (!cur) throw notFound('Connection not found');
+  const name = p.name !== undefined ? String(p.name).trim() : cur.name; if (!name) throw bad('Name is required');
+  if (name.toLowerCase() !== cur.name.toLowerCase() && connections.list().some((c) => c.name.toLowerCase() === name.toLowerCase())) throw bad(`A connection named "${name}" already exists`);
+  const config = mergeConfig(cur.config, p.config);
+  const agent_id = p.agent_id !== undefined ? (p.agent_id || null) : cur.agent_id;
+  const enabled = p.enabled !== undefined ? !!p.enabled : cur.enabled;
+  validateConnection(cur.kind, config, agent_id, enabled);
+  connections.update(cur.id, { name, config, agent_id, enabled, allowed: p.allowed !== undefined ? cleanAllowed(p.allowed) : cur.allowed });
+  await startConnection(cur.id); notifyAgentsChanged();
+  return publicConnection(connections.get(cur.id)!);
+});
+route('DELETE', '/api/connections/:id', async ({ params }) => {
+  await stopConnection(params[0]);
+  if (!connections.remove(params[0])) throw notFound('Connection not found');
+  notifyAgentsChanged();
+  return { ok: true };
+});
+route('POST', '/api/connections/:id/restart', async ({ params }) => {
+  if (!connections.get(params[0])) throw notFound('Connection not found');
+  await startConnection(params[0]);
+  return { status: connectionStatus(params[0]) };
+});
+route('POST', '/api/connections/:id/test', async ({ params }) => {
+  if (!connections.get(params[0])) throw notFound('Connection not found');
+  try { return { ok: true, detail: await testConnection(params[0]) }; } catch (e) { throw bad(e instanceof Error ? e.message : String(e)); }
+});
+route('GET', '/api/connections/:id/threads', ({ params }) => {
+  if (!connections.get(params[0])) throw notFound('Connection not found');
+  return threads.forConnection(params[0]);
 });
 
 // ---- orchestration ----
@@ -308,6 +380,11 @@ route('POST', '/api/dispatch', async ({ req }) => {
   const { from, agent, task } = await body(req);
   if (!from || !agent || !task) throw bad('from, agent and task are required');
   try { return await dispatch(from, agent, task); } catch (e) { throw bad(e instanceof Error ? e.message : String(e)); }
+});
+route('POST', '/api/channel/reply', async ({ req }) => {
+  const { from, text } = await body(req);
+  try { return await channelReply(String(from ?? ''), String(text ?? '')); }
+  catch (e) { if (e instanceof ChannelError) throw bad(e.message); throw e; }
 });
 route('GET', '/api/dispatches', () => dispatches.recent());
 

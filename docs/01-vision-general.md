@@ -13,7 +13,7 @@ Un agente es una configuración (proveedor, modelo, prompt, permisos, carpeta, s
 ## Principios de diseño
 
 1. **La conversación es del CLI, no de hive-am.** hive-am guarda `proveedor + session_id + carpeta`. Tras un apagón basta relanzar el CLI con `--resume`/`-s`/`--resume-id`; no hay resúmenes ni reconstrucciones.
-2. **Sin ACP.** Cada turno es un proceso `claude -p`, `opencode run` o `kiro-cli chat --no-interactive` con salida JSON por líneas. Es el mismo enfoque que usa tide-commander.
+2. **Sin ACP.** Cada turno es un proceso `claude -p`, `opencode run` o `kiro-cli chat --no-interactive` con salida JSON por líneas.
 3. **Un turno = un proceso.** No hay procesos residentes por agente. Esto simplifica la recuperación: si hive-am cae, no queda nada colgado salvo el turno en vuelo.
 4. **El historial se lee, no se persiste.** Tres lectores (uno por proveedor) normalizan los formatos nativos a un mismo formato de mensajes.
 5. **Delegación explícita.** Un orquestador solo puede delegar a los subagentes conectados directamente a él. Cada delegación abre una sesión nueva del subagente.

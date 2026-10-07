@@ -1,18 +1,23 @@
 #!/usr/bin/env node
-// Minimal MCP stdio server giving an orchestrator two tools: list_agents and dispatch.
+// Minimal MCP stdio server for hive-am agents. Tool groups come from HIVE_CAPS:
+//   dispatch → list_agents, dispatch (orchestrators with a team)
+//   channel  → channel_reply (agents linked to Telegram/Slack)
 // It only talks to the hive-am HTTP API; all rules (assignments, queueing) live there.
 import { createInterface } from 'node:readline';
 
 const API = process.env.HIVE_AM_API ?? 'http://127.0.0.1:4400';
 const FROM = process.env.HIVE_AGENT_ID;
+const CAPS = new Set((process.env.HIVE_CAPS ?? 'dispatch').split(',').filter(Boolean));
 
-const tools = [
+const allTools = [
   {
+    cap: 'dispatch',
     name: 'list_agents',
     description: 'List the subagents you are allowed to dispatch tasks to, with their roles and descriptions.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
+    cap: 'dispatch',
     name: 'dispatch',
     description: 'Send a self-contained task to one of your subagents and wait for its final answer. Every delegation starts a fresh conversation for the subagent, so include all the context it needs.',
     inputSchema: {
@@ -25,9 +30,22 @@ const tools = [
       additionalProperties: false,
     },
   },
+  {
+    cap: 'channel',
+    name: 'channel_reply',
+    description: 'Send a message back to the person (Slack/Telegram) whose message you are handling right now. It goes to the thread of that message; you do not need to pass any id. Your normal text is NOT delivered to them, so always use this tool to answer. You may call it several times.',
+    inputSchema: {
+      type: 'object',
+      properties: { text: { type: 'string', description: 'The message to send. Short and conversational; Markdown is fine.' } },
+      required: ['text'],
+      additionalProperties: false,
+    },
+  },
 ];
+const tools = allTools.filter((t) => CAPS.has(t.cap)).map(({ cap, ...t }) => t);
 
 async function call(name, args) {
+  if (!tools.some((t) => t.name === name)) throw new Error(`Unknown tool ${name}`);
   if (name === 'list_agents') {
     const r = await fetch(`${API}/api/orchestrators/${FROM}/workers`);
     return JSON.stringify(await r.json(), null, 2);
@@ -40,6 +58,15 @@ async function call(name, args) {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? `dispatch failed (${r.status})`);
     return j.text || '(the subagent finished without a text answer)';
+  }
+  if (name === 'channel_reply') {
+    const r = await fetch(`${API}/api/channel/reply`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: FROM, text: args.text }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `channel_reply failed (${r.status})`);
+    return j.sent ? `Sent (${j.parts} message${j.parts === 1 ? '' : 's'}).` : 'Nothing sent.';
   }
   throw new Error(`Unknown tool ${name}`);
 }

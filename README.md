@@ -11,7 +11,7 @@ The conversation is never copied or summarised into a database. Each agent store
 | OpenCode | `opencode run --format json -s <id>` | `~/.local/share/opencode/opencode.db` (`session_message`) |
 | Kiro | `kiro-cli chat --no-interactive --output-format stream-json --resume-id <id>` | `~/.kiro/sessions/cli/<id>.jsonl` |
 
-After a blackout, restart and every agent resumes its real session. Not ACP: plain CLI processes, like tide-commander.
+After a blackout, restart and every agent resumes its real session. Not ACP: plain CLI processes.
 
 ## Documentación
 

@@ -2,11 +2,13 @@ import { EventEmitter } from 'node:events';
 import { createHash } from 'node:crypto';
 import { agents, colonies, skills, dispatches, resolved } from './db.js';
 import { runners } from './providers/index.js';
+import { connections } from './connections/store.js';
+import type { Origin } from './connections/types.js';
 import type { Agent, StreamEvent } from './types.js';
 
 export type BusMessage =
   | { kind: 'event'; agentId: string; turnId: string; event: StreamEvent }
-  | { kind: 'turn_start'; agentId: string; turnId: string; prompt: string; source: 'user' | 'dispatch'; from?: string }
+  | { kind: 'turn_start'; agentId: string; turnId: string; prompt: string; source: 'user' | 'dispatch'; from?: string; channel?: { platform: string; place: string; user: string } }
   | { kind: 'status'; agentId: string; status: 'idle' | 'running' | 'error' | 'queued'; queued: number }
   | { kind: 'agents_changed' };
 
@@ -15,7 +17,7 @@ bus.setMaxListeners(0);
 const emit = (m: BusMessage) => bus.emit('msg', m);
 export const notifyAgentsChanged = () => emit({ kind: 'agents_changed' });
 
-interface Live { turnId: string; prompt: string; events: StreamEvent[]; source: 'user' | 'dispatch' }
+interface Live { turnId: string; prompt: string; events: StreamEvent[]; source: 'user' | 'dispatch'; origin?: Origin }
 interface State { chain: Promise<unknown>; controller: AbortController | null; queued: number; live: Live | null }
 const states = new Map<string, State>();
 const st = (id: string): State => {
@@ -26,14 +28,24 @@ const st = (id: string): State => {
 
 export const liveTurn = (id: string) => states.get(id)?.live ?? null;
 export const queueDepth = (id: string) => states.get(id)?.queued ?? 0;
+/** The channel message the agent is answering right now, if the running turn came from one. */
+export const liveOrigin = (id: string) => states.get(id)?.live?.origin;
+
+/** Which hive tools an agent gets: `dispatch` (orchestrator with a team) and `channel` (linked to an external connection). */
+export function mcpCaps(a: Agent): string[] {
+  const caps: string[] = [];
+  if (a.role === 'orchestrator' && a.worker_ids.length > 0) caps.push('dispatch');
+  if (connections.forAgent(a.id).length > 0) caps.push('channel');
+  return caps;
+}
 
 /** How each CLI names the hive delegation tools. OpenCode exposes MCP tools through `tools.<server>.<tool>`. */
 function toolNames(provider: Agent['provider']) {
   return provider === 'opencode'
-    ? { dispatch: 'tools.hive.dispatch', list: 'tools.hive.list_agents' }
+    ? { dispatch: 'tools.hive.dispatch', list: 'tools.hive.list_agents', reply: 'tools.hive.channel_reply' }
     : provider === 'kiro'
-      ? { dispatch: '@hive/dispatch', list: '@hive/list_agents' }
-      : { dispatch: 'mcp__hive__dispatch', list: 'mcp__hive__list_agents' };
+      ? { dispatch: '@hive/dispatch', list: '@hive/list_agents', reply: '@hive/channel_reply' }
+      : { dispatch: 'mcp__hive__dispatch', list: 'mcp__hive__list_agents', reply: 'mcp__hive__channel_reply' };
 }
 
 export function composeInstructions(a: Agent, delegated = false): string {
@@ -67,22 +79,28 @@ export function composeInstructions(a: Agent, delegated = false): string {
       parts.push('## Your team\nYou currently have no subagents connected to you, so you cannot delegate. If asked, say so; do not claim to know other agents.');
     }
   }
+
+  const links = connections.forAgent(a.id);
+  if (links.length) {
+    const names = [...new Set(links.map((c) => ({ telegram: 'Telegram', slack: 'Slack', fake: 'Test' })[c.kind]))].join(' / ');
+    parts.push(`## Messages from ${names}\nPeople can write to you from ${names}. Those messages start with a header line \`[hive:channel] …\` that says the platform, place, thread and sender. **Your normal text is not delivered to them**: to answer, call the \`channel_reply\` tool (${toolNames(a.provider).reply}) with the text; it goes to the thread of the message you are handling. You can call it more than once (e.g. a short heads-up before long work, then the result). Keep replies short and conversational, use plain Markdown, and never use interactive question tools. Messages in other threads share this same conversation, so answer only the message you are handling now.`);
+  }
   return parts.join('\n\n');
 }
 
 export interface TurnResult { ok: boolean; text: string; error?: string }
 
 /** Queue a prompt for an agent. Turns for one agent run strictly one at a time. */
-export function sendTurn(agentId: string, prompt: string, source: 'user' | 'dispatch' = 'user', from?: string, dispatchId?: string): Promise<TurnResult> {
+export function sendTurn(agentId: string, prompt: string, source: 'user' | 'dispatch' = 'user', from?: string, dispatchId?: string, origin?: Origin): Promise<TurnResult> {
   const s = st(agentId);
   s.queued++;
   emit({ kind: 'status', agentId, status: s.live ? 'running' : 'queued', queued: s.queued });
-  const job = s.chain.then(() => execute(agentId, prompt, source, from, dispatchId));
+  const job = s.chain.then(() => execute(agentId, prompt, source, from, dispatchId, origin));
   s.chain = job.catch(() => undefined);
   return job;
 }
 
-async function execute(agentId: string, prompt: string, source: 'user' | 'dispatch', from?: string, dispatchId?: string): Promise<TurnResult> {
+async function execute(agentId: string, prompt: string, source: 'user' | 'dispatch', from?: string, dispatchId?: string, origin?: Origin): Promise<TurnResult> {
   const s = st(agentId);
   s.queued--;
   const raw = agents.get(agentId);
@@ -101,9 +119,9 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
   const turnId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const controller = new AbortController();
   s.controller = controller;
-  s.live = { turnId, prompt, events: [], source };
+  s.live = { turnId, prompt, events: [], source, origin };
   agents.setStatus(agentId, 'running');
-  emit({ kind: 'turn_start', agentId, turnId, prompt, source, from });
+  emit({ kind: 'turn_start', agentId, turnId, prompt, source, from, channel: origin && { platform: origin.platform, place: origin.place, user: origin.userName } });
   emit({ kind: 'status', agentId, status: 'running', queued: s.queued });
 
   const instructions = composeInstructions(agent, delegated);
@@ -119,7 +137,7 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
     const stream = runners[agent.provider]({
       agent, prompt, signal: controller.signal,
       instructions, refreshInstructions,
-      mcpDispatch: agent.role === 'orchestrator' && agent.worker_ids.length > 0,
+      mcpCaps: mcpCaps(agent),
     });
     for await (const ev of stream) {
       if (ev.t === 'session') {
