@@ -8,9 +8,9 @@ import { withInstructions } from './preamble.js';
 export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> {
   const { agent } = o;
   const args = ['run', '--format', 'json', '--thinking', '--auto'];
-  // `opencode run` normally talks to OpenCode's background service, which ignores the MCP config we pass through
-  // the environment. A private (standalone) server reads it, so orchestrators must run standalone to get `dispatch`.
-  if (o.mcpDispatch) args.splice(1, 0, '--standalone');
+  // `opencode run` normally talks to OpenCode's background service, which ignores the config we pass through the
+  // environment. A private (standalone) server reads it, which we need for the `dispatch` MCP and to deny `question`.
+  args.splice(1, 0, '--standalone');
   // Sessions created while the folder was wrong (older hive-am builds) would keep running there; start fresh instead.
   const recorded = agent.session_id ? opencodeSessionDir(agent.session_id) : null;
   const resume = agent.session_id && (!recorded || recorded === agent.cwd) ? agent.session_id : null;
@@ -19,8 +19,10 @@ export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> 
   const prompt = withInstructions(o.prompt, o.instructions, !!resume, o.refreshInstructions);
   args.push(prompt);
 
-  const env: Record<string, string> = {};
-  if (o.mcpDispatch) env.OPENCODE_CONFIG_CONTENT = JSON.stringify(dispatchMcpConfigOpencode(agent.id));
+  // Turns are non-interactive: OpenCode's `question` tool would be dismissed and end the turn with exit code 1, so
+  // deny it and the agent asks in plain text instead.
+  const config = { permission: { question: 'deny' }, ...(o.mcpDispatch ? dispatchMcpConfigOpencode(agent.id) : {}) };
+  const env: Record<string, string> = { OPENCODE_CONFIG_CONTENT: JSON.stringify(config) };
 
   const seen = new Map<string, number>();
   const toolStarted = new Set<string>();
