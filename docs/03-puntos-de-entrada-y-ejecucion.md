@@ -36,7 +36,7 @@ Abre `http://localhost:4401`.
 Secuencia de arranque:
 
 1. Se importa `db.ts`: abre (o crea) `~/.hive-am/hive-am.db`, crea las tablas, aplica migraciones y **normaliza el estado tras un apagón** (ver abajo).
-2. `seedIfEmpty()` crea el kit inicial solo si no hay tipos, agentes ni skills.
+2. `skills.seedDefaults()` crea, una sola vez cada una, las skills que vienen con hive-am; después `seedIfEmpty()` crea el kit inicial solo si no hay tipos, agentes ni skills propias.
 3. Se crea un `http.createServer` cuyo handler es `handle()` de `api.ts`.
 4. Se monta un `WebSocketServer` en la ruta `/ws` sobre el mismo servidor HTTP.
 5. Cada conexión WebSocket se suscribe al `bus` del runtime y reenvía cada mensaje como JSON; al cerrarse se desuscribe.

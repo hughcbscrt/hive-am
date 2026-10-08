@@ -15,9 +15,9 @@ type Runner = (o: TurnOptions) => AsyncGenerator<StreamEvent>;
 interface TurnOptions {
   agent: Agent;               // agente YA resuelto (cwd, permisos, skills efectivos)
   prompt: string;             // mensaje del usuario o tarea delegada
-  instructions: string;       // instrucciones compuestas (identidad + prompt + skills + equipo)
+  instructions: string;       // instrucciones compuestas (identidad + prompt + skills + equipo + canales + cuaderno)
   refreshInstructions?: boolean; // la sesión recibió instrucciones antiguas; reenviar
-  mcpDispatch: boolean;       // ¿inyectar las herramientas de delegación?
+  mcpCaps: string[];          // capacidades del MCP `hive` que recibe: dispatch, channel, memory, skills (vacío: sin MCP)
   signal: AbortSignal;        // para detener el turno
 }
 ```
@@ -54,7 +54,7 @@ claude -p --output-format stream-json --verbose --include-partial-messages \
 |---|---|
 | Permisos | `--permission-mode` recibe directamente `plan`, `acceptEdits` o `bypassPermissions`. |
 | Reanudación | `--resume <id>` si el agente tiene sesión. |
-| Instrucciones | Se pasan **en cada turno** con `--append-system-prompt`, por lo que siempre están actualizadas. |
+| Instrucciones | Se pasan en cada turno con `--append-system-prompt`, **pero Claude solo las aplica al crear la sesión**: con `--resume` conserva el system prompt original. Por eso, si cambiaron (skills, equipo, notas editadas…), la sesión reanudada recibe un bloque `<instructions update="true">` delante del mensaje, igual que OpenCode y Kiro; el historial lo oculta. |
 | Delegación | Si es orquestador con subagentes: escribe el archivo MCP y añade `--mcp-config` y `--allowedTools mcp__hive` (permite todas las herramientas del servidor `hive` sin pedir confirmación). |
 | Id de sesión | Se toma del primer evento que trae `session_id`. |
 
@@ -185,4 +185,4 @@ Modelos fuera de esas familias no tienen costo estimado. Las estimaciones se mar
 5. **Modelos:** añade la rama en `models.ts`.
 6. **Interfaz:** añade nombre, color y descripción en `web/lib/meta.ts` (`PROVIDERS`) y la variable de color `--p-<nombre>` en `globals.css` (claro y oscuro).
 7. **Instrucciones:** si el CLI no tiene flag de system prompt, usa `withInstructions`; si sí lo tiene, pásalas en cada turno.
-8. **Delegación (opcional):** si soporta MCP, añade en `mcp-config.ts` el objeto de configuración y pásalo cuando `o.mcpDispatch` sea verdadero.
+8. **Delegación (opcional):** si soporta MCP, añade en `mcp-config.ts` el objeto de configuración y pásalo cuando `o.mcpCaps` no esté vacío (el servidor anuncia solo las herramientas de esas capacidades).

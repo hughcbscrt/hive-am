@@ -27,6 +27,11 @@ CREATE TABLE IF NOT EXISTS connection_cursor (
 );
 `);
 
+// Columns added after the first release.
+for (const col of ['muted INTEGER NOT NULL DEFAULT 0', 'seen_id INTEGER NOT NULL DEFAULT 0']) {
+  try { db.exec(`ALTER TABLE threads ADD COLUMN ${col}`); } catch { /* already there */ }
+}
+
 const now = () => Date.now();
 const json = <T>(s: string, fallback: T): T => { try { return JSON.parse(s) as T; } catch { return fallback; } };
 
@@ -34,7 +39,7 @@ const connRow = (r: any): Connection => ({
   id: r.id, kind: r.kind as ChannelKind, name: r.name, agent_id: r.agent_id,
   config: json(r.config, {}), allowed: json<AllowedUser[]>(r.allowed, []), enabled: !!r.enabled, created_at: r.created_at,
 });
-const threadRow = (r: any): Thread => ({ ...r, target: json<Target>(r.target, { chat: '' }) });
+const threadRow = (r: any): Thread => ({ ...r, target: json<Target>(r.target, { chat: '' }), muted: !!r.muted, seen_id: r.seen_id ?? 0 });
 
 export const connections = {
   list: () => (db.prepare('SELECT * FROM connections ORDER BY name').all() as any[]).map(connRow),
@@ -73,6 +78,8 @@ export const threads = {
       .run(id, connectionId, externalKey, info.title, JSON.stringify(info.target), info.user, t, t);
     return threads.get(id)!;
   },
+  setMuted: (id: string, muted: boolean) => { db.prepare('UPDATE threads SET muted=? WHERE id=?').run(muted ? 1 : 0, id); },
+  markSeen: (id: string, upTo: number) => { db.prepare('UPDATE threads SET seen_id=MAX(seen_id, ?) WHERE id=?').run(upTo, id); },
 };
 
 export const threadMessages = {
@@ -81,6 +88,11 @@ export const threadMessages = {
     return db.prepare('INSERT OR IGNORE INTO thread_messages (thread_id,direction,external_id,user_id,user_name,text,ts) VALUES (?,?,?,?,?,?,?)')
       .run(threadId, direction, externalId, who.id ?? null, who.name ?? null, text, now()).changes > 0;
   },
+  /** Id of the newest message of the thread (0 when none). */
+  lastId: (threadId: string) => (db.prepare('SELECT MAX(id) AS m FROM thread_messages WHERE thread_id=?').get(threadId) as { m: number | null }).m ?? 0,
+  /** Messages people wrote that the agent has not been shown yet (after `afterId`, before `beforeId`), oldest first. */
+  unseen: (threadId: string, afterId: number, beforeId: number, limit = 30) =>
+    (db.prepare(`SELECT * FROM (SELECT * FROM thread_messages WHERE thread_id=? AND direction='in' AND id>? AND id<? ORDER BY id DESC LIMIT ?) ORDER BY id`).all(threadId, afterId, beforeId, limit) as any[]),
   recent: (threadId: string, limit = 30) =>
     (db.prepare('SELECT * FROM (SELECT * FROM thread_messages WHERE thread_id=? ORDER BY id DESC LIMIT ?) ORDER BY id').all(threadId, limit) as any[]),
 };

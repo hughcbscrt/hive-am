@@ -7,12 +7,12 @@ import { api } from '@/lib/api';
 import { PROVIDERS, ago, shortPath } from '@/lib/meta';
 import type { Agent, Colony, Dispatch } from '@/lib/types';
 import { Hex, ProviderBadge, RoleChip, StatusChip, useToast } from '@/components/ui';
-import { NewAgentDrawer } from '@/components/NewAgentDrawer';
-import { ColonyEditor } from '@/components/ColonyEditor';
-import { AgentEditDrawer } from '@/components/AgentEditDrawer';
-import { DeleteAgentModal } from '@/components/DeleteAgentModal';
+import { NewAgentDrawer } from '@/components/agents/NewAgentDrawer';
+import { ColonyEditor } from '@/components/agents/ColonyEditor';
+import { AgentEditDrawer } from '@/components/agents/AgentEditDrawer';
+import { DeleteAgentModal } from '@/components/agents/DeleteAgentModal';
 import { HelpPopover } from '@/components/HelpPopover';
-import { useAgentCard } from '@/components/AgentCard';
+import { useAgentCard } from '@/components/agents/AgentCard';
 import { useI18n } from '@/lib/i18n';
 
 const S = 74; // hex circumradius

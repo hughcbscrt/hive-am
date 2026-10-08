@@ -5,14 +5,14 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
 import { PROVIDERS } from '@/lib/meta';
-import type { AgentType, Permission, Provider, Role } from '@/lib/types';
+import type { AgentType, Permission, Provider, Role, SkillLoad } from '@/lib/types';
 import { Drawer, Field, Hex, ModelField, Modal, PermissionField, ProviderPicker, RoleChip, Segmented, SkillPicker, useToast } from '@/components/ui';
-import { NewAgentDrawer } from '@/components/NewAgentDrawer';
+import { NewAgentDrawer } from '@/components/agents/NewAgentDrawer';
 import { useI18n } from '@/lib/i18n';
 import { fmtNum } from '@/lib/format';
 
-interface Draft { id?: string; name: string; description: string; role: Role; provider: Provider; model: string; system_prompt: string; permission: Permission; skill_ids: string[] }
-const blank: Draft = { name: '', description: '', role: 'worker', provider: 'claude', model: '', system_prompt: '', permission: 'acceptEdits', skill_ids: [] };
+interface Draft { id?: string; name: string; description: string; role: Role; provider: Provider; model: string; system_prompt: string; permission: Permission; skill_ids: string[]; skill_loads: Record<string, SkillLoad> }
+const blank: Draft = { name: '', description: '', role: 'worker', provider: 'claude', model: '', system_prompt: '', permission: 'acceptEdits', skill_ids: [], skill_loads: {} };
 
 export default function Types() {
   const { t } = useI18n();
@@ -71,7 +71,7 @@ export default function Types() {
           <ModelField provider={draft.provider} value={draft.model} onChange={(v) => set('model', v)} />
           <PermissionField value={draft.permission} onChange={(v) => set('permission', v)} />
           <Field label={t('form.systemPrompt')} hint={t('types.chars', { count: draft.system_prompt.length, n: fmtNum(draft.system_prompt.length) })}><MarkdownEditor value={draft.system_prompt} onChange={(v) => set('system_prompt', v)} minHeight={260} /></Field>
-          <Field label={t('form.skills')}><SkillPicker skills={skills} value={draft.skill_ids} onChange={(v) => set('skill_ids', v)} /></Field>
+          <Field label={t('form.skills')}><SkillPicker skills={skills} value={draft.skill_ids} loads={draft.skill_loads} onChange={(ids, loads) => setDraft({ ...draft, skill_ids: ids, skill_loads: loads })} /></Field>
         </Drawer>
       )}
       {del && (

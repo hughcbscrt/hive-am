@@ -1,8 +1,9 @@
 import { EventEmitter } from 'node:events';
 import { createHash } from 'node:crypto';
-import { agents, colonies, skills, dispatches, resolved } from './db.js';
+import { agents, dispatches, resolved } from './db.js';
+import { composeInstructions, mcpCaps, notebookBlock } from './instructions.js';
 import { runners } from './providers/index.js';
-import { connections } from './connections/store.js';
+import { notebooks } from './skills/notebook.js';
 import type { Origin } from './connections/types.js';
 import type { Agent, StreamEvent } from './types.js';
 
@@ -30,63 +31,9 @@ export const liveTurn = (id: string) => states.get(id)?.live ?? null;
 export const queueDepth = (id: string) => states.get(id)?.queued ?? 0;
 /** The channel message the agent is answering right now, if the running turn came from one. */
 export const liveOrigin = (id: string) => states.get(id)?.live?.origin;
+/** Whether the turn running now is the agent's own conversation (not work delegated to it by an orchestrator). */
+export const liveIsDirect = (id: string) => states.get(id)?.live?.source === 'user';
 
-/** Which hive tools an agent gets: `dispatch` (orchestrator with a team) and `channel` (linked to an external connection). */
-export function mcpCaps(a: Agent): string[] {
-  const caps: string[] = [];
-  if (a.role === 'orchestrator' && a.worker_ids.length > 0) caps.push('dispatch');
-  if (connections.forAgent(a.id).length > 0) caps.push('channel');
-  return caps;
-}
-
-/** How each CLI names the hive delegation tools. OpenCode exposes MCP tools through `tools.<server>.<tool>`. */
-function toolNames(provider: Agent['provider']) {
-  return provider === 'opencode'
-    ? { dispatch: 'tools.hive.dispatch', list: 'tools.hive.list_agents', reply: 'tools.hive.channel_reply' }
-    : provider === 'kiro'
-      ? { dispatch: '@hive/dispatch', list: '@hive/list_agents', reply: '@hive/channel_reply' }
-      : { dispatch: 'mcp__hive__dispatch', list: 'mcp__hive__list_agents', reply: 'mcp__hive__channel_reply' };
-}
-
-export function composeInstructions(a: Agent, delegated = false): string {
-  const parts: string[] = [];
-
-  // Identity first: the underlying CLI has its own persona, but inside hive-am this agent has a name and a place.
-  const col = a.colony_id ? colonies.get(a.colony_id) : undefined;
-  const id: string[] = [
-    `## Who you are`,
-    `You are **${a.name}**, ${a.role === 'orchestrator' ? 'an orchestrator' : 'a worker'} agent in a hive-am colony of coding agents.${a.description ? ` Your purpose: ${a.description}` : ''}`,
-    `If someone asks who you are, answer as ${a.name} (${a.role}) and describe your purpose. Do not introduce yourself as the underlying CLI or model.`,
-    `Your working folder is \`${a.cwd}\`. Everything you read, write or run happens there unless you are told otherwise.`,
-  ];
-  if (col) id.push(`You belong to the colony "${col.name}"${col.cwd ? `, whose shared folder is \`${col.cwd}\`` : ''}. Colony-wide rules appear below when they apply.`);
-  if (delegated) id.push('This request was delegated to you by an orchestrator. Do the task fully and finish with a short, self-contained report: what you did, what you found, what is left.');
-  parts.push(id.join('\n'));
-
-  if (a.system_prompt.trim()) parts.push(a.system_prompt.trim());
-  for (const sid of a.skill_ids) {
-    const s = skills.get(sid);
-    if (s?.content.trim()) parts.push(`## Skill: ${s.name}\n${s.description ? `_${s.description}_\n\n` : ''}${s.content.trim()}`);
-  }
-
-  if (a.role === 'orchestrator') {
-    const tn = toolNames(a.provider);
-    const team = a.worker_ids.map((wid) => agents.get(wid)).filter(Boolean);
-    if (team.length) {
-      const roster = team.map((w) => `- **${w!.name}**${w!.description ? `: ${w!.description}` : ''}`).join('\n');
-      parts.push(`## Your team\nThese are your subagents — the ONLY agents you can delegate to:\n${roster}\n\nDelegate with the \`dispatch\` tool (${tn.dispatch}) instead of doing their work yourself, then synthesize their answers. Always use it: never play a subagent's role yourself, and never use a generic built-in subagent in its place — a subagent is a separate real agent with its own session. Each delegation starts a fresh conversation for that subagent, so put all the context it needs in the task. Your team can change at any time: when asked which agents you have or can delegate to, call the \`list_agents\` tool (${tn.list}) and report exactly what it returns, never an older list from memory. Never mention or try to use agents outside that list.`);
-    } else {
-      parts.push('## Your team\nYou currently have no subagents connected to you, so you cannot delegate. If asked, say so; do not claim to know other agents.');
-    }
-  }
-
-  const links = connections.forAgent(a.id);
-  if (links.length) {
-    const names = [...new Set(links.map((c) => ({ telegram: 'Telegram', slack: 'Slack', fake: 'Test' })[c.kind]))].join(' / ');
-    parts.push(`## Messages from ${names}\nPeople can write to you from ${names}. Those messages start with a header line \`[hive:channel] …\` that says the platform, place, thread and sender. **Your normal text is not delivered to them**: to answer, call the \`channel_reply\` tool (${toolNames(a.provider).reply}) with the text; it goes to the thread of the message you are handling. You can call it more than once (e.g. a short heads-up before long work, then the result). Keep replies short and conversational, use plain Markdown, and never use interactive question tools. Messages in other threads share this same conversation, so answer only the message you are handling now.`);
-  }
-  return parts.join('\n\n');
-}
 
 export interface TurnResult { ok: boolean; text: string; error?: string }
 
@@ -124,9 +71,12 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
   emit({ kind: 'turn_start', agentId, turnId, prompt, source, from, channel: origin && { platform: origin.platform, place: origin.place, user: origin.userName } });
   emit({ kind: 'status', agentId, status: 'running', queued: s.queued });
 
-  const instructions = composeInstructions(agent, delegated);
-  const hash = createHash('sha1').update(instructions).digest('hex').slice(0, 16);
-  const refreshInstructions = !delegated && !!agent.session_id && raw.instr_hash !== hash;
+  const base = composeInstructions(agent, delegated);
+  const nbVersion = notebooks.get(agentId).version;
+  const instructions = [base, notebookBlock(agent)].filter(Boolean).join('\n\n');
+  const hash = createHash('sha1').update(base).digest('hex').slice(0, 16);
+  // The conversation is re-sent the instructions when its configuration changed, or when the notes were edited behind its back (by the user, or in another conversation).
+  const refreshInstructions = !delegated && !!agent.session_id && (raw.instr_hash !== hash || notebooks.get(agentId).seen < nbVersion);
 
   let text = '';
   let summary: string | undefined;
@@ -158,7 +108,7 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
   if (controller.signal.aborted && !error) push({ t: 'done', ok: false, summary: 'Stopped' });
   s.controller = null;
   s.live = null;
-  if (!error && !delegated && !controller.signal.aborted) agents.setInstrHash(agentId, hash);
+  if (!error && !delegated && !controller.signal.aborted) { agents.setInstrHash(agentId, hash); notebooks.markSeen(agentId, nbVersion); }
   agents.setStatus(agentId, error ? 'error' : 'idle');
   emit({ kind: 'status', agentId, status: error ? 'error' : 'idle', queued: s.queued });
   return { ok: !error && !controller.signal.aborted, text: (summary ?? text).trim(), error: error ?? (controller.signal.aborted ? 'Stopped' : undefined) };

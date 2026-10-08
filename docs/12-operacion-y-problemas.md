@@ -12,7 +12,8 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 | Qué puede hacer un agente | Lo que permita su permiso y el CLI: `bypassPermissions` ejecuta cualquier comando sin preguntar; `acceptEdits` edita archivos libremente. Úsalos en carpetas de confianza. |
 | Explorador de carpetas | `GET /api/fs/dirs` lista subcarpetas de cualquier ruta legible. |
 | Explorador de cambios (git) | Las lecturas no escriben nada; las acciones (commit, pull, push, ramas) nunca fuerzan ni omiten *hooks* y rechazan peticiones que no vengan de la propia app. Todo limitado a la carpeta del agente; rechaza rutas fuera de ella (también por enlaces simbólicos) y cualquier ruta con `.git`. Detalle en el [documento 13](13-explorador-de-cambios-git.md#135-seguridad). |
-| Secretos | hive-am no guarda credenciales. Los CLIs usan su propia sesión. La base de datos contiene tus prompts y skills en texto plano. |
+| Secretos | Los CLIs usan su propia sesión. La única credencial que guarda hive-am es el **token del bot** de cada conexión externa, en `~/.hive-am/hive-am.db`: la API nunca lo devuelve (solo `{ set, hint }`). La base contiene además tus prompts, skills y el cuaderno de cada agente en texto plano; el cuaderno rechaza credenciales ([7.3.2](07-agentes-tipos-skills-colonias.md#732-el-cuaderno-del-agente)). |
+| Conexiones externas | Solo responden a personas de la lista (o a miembros de un grupo autorizado); un agente con conexión necesita al menos «Editar archivos» y autorizar un grupo le da ese acceso a todos sus miembros ([documento 14](14-conexiones-externas.md#145-permisos)). |
 | Lectores de historial | Validan los ids de sesión (Claude: `^[\w-]+$`; Kiro: UUID) y abren la base de OpenCode en solo lectura. |
 
 ### Mejoras de seguridad recomendadas (no implementadas)
@@ -27,7 +28,7 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 |---|---|---|
 | 1 | **Kiro orquesta mediante un perfil generado** | Escribe `~/.kiro/agents/hive-<agentId>.json` por cada orquestador Kiro con subagentes (se queda ahí al borrar el agente). |
 | 2 | **Permisos en OpenCode** | Siempre `--auto`; `plan` (solo lectura) y el resto de permisos **no se aplican** a OpenCode. |
-| 3 | **System prompt en OpenCode/Kiro** | Viaja dentro del mensaje (preámbulo), no como instrucción de sistema del CLI. Se oculta en la interfaz, pero el modelo lo ve como parte del mensaje. |
+| 3 | **System prompt en OpenCode/Kiro (y Claude al reanudar)** | Viaja dentro del mensaje (preámbulo), no como instrucción de sistema del CLI. Claude solo aplica `--append-system-prompt` al crear la sesión, así que una actualización de instrucciones en una sesión reanudada también va en el mensaje. Se oculta en la interfaz, pero el modelo lo ve como parte del mensaje. |
 | 4 | **Turno en vuelo en un apagón** | Se pierde el turno a medias; la sesión queda intacta y el agente vuelve a `idle` al reiniciar. El mensaje hay que reenviarlo. |
 | 5 | **`PATCH` de agente valida la carpeta efectiva después de guardar** | Si dejas al agente sin carpeta efectiva, el cambio ya quedó guardado cuando se devuelve el error. |
 | 6 | **Lectura de historial sin caché** | `GET /api/sessions` y `…/stats` leen archivos completos en cada llamada; pueden tardar con sesiones enormes. |
@@ -39,12 +40,12 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 | 12 | **Subagentes internos de Claude** | Las líneas `isSidechain` del `.jsonl` no se muestran en el chat. |
 | 13 | **Formato de herramientas de Kiro** | Mapeo de `toolUse`/`ToolResults` de mejor esfuerzo (no hay ejemplos guardados para validarlo). |
 | 14 | **Lista de modelos de OpenCode** | Depende de `opencode models`; si no devuelve líneas `proveedor/modelo`, la lista queda vacía (se puede escribir el id a mano). |
-| 15 | **Sin pruebas automatizadas** | No hay suite de tests. |
+| 15 | **Sin pruebas automatizadas** | No hay suite de tests; las funciones nuevas se verifican con simulaciones con agentes reales (`server/scripts/sim-*.ts`, ver 12.4). |
 | 16 | **Tipos duplicados** | `server/src/types.ts` y `web/lib/types.ts` se mantienen a mano. |
 | 17 | **Mover agentes entre colonias** | Se hace con selectores y listas; no hay arrastrar y soltar en el panal. |
 | 18 | **`type_id` informativo** | Editar un tipo no actualiza a los agentes ya creados. |
 | 19 | **Parpadeo de idioma** | En la primera carga se ve brevemente el inglés base antes de aplicar el idioma guardado. |
-| 21 | **Explorador de cambios** | Diferencias contra `HEAD` sin resaltado de sintaxis; árbol recortado a 30 000 archivos ([documento 13](13-explorador-de-cambios-git.md#137-límites-conocidos)). |
+| 21 | **Explorador de cambios** | Árbol recortado a 30 000 archivos ([documento 13](13-explorador-de-cambios-git.md#137-límites-conocidos)). |
 | 20 | **Contenido sin traducir** | Los nombres/descripciones creados por ti o por el seed, las instrucciones que reciben los agentes y los errores crudos de los CLIs se muestran como vienen (ver [documento 11](11-frontend.md#118-internacionalización-i18n)). |
 
 ## 12.3 Solución de problemas
@@ -88,7 +89,19 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
    curl -s localhost:4410/api/agents/<id>/history
    ```
 5. **Interfaz:** levantar la web de prueba con `NEXT_DIST_DIR` y `HIVE_AM_API` apuntando a esa instancia ([documento 3](03-puntos-de-entrada-y-ejecucion.md#correr-una-segunda-instancia-pruebas)).
-6. **Delegación:** crear un orquestador (Claude u OpenCode), conectarle un worker y pedirle que delegue; comprobar la fila en `GET /api/dispatches`, la sesión de delegación en `GET /api/agents/<worker>/sessions` y que el chat directo del worker no cambió.
+6. **Simulaciones con agentes reales** (`server/scripts/`, cada una con una carpeta de datos temporal y su propio puerto; gastan tokens del proveedor que elijas):
+
+   ```bash
+   cd server
+   HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4420 npx tsx scripts/sim-channel.ts   claude haiku   # dos hilos, una sola sesión
+   HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4421 npx tsx scripts/sim-telegram.ts  claude haiku   # adaptador contra una Bot API falsa
+   HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4422 npx tsx scripts/sim-groups.ts    claude haiku   # grupos: charla, silencio, /mute
+   HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4423 npx tsx scripts/sim-notebook.ts  claude haiku   # cuaderno del agente
+   HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4424 npx tsx scripts/sim-skills.ts    claude haiku   # skills siempre / a demanda
+   ```
+
+   El proveedor (`claude`, `opencode`, `kiro`) es el primer argumento; todas terminan con `ALL PASSED` o `N FAILED`.
+7. **Delegación:** crear un orquestador (Claude u OpenCode), conectarle un worker y pedirle que delegue; comprobar la fila en `GET /api/dispatches`, la sesión de delegación en `GET /api/agents/<worker>/sessions` y que el chat directo del worker no cambió.
 
 ## 12.5 Mantenimiento de datos
 

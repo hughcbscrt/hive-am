@@ -54,6 +54,15 @@ export async function testConnection(id: string): Promise<string> {
 
 export class ChannelError extends Error {}
 
+/** `channel_mute`: the agent keeps quiet in the thread it is handling (or starts talking there again). */
+export function channelMute(agentId: string, muted: boolean): { muted: boolean; place: string } {
+  if (!agents.get(agentId)) throw new ChannelError('Unknown agent');
+  const origin = liveOrigin(agentId);
+  if (!origin) throw new ChannelError('No channel message is being handled right now, so there is no thread to mute.');
+  threads.setMuted(origin.threadId, muted);
+  return { muted, place: origin.place };
+}
+
 /** `channel_reply`: sends the agent's text to the thread of the message it is handling. */
 export async function channelReply(agentId: string, text: string): Promise<{ sent: boolean; parts: number }> {
   if (!agents.get(agentId)) throw new ChannelError('Unknown agent');

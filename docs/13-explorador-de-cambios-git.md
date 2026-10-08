@@ -127,18 +127,18 @@ Recuerda que, como el resto de la API, **no tiene autenticación** ([documento 1
 
 | Archivo | Responsabilidad |
 |---|---|
-| `server/src/git.ts` | Lectura: `gitStatus`, `gitTree`, `gitDiff`, `gitFile`, `gitImagePath`; validación de rutas |
+| `server/src/git/repo.ts` | Lectura: `gitStatus`, `gitTree`, `gitDiff`, `gitFile`, `gitImagePath`; validación de rutas |
 | `server/src/api.ts` | Las rutas `…/git/*` (la de `raw` escribe su propia respuesta binaria) |
-| `web/lib/useGit.ts` | Hook: estado, árbol, refresco y *polling* |
-| `web/lib/gitTree.ts` | Construye el árbol, compacta carpetas, filtra y aplana filas |
-| `web/lib/diff.ts` | Parser de diff unificado y emparejado para la vista lado a lado |
-| `web/components/GitExplorer.tsx` | Barra, árbol, vista previa y vista de un commit |
-| `web/components/ConflictResolver.tsx` · `web/lib/conflicts.ts` | Resolvedor de conflictos y el análisis/aplicación de bloques |
-| `web/components/CodeEditor.tsx` · `Code.tsx` · `GitSettings.tsx` · `web/lib/highlight.ts` · `web/lib/gitPrefs.ts` | Editor con resaltado, código resaltado, ajustes de vista, resaltador y preferencias |
-| `web/components/StatusLetter.tsx` · `web/lib/useDismiss.ts` | Piezas compartidas: la letra de estado (M/A/D/R/U/!/T) y el cierre de popovers con clic fuera o Esc (también lo usa `HelpPopover`) |
-| `web/components/useAgentSettings.tsx` · `DeleteAgentModal.tsx` | Edición y borrado de un agente, compartidos por el chat y Colonia |
-| `web/components/GitActions.tsx` | Botones Fetch/Pull/Push/Commit, menú de ramas, diálogo de commit, lista del historial |
-| `server/src/gitops.ts` | Historial, ramas y acciones que escriben (commit, pull, push, fetch, switch, merge) |
+| `web/lib/git/useGit.ts` | Hook: estado, árbol, refresco y *polling* |
+| `web/lib/git/gitTree.ts` | Construye el árbol, compacta carpetas, filtra y aplana filas |
+| `web/lib/git/diff.ts` | Parser de diff unificado y emparejado para la vista lado a lado |
+| `web/components/git/GitExplorer.tsx` | Barra, árbol, vista previa y vista de un commit |
+| `web/components/git/ConflictResolver.tsx` · `web/lib/git/conflicts.ts` | Resolvedor de conflictos y el análisis/aplicación de bloques |
+| `web/components/git/CodeEditor.tsx` · `Code.tsx` · `GitSettings.tsx` · `web/lib/git/highlight.ts` · `web/lib/git/gitPrefs.ts` | Editor con resaltado, código resaltado, ajustes de vista, resaltador y preferencias |
+| `web/components/git/StatusLetter.tsx` · `web/lib/useDismiss.ts` | Piezas compartidas: la letra de estado (M/A/D/R/U/!/T) y el cierre de popovers con clic fuera o Esc (también lo usa `HelpPopover`) |
+| `web/components/agents/useAgentSettings.tsx` · `DeleteAgentModal.tsx` | Edición y borrado de un agente, compartidos por el chat y Colonia |
+| `web/components/git/GitActions.tsx` | Botones Fetch/Pull/Push/Commit, menú de ramas, diálogo de commit, lista del historial |
+| `server/src/git/ops.ts` | Historial, ramas y acciones que escriben (commit, pull, push, fetch, switch, merge) |
 | `web/app/agents/[id]/page.tsx` | Pestañas **Chat / Cambios** y la insignia |
 
 ## 13.7 Límites conocidos
@@ -220,7 +220,7 @@ API: `POST …/git/resolve-side` `{ path, side: 'ours'|'theirs' }`, `…/resolve
 
 Los ajustes se aplican por igual al **visor de archivos**, a los **diffs** (unificado y lado a lado, también en el historial), a los bloques del resolvedor y al **editor del resultado**, que es un `<textarea>` transparente sobre una capa resaltada (mismo tipo de letra y *scroll*), así que se ve idéntico al visor y conserva el cursor y la selección nativos.
 
-**Resaltado:** `highlight.js` (núcleo + 26 lenguajes, cargados con el resto del código) en `web/lib/highlight.ts`; el lenguaje sale de la extensión (o `Dockerfile`/`Makefile`). Cada línea de un diff se resalta por separado. Por encima de 250 000 caracteres no se resalta.
+**Resaltado:** `highlight.js` (núcleo + 26 lenguajes, cargados con el resto del código) en `web/lib/git/highlight.ts`; el lenguaje sale de la extensión (o `Dockerfile`/`Makefile`). Cada línea de un diff se resalta por separado. Por encima de 250 000 caracteres no se resalta.
 
 **Blame:** en la pestaña **Archivo** de un archivo versionado, el botón **Blame** añade una columna con el hash corto, el autor y el tiempo relativo en la primera línea de cada tramo del mismo commit (los tramos alternan de tono). Pasar el cursor muestra el asunto del commit y la fecha; al hacer clic se abre ese commit en **Historial**. Las líneas sin commit dicen "Sin commit". Hasta 5 000 líneas (se avisa). `GET …/git/blame?path=` devuelve `{ commits, lines[] (un hash por línea), truncated }` (`git blame --porcelain -w`).
 
@@ -230,8 +230,8 @@ Los ajustes se aplican por igual al **visor de archivos**, a los **diffs** (unif
 
 Un archivo de miles de líneas (p. ej. un `.pm` de 2 200 líneas / 80 KB) no debe trabar la interfaz. Por eso:
 
-- **Filas virtualizadas** (`web/components/VirtualLines.tsx`): el visor de archivos y el editor del resolvedor solo ponen en el DOM las filas visibles más un margen (~50 en total), con altura fija de 20 px y sin ajuste de línea. Abrir un archivo de 2 185 líneas pasó de ~2 200 filas de tabla a ~56 filas. Los **diffs** (unificado y lado a lado, también en el historial) funcionan igual: un diff de ~2 900 filas pone ~60 en el DOM. Ya no existe el límite de 2 000 filas ni el botón "Mostrar todas".
-- **Resaltado fuera del hilo principal** (`web/lib/useHighlighted.ts`, `highlight.worker.ts`): hasta 15 000 caracteres se resalta al instante; por encima, lo hace un *Web Worker*. Mientras el worker trabaja (y mientras editas), cada línea que no cambió conserva sus colores —se compara desde el principio y desde el final del archivo— y solo las líneas editadas se ven sin color un instante. En el editor, el resaltado espera 150 ms de calma.
+- **Filas virtualizadas** (`web/components/git/VirtualLines.tsx`): el visor de archivos y el editor del resolvedor solo ponen en el DOM las filas visibles más un margen (~50 en total), con altura fija de 20 px y sin ajuste de línea. Abrir un archivo de 2 185 líneas pasó de ~2 200 filas de tabla a ~56 filas. Los **diffs** (unificado y lado a lado, también en el historial) funcionan igual: un diff de ~2 900 filas pone ~60 en el DOM. Ya no existe el límite de 2 000 filas ni el botón "Mostrar todas".
+- **Resaltado fuera del hilo principal** (`web/lib/git/useHighlighted.ts`, `highlight.worker.ts`): hasta 15 000 caracteres se resalta al instante; por encima, lo hace un *Web Worker*. Mientras el worker trabaja (y mientras editas), cada línea que no cambió conserva sus colores —se compara desde el principio y desde el final del archivo— y solo las líneas editadas se ven sin color un instante. En el editor, el resaltado espera 150 ms de calma.
 - **Filas baratas:** cada fila recibe la preferencia de "mostrar espacios" ya resuelta (`CodeCell`, sin suscribirse por fila) y los diffs usan filas memorizadas.
 - **Límite de resaltado:** 1,2 M de caracteres (más que cualquier archivo que el servidor envía, 1 MB).
 

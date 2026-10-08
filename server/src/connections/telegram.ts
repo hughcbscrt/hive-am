@@ -15,7 +15,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export class TelegramAdapter implements ChannelAdapter {
   readonly kind = 'telegram' as const;
   private state: AdapterStatus = { state: 'connecting' };
-  private me: { id: number; username: string } | null = null;
+  private me: { id: number; username: string; can_read_all_group_messages?: boolean } | null = null;
   private stopped = false;
   private abort = new AbortController();
   private typing = new Map<string, ReturnType<typeof setInterval>>();
@@ -41,7 +41,7 @@ export class TelegramAdapter implements ChannelAdapter {
       this.state = { state: 'error', detail: e instanceof TelegramError && e.code === 401 ? 'Invalid bot token' : (e as Error).message };
       throw new Error(this.state.detail);
     }
-    this.state = { state: 'connected', detail: `@${this.me!.username}` };
+    this.state = this.connected();
     void this.poll(onMessage);
   }
 
@@ -55,13 +55,19 @@ export class TelegramAdapter implements ChannelAdapter {
 
   status() { return this.state; }
 
+  /** «Connected», with a warning when the connection listens to whole groups but Telegram's privacy mode hides them. */
+  private connected(): AdapterStatus {
+    const blind = this.conn.config.group_mode === 'open' && this.me?.can_read_all_group_messages === false;
+    return { state: 'connected', detail: `@${this.me?.username}${blind ? ' · privacy mode is on: in groups the bot only sees mentions and replies. Turn it off in @BotFather (/setprivacy → Disable), then remove and re-add the bot to each group.' : ''}` };
+  }
+
   private async poll(onMessage: (m: Inbound) => Promise<void>) {
     let offset = Number(cursors.get(this.conn.id)) || 0;
     let wait = 1000;
     while (!this.stopped) {
       try {
         const updates = await this.call<any[]>('getUpdates', { offset, timeout: 25, allowed_updates: ['message'] }, this.abort.signal);
-        if (this.state.state === 'error') this.state = { state: 'connected', detail: `@${this.me?.username}` };
+        if (this.state.state === 'error') this.state = this.connected();
         wait = 1000;
         for (const u of updates) {
           offset = u.update_id + 1;
@@ -90,7 +96,6 @@ export class TelegramAdapter implements ChannelAdapter {
     if (cmd && cmd[2] && cmd[2].toLowerCase() !== this.me.username.toLowerCase()) return null;   // a command for another bot
     const mention = new RegExp(`@${this.me.username}\\b`, 'i');
     const addressed = isPrivate || !!cmd || mention.test(text) || msg.reply_to_message?.from?.id === this.me.id;
-    if (!addressed) return null;
     text = text.replace(mention, '').trim();
     if (!text) return null;
 
@@ -105,6 +110,8 @@ export class TelegramAdapter implements ChannelAdapter {
       target: { chat: String(chat.id), thread: topic },
       place: isPrivate ? 'DM' : (chat.title ?? String(chat.id)),
       command: cmd ? { name: cmd[1].toLowerCase(), args: (cmd[3] ?? '').trim() } : undefined,
+      group: !isPrivate,
+      addressed,
     };
   }
 

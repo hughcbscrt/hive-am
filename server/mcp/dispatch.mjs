@@ -41,6 +41,62 @@ const allTools = [
       additionalProperties: false,
     },
   },
+  {
+    cap: 'skills',
+    name: 'skill_read',
+    description: 'Load the full instructions of one of your skills. Your instructions list your skills by name and description only; call this with the exact name when a task matches one, BEFORE doing that work, and follow what it returns.',
+    inputSchema: {
+      type: 'object',
+      properties: { name: { type: 'string', description: 'Exact skill name, as listed in your instructions.' } },
+      required: ['name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    cap: 'memory',
+    name: 'notebook_read',
+    description: 'Read your notebook: the Markdown notes you keep across conversations. Returns the text and its version (needed by notebook_rewrite). Your current notes are already in your instructions, so call this only when you need the exact current text, e.g. before rewriting it.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    cap: 'memory',
+    name: 'notebook_add',
+    description: 'Save ONE short, durable note in your notebook under a section (e.g. Preferences, Infrastructure, Lessons, People & roles). One fact per note, one sentence, specific. Duplicates are skipped; credentials are refused. If the notebook is full you get an error asking you to tidy it with notebook_rewrite.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        section: { type: 'string', description: 'Section title; an existing one is reused (case-insensitive).' },
+        note: { type: 'string', description: 'The note: one short sentence (max 500 characters).' },
+      },
+      required: ['section', 'note'],
+      additionalProperties: false,
+    },
+  },
+  {
+    cap: 'memory',
+    name: 'notebook_rewrite',
+    description: 'Replace your whole notebook with a cleaned-up version: merge duplicates, remove outdated or wrong notes, shorten. Pass the version returned by notebook_read; if the notebook changed since, you get an error and must read it again. Keep the "## Section" + "- note" format.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', description: 'The complete new notebook (Markdown).' },
+        version: { type: 'integer', description: 'The version you read.' },
+      },
+      required: ['content', 'version'],
+      additionalProperties: false,
+    },
+  },
+  {
+    cap: 'channel',
+    name: 'channel_mute',
+    description: 'Keep quiet in the thread of the message you are handling (muted=true), or start taking part again (muted=false). Use it when people ask you to stop answering / be quiet / not to reply anymore, and when they ask you to talk again. It only affects this one thread (a group chat or a topic); other threads are untouched. While muted you are only woken when someone mentions you, replies to you or uses a command. Say a short goodbye with channel_reply first if it fits.',
+    inputSchema: {
+      type: 'object',
+      properties: { muted: { type: 'boolean', description: 'true to stay quiet in this thread, false to take part again.' } },
+      required: ['muted'],
+      additionalProperties: false,
+    },
+  },
 ];
 const tools = allTools.filter((t) => CAPS.has(t.cap)).map(({ cap, ...t }) => t);
 
@@ -67,6 +123,37 @@ async function call(name, args) {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? `channel_reply failed (${r.status})`);
     return j.sent ? `Sent (${j.parts} message${j.parts === 1 ? '' : 's'}).` : 'Nothing sent.';
+  }
+  if (name === 'skill_read') {
+    const r = await fetch(`${API}/api/skills/read`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: FROM, name: args.name }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `skill_read failed (${r.status})`);
+    return `# Skill: ${j.name}\n\n${j.content}`;
+  }
+  if (name === 'notebook_read' || name === 'notebook_add' || name === 'notebook_rewrite') {
+    const r = await fetch(`${API}/api/notebook/${name.slice('notebook_'.length)}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: FROM, ...args }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `${name} failed (${r.status})`);
+    if (name === 'notebook_read') return `version: ${j.version} · ${j.size}/${j.max} characters\n\n${j.content || '(empty)'}`;
+    const left = j.max - j.size;
+    const tip = left < j.max * 0.2 ? ` The notebook is nearly full (${j.size}/${j.max}): tidy it soon with notebook_rewrite.` : '';
+    if (name === 'notebook_add') return `${j.added ? 'Saved.' : j.note}${tip} (version ${j.version})`;
+    return `Notebook replaced (version ${j.version}, ${j.size}/${j.max} characters).`;
+  }
+  if (name === 'channel_mute') {
+    const r = await fetch(`${API}/api/channel/mute`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: FROM, muted: args.muted !== false }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `channel_mute failed (${r.status})`);
+    return j.muted ? `Muted in this thread (${j.place}). You will only be woken when someone mentions you or replies to you.` : `Unmuted in this thread (${j.place}).`;
   }
   throw new Error(`Unknown tool ${name}`);
 }

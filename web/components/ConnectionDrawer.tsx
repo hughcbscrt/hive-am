@@ -1,14 +1,15 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Plus, Trash2, Volume2, VolumeX, X } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
 import { ago } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n';
-import type { AllowedUser, Connection, ConnectionThread } from '@/lib/types';
+import type { AllowedChat, AllowedUser, Connection, ConnectionThread } from '@/lib/types';
 import { Drawer, Field, Hex, Modal, Segmented, useToast } from './ui';
 
 type Silent = 'notice' | 'send_text' | 'ignore';
+type GroupMode = 'mention' | 'open';
 
 /** Create or edit a connection: which agent answers, who may talk to it, and the platform credentials. */
 export function ConnectionDrawer({ connection, onClose }: { connection?: Connection; onClose: () => void }) {
@@ -23,6 +24,9 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
   const [allowed, setAllowed] = useState<AllowedUser[]>(connection?.allowed ?? []);
   const [lang, setLang] = useState<'es' | 'en'>(connection?.config.lang === 'en' ? 'en' : 'es');
   const [silent, setSilent] = useState<Silent>(connection?.config.on_silent ?? 'notice');
+  const [groupMode, setGroupMode] = useState<GroupMode>(connection?.config.group_mode === 'open' ? 'open' : 'mention');
+  const [chats, setChats] = useState<AllowedChat[]>(connection?.config.chats ?? []);
+  const [aliases, setAliases] = useState<string>((connection?.config.aliases ?? []).join(', '));
   const [enabled, setEnabled] = useState(connection?.enabled ?? true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -38,6 +42,11 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
 
   const eligible = useMemo(() => [...agents].sort((a, b) => a.name.localeCompare(b.name)), [agents]);
   const setUser = (i: number, p: Partial<AllowedUser>) => setAllowed((l) => l.map((u, j) => (j === i ? { ...u, ...p } : u)));
+  const setChat = (i: number, p: Partial<AllowedChat>) => setChats((l) => l.map((c, j) => (j === i ? { ...c, ...p } : c)));
+  const toggleMute = async (th: ConnectionThread) => {
+    try { await api.patch(`/connections/${connection!.id}/threads/${th.id}`, { muted: !th.muted }); setThreads((l) => l.map((x) => (x.id === th.id ? { ...x, muted: !th.muted } : x))); }
+    catch (x) { toast(x instanceof Error ? x.message : String(x), 'err'); }
+  };
 
   /** Reading is not enough to reply, so raise the agent to "Edit files" (and stop following its colony's setting if it did). */
   const allowEditing = async () => {
@@ -58,7 +67,10 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
     setErrs(e); setError('');
     if (Object.keys(e).length) return;
     setSaving(true);
-    const body = { kind: 'telegram', name: name.trim(), agent_id: agentId, enabled, allowed: allowed.filter((u) => u.id.trim()), config: { ...(token.trim() ? { token: token.trim() } : {}), lang, on_silent: silent } };
+    const body = { kind: 'telegram', name: name.trim(), agent_id: agentId, enabled, allowed: allowed.filter((u) => u.id.trim()), config: {
+      ...(token.trim() ? { token: token.trim() } : {}), lang, on_silent: silent, group_mode: groupMode,
+      chats: chats.filter((c) => c.id.trim()), aliases: aliases.split(',').map((x) => x.trim()).filter(Boolean),
+    } };
     try {
       if (connection) await api.patch(`/connections/${connection.id}`, body); else await api.post('/connections', body);
       await refresh(['connections', 'agents']);
@@ -129,6 +141,28 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
           </div>
         </Field>
 
+        <Field label={t('conn.groups')}>
+          <div className="col" style={{ gap: 10 }}>
+            <p className="hint" style={{ margin: 0 }}>{t('conn.groups.hint')}</p>
+            <Segmented value={groupMode} onChange={setGroupMode} options={[{ id: 'mention', label: t('conn.mode.mention') }, { id: 'open', label: t('conn.mode.open') }]} />
+            <p className="hint" style={{ margin: 0 }}>{t(`conn.mode.${groupMode}.hint`)}</p>
+            <div className="eyebrow">{t('conn.chats')}</div>
+            {chats.length === 0 && <p className="hint" style={{ margin: 0 }}>{t('conn.chats.empty')}</p>}
+            {chats.map((c, i) => (
+              <div key={i} className="row gap-s" style={{ alignItems: 'center' }}>
+                <input className="input mono" style={{ width: 190 }} value={c.id} onChange={(e) => setChat(i, { id: e.target.value.replace(/[^\d-]/g, '') })} placeholder={t('conn.chats.id')} aria-label={t('conn.chats.id')} />
+                <input className="input grow" value={c.name ?? ''} onChange={(e) => setChat(i, { name: e.target.value })} placeholder={t('conn.chats.name')} aria-label={t('conn.chats.name')} />
+                <button className="btn ghost icon sm" onClick={() => setChats((l) => l.filter((_, j) => j !== i))} aria-label={t('conn.chats.remove')} title={t('conn.chats.remove')}><X size={15} /></button>
+              </div>
+            ))}
+            <div><button className="btn sm" onClick={() => setChats((l) => [...l, { id: '' }])}><Plus size={14} />{t('conn.chats.add')}</button></div>
+            <p className="hint" style={{ margin: 0 }}>{t('conn.chats.hint')} {t('conn.chats.howto')}</p>
+            <Field label={t('conn.aliases')} hint={t('conn.aliases.hint')}>
+              <input className="input" value={aliases} onChange={(e) => setAliases(e.target.value)} placeholder={t('conn.aliases.placeholder')} />
+            </Field>
+          </div>
+        </Field>
+
         <Field label={t('conn.lang')}><Segmented value={lang} onChange={setLang} options={[{ id: 'es', label: t('conn.lang.es') }, { id: 'en', label: t('conn.lang.en') }]} /></Field>
         <Field label={t('conn.silent')}>
           <Segmented value={silent} onChange={setSilent} options={(['notice', 'send_text', 'ignore'] as Silent[]).map((s) => ({ id: s, label: t(`conn.silent.${s}`) }))} />
@@ -143,7 +177,11 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
             {threads.length === 0 ? <p className="hint" style={{ margin: 0 }}>{t('conn.threads.empty')}</p> : threads.map((th) => (
               <div key={th.id} className="row gap-s small" style={{ justifyContent: 'space-between' }}>
                 <span><b>{th.title || th.external_key}</b> <span className="muted mono">{th.external_key}</span></span>
-                <span className="muted">{th.last_user ? t('conn.threads.last', { user: th.last_user }) + ' · ' : ''}{ago(th.last_activity)}</span>
+                <span className="row gap-s muted" style={{ alignItems: 'center' }}>
+                  {th.muted && <span className="gx-chip soft">{t('conn.threads.muted')}</span>}
+                  {th.last_user ? t('conn.threads.last', { user: th.last_user }) + ' · ' : ''}{ago(th.last_activity)}
+                  <button type="button" className="btn ghost icon sm" onClick={() => toggleMute(th)} title={t(th.muted ? 'conn.threads.unmute' : 'conn.threads.mute')} aria-label={t(th.muted ? 'conn.threads.unmute' : 'conn.threads.mute')}>{th.muted ? <Volume2 size={14} /> : <VolumeX size={14} />}</button>
+                </span>
               </div>
             ))}
           </div>

@@ -15,12 +15,13 @@ export class FakeAdapter implements ChannelAdapter {
   status(): AdapterStatus { return { state: this.onMessage ? 'connected' : 'stopped' }; }
 
   /** Types a message as `userId` in thread `key`; resolves when the agent's turn is over. */
-  say(key: string, text: string, userId = 'u1', externalId = `in-${++this.n}`) {
+  say(key: string, text: string, userId = 'u1', externalId = `in-${++this.n}`, opts: { group?: boolean; addressed?: boolean } = {}) {
     const [chat, thread] = key.split(':');
     const command = /^\/(\w+)(?:\s+(.*))?$/.exec(text);
     return this.onMessage!({
       externalId, externalKey: key, userId, userName: userId, text, place: `#${chat}`, target: { chat, thread },
       command: command ? { name: command[1], args: command[2] ?? '' } : undefined,
+      group: opts.group, addressed: opts.addressed,
     });
   }
 }

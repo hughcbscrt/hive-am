@@ -29,8 +29,11 @@ Data: `~/.hive-am/hive-am.db` (override with `HIVE_AM_HOME`). Server binds to 12
 ## Layout
 
 - `server/` — TypeScript: SQLite entities, provider runners, native history readers, per-agent turn queue, REST + WS.
-- `server/mcp/dispatch.mjs` — stdio MCP giving orchestrators `list_agents` / `dispatch`; assignments are enforced server-side.
-- `web/` — Next.js UI: Colony (honeycomb), Agents, agent workspace (chat + config + sessions), Relations canvas, Types, Skills, Sessions.
+- `server/src/instructions.ts` — what each agent is told (identity, skills, team, channels, notebook) and which hive tools it gets.
+- `server/src/connections/` — external connections (Telegram): one agent session shared by every chat, group or topic.
+- `server/src/skills/` — the skills that ship with hive-am and the agent notebook.
+- `server/mcp/dispatch.mjs` — stdio MCP `hive`: `list_agents` / `dispatch` for orchestrators, `channel_*` for connections, `notebook_*` and `skill_read`; assignments are enforced server-side.
+- `web/` — Next.js UI: Colony (honeycomb), Agents, agent workspace (chat + changes + config + notebook + sessions), Relations canvas, Types, Skills, Connections, Sessions.
 
 ## Colonies
 
@@ -47,8 +50,14 @@ conversation (what you chat about with it directly) never contains delegated wor
 Each agent's system prompt starts with who it is (name, role, purpose), its working folder and colony; orchestrators are told their
 direct subagents are the only agents they know.
 
+## Skills and the notebook
+
+Skills come in two modes, chosen where they are assigned (agent, type or colony): **always** (the whole text is in the agent's
+instructions) or **on demand** (only name + description are, and the agent reads the rest with `skill_read` when a task needs it).
+Seven general skills ship with hive-am (they are ordinary skills: edit or delete them). One of them, **Notebook**, gives an agent a
+persistent notebook it writes by itself and you can read and edit from its settings.
+
 ## Known limits
 
-- Orchestrator dispatch is wired for Claude and OpenCode; Kiro orchestrators have no MCP injection yet.
-- OpenCode/Kiro receive system prompt + skills as a preamble on the first turn only (no CLI flag for it).
+- Claude fixes the system prompt when a session starts, so changed instructions reach a resumed session as an update inside the next message (the same way OpenCode and Kiro get them).
 - A turn in flight during a crash is lost; the session is intact and the agent is idle on restart.

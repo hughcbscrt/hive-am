@@ -4,6 +4,7 @@ import type { StreamEvent, TurnOptions } from '../types.js';
 import { spawnLines, safeJson } from './spawn.js';
 import { DATA_DIR } from '../db.js';
 import { dispatchMcpConfig } from '../mcp-config.js';
+import { withInstructions } from './preamble.js';
 
 /** Claude Code: `claude -p` with stream-json; the prompt goes through stdin, the session is resumed by id. */
 export async function* runClaude(o: TurnOptions): AsyncGenerator<StreamEvent> {
@@ -11,7 +12,10 @@ export async function* runClaude(o: TurnOptions): AsyncGenerator<StreamEvent> {
   const args = ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', agent.permission];
   if (agent.session_id) args.push('--resume', agent.session_id);
   if (agent.model) args.push('--model', agent.model);
+  // The system prompt of a session is fixed when it starts: `--append-system-prompt` is ignored on `--resume`. So a
+  // resumed conversation whose instructions changed (skills, team, notebook…) gets them as an update inside the message.
   if (o.instructions) args.push('--append-system-prompt', o.instructions);
+  const prompt = withInstructions(o.prompt, o.instructions, !!agent.session_id, o.refreshInstructions);
   if (o.mcpCaps.length) {
     const dir = join(DATA_DIR, 'mcp'); mkdirSync(dir, { recursive: true });
     const file = join(dir, `${agent.id}.json`);
@@ -23,7 +27,7 @@ export async function* runClaude(o: TurnOptions): AsyncGenerator<StreamEvent> {
   let streamedText = false;
   let sawSession = false;
 
-  for await (const line of spawnLines({ cmd: 'claude', args, cwd: agent.cwd, stdin: o.prompt, signal: o.signal })) {
+  for await (const line of spawnLines({ cmd: 'claude', args, cwd: agent.cwd, stdin: prompt, signal: o.signal })) {
     const ev = safeJson(line);
     if (!ev) continue;
 

@@ -16,6 +16,10 @@ export interface Inbound {
   place: string;
   /** Slash command typed by the user, when the message is one. */
   command?: { name: string; args: string };
+  /** Sent in a group/channel rather than a private chat. */
+  group?: boolean;
+  /** False for group chatter nobody aimed at the agent (no mention, reply or command). Missing means addressed. */
+  addressed?: boolean;
 }
 
 export interface AdapterStatus { state: 'connecting' | 'connected' | 'error' | 'stopped'; detail?: string; lastEventAt?: number }
@@ -36,6 +40,9 @@ export interface ChannelAdapter {
 }
 
 export interface AllowedUser { id: string; name?: string; admin?: boolean }
+/** A group the whole membership of which may talk to the agent (no need to list each person). */
+export interface AllowedChat { id: string; name?: string }
+export type GroupMode = 'mention' | 'open';
 export type OnSilent = 'notice' | 'send_text' | 'ignore';
 
 export interface Connection {
@@ -53,12 +60,18 @@ export interface Connection {
 export interface Thread {
   id: string; connection_id: string; external_key: string; title: string;
   target: Target; last_user: string | null; created_at: number; last_activity: number;
+  /** The agent was asked to keep quiet here: it only hears messages aimed at it. */
+  muted: boolean;
+  /** Highest inbound message id the agent has been shown, so the rest can be handed over as context. */
+  seen_id: number;
 }
 
 /** The message a turn is answering; lets `channel_reply` find the right thread without the agent copying ids. */
 export interface Origin {
   connectionId: string; threadId: string; externalKey: string;
   platform: ChannelKind; place: string; userName: string;
+  /** False when the message was group chatter: staying silent is then a normal outcome. */
+  addressed: boolean;
   /** Set once the agent has sent something back, so a silent turn can be noticed. */
   replied: boolean;
 }

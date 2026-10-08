@@ -76,11 +76,11 @@ flowchart LR
 | Presentación | `web/` | Páginas, formularios, chat, panal, lienzo de relaciones |
 | API | `server/src/api.ts` | Validación, rutas REST, orquestación de las demás capas |
 | Tiempo real | `server/src/index.ts`, `runtime.ts` (`bus`) | Difunde eventos por WebSocket |
-| Ejecución | `server/src/runtime.ts` | Cola por agente, composición de instrucciones, sesiones, delegación |
+| Ejecución | `server/src/runtime.ts`, `instructions.ts` | Cola por agente, sesiones y delegación; composición de instrucciones y herramientas de cada agente |
 | Proveedores | `server/src/providers/` | Construye el comando de cada CLI y traduce su salida a eventos comunes |
 | Historial | `server/src/history/` | Lee las conversaciones guardadas por cada CLI |
 | Datos | `server/src/db.ts` | Esquema SQLite, migraciones, acceso a datos |
-| Orquestación | `server/mcp/dispatch.mjs` | Herramientas `list_agents` y `dispatch` para los orquestadores |
+| Herramientas MCP | `server/mcp/dispatch.mjs` | Servidor `hive`: `list_agents` y `dispatch` (orquestadores), `channel_reply` y `channel_mute` (conexiones), `notebook_*` (cuaderno) y `skill_read` (skills a demanda) |
 
 ## Glosario
 

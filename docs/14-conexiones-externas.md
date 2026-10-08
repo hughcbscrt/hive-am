@@ -49,9 +49,11 @@ El servidor MCP `hive` (`server/mcp/dispatch.mjs`) anuncia herramientas según l
 | Capacidad | Herramientas | Quién la tiene |
 |---|---|---|
 | `dispatch` | `list_agents`, `dispatch` | Orquestadores con al menos un subagente |
-| `channel` | `channel_reply` | Agentes con al menos una conexión **activa** |
+| `channel` | `channel_reply`, `channel_mute` | Agentes con al menos una conexión **activa** |
+| `memory` | `notebook_read`, `notebook_add`, `notebook_rewrite` | Agentes con la skill Notebook ([7.3.2](07-agentes-tipos-skills-colonias.md#732-el-cuaderno-del-agente)) |
+| `skills` | `skill_read` | Agentes con alguna skill *a demanda* ([7.3.3](07-agentes-tipos-skills-colonias.md#733-carga-bajo-demanda)) |
 
-`mcpCaps(agent)` en `runtime.ts` calcula el conjunto en cada turno y los tres proveedores lo reciben (`TurnOptions.mcpCaps`). `channel_reply({ text })` responde **al hilo del mensaje que se está atendiendo**; el agente no copia ids. Si el turno no viene de un canal devuelve un error explicativo. Las instrucciones del agente (`composeInstructions`) añaden una sección que lo explica, con el nombre de la herramienta según el proveedor.
+`mcpCaps(agent)` en `instructions.ts` calcula el conjunto en cada turno y los tres proveedores lo reciben (`TurnOptions.mcpCaps`). `channel_reply({ text })` responde **al hilo del mensaje que se está atendiendo**; el agente no copia ids. Si el turno no viene de un canal devuelve un error explicativo. Las instrucciones del agente (`composeInstructions`) añaden una sección que lo explica, con el nombre de la herramienta según el proveedor.
 
 Los tokens nunca llegan al agente: el MCP llama a `POST /api/channel/reply` en el servidor local y es el adaptador quien envía.
 
@@ -67,6 +69,7 @@ Los tokens nunca llegan al agente: el MCP llama a `POST /api/channel/reply` en e
 |---|---|---|
 | `/stop` | Cualquier permitido | Aborta el turno en curso |
 | `/status` | Cualquier permitido | Agente, estado, carpeta y cola |
+| `/mute` · `/unmute` | Cualquier permitido | Silencia o reactiva al agente **en ese hilo** (14.6.1) |
 | `/new` | Solo administradores | Pide confirmación (`/new confirmar`) y reinicia la sesión compartida |
 
 ## 14.6 Telegram
@@ -75,7 +78,7 @@ Implementado con `fetch` plano contra la Bot API (sin dependencias nuevas), por 
 
 - **Arranque:** `getMe` valida el token. Si es inválido, la conexión se guarda con estado `error` y el motivo («Invalid bot token»).
 - **Sondeo:** `getUpdates` con espera de 25 s; el *offset* se guarda en `connection_cursor` en cuanto se entrega cada actualización, así que un reinicio no repite mensajes. Los errores de red reintentan con espera creciente (hasta 30 s); un 409 (otro proceso sondea el mismo bot) espera 10 s.
-- **A quién responde:** en chat privado, a todo mensaje de texto de un permitido. En grupos, solo si empieza con `/comando`, menciona `@bot` o responde a un mensaje del bot. Un comando dirigido a otro bot (`/x@otro_bot`) se ignora. Se ignoran mensajes de bots.
+- **A quién responde:** en chat privado, a todo mensaje de texto de un permitido. En grupos, por defecto solo si empieza con `/comando`, menciona `@bot`, usa un alias o responde a un mensaje del bot (con `group_mode: open` también atiende la charla no dirigida: ver 14.6.1). Un comando dirigido a otro bot (`/x@otro_bot`) se ignora. Se ignoran mensajes de bots.
 - **Hilos:** en un grupo con temas, la clave es `chat:tema` y la respuesta va al mismo tema (`message_thread_id`). En chat privado o grupo sin temas hay un solo hilo por chat.
 - **Salida:** Markdown → HTML de Telegram (negrita, cursiva, código, bloques, enlaces); mensajes de más de 3500 caracteres se parten por párrafo, línea o palabra; si Telegram rechaza el HTML se reenvía como texto plano al mismo tema; separación mínima de 350 ms por chat y reintento con `retry_after` ante un 429.
 - **Indicador de trabajo:** `sendChatAction: typing` cada 4,5 s mientras el turno corre.
@@ -92,6 +95,25 @@ Implementado con `fetch` plano contra la Bot API (sin dependencias nuevas), por 
 
 `config` opciones no secretas: `lang` (`es`/`en`, idioma de los avisos del bot), `on_silent`, `rate_limit`. La URL de la API (`api_base`) solo existe para pruebas.
 
+### 14.6.1 Grupos: autorización, escucha y silencio
+
+Configuración de la conexión (`config`, sin migración):
+
+| Clave | Valores | Efecto |
+|---|---|---|
+| `group_mode` | `mention` (por defecto) · `open` | `mention`: solo atiende lo que va dirigido a él. `open`: **lee todo** lo que se escribe en los grupos autorizados y decide si aporta algo. |
+| `chats` | `[{ id, name? }]` (máx. 50) | Grupos autorizados: **cualquier miembro** puede hablarle sin estar en la lista de personas (sin permisos de admin). |
+| `aliases` | `["Morena", …]` (máx. 10) | Nombres que cuentan como mención al escribirlos en un grupo (palabra completa, sin distinguir mayúsculas). |
+
+- **Quién puede hablar en un grupo:** una persona de la lista, o cualquier miembro de un grupo de `chats`. Quien no cumple y escribe algo que **no** va dirigido al agente es ignorado sin respuesta; si lo llama, recibe su id **y el id del chat** una sola vez, para que lo añadan. Los permisos del agente (14.5) aplican a todos los miembros del grupo autorizado.
+- **Mensaje dirigido (`Addressed: yes`):** mención `@bot`, nombre/alias, respuesta a un mensaje del bot o comando. Se entrega al instante, con aviso de cola e indicador de «escribiendo».
+- **Charla no dirigida (`Addressed: no`, solo en `open`):** se guarda y se espera a que el chat **pause 4 s** (una ráfaga es un solo turno); si el agente está ocupado se reintenta hasta 5 veces y, si sigue ocupado, queda como contexto del siguiente turno. No hay aviso de cola ni «escribiendo», y terminar sin responder es un resultado normal (no se avisa ni se envía su texto). Un fallo de ese turno solo se registra en el log, no se publica en el grupo.
+- **Contexto pendiente:** los mensajes del hilo que el agente no llegó a ver (charla guardada mientras estaba en silencio o esperando) van en el siguiente mensaje, tras una línea `[hive:context]` (hasta 30, 500 caracteres cada uno). Se lleva la cuenta con `threads.seen_id`. En el chat se muestran plegados bajo la burbuja.
+- **Silencio por hilo (`threads.muted`):** si alguien le pide que se calle, el agente llama a `channel_mute({ muted: true })`; con `/mute` pasa lo mismo sin pasar por el agente. Solo afecta a **ese hilo** (el grupo o ese tema). En silencio, la charla no dirigida no lo despierta (solo se guarda); sí lo despiertan una mención, un alias, una respuesta a su mensaje o un comando, con `Muted: yes` en la cabecera. Para que vuelva basta pedírselo así (`channel_mute({ muted: false })`) o usar `/unmute`. También se puede cambiar desde el panel de la conexión.
+- **Coherencia:** las instrucciones del agente (`composeInstructions`) le piden hablar solo si aporta algo, afirmar como hecho únicamente lo comprobado en archivos/herramientas o dicho antes en la conversación, no contradecirse sin explicar qué cambió y corregir abiertamente un error propio. Todos los hilos comparten una sola sesión, así que lo que dijo en otro hilo lo recuerda.
+- **Privacidad de Telegram:** por defecto un bot **no ve** los mensajes de grupo que no lo mencionan (privacy mode). En modo `open` hay que desactivarlo en @BotFather (`/setprivacy` → Disable) y volver a añadir el bot a cada grupo; la conexión lo detecta (`getMe.can_read_all_group_messages`) y muestra el aviso en su estado.
+- **Id del grupo:** el aviso de acceso incluye el id del chat; los grupos suelen empezar por `-100…`.
+
 ## 14.8 API
 
 Todas bajo `/api`, solo origen local.
@@ -105,14 +127,16 @@ Todas bajo `/api`, solo origen local.
 | `POST /connections/:id/restart` | Reinicia el adaptador |
 | `POST /connections/:id/test` | Comprueba credenciales y saluda a los permitidos |
 | `GET /connections/:id/threads` | Hilos conocidos |
+| `PATCH /connections/:id/threads/:threadId` | `{ muted }`: silencia o reactiva un hilo |
 | `POST /channel/reply` | Lo usa el MCP `hive` (`channel_reply`) |
+| `POST /channel/mute` | Lo usa el MCP `hive` (`channel_mute`): `{ from, muted }` sobre el hilo que se está atendiendo |
 
 **Los tokens nunca se devuelven:** en lugar del valor, la API envía `{ set: true, hint: "••••1234" }`. Los errores de validación (`400`) cubren: tipo desconocido, nombre repetido, token faltante, agente inexistente y agente en modo `plan`.
 
 ## 14.9 Interfaz
 
 - **Conexiones** (`/connections`, en la barra lateral): tarjetas con nombre, estado (Conectada / Conectando / Problema / Apagada, con el motivo del error), agente, bot, nº de hilos y último mensaje. Se actualiza cada 5 s.
-- **Panel de la conexión** (ampliable): plataforma, nombre, agente que responde (con aviso si está en solo lectura o en acceso total), token (se muestra `Déjalo vacío para conservar ••••1234`), personas permitidas (id, nombre, admin), idioma del bot, qué hacer si el agente no responde, activa/apagada, **Enviar prueba**, eliminar y la lista de hilos.
+- **Panel de la conexión** (ampliable): plataforma, nombre, agente que responde (con aviso si está en solo lectura o en acceso total), token (se muestra `Déjalo vacío para conservar ••••1234`), modo de grupos, grupos autorizados y alias (14.6.1), personas permitidas (id, nombre, admin), idioma del bot, qué hacer si el agente no responde, activa/apagada, **Enviar prueba**, eliminar y la lista de hilos.
 - **Chat del agente:** los mensajes de un canal se ven como burbuja con su origen; la llamada a `channel_reply` aparece como la fila **«Responder en el canal»** con el texto enviado (también cuando OpenCode la llama dentro de un bloque de código).
 
 ## 14.10 Pruebas
@@ -123,6 +147,7 @@ Scripts en `server/scripts/` (usan una carpeta de datos temporal y agentes reale
 |---|---|
 | `sim-channel.ts <proveedor> [modelo] [permiso]` | Dos hilos contra una plataforma falsa: el agente responde con `channel_reply` al hilo correcto, recuerda lo dicho en el otro hilo, `/status` y la lista de permitidos. |
 | `sim-telegram.ts [proveedor] [modelo]` | El adaptador de Telegram contra una Bot API falsa: token inválido, reglas de permisos, token oculto, chat privado, tema de un grupo, mensaje sin mención, comandos para otro bot, reinicio sin repetir, partido y formato, respaldo a texto plano. |
+| `sim-groups.ts <proveedor> [modelo]` | Grupos contra una plataforma falsa: charla de un grupo no autorizado ignorada, aviso con el id del chat, charla no dirigida (una ráfaga = un turno `Addressed: no`, sin respuesta), mención por alias, petición de silencio (`channel_mute`), silencio efectivo (sin turno nuevo), vuelta a hablar y `/mute` · `/unmute`. |
 | `fake-telegram.ts [puerto]` | Bot API falsa para pruebas manuales de la interfaz (`POST /_say`, `GET /_sent`). |
 
 ## 14.11 Límites conocidos
@@ -130,4 +155,6 @@ Scripts en `server/scripts/` (usan una carpeta de datos temporal y agentes reale
 - Solo texto: no se procesan adjuntos, imágenes ni voz.
 - Una conexión se vincula a **un** agente (para hablar con varios, se vincula un orquestador).
 - El adaptador de Slack no está implementado; la interfaz lo muestra como «pronto».
-- No se ha probado contra la Bot API real (solo contra la simulación).
+- Los chats privados se probaron contra la Bot API real; los **grupos, temas y el modo `open`** solo contra la simulación.
+- Si un grupo se convierte en supergrupo cambia de id y hay que autorizarlo de nuevo.
+- En modo `open` cada ráfaga de charla cuesta un turno del agente: úsalo con un modelo económico o en grupos pequeños.
