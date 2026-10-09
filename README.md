@@ -1,9 +1,46 @@
-# hive-am
+<p align="center">
+  <img src="web/public/logo.png" alt="hive-am" width="180" />
+</p>
 
-Agent manager for orchestrator/subagent setups over **Claude Code**, **OpenCode** and **Kiro**.
+<h1 align="center">hive-am</h1>
 
-The conversation is never copied or summarised into a database. Each agent stores only a pointer
-(`provider`, `session_id`, `cwd`); the transcript lives in the CLI's own store and is read back from there:
+<p align="center">
+  <strong>A colony of coding agents on your machine.</strong><br />
+  Orchestrators and subagents over <b>Claude Code</b>, <b>OpenCode</b> and <b>Kiro</b>, with the real sessions of each CLI, a browser UI and Telegram.
+</p>
+
+<p align="center">
+  <a href="https://github.com/hughcbscrt/hive-am/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/hughcbscrt/hive-am?style=flat-square&color=bf963d" /></a>
+  <a href="https://github.com/hughcbscrt/hive-am/pulls?q=is%3Apr"><img alt="Pull requests" src="https://img.shields.io/github/issues-pr-closed/hughcbscrt/hive-am?style=flat-square&color=bf963d" /></a>
+  <a href="https://github.com/hughcbscrt/hive-am/issues"><img alt="Issues" src="https://img.shields.io/github/issues/hughcbscrt/hive-am?style=flat-square&color=bf963d" /></a>
+  <a href="https://github.com/hughcbscrt/hive-am"><img alt="Repo size" src="https://img.shields.io/github/repo-size/hughcbscrt/hive-am?style=flat-square&color=bf963d" /></a>
+  <a href="https://github.com/hughcbscrt/hive-am"><img alt="Top language" src="https://img.shields.io/github/languages/top/hughcbscrt/hive-am?style=flat-square&color=3178c6" /></a>
+  <img alt="Node 20+" src="https://img.shields.io/badge/node-%E2%89%A520-339933?style=flat-square&logo=nodedotjs&logoColor=white" />
+  <img alt="Next.js 15" src="https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=nextdotjs&logoColor=white" />
+  <img alt="SQLite" src="https://img.shields.io/badge/SQLite-local-003B57?style=flat-square&logo=sqlite&logoColor=white" />
+</p>
+
+---
+
+hive-am lets you create **orchestrators** and **subagents**, group them into **colonies**, give them **skills** and a **notebook**,
+talk to them from the browser or from **Telegram**, and see everything they did, even after a blackout. It runs the CLIs you already
+have installed; it does not replace them and it never copies your conversations into its own database.
+
+## Highlights
+
+- **Three providers, one place.** Claude Code, OpenCode and Kiro agents side by side, each with its own model.
+- **Real sessions.** An agent stores only a pointer (`provider`, `session_id`, `cwd`). The transcript lives in the CLI's own store and is read back from there. After a restart every agent resumes its real session.
+- **Orchestration.** An orchestrator delegates to the workers connected to it on the Relations canvas. Every delegation runs in a fresh native session of the worker, and the rule is enforced on the server, not just requested.
+- **Colonies.** Group agents on a honeycomb map and lend them defaults: working folder, permissions, skills and a shared prompt. Each agent can opt out per field.
+- **Skills.** Seven general skills ship with hive-am (all ordinary: edit or delete them). Assign them to an agent, a type or a colony, and choose per assignment whether they are **always** in the instructions or loaded **on demand** with a `skill_read` tool. Searchable picker with token weights.
+- **Notebook.** An agent can keep a persistent notebook of what it learns (no credentials, no duplicates, every note with its source). You can read and edit it from the agent's settings.
+- **Telegram.** Link a bot to an agent: private chats, groups and topics, one shared session across all of them. In groups the agent can listen to everything and speak only when it adds something; people can mute it per thread and bring it back.
+- **Files and images.** People send documents and photos to the agent; the agent sends files back. An optional image model can describe pictures for models that cannot see them.
+- **Permissions that hold.** *Read-only*, *Edit files* and *Full access* are enforced by the CLI itself in all three providers.
+- **Changes explorer.** A Git tab per agent: file tree with highlighting, diff viewer, history, commit, pull, push and branches.
+- **Local and private.** The server binds to `127.0.0.1`. Data lives in `~/.hive-am/`.
+
+## Providers
 
 | Provider | Run a turn | Transcript source |
 |---|---|---|
@@ -11,53 +48,72 @@ The conversation is never copied or summarised into a database. Each agent store
 | OpenCode | `opencode run --format json -s <id>` | `~/.local/share/opencode/opencode.db` (`session_message`) |
 | Kiro | `kiro-cli chat --no-interactive --output-format stream-json --resume-id <id>` | `~/.kiro/sessions/cli/<id>.jsonl` |
 
-After a blackout, restart and every agent resumes its real session. Not ACP: plain CLI processes.
+Plain CLI processes, one per turn, not ACP. Turns are serialized per agent.
 
-## Documentación
+## Quick start
 
-Documentación completa en español (estructura, funcionamiento, almacenamiento, API, proveedores, sesiones, chat y más): **[docs/README.md](docs/README.md)**.
-
-## Run
+You need Node 20+ and at least one of the three CLIs installed and logged in.
 
 ```bash
+git clone git@github.com:hughcbscrt/hive-am.git
+cd hive-am
 npm install
-npm run dev        # server :4400 (API + WS) and Next.js UI :4401
+npm run dev        # server :4400 (API + WebSocket) and Next.js UI :4401
 ```
 
-Data: `~/.hive-am/hive-am.db` (override with `HIVE_AM_HOME`). Server binds to 127.0.0.1 only.
+Open <http://127.0.0.1:4401>, create an agent pointing at a folder, and send it a message.
 
-## Layout
+Data lives in `~/.hive-am/hive-am.db` (override with `HIVE_AM_HOME`). The server only listens on `127.0.0.1`.
 
-- `server/` — TypeScript: SQLite entities, provider runners, native history readers, per-agent turn queue, REST + WS.
-- `server/src/instructions.ts` — what each agent is told (identity, skills, team, channels, notebook) and which hive tools it gets.
-- `server/src/connections/` — external connections (Telegram): one agent session shared by every chat, group or topic.
-- `server/src/skills/` — the skills that ship with hive-am and the agent notebook.
-- `server/mcp/dispatch.mjs` — stdio MCP `hive`: `list_agents` / `dispatch` for orchestrators, `channel_*` for connections, `notebook_*` and `skill_read`; assignments are enforced server-side.
-- `web/` — Next.js UI: Colony (honeycomb), Agents, agent workspace (chat + changes + config + notebook + sessions), Relations canvas, Types, Skills, Connections, Sessions.
+## Permission levels
 
-## Colonies
+| Level | Claude Code | OpenCode | Kiro |
+|---|---|---|---|
+| **Read-only** | `--permission-mode plan` | edit, shell and subagents denied | no tool trusted |
+| **Edit files** | `acceptEdits`, `.git` and keys protected | edits (`.env` included), no shell, only inside the agent's folder | same |
+| **Full access** | `bypassPermissions` | no restrictions | `--trust-all-tools` |
 
-A colony groups agents on the Colony map (an outline hugging only their hexagons) and lends them defaults:
-working folder, permissions, skills (added to the agent's own) and a shared prompt (placed before the agent's own).
-Provider and model are never inherited. On every save the UI asks which of those members follow; each agent can opt out per field.
-Delegation is unchanged and independent of colonies: an orchestrator can only dispatch to workers directly connected to it.
-If an agent's effective folder changes, its next turn starts a fresh native session (older ones stay in its Sessions tab).
+In *Edit files* the agent cannot touch `.git` or private keys (`*.pem`, `*.key`) and cannot write outside its folder. Details and the
+few differences between providers are in [docs/06](docs/06-proveedores.md) and [docs/12](docs/12-operacion-y-problemas.md).
 
-## Delegations
+## Connections (Telegram)
 
-Every delegation runs in a **fresh native session** of the worker, tagged with the orchestrator and the task. The worker's own
-conversation (what you chat about with it directly) never contains delegated work; those sessions live under Settings → Sessions → Delegated tasks.
-Each agent's system prompt starts with who it is (name, role, purpose), its working folder and colony; orchestrators are told their
-direct subagents are the only agents they know.
+1. Create a bot with @BotFather and copy its token.
+2. In **Connections**, add a Telegram connection, pick the agent that answers, and list the people (and groups) allowed to talk to it.
+3. Optional: set the group mode (`mention` or `open`), an alias, whether files are accepted, and an image model.
 
-## Skills and the notebook
+The agent answers through a `channel_reply` tool: its plain text is never delivered. Only authorized people and groups reach it,
+checked on the server. The bot token is stored in `~/.hive-am/hive-am.db` and never returned by the API; see the note about it in
+[docs/14](docs/14-conexiones-externas.md).
 
-Skills come in two modes, chosen where they are assigned (agent, type or colony): **always** (the whole text is in the agent's
-instructions) or **on demand** (only name + description are, and the agent reads the rest with `skill_read` when a task needs it).
-Seven general skills ship with hive-am (they are ordinary skills: edit or delete them). One of them, **Notebook**, gives an agent a
-persistent notebook it writes by itself and you can read and edit from its settings.
+## How it is built
+
+- `server/`: TypeScript. SQLite entities, provider runners, native history readers, the per-agent turn queue, REST and WebSocket.
+  - `src/instructions.ts`: what each agent is told (identity, skills, team, channels, notebook) and which hive tools it gets.
+  - `src/connections/`: external connections. One agent session shared by every chat, group or topic.
+  - `src/skills/`: the skills that ship with hive-am and the agent notebook.
+  - `mcp/dispatch.mjs`: the `hive` MCP server: `list_agents` and `dispatch` for orchestrators, `channel_*` for connections, `notebook_*` and `skill_read`.
+- `web/`: Next.js 15 UI. Colony (honeycomb), Agents, the agent workspace (chat, changes, settings, notebook, sessions), Relations canvas, Types, Skills, Connections and Sessions.
+
+## Documentation
+
+Full documentation in Spanish: **[docs/README.md](docs/README.md)**.
+
+| Topic | Where |
+|---|---|
+| Overview and architecture | [docs/01](docs/01-vision-general.md) |
+| Folder structure | [docs/02](docs/02-estructura-del-proyecto.md) |
+| Storage and database | [docs/04](docs/04-almacenamiento.md) |
+| Providers and permissions | [docs/06](docs/06-proveedores.md) |
+| Agents, types, skills and colonies | [docs/07](docs/07-agentes-tipos-skills-colonias.md) |
+| Orchestration and relations | [docs/09](docs/09-orquestacion-y-relaciones.md) |
+| Changes explorer (git) | [docs/13](docs/13-explorador-de-cambios-git.md) |
+| External connections | [docs/14](docs/14-conexiones-externas.md) |
+| Operation and troubleshooting | [docs/12](docs/12-operacion-y-problemas.md) |
 
 ## Known limits
 
-- Claude fixes the system prompt when a session starts, so changed instructions reach a resumed session as an update inside the next message (the same way OpenCode and Kiro get them).
+- Claude fixes the system prompt when a session starts, so changed instructions reach a resumed session as an update inside the next message (OpenCode and Kiro get them the same way).
 - A turn in flight during a crash is lost; the session is intact and the agent is idle on restart.
+- Instructions are advice to the model; what the server enforces is who an agent can delegate to, who a connection answers, which files can be sent, and the permission level.
+- There is no automated test suite. Features are checked with simulations against real agents (`server/scripts/sim-*.ts`).
