@@ -15,9 +15,9 @@ type Runner = (o: TurnOptions) => AsyncGenerator<StreamEvent>;
 interface TurnOptions {
   agent: Agent;               // agente YA resuelto (cwd, permisos, skills efectivos)
   prompt: string;             // mensaje del usuario o tarea delegada
-  instructions: string;       // instrucciones compuestas (identidad + prompt + skills + equipo)
+  instructions: string;       // instrucciones compuestas (identidad + prompt + skills + equipo + canales + cuaderno)
   refreshInstructions?: boolean; // la sesión recibió instrucciones antiguas; reenviar
-  mcpDispatch: boolean;       // ¿inyectar las herramientas de delegación?
+  mcpCaps: string[];          // capacidades del MCP `hive` que recibe: dispatch, channel, memory, skills (vacío: sin MCP)
   signal: AbortSignal;        // para detener el turno
 }
 ```
@@ -52,9 +52,9 @@ claude -p --output-format stream-json --verbose --include-partial-messages \
 
 | Aspecto | Comportamiento |
 |---|---|
-| Permisos | `--permission-mode` recibe directamente `plan`, `acceptEdits` o `bypassPermissions`. |
+| Permisos | `--permission-mode` recibe directamente `plan`, `acceptEdits` o `bypassPermissions`. En `acceptEdits` se añade `--disallowedTools` con `CLAUDE_EDIT_DENY` (`Edit(**/.git/**)`, `Edit(**/*.pem)`, `Edit(**/*.key)`); `.env` queda editable y escribir fuera de la carpeta ya lo bloquea el propio modo. Es el único proveedor que distingue «Editar archivos» de «Acceso total»: con el primero edita archivos pero un comando de shell que no sea de archivos (p. ej. `python3 …`) queda sin aprobar y falla; con el segundo corre todo. |
 | Reanudación | `--resume <id>` si el agente tiene sesión. |
-| Instrucciones | Se pasan **en cada turno** con `--append-system-prompt`, por lo que siempre están actualizadas. |
+| Instrucciones | Se pasan en cada turno con `--append-system-prompt`, **pero Claude solo las aplica al crear la sesión**: con `--resume` conserva el system prompt original. Por eso, si cambiaron (skills, equipo, notas editadas…), la sesión reanudada recibe un bloque `<instructions update="true">` delante del mensaje, igual que OpenCode y Kiro; el historial lo oculta. |
 | Delegación | Si es orquestador con subagentes: escribe el archivo MCP y añade `--mcp-config` y `--allowedTools mcp__hive` (permite todas las herramientas del servidor `hive` sin pedir confirmación). |
 | Id de sesión | Se toma del primer evento que trae `session_id`. |
 
@@ -82,11 +82,11 @@ opencode run --standalone --format json --thinking --auto \
 
 | Aspecto | Comportamiento |
 |---|---|
-| Permisos | Siempre `--auto` (aprueba permisos no denegados). **El permiso del agente (`plan`, etc.) no se traduce a OpenCode**; ver [documento 12](12-operacion-y-problemas.md). |
+| Permisos | Siempre `--auto` (aprueba lo que no esté denegado; un `deny` se respeta igual). Los tres niveles se escriben como reglas de OpenCode en `opencodePermissions()` (`providers/opencode.ts`): **solo leer** deniega `edit`, `bash` y `task`; **editar archivos** permite leer y editar (incluido `.env`) salvo `.git/**`, `*.pem` y `*.key`, deniega `bash` y `task`, y deniega `external_directory` (todo lo que quede fuera de la carpeta efectiva del agente, que es donde arranca el proceso) salvo `~/.hive-am/inbox/**`; **acceso total** no añade reglas. `doom_loop` queda por defecto. Ver [documento 12](12-operacion-y-problemas.md). |
 | Modelo | `-m` con formato `proveedor/modelo`, p. ej. `opencode/…`. |
 | Reanudación | `-s <id>` **solo si** la carpeta registrada por OpenCode para esa sesión (`session_v2.directory`) coincide con la carpeta del agente (o si no se puede saber). Si no coincide (sesiones creadas con versiones anteriores de hive-am que se registraron en la carpeta equivocada), se **inicia una sesión nueva**. |
 | Instrucciones | Sin flag de system prompt: se envían como preámbulo en el mensaje (ver 6.6). |
-| Configuración por turno | Siempre `--standalone` (servidor privado que sí lee la configuración del entorno) y la variable `OPENCODE_CONFIG_CONTENT` con `permission.question = "deny"`. Los turnos no son interactivos: la herramienta `question` de OpenCode se descartaba y el proceso terminaba con código 1 ("The user dismissed this question"). Denegada, el agente hace la pregunta como texto normal del chat. |
+| Configuración por turno | Siempre `--standalone` (servidor privado que sí lee la configuración del entorno) y la variable `OPENCODE_CONFIG_CONTENT` con `permission.question = "deny"` (y `edit`, `bash` y `task` si el agente es de solo lectura). Los turnos no son interactivos: la herramienta `question` de OpenCode se descartaba y el proceso terminaba con código 1 ("The user dismissed this question"). Denegada, el agente hace la pregunta como texto normal del chat. |
 | Delegación | La misma variable `OPENCODE_CONFIG_CONTENT` añade el servidor MCP `hive` (solo orquestadores con subagentes). |
 | Id de sesión | Campo `sessionID` de cualquier evento. |
 | Servicio en segundo plano | Sin `--standalone`, `opencode run` usaría el servicio de OpenCode y no leería la configuración del entorno; con él cada turno levanta un servidor privado. El manejo de `exit` de 6.2 sigue aplicando. |
@@ -109,15 +109,15 @@ Al terminar el stream se emite `done`.
 
 ```bash
 kiro-cli chat --no-interactive --output-format stream-json \
-  [--trust-all-tools] [--resume-id <session_id>] [--model <modelo>] "<prompt>"
+  [--agent hive-<id>] [--trust-all-tools] [--resume-id <session_id>] [--model <modelo>] "<prompt>"
 ```
 
 | Aspecto | Comportamiento |
 |---|---|
-| Permisos | `--trust-all-tools` salvo que el permiso sea `plan`. (`acceptEdits` y `bypassPermissions` se comportan igual.) |
+| Permisos | Una herramienta sin confianza no puede pedir aprobación (el turno no es interactivo) y falla. **Solo leer:** ninguna de confianza. **Editar archivos:** perfil generado (`~/.kiro/agents/hive-<id>.json`) con `allowedTools` = `fs_read`, `grep`, `glob`, `web_fetch`, `web_search` (`KIRO_EDIT_TOOLS`; el shell no) y `toolsSettings.fs_write`: `allowedPaths` = la carpeta efectiva del agente (con sus archivos que empiezan con punto, como `.env`) y `deniedPaths` = `.git`, `*.pem`, `*.key`. `fs_write` no se confía entero, así que una ruta fuera de la carpeta no se puede aprobar. **Acceso total:** `--trust-all-tools`. Dos cosas que aprendimos con Kiro 2.27: con un perfil (`--agent`) el flag `--trust-tools` deja de aplicarse, y las reglas `permissions.rules` de la documentación son de Kiro 3.x y aquí se ignoran; por eso se usa `toolsSettings`. |
 | Reanudación | `--resume-id <id>`. Las sesiones de Kiro son por carpeta, de ahí la importancia del `cwd`. |
 | Instrucciones | Preámbulo en el mensaje (ver 6.6). |
-| Delegación | Kiro solo carga servidores MCP desde archivos de configuración, así que un orquestador con subagentes recibe un perfil `~/.kiro/agents/hive-<agentId>.json` (`mcpServers.hive`, `tools: ["*"]`, `allowedTools: ["@hive"]`) y se ejecuta con `--agent hive-<agentId>`. |
+| Perfil | Kiro solo carga servidores MCP y rutas permitidas desde un perfil `~/.kiro/agents/hive-<agentId>.json`, que hive-am regenera en cada turno cuando el agente tiene herramientas de hive (`mcpServers.hive`, `tools: ["*"]`, `allowedTools: ["@hive"]`: delegación, canales, cuaderno, skills a demanda) o permiso «Editar archivos»; en ese caso se ejecuta con `--agent hive-<agentId>`. |
 | Id de sesión | `data.sessionId` de cualquier evento. |
 
 **Traducción de eventos** (Kiro emite eventos ACP en formato JSON por líneas):
@@ -185,4 +185,4 @@ Modelos fuera de esas familias no tienen costo estimado. Las estimaciones se mar
 5. **Modelos:** añade la rama en `models.ts`.
 6. **Interfaz:** añade nombre, color y descripción en `web/lib/meta.ts` (`PROVIDERS`) y la variable de color `--p-<nombre>` en `globals.css` (claro y oscuro).
 7. **Instrucciones:** si el CLI no tiene flag de system prompt, usa `withInstructions`; si sí lo tiene, pásalas en cada turno.
-8. **Delegación (opcional):** si soporta MCP, añade en `mcp-config.ts` el objeto de configuración y pásalo cuando `o.mcpDispatch` sea verdadero.
+8. **Delegación (opcional):** si soporta MCP, añade en `mcp-config.ts` el objeto de configuración y pásalo cuando `o.mcpCaps` no esté vacío (el servidor anuncia solo las herramientas de esas capacidades).

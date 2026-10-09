@@ -1,6 +1,6 @@
 import type { LiveTurn } from './store';
 import { translate as tr } from './i18n/core';
-import { describe } from '@/components/ToolCall';
+import { describe } from '@/components/chat/ToolCall';
 
 /** One-line "what is it doing right now" for a running agent. */
 export function activity(turn?: LiveTurn): string | null {

@@ -2,9 +2,14 @@ import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { handle } from './api.js';
 import { bus } from './runtime.js';
+import { skills } from './db.js';
+import { DEFAULT_SKILLS } from './skills/defaults.js';
 import { seedIfEmpty } from './seed.js';
 import { API_PORT } from './mcp-config.js';
+import './connections/index.js';
+import { startAll } from './connections/manager.js';
 
+skills.seedDefaults(DEFAULT_SKILLS);
 seedIfEmpty();
 
 const server = createServer((req, res) => { void handle(req, res); });
@@ -15,4 +20,4 @@ wss.on('connection', (ws) => {
   ws.on('close', () => bus.off('msg', onMsg));
 });
 
-server.listen(API_PORT, '127.0.0.1', () => console.log(`hive-am server → http://127.0.0.1:${API_PORT}`));
+server.listen(API_PORT, '127.0.0.1', () => { console.log(`hive-am server → http://127.0.0.1:${API_PORT}`); void startAll(); });

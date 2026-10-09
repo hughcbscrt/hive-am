@@ -6,23 +6,35 @@ export type InheritField = 'cwd' | 'permission' | 'skills' | 'prompt';
 export type InheritFlags = Record<InheritField, boolean>;
 export interface Colony {
   id: string; name: string; color: string; cwd: string; permission: Permission; system_prompt: string;
-  skill_ids: string[]; inherit: InheritFlags; agent_ids: string[]; created_at: number;
+  skill_ids: string[]; skill_loads: Record<string, SkillLoad>; inherit: InheritFlags; agent_ids: string[]; created_at: number;
 }
 export interface Agent {
   id: string; name: string; description: string; role: Role; type_id: string | null;
   provider: Provider; model: string; system_prompt: string; permission: Permission; cwd: string;
   colony_id: string | null; overrides: InheritField[];
-  effective: { cwd: string; permission: Permission; system_prompt: string; skill_ids: string[]; inherited: InheritField[] };
+  effective: { cwd: string; permission: Permission; system_prompt: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; inherited: InheritField[] };
   session_id: string | null; status: 'idle' | 'running' | 'error';
-  skill_ids: string[]; worker_ids: string[]; created_at: number; updated_at: number;
+  skill_ids: string[]; skill_loads: Record<string, SkillLoad>; worker_ids: string[]; created_at: number; updated_at: number;
   queued?: number; live?: boolean;
 }
 export interface AgentType {
   id: string; name: string; description: string; role: Role; provider: Provider; model: string;
-  system_prompt: string; permission: Permission; color: string; skill_ids: string[]; created_at: number;
+  system_prompt: string; permission: Permission; color: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; created_at: number;
 }
-export interface Skill { id: string; name: string; description: string; content: string; created_at: number; updated_at: number }
+export type SkillLoad = 'always' | 'on_demand';
+export interface Skill { id: string; name: string; description: string; content: string; load: SkillLoad; created_at: number; updated_at: number }
+export interface NotebookInfo { content: string; version: number; size: number; max: number; updated_at: number; updated_by: string; enabled: boolean; /** The skill that switches the notebook on for an agent. */ skill_id: string }
 export interface ProviderInfo { id: Provider; label: string; installed: boolean; version: string }
+export type ChannelKind = 'telegram' | 'slack';
+export interface ConnectionStatus { state: 'connecting' | 'connected' | 'error' | 'stopped'; detail?: string; lastEventAt?: number }
+export interface AllowedUser { id: string; name?: string; admin?: boolean }
+/** A connection as the server sends it: credentials arrive as `{ set, hint }`, never as the value. */
+export interface Connection {
+  id: string; kind: ChannelKind; name: string; agent_id: string | null; enabled: boolean; created_at: number;
+  config: Record<string, any>; allowed: AllowedUser[]; status: ConnectionStatus; thread_count: number;
+}
+export interface AllowedChat { id: string; name?: string }
+export interface ConnectionThread { id: string; external_key: string; title: string; last_user: string | null; last_activity: number; created_at: number; muted: boolean }
 export interface ModelInfo { id: string; label: string }
 
 export interface Usage { input: number; output: number; cacheRead: number; cacheWrite: number; reasoning: number; credits?: number; contextPct?: number }

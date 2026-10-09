@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { Field, Modal, useToast } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
+import { estTokens, fmtTok } from '@/lib/tokens';
 
 export default function Skills() {
   const { t } = useI18n();
@@ -56,7 +57,7 @@ export default function Skills() {
               {list.map((s) => (
                 <button key={s.id} className="sk-item" aria-current={sel === s.id} onClick={() => setSel(s.id)}>
                   <b>{s.name}</b><span className="sk-desc">{s.description || t('common.noDescription')}</span>
-                  <span className="sk-meta">{t('skills.nAgents', { count: usage[s.id]?.agents ?? 0 })} · {t('skills.nTypes', { count: usage[s.id]?.types ?? 0 })}</span>
+                  <span className="sk-meta">{t('skills.nAgents', { count: usage[s.id]?.agents ?? 0 })} · {t('skills.nTypes', { count: usage[s.id]?.types ?? 0 })} · ~{fmtTok(estTokens(s.content))} tokens</span>
                 </button>
               ))}
               {!list.length && sel !== 'new' && <p className="muted small" style={{ padding: 16 }}>{t('skills.noMatch', { query: q })}</p>}

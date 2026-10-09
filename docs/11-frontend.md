@@ -27,6 +27,9 @@ Selector de agentes + chat + ajustes plegables (ver [documento 10](10-chat-y-vis
 
 Cabecera: volver a Colony, avatar, nombre, rol, proveedor, modelo, estado, **New conversation** (con confirmación) y **Settings**.
 
+### Connections (`/connections`)
+Tarjetas de las conexiones externas con su estado en vivo (se refresca cada 5 s) y un panel lateral para crearlas o editarlas. Detalle en el [documento 14](14-conexiones-externas.md).
+
 ### Types (`/types`)
 
 Tarjetas de tipos (rol, proveedor, modelo, nº de skills, nº de agentes que lo usan) con **Edit** (panel lateral) y **Create agent**. El editor incluye selector de proveedor, modelo, permisos, prompt (monoespaciado, con contador de caracteres) y skills.
@@ -83,7 +86,9 @@ Un solo contexto React (`useHive()`), sin librerías de estado. Contiene los dat
 | `ProviderPicker` | Tres tarjetas con indicador de instalado |
 | `ModelField` | Texto libre con sugerencias del proveedor |
 | `PermissionField` | Control segmentado con la explicación del permiso elegido |
-| `SkillPicker` | Lista de skills con casillas (`.skillrow` + `.check`); se reutiliza para miembros de colonia y equipos |
+| `SkillPicker` | Lista de skills con casillas (`.skillrow` + `.check`), se reutiliza para miembros de colonia y equipos |
+| `SkillPicker` (modo y peso) | Cada skill elegida es una pill con su botón `siempre` / `a demanda` (se elige por agente, tipo o colonia); bajo el selector se suma lo que va siempre en el prompt |
+| `NotebookPanel` | Pestaña **Cuaderno** de los ajustes del agente: edita su memoria (ver 7.3.2) |
 | `FolderPicker` | Campo de ruta + explorador de carpetas (usa `GET /api/fs/dirs`) |
 | `Toaster` / `useToast` | Avisos transitorios |
 | `AgentForm` | Formulario único de agente (incluye herencia y *Team*) |
@@ -155,6 +160,7 @@ Resumen de lo que cada pantalla necesita del backend, para quien toque la API:
 | Agente | `GET …/history`, `…/stats`, `…/live`, `…/sessions`; `POST …/messages`, `…/stop`, `…/new-session`, `…/resume-session`; `PATCH/DELETE /api/agents/:id` |
 | Types | `POST/PATCH/DELETE /api/types` |
 | Skills | `GET /api/skills/usage`; `POST/PATCH/DELETE /api/skills` |
+| Cuaderno | `GET/PUT /api/agents/:id/notebook` |
 | Relations | `PUT /api/orchestrators/:id/workers` |
 | Sessions | `GET /api/sessions`; `GET /api/agents/:id/history?session=` |
 | Formularios | `GET /api/providers/:p/models`; `GET /api/fs/dirs` |
@@ -165,7 +171,7 @@ Toda la interfaz está disponible en **inglés** y **español**. El sistema es p
 
 ### Selector de idioma
 
-- Está **arriba de la barra lateral**, debajo del logo: un control `EN | ES` (`LanguageSwitch` en `components/Shell.tsx`).
+- Está **arriba de la barra lateral**, debajo del logo (`/icon.png`, el mismo del favicon; se oculta cuando la barra se colapsa): un control `EN | ES` (`LanguageSwitch` en `components/Shell.tsx`).
 - El cambio es **inmediato** y no recarga la página.
 - **Nada del idioma aparece en la URL**: las rutas (`/agents`, `/relations`, …) son las mismas en ambos idiomas. La elección se guarda solo en `localStorage` (`hive-locale`).
 - Idioma inicial: el guardado en `localStorage`; si no hay, el del navegador (`es*` → español, cualquier otro → inglés). También se actualiza `<html lang>`.
@@ -204,7 +210,7 @@ El backend responde en inglés. `lib/api.ts` pasa cada mensaje por `translateSer
 - Nombres de marca: Claude Code, OpenCode, Kiro.
 - Contenido creado por el usuario o por el seed: nombres y descripciones de agentes, tipos, skills y colonias.
 - Lo que dicen los modelos y la salida de las herramientas.
-- Las **instrucciones que reciben los agentes** (identidad, equipo, delegación): son texto para el modelo y se mantienen en inglés (`server/src/runtime.ts`).
+- Las **instrucciones que reciben los agentes** (identidad, equipo, delegación): son texto para el modelo y se mantienen en inglés (`server/src/instructions.ts`).
 - Los nombres de herramientas "crudos" que no tienen etiqueta propia (Grep, Glob, WebFetch…), que se muestran como los reporta el CLI.
 - El `<title>` y la descripción del documento (`app/layout.tsx`), fijos en `hive-am`.
 
@@ -230,6 +236,6 @@ Con `next dev`, al editar los catálogos el recargado en caliente reinicia el m�
 
 Al pasar el mouse (o enfocar con el teclado) sobre un agente en la **lista lateral** (expandida o contraída) o en una celda del **mapa de la colonia**, aparece una tarjeta con su información: nombre, rol y estado, descripción, actividad actual, proveedor y modelo, permisos efectivos, carpeta, colonia, equipo (orquestador) o quién lo dirige (worker), sesión y última actualización.
 
-- `web/components/AgentCard.tsx`: hook `useAgentCard()` (devuelve `bind(id)` y `node`) y la tarjeta, renderizada con `createPortal` en `<body>` y posicionada a la derecha del elemento (a la izquierda si no cabe).
+- `web/components/agents/AgentCard.tsx`: hook `useAgentCard()` (devuelve `bind(id)` y `node`) y la tarjeta, renderizada con `createPortal` en `<body>` y posicionada a la derecha del elemento (a la izquierda si no cabe).
 - Se abre con ~280 ms de retraso (sin retraso al pasar de un agente a otro), se cierra con `Esc`, scroll, redimensionar, clic o al salir. Ignora el puntero y no se muestra en pantallas < 760 px.
 - `web/lib/activity.ts`: `activity()` (antes dentro de `AgentSwitcher`), compartida con la lista.

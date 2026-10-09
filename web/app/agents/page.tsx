@@ -7,7 +7,7 @@ import { useHive } from '@/lib/store';
 import { PROVIDERS, ago, shortPath } from '@/lib/meta';
 import type { Provider, Role } from '@/lib/types';
 import { Hex, RoleChip, Segmented, StatusChip } from '@/components/ui';
-import { NewAgentDrawer } from '@/components/NewAgentDrawer';
+import { NewAgentDrawer } from '@/components/agents/NewAgentDrawer';
 import { useI18n } from '@/lib/i18n';
 
 export default function Agents() {

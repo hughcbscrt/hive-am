@@ -1,8 +1,9 @@
 import { agents, skills, types } from './db.js';
+import { NOTEBOOK_SKILL_ID } from './skills/defaults.js';
 
 /** First-run starter kit so the UI is never empty. Only runs on a fresh database. */
 export function seedIfEmpty() {
-  if (types.list().length || agents.list().length || skills.list().length) return;
+  if (types.list().length || agents.list().length || skills.list().some((s) => !s.id.startsWith('default-'))) return;
 
   const s1 = skills.create({
     name: 'concise-reports', description: 'Short, structured final answers',
@@ -17,13 +18,13 @@ export function seedIfEmpty() {
     name: 'Queen', role: 'orchestrator', provider: 'claude', model: 'sonnet', permission: 'acceptEdits', color: '#E8A317',
     description: 'Plans the work and delegates it to workers',
     system_prompt: 'You are an orchestrator. Break the request into independent tasks, delegate each to the best subagent, then merge their answers into one clear result.',
-    skill_ids: [s1.id],
+    skill_ids: [s1.id, NOTEBOOK_SKILL_ID],
   });
   types.create({
     name: 'Builder', role: 'worker', provider: 'claude', model: 'sonnet', permission: 'acceptEdits', color: '#D97757',
     description: 'Implements features and fixes in the codebase',
     system_prompt: 'You implement changes carefully and verify them by running the project’s tests when they exist.',
-    skill_ids: [s1.id],
+    skill_ids: [s1.id, NOTEBOOK_SKILL_ID],
   });
   types.create({
     name: 'Reviewer', role: 'worker', provider: 'opencode', model: '', permission: 'plan', color: '#3E7BFA',

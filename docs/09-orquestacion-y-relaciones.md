@@ -10,7 +10,7 @@
 
 ## 9.2 Cómo delega un orquestador
 
-El orquestador recibe dos herramientas, expuestas por un **servidor MCP** (`server/mcp/dispatch.mjs`) con el nombre `hive`:
+El orquestador recibe dos herramientas, expuestas por un **servidor MCP** (`server/mcp/dispatch.mjs`) con el nombre `hive`. El mismo servidor anuncia además las herramientas de las conexiones ([documento 14](14-conexiones-externas.md)), del cuaderno y de las skills a demanda ([7.3](07-agentes-tipos-skills-colonias.md#73-skills)) según las capacidades del agente (`HIVE_CAPS`):
 
 | Herramienta | Qué hace |
 |---|---|
@@ -34,9 +34,9 @@ En los CLIs aparecen como `mcp__hive__list_agents` y `mcp__hive__dispatch`.
 |---|---|
 | Claude | Archivo `~/.hive-am/mcp/<agentId>.json` + `--mcp-config` + `--allowedTools mcp__hive` |
 | OpenCode | Variable de entorno `OPENCODE_CONFIG_CONTENT` con `{ mcp: { hive: { type: 'local', command: [...], environment: {...} } } }` (se fusiona con `permission.question = "deny"`, que se envía en todos los turnos; ver [documento 6](06-proveedores.md)) |
-| Kiro | Perfil de agente generado `~/.kiro/agents/hive-<agentId>.json` con el servidor MCP `hive` (se reescribe en cada turno y se pasa con `--agent`); herramientas `@hive/dispatch` y `@hive/list_agents` |
+| Kiro | Perfil de agente generado `~/.kiro/agents/hive-<agentId>.json` con el servidor MCP `hive` (se reescribe en cada turno y se pasa con `--agent`); herramientas `@hive/<herramienta>` (p. ej. `@hive/dispatch`, `@hive/list_agents`) |
 
-Solo se inyecta cuando el agente es orquestador **y** tiene al menos un subagente (`mcpDispatch = true` en `runtime.ts`). La configuración se regenera en cada turno, por lo que refleja siempre las conexiones actuales.
+Las herramientas de delegación solo se anuncian cuando el agente es orquestador **y** tiene al menos un subagente (capacidad `dispatch` de `mcpCaps()`, en `instructions.ts`); el servidor MCP se inyecta si el agente tiene alguna capacidad. La configuración se regenera en cada turno, por lo que refleja siempre las conexiones actuales.
 
 ## 9.3 Flujo de una delegación
 
@@ -93,7 +93,7 @@ State = { chain: Promise, controller: AbortController | null, queued: number, li
 - **Con subagentes:** lista `- **nombre**: descripción` de **solo** los conectados; indica que son los *únicos* a los que puede delegar; le ordena delegar con `dispatch` en vez de hacer el trabajo, avisa que cada delegación abre una conversación nueva (hay que dar todo el contexto en la tarea) y que, si le preguntan por sus agentes, debe **llamar a `list_agents` y responder exactamente con lo que devuelva**, nunca con una lista antigua, y no mencionar ni usar agentes fuera de esa lista.
 - **Sin subagentes:** le indica que no puede delegar y que no afirme conocer otros agentes.
 
-**Actualización cuando cambian las conexiones:** en Claude las instrucciones se envían en cada turno. En OpenCode y Kiro viajan dentro del mensaje; por eso se compara la huella (`instr_hash`) y, si cambió el equipo, el siguiente mensaje lleva un bloque `<instructions update="true">` que sustituye al anterior ([documento 6](06-proveedores.md#66-preámbulo-de-instrucciones-providerspreamblets)).
+**Actualización cuando cambian las conexiones:** los CLIs fijan las instrucciones cuando empieza la sesión (Claude ignora `--append-system-prompt` al reanudar; OpenCode y Kiro las reciben dentro del mensaje); por eso se compara la huella (`instr_hash`) y, si cambió el equipo (o las skills, o el cuaderno editado desde fuera), el siguiente mensaje lleva un bloque `<instructions update="true">` que sustituye al anterior ([documento 6](06-proveedores.md#66-preámbulo-de-instrucciones-providerspreamblets)).
 
 ## 9.6 Cómo se editan las relaciones en la interfaz
 

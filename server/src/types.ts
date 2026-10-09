@@ -14,6 +14,8 @@ export interface AgentType {
   permission: Permission;
   color: string;
   skill_ids: string[];
+  /** How each assigned skill is loaded: all its text in the instructions (`always`) or read when needed (`on_demand`). */
+  skill_loads: Record<string, SkillLoad>;
   created_at: number;
 }
 
@@ -30,6 +32,7 @@ export interface Colony {
   /** Shared context, placed before each member's own prompt. */
   system_prompt: string;
   skill_ids: string[];
+  skill_loads: Record<string, SkillLoad>;
   /** Which fields members follow by default. A member can opt out per field. */
   inherit: InheritFlags;
   agent_ids: string[];
@@ -51,7 +54,7 @@ export interface Agent {
   /** Fields where this agent ignores its colony and uses its own value. */
   overrides: InheritField[];
   /** What actually runs: own values merged with the colony's according to inherit/overrides. */
-  effective: { cwd: string; permission: Permission; system_prompt: string; skill_ids: string[]; inherited: InheritField[] };
+  effective: { cwd: string; permission: Permission; system_prompt: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; inherited: InheritField[] };
   /** Native session pointer — the conversation itself lives in the CLI's own store. */
   session_id: string | null;
   /** Folder the session was created in; resuming from another folder would fail. */
@@ -60,17 +63,22 @@ export interface Agent {
   instr_hash: string | null;
   status: AgentStatus;
   skill_ids: string[];
+  skill_loads: Record<string, SkillLoad>;
   /** Workers this orchestrator may dispatch to (only meaningful for orchestrators). */
   worker_ids: string[];
   created_at: number;
   updated_at: number;
 }
 
+export type SkillLoad = 'always' | 'on_demand';
+
 export interface Skill {
   id: string;
   name: string;
   description: string;
   content: string;
+  /** `always`: the text is part of the agent's instructions; `on_demand`: only name + description are, and the text is read with `skill_read`. */
+  load: SkillLoad;
   created_at: number;
   updated_at: number;
 }
@@ -115,7 +123,7 @@ export interface TurnOptions {
   instructions: string;
   /** The session already received older instructions; send the new ones before this message. */
   refreshInstructions?: boolean;
-  /** Present when the orchestrator may dispatch to workers. */
-  mcpDispatch: boolean;
+  /** Hive MCP tool groups this agent gets (`dispatch`, `channel`); empty means no hive MCP at all. */
+  mcpCaps: string[];
   signal: AbortSignal;
 }

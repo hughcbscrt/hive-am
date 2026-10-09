@@ -1,5 +1,5 @@
 'use client';
-import { useAgentSettings } from '@/components/useAgentSettings';
+import { useAgentSettings } from '@/components/agents/useAgentSettings';
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -7,12 +7,13 @@ import { ArrowLeft, History, Maximize2, Minimize2, RotateCcw, SlidersHorizontal,
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
 import { ago, shortPath } from '@/lib/meta';
-import { Chat } from '@/components/Chat';
-import { StatsBar } from '@/components/StatsBar';
-import { AgentSwitcher } from '@/components/AgentSwitcher';
-import { GitExplorer } from '@/components/GitExplorer';
-import { useGit } from '@/lib/useGit';
-import { AgentForm } from '@/components/AgentForm';
+import { Chat } from '@/components/chat/Chat';
+import { StatsBar } from '@/components/chat/StatsBar';
+import { AgentSwitcher } from '@/components/agents/AgentSwitcher';
+import { GitExplorer } from '@/components/git/GitExplorer';
+import { useGit } from '@/lib/git/useGit';
+import { AgentForm } from '@/components/agents/AgentForm';
+import { NotebookPanel } from '@/components/agents/NotebookPanel';
 import { Hex, Modal, ProviderBadge, RoleChip, StatusChip, useToast } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
 
@@ -34,7 +35,7 @@ function Workspace({ id }: { id: string }) {
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<'config' | 'sessions'>('config');
+  const [tab, setTab] = useState<'config' | 'notebook' | 'sessions'>('config');
   const [sessions, setSessions] = useState<Sess[]>([]);
   const [viewing, setViewing] = useState<string | undefined>(undefined);
   const [confirm, setConfirm] = useState<'new' | null>(null);
@@ -60,7 +61,7 @@ function Workspace({ id }: { id: string }) {
     const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); saveCfgW(w); };
     el.addEventListener('pointermove', move); el.addEventListener('pointerup', up);
   };
-  const toggle = (v: boolean, tb?: 'config' | 'sessions') => { setOpen(v); if (tb) setTab(tb); try { localStorage.setItem('hive-cfg-open', v ? '1' : '0'); } catch { /* ignore */ } };
+  const toggle = (v: boolean, tb?: 'config' | 'notebook' | 'sessions') => { setOpen(v); if (tb) setTab(tb); try { localStorage.setItem('hive-cfg-open', v ? '1' : '0'); } catch { /* ignore */ } };
 
   const settings = useAgentSettings(agent, { onDeleted: () => router.push('/agents') });
   const { draft, setDraft, errors, dirty, saving } = settings;
@@ -105,6 +106,7 @@ function Workspace({ id }: { id: string }) {
           <div className="ws-grip" onPointerDown={dragCfg} onDoubleClick={toggleCfgW} role="separator" aria-orientation="vertical" aria-label={t('drawer.resize')} title={t('drawer.resize')} />
           <div className="tabs" role="tablist" style={{ padding: '0 12px', position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 2 }}>
             <button className="tab" role="tab" aria-selected={tab === 'config'} onClick={() => setTab('config')}>{t('agent.tab.config')}</button>
+            <button className="tab" role="tab" aria-selected={tab === 'notebook'} onClick={() => setTab('notebook')}>{t('agent.tab.notebook')}</button>
             <button className="tab" role="tab" aria-selected={tab === 'sessions'} onClick={() => setTab('sessions')}>{t('nav.sessions')}</button>
             <button className="btn ghost icon sm" style={{ marginLeft: 'auto', alignSelf: 'center' }} onClick={toggleCfgW} aria-label={cfgWide ? t('drawer.shrink') : t('drawer.expand')} title={cfgWide ? t('drawer.shrink') : t('drawer.expand')}>{cfgWide ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
             <button className="btn ghost sm" style={{ alignSelf: 'center' }} onClick={() => toggle(false)}>{t('common.hide')}</button>
@@ -119,6 +121,7 @@ function Workspace({ id }: { id: string }) {
               </div>
             </>
           )}
+          {tab === 'notebook' && <NotebookPanel agent={agent} />}
           {tab === 'sessions' && (
             <div className="pane">
               <p className="hint" style={{ margin: 0 }}>{t('agent.sessions.intro', { path: shortPath(agent.effective.cwd) })}</p>

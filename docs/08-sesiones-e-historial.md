@@ -35,7 +35,7 @@ Paso a paso (`runtime.ts`, función `execute`):
 1. **Primer mensaje:** el agente no tiene `session_id`; se lanza el CLI sin reanudar.
 2. El CLI informa su id → el runner emite `{ t: 'session', sessionId }`.
 3. El runtime llama `agents.setSession(agent, id)`: guarda `session_id`, `session_cwd` (carpeta efectiva), pone `instr_hash` en `NULL` y registra la sesión en `agent_sessions` (o actualiza `last_seen`).
-4. Al terminar el turno **sin error ni cancelación**, se guarda `instr_hash` (huella de las instrucciones enviadas).
+4. Al terminar el turno **sin error ni cancelación**, se guarda `instr_hash` (huella de las instrucciones enviadas, **sin** el texto del cuaderno) y se anota qué versión del cuaderno ya conoce la conversación. Si en el siguiente turno la huella cambió, o el cuaderno se editó fuera de la conversación, la sesión reanudada recibe las instrucciones de nuevo (en el mensaje; ver [documento 6](06-proveedores.md)).
 5. **Mensajes siguientes:** se reanuda con `session_id`.
 
 ### Cuándo se abandona una sesión (y se empieza otra)

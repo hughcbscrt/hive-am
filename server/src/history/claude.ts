@@ -8,6 +8,9 @@ const ROOT = join(homedir(), '.claude', 'projects');
 /** Claude encodes the project path by replacing both "/" and "." with "-". */
 const encode = (cwd: string) => cwd.replace(/[/.]/g, '-');
 
+/** An instructions update sent in front of a message (see providers/preamble.ts) is not part of what the user wrote. */
+const stripPreamble = (x: string) => x.replace(/^<instructions[^>]*>[\s\S]*?<\/instructions>\s*/, '');
+
 export function claudeFile(cwd: string, sessionId: string): string | null {
   if (!/^[\w-]+$/.test(sessionId)) return null;
   const direct = join(ROOT, encode(cwd), `${sessionId}.jsonl`);
@@ -38,8 +41,9 @@ export function readClaude(cwd: string, sessionId: string): ChatMessage[] {
 
     if (e.type === 'user') {
       if (typeof m.content === 'string') {
-        if (m.content.startsWith('<')) continue; // command/system wrappers
-        out.push({ id: e.uuid, role: 'user', ts, blocks: [{ type: 'text', text: m.content }] });
+        const content = stripPreamble(m.content);
+        if (content.startsWith('<')) continue; // command/system wrappers
+        out.push({ id: e.uuid, role: 'user', ts, blocks: [{ type: 'text', text: content }] });
       } else if (Array.isArray(m.content)) {
         const text: Block[] = [];
         for (const b of m.content) {
@@ -49,7 +53,7 @@ export function readClaude(cwd: string, sessionId: string): ChatMessage[] {
               t.output = flat(b.content); t.error = !!b.is_error;
               const st = toolStart.get(b.tool_use_id); if (st && ts) t.durationMs = Math.max(0, ts - st);
             }
-          } else if (b.type === 'text' && b.text) text.push({ type: 'text', text: b.text });
+          } else if (b.type === 'text' && b.text) { const t = stripPreamble(b.text); if (t) text.push({ type: 'text', text: t }); }
         }
         if (text.length) out.push({ id: e.uuid, role: 'user', ts, blocks: text });
       }

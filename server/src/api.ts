@@ -4,16 +4,24 @@ import { promisify } from 'node:util';
 import { readdirSync, statSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { agents, colonies, dispatches, resolved, skills, types } from './db.js';
-import { dispatch, liveTurn, notifyAgentsChanged, queueDepth, sendTurn, stopAgent } from './runtime.js';
+import { agents, colonies, db, dispatches, resolved, skills, types } from './db.js';
+import { ChannelError, SendError, channelMute, channelReply, channelSendFile, connectionStatus, startConnection, stopConnection, testConnection } from './connections/manager.js';
+import { mergeConfig, publicConnection } from './connections/public.js';
+import { channelPermissionError } from './connections/rules.js';
+import { validVision } from './connections/vision.js';
+import { NOTEBOOK_MAX, NotebookError, notebooks } from './skills/notebook.js';
+import { NOTEBOOK_SKILL_ID } from './skills/defaults.js';
+import { connections, threads } from './connections/store.js';
+import { dispatch, liveIsDirect, liveOrigin, liveTurn, notifyAgentsChanged, queueDepth, sendTurn, stopAgent } from './runtime.js';
+import { mcpCaps } from './instructions.js';
 import { readHistory } from './history/index.js';
 import { listModels } from './models.js';
 import type { Provider } from './types.js';
 import { sessionStats } from './stats.js';
 import { createReadStream } from 'node:fs';
-import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git.js';
-import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './gitswitch.js';
-import { GitOpError, gitBlame, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitUnresolve, type PullMode } from './gitops.js';
+import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git/repo.js';
+import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './git/switch.js';
+import { GitOpError, gitBlame, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitUnresolve, type PullMode } from './git/ops.js';
 
 const exec = promisify(execFile);
 const PROVIDERS: Record<Provider, { bin: string; label: string }> = {
@@ -89,7 +97,12 @@ route('PATCH', '/api/agents/:id', async ({ req, params }) => {
   const cur = agents.get(params[0]); if (!cur) throw notFound('Agent not found');
   if (p.name && p.name.toLowerCase() !== cur.name.toLowerCase() && agents.byName(p.name)) throw bad(`An agent named "${p.name}" already exists`);
   // Changing provider invalidates the native session pointer. (A changed folder is detected when the next turn starts.)
-  const a = agents.update(params[0], p)!;
+  // All-or-nothing: a change that would leave a linked agent in Plan mode is rolled back.
+  const a = db.transaction(() => {
+    const u = agents.update(params[0], p)!;
+    const why = channelPermissionError(u.id); if (why) throw bad(why);
+    return u;
+  })();
   if (p.provider && p.provider !== cur.provider) agents.setSession(a, null);
   if (!agents.get(a.id)!.effective.cwd) throw bad('Choose a working folder, or keep inheriting the colony’s folder.');
   notifyAgentsChanged();
@@ -224,16 +237,19 @@ route('GET', '/api/sessions', () => {
 });
 
 // ---- skills ----
+const checkLoad = (v: unknown) => { if (v !== undefined && v !== 'always' && v !== 'on_demand') throw bad('load must be always or on_demand'); };
 route('GET', '/api/skills', () => skills.list());
 route('GET', '/api/skills/usage', () => skills.usage());
 route('POST', '/api/skills', async ({ req }) => {
   const p = await body(req);
   if (!String(p.name ?? '').trim()) throw bad('Name is required');
-  try { return skills.create({ name: p.name.trim(), description: p.description ?? '', content: p.content ?? '' }); }
+  checkLoad(p.load);
+  try { return skills.create({ name: p.name.trim(), description: p.description ?? '', content: p.content ?? '', load: p.load }); }
   catch { throw bad(`A skill named "${p.name}" already exists`); }
 });
 route('PATCH', '/api/skills/:id', async ({ req, params }) => {
   const p = await body(req);
+  checkLoad(p.load);
   try { return skills.update(params[0], p) ?? (() => { throw notFound('Skill not found'); })(); }
   catch (e) { if (e instanceof HttpError) throw e; throw bad(`A skill named "${p.name}" already exists`); }
 });
@@ -258,7 +274,7 @@ route('POST', '/api/types/:id/spawn', async ({ req, params }) => {
   if (agents.byName(p.name)) throw bad(`An agent named "${p.name}" already exists`);
   const a = agents.create({
     name: p.name.trim(), description: p.description ?? t.description, role: t.role, type_id: t.id, provider: t.provider, model: t.model,
-    system_prompt: t.system_prompt, permission: t.permission, cwd: p.cwd ?? '', skill_ids: t.skill_ids, colony_id: p.colony_id ?? null,
+    system_prompt: t.system_prompt, permission: t.permission, cwd: p.cwd ?? '', skill_ids: t.skill_ids, skill_loads: t.skill_loads, colony_id: p.colony_id ?? null,
   });
   if (!a.effective.cwd) { agents.remove(a.id); throw bad('Choose a working folder, or put the agent in a colony that provides one.'); }
   notifyAgentsChanged();
@@ -282,7 +298,11 @@ route('PATCH', '/api/colonies/:id', async ({ req, params }) => {
   const p = await body(req); validateColony(p, true);
   const cur = colonies.get(params[0]); if (!cur) throw notFound('Colony not found');
   if (p.name && p.name.toLowerCase() !== cur.name.toLowerCase() && colonies.list().some((c) => c.name.toLowerCase() === p.name.trim().toLowerCase())) throw bad(`A colony named "${p.name}" already exists`);
-  const c = colonies.update(params[0], p.name ? { ...p, name: p.name.trim() } : p)!;
+  const c = db.transaction(() => {
+    const u = colonies.update(params[0], p.name ? { ...p, name: p.name.trim() } : p)!;
+    for (const id of u.agent_ids) { const why = channelPermissionError(id); if (why) throw bad(why); }
+    return u;
+  })();
   notifyAgentsChanged();
   return c;
 });
@@ -290,6 +310,85 @@ route('DELETE', '/api/colonies/:id', ({ params }) => {
   if (!colonies.remove(params[0])) throw notFound('Colony not found');
   notifyAgentsChanged();
   return { ok: true };
+});
+
+// ---- external connections ----
+const KINDS = ['telegram', 'slack'] as const;
+const REQUIRED: Record<string, string[]> = { telegram: ['token'], slack: ['bot_token', 'app_token'] };
+function validateConnection(kind: string, config: Record<string, any>, agentId: string | null | undefined, enabled: boolean) {
+  const missing = (REQUIRED[kind] ?? []).filter((k) => typeof config[k] !== 'string' || !config[k].trim());
+  if (missing.length) throw bad(`Missing: ${missing.join(', ')}`);
+  if (config.on_silent !== undefined && !['notice', 'send_text', 'ignore'].includes(config.on_silent)) throw bad('on_silent must be notice, send_text or ignore');
+  if (config.group_mode !== undefined && !['mention', 'open'].includes(config.group_mode)) throw bad('group_mode must be mention or open');
+  if (config.vision !== undefined && config.vision !== null && !validVision(config.vision)) throw bad('vision must be { provider, model } or empty');
+  if (config.chats !== undefined && (!Array.isArray(config.chats) || config.chats.length > 50)) throw bad('chats must be a list of at most 50 groups');
+  if (config.aliases !== undefined && (!Array.isArray(config.aliases) || config.aliases.length > 10)) throw bad('aliases must be a list of at most 10 names');
+  if (agentId) {
+    const a = agents.get(agentId); if (!a) throw bad('That agent no longer exists');
+    if (enabled && a.effective.permission === 'plan') throw bad(`"${a.name}" is in Plan mode and cannot reply. Give it "Edit files" permission first.`);
+  }
+}
+/** Group ids and alias names from the form: trimmed, de-duplicated, blanks dropped. */
+function cleanGroupConfig(config: Record<string, any>) {
+  if (Array.isArray(config.chats)) {
+    const seen = new Set<string>();
+    config.chats = config.chats.map((c: any) => ({ id: String(c?.id ?? '').trim(), name: c?.name ? String(c.name).trim() : undefined })).filter((c: any) => c.id && !seen.has(c.id) && seen.add(c.id));
+  }
+  if (Array.isArray(config.aliases)) config.aliases = [...new Set(config.aliases.map((x: any) => String(x).trim()).filter(Boolean))];
+  return config;
+}
+const cleanAllowed = (v: unknown) => (Array.isArray(v) ? v : []).map((u: any) => ({ id: String(u?.id ?? '').trim(), name: u?.name ? String(u.name) : undefined, admin: !!u?.admin })).filter((u) => u.id);
+
+route('GET', '/api/connections', () => connections.list().map(publicConnection));
+route('POST', '/api/connections', async ({ req }) => {
+  const p = await body(req);
+  if (!KINDS.includes(p.kind)) throw bad(`Kind must be one of: ${KINDS.join(', ')}`);
+  const name = String(p.name ?? '').trim(); if (!name) throw bad('Name is required');
+  if (connections.list().some((c) => c.name.toLowerCase() === name.toLowerCase())) throw bad(`A connection named "${name}" already exists`);
+  const config = cleanGroupConfig(mergeConfig({}, p.config)); const enabled = p.enabled !== false;
+  validateConnection(p.kind, config, p.agent_id, enabled);
+  const c = connections.create({ kind: p.kind, name, agent_id: p.agent_id || null, config, allowed: cleanAllowed(p.allowed), enabled });
+  await startConnection(c.id); notifyAgentsChanged();
+  return publicConnection(connections.get(c.id)!);
+});
+route('PATCH', '/api/connections/:id', async ({ req, params }) => {
+  const p = await body(req);
+  const cur = connections.get(params[0]); if (!cur) throw notFound('Connection not found');
+  const name = p.name !== undefined ? String(p.name).trim() : cur.name; if (!name) throw bad('Name is required');
+  if (name.toLowerCase() !== cur.name.toLowerCase() && connections.list().some((c) => c.name.toLowerCase() === name.toLowerCase())) throw bad(`A connection named "${name}" already exists`);
+  const config = cleanGroupConfig(mergeConfig(cur.config, p.config));
+  const agent_id = p.agent_id !== undefined ? (p.agent_id || null) : cur.agent_id;
+  const enabled = p.enabled !== undefined ? !!p.enabled : cur.enabled;
+  validateConnection(cur.kind, config, agent_id, enabled);
+  connections.update(cur.id, { name, config, agent_id, enabled, allowed: p.allowed !== undefined ? cleanAllowed(p.allowed) : cur.allowed });
+  await startConnection(cur.id); notifyAgentsChanged();
+  return publicConnection(connections.get(cur.id)!);
+});
+route('DELETE', '/api/connections/:id', async ({ params }) => {
+  await stopConnection(params[0]);
+  if (!connections.remove(params[0])) throw notFound('Connection not found');
+  notifyAgentsChanged();
+  return { ok: true };
+});
+route('POST', '/api/connections/:id/restart', async ({ params }) => {
+  if (!connections.get(params[0])) throw notFound('Connection not found');
+  await startConnection(params[0]);
+  return { status: connectionStatus(params[0]) };
+});
+route('POST', '/api/connections/:id/test', async ({ params }) => {
+  if (!connections.get(params[0])) throw notFound('Connection not found');
+  try { return { ok: true, detail: await testConnection(params[0]) }; } catch (e) { throw bad(e instanceof Error ? e.message : String(e)); }
+});
+route('PATCH', '/api/connections/:id/threads/:threadId', async ({ req, params }) => {
+  const th = threads.get(params[1]);
+  if (!th || th.connection_id !== params[0]) throw notFound('Thread not found');
+  const p = await body(req);
+  if (typeof p.muted === 'boolean') threads.setMuted(th.id, p.muted);
+  return threads.get(th.id);
+});
+route('GET', '/api/connections/:id/threads', ({ params }) => {
+  if (!connections.get(params[0])) throw notFound('Connection not found');
+  return threads.forConnection(params[0]);
 });
 
 // ---- orchestration ----
@@ -308,6 +407,67 @@ route('POST', '/api/dispatch', async ({ req }) => {
   const { from, agent, task } = await body(req);
   if (!from || !agent || !task) throw bad('from, agent and task are required');
   try { return await dispatch(from, agent, task); } catch (e) { throw bad(e instanceof Error ? e.message : String(e)); }
+});
+// `skill_read`: the text of one of the skills the agent has, loaded when it needs it.
+route('POST', '/api/skills/read', async ({ req }) => {
+  const { from, name } = await body(req);
+  const agent = agents.get(String(from ?? '')); if (!agent) throw bad('Unknown agent');
+  const mine = resolved(agent).skill_ids.map((id) => skills.get(id)).filter((s): s is NonNullable<typeof s> => !!s);
+  const want = String(name ?? '').trim().toLowerCase();
+  const s = mine.find((x) => x.name.toLowerCase() === want);
+  if (!s) throw bad(`No skill named "${name}". Your skills: ${mine.map((x) => x.name).join(', ') || '(none)'}.`);
+  return { name: s.name, content: s.content.trim() };
+});
+
+// ---- notebook ----
+/** Who a note came from, so it can be audited: the date plus, for chat turns, where and who. */
+function noteSource(agentId: string): string {
+  const day = new Date().toISOString().slice(0, 10), o = liveOrigin(agentId);
+  return o ? `${day} · ${o.platform}: ${o.userName}` : day;
+}
+function notebookAgent(from: unknown) {
+  const agent = agents.get(String(from ?? '')); if (!agent) throw bad('Unknown agent');
+  if (!mcpCaps(resolved(agent)).includes('memory')) throw bad('This agent does not have the Notebook skill.');
+  return agent;
+}
+const nbSafe = <T>(fn: () => T): T => { try { return fn(); } catch (e) { if (e instanceof NotebookError) throw bad(e.message); throw e; } };
+const nbView = (n: { content: string; version: number }) => ({ content: n.content, version: n.version, size: n.content.length, max: NOTEBOOK_MAX });
+route('POST', '/api/notebook/read', async ({ req }) => { const { from } = await body(req); return nbView(notebooks.get(notebookAgent(from).id)); });
+route('POST', '/api/notebook/add', async ({ req }) => {
+  const { from, section, note } = await body(req); const a = notebookAgent(from);
+  const r = nbSafe(() => notebooks.add(a.id, String(section ?? ''), String(note ?? ''), noteSource(a.id), liveIsDirect(a.id)));
+  return { added: r.added, note: r.note, ...nbView(r.notebook) };
+});
+route('POST', '/api/notebook/rewrite', async ({ req }) => {
+  const { from, content, version } = await body(req); const a = notebookAgent(from);
+  return { added: true, ...nbView(nbSafe(() => notebooks.rewrite(a.id, String(content ?? ''), Number(version), liveIsDirect(a.id)))) };
+});
+route('GET', '/api/agents/:id/notebook', ({ params }) => {
+  const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');
+  const n = notebooks.get(a.id);
+  return { ...nbView(n), updated_at: n.updated_at, updated_by: n.updated_by, enabled: resolved(a).skill_ids.includes(NOTEBOOK_SKILL_ID), skill_id: NOTEBOOK_SKILL_ID };
+});
+route('PUT', '/api/agents/:id/notebook', async ({ req, params }) => {
+  localOnly(req);
+  const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');
+  const p = await body(req);
+  const n = nbSafe(() => notebooks.edit(a.id, String(p.content ?? ''), typeof p.version === 'number' ? p.version : undefined));
+  return { ...nbView(n), updated_at: n.updated_at, updated_by: n.updated_by };
+});
+route('POST', '/api/channel/reply', async ({ req }) => {
+  const { from, text } = await body(req);
+  try { return await channelReply(String(from ?? ''), String(text ?? '')); }
+  catch (e) { if (e instanceof ChannelError) throw bad(e.message); throw e; }
+});
+route('POST', '/api/channel/send-file', async ({ req }) => {
+  const { from, path, caption } = await body(req);
+  try { return await channelSendFile(String(from ?? ''), String(path ?? ''), caption === undefined ? undefined : String(caption)); }
+  catch (e) { if (e instanceof ChannelError || e instanceof SendError) throw bad(e.message); throw e; }
+});
+route('POST', '/api/channel/mute', async ({ req }) => {
+  const { from, muted } = await body(req);
+  try { return channelMute(String(from ?? ''), muted !== false); }
+  catch (e) { if (e instanceof ChannelError) throw bad(e.message); throw e; }
 });
 route('GET', '/api/dispatches', () => dispatches.recent());
 

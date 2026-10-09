@@ -1,6 +1,6 @@
 # 10. Chat y formas de mostrar información
 
-Este documento describe **qué se muestra** en la conversación con un agente, **de dónde sale** cada dato y **cómo se dibuja**. Archivos: `web/components/Chat.tsx`, `ToolCall.tsx`, `StatsBar.tsx`, `AgentSwitcher.tsx` y `web/lib/format.ts`.
+Este documento describe **qué se muestra** en la conversación con un agente, **de dónde sale** cada dato y **cómo se dibuja**. Archivos: `web/components/chat/Chat.tsx`, `ToolCall.tsx`, `StatsBar.tsx`, `web/components/agents/AgentSwitcher.tsx` y `web/lib/format.ts`.
 
 ## 10.1 Distribución de la pantalla del agente
 

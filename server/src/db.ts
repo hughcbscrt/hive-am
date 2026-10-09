@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { Agent, AgentType, Colony, InheritField, InheritFlags, Skill, Provider, Role, Permission } from './types.js';
+import type { Agent, AgentType, Colony, InheritField, InheritFlags, Skill, SkillLoad, Provider, Role, Permission } from './types.js';
 
 export const DATA_DIR = process.env.HIVE_AM_HOME ?? join(homedir(), '.hive-am');
 mkdirSync(DATA_DIR, { recursive: true });
@@ -77,6 +77,23 @@ if (!agentCols.includes('overrides')) db.exec("ALTER TABLE agents ADD COLUMN ove
 if (!agentCols.includes('session_cwd')) db.exec('ALTER TABLE agents ADD COLUMN session_cwd TEXT');
 if (!agentCols.includes('instr_hash')) db.exec('ALTER TABLE agents ADD COLUMN instr_hash TEXT');
 
+// Skills briefly had a "default/personal" split; all skills are equal now.
+for (const col of ['kind', 'slug']) { try { db.exec(`ALTER TABLE skills DROP COLUMN ${col}`); } catch { /* already gone */ } }
+db.exec('CREATE TABLE IF NOT EXISTS seeded_skills (slug TEXT PRIMARY KEY)');
+// How a skill reaches the agent: `always` puts all its text in the instructions; `on_demand` lists name + description and the agent reads the text with `skill_read` when a task needs it.
+if (!(db.prepare('PRAGMA table_info(skills)').all() as any[]).some((c) => c.name === 'load')) {
+  db.exec("ALTER TABLE skills ADD COLUMN load TEXT NOT NULL DEFAULT 'always'");
+  // The skills that came with hive-am are long, situational guides (the notebook one must always be in view).
+  db.exec("UPDATE skills SET load='on_demand' WHERE id LIKE 'default-%' AND id<>'default-notebook'");
+}
+
+// How each assignment loads the skill (see Skill.load, which is only the suggestion offered when assigning).
+for (const [table] of [['type_skills'], ['colony_skills'], ['agent_skills']]) {
+  if ((db.prepare(`PRAGMA table_info(${table})`).all() as any[]).some((c) => c.name === 'load')) continue;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN load TEXT NOT NULL DEFAULT 'always'`);
+  db.exec(`UPDATE ${table} SET load=COALESCE((SELECT load FROM skills WHERE skills.id=${table}.skill_id), 'always')`);
+}
+
 const sessCols = (db.prepare('PRAGMA table_info(agent_sessions)').all() as any[]).map((c) => c.name);
 if (!sessCols.includes('kind')) db.exec("ALTER TABLE agent_sessions ADD COLUMN kind TEXT NOT NULL DEFAULT 'direct'");
 if (!sessCols.includes('from_id')) db.exec('ALTER TABLE agent_sessions ADD COLUMN from_id TEXT');
@@ -91,18 +108,33 @@ const uid = () => randomUUID();
 export const skills = {
   list: () => db.prepare('SELECT * FROM skills ORDER BY name').all() as Skill[],
   get: (id: string) => db.prepare('SELECT * FROM skills WHERE id=?').get(id) as Skill | undefined,
-  create(p: Pick<Skill, 'name' | 'description' | 'content'>): Skill {
+  create(p: Pick<Skill, 'name' | 'description' | 'content'> & { load?: SkillLoad }): Skill {
     const id = uid(), t = now();
-    db.prepare('INSERT INTO skills VALUES (?,?,?,?,?,?)').run(id, p.name, p.description ?? '', p.content ?? '', t, t);
+    db.prepare('INSERT INTO skills (id,name,description,content,created_at,updated_at,load) VALUES (?,?,?,?,?,?,?)').run(id, p.name, p.description ?? '', p.content ?? '', t, t, p.load ?? ((p.content ?? '').length > 2000 ? 'on_demand' : 'always'));
     return skills.get(id)!;
   },
-  update(id: string, p: Partial<Pick<Skill, 'name' | 'description' | 'content'>>): Skill | undefined {
+  update(id: string, p: Partial<Pick<Skill, 'name' | 'description' | 'content' | 'load'>>): Skill | undefined {
     const cur = skills.get(id); if (!cur) return;
     const n = { ...cur, ...p };
-    db.prepare('UPDATE skills SET name=?, description=?, content=?, updated_at=? WHERE id=?').run(n.name, n.description, n.content, now(), id);
+    db.prepare('UPDATE skills SET name=?, description=?, content=?, load=?, updated_at=? WHERE id=?').run(n.name, n.description, n.content, n.load, now(), id);
     return skills.get(id);
   },
   remove: (id: string) => db.prepare('DELETE FROM skills WHERE id=?').run(id).changes > 0,
+  /**
+   * Adds the skills that come with hive-am, once each: they are ordinary skills afterwards (edit them, delete them). A
+   * skill that was seeded before is never added back, and one the user already has under that name is left alone.
+   */
+  seedDefaults(defs: { slug: string; name: string; description: string; content: string; load?: SkillLoad }[]) {
+    const t = now();
+    for (const d of defs) {
+      const id = `default-${d.slug}`;
+      if (db.prepare('SELECT 1 FROM seeded_skills WHERE slug=?').get(d.slug)) continue;
+      db.prepare('INSERT OR IGNORE INTO seeded_skills (slug) VALUES (?)').run(d.slug);
+      if (db.prepare('SELECT 1 FROM skills WHERE id=?').get(id)) continue; // from an earlier build: keep it as it is
+      const taken = !!db.prepare('SELECT 1 FROM skills WHERE lower(name)=lower(?)').get(d.name);
+      db.prepare('INSERT INTO skills (id,name,description,content,created_at,updated_at,load) VALUES (?,?,?,?,?,?,?)').run(id, taken ? `${d.name} (hive-am)` : d.name, d.description, d.content, t, t, d.load ?? 'always');
+    }
+  },
   /** Agents/types using each skill, for the library view. */
   usage(): Record<string, { agents: number; types: number }> {
     const out: Record<string, { agents: number; types: number }> = {};
@@ -113,10 +145,38 @@ export const skills = {
   },
 };
 
+// ---- skill assignments ----
+const JOINS = {
+  type: { table: 'type_skills', owner: 'type_id' },
+  colony: { table: 'colony_skills', owner: 'colony_id' },
+  agent: { table: 'agent_skills', owner: 'agent_id' },
+} as const;
+type JoinKind = keyof typeof JOINS;
+/** How each skill assigned to this type/colony/agent is loaded. */
+function loadsOf(kind: JoinKind, id: string): Record<string, SkillLoad> {
+  const j = JOINS[kind], out: Record<string, SkillLoad> = {};
+  for (const r of db.prepare(`SELECT skill_id, load FROM ${j.table} WHERE ${j.owner}=?`).all(id) as any[]) out[r.skill_id] = r.load === 'on_demand' ? 'on_demand' : 'always';
+  return out;
+}
+/**
+ * Replaces the skills of a type/colony/agent. A skill keeps the way it was loaded before; a new one takes what the caller
+ * says, or else the skill's own suggestion.
+ */
+function assignSkills(kind: JoinKind, id: string, ids: string[], loads?: Record<string, SkillLoad>) {
+  const j = JOINS[kind], prev = loadsOf(kind, id);
+  db.transaction(() => {
+    db.prepare(`DELETE FROM ${j.table} WHERE ${j.owner}=?`).run(id);
+    for (const s of ids) {
+      const load = loads?.[s] ?? prev[s] ?? skills.get(s)?.load ?? 'always';
+      db.prepare(`INSERT OR IGNORE INTO ${j.table} (${j.owner}, skill_id, load) VALUES (?,?,?)`).run(id, s, load === 'on_demand' ? 'on_demand' : 'always');
+    }
+  })();
+}
+
 // ---- agent types ----
 function typeRow(r: any): AgentType {
   const skill_ids = (db.prepare('SELECT skill_id FROM type_skills WHERE type_id=?').all(r.id) as any[]).map((x) => x.skill_id);
-  return { ...r, skill_ids };
+  return { ...r, skill_ids, skill_loads: loadsOf('type', r.id) };
 }
 export const types = {
   list: () => (db.prepare('SELECT * FROM agent_types ORDER BY role DESC, name').all() as any[]).map(typeRow),
@@ -126,7 +186,7 @@ export const types = {
     db.prepare('INSERT INTO agent_types VALUES (?,?,?,?,?,?,?,?,?,?)').run(
       id, p.name, p.description ?? '', p.role, p.provider, p.model ?? '', p.system_prompt ?? '',
       (p.permission ?? 'acceptEdits') as Permission, p.color ?? '', now());
-    types.setSkills(id, p.skill_ids ?? []);
+    types.setSkills(id, p.skill_ids ?? [], p.skill_loads);
     return types.get(id)!;
   },
   update(id: string, p: Partial<AgentType>): AgentType | undefined {
@@ -134,15 +194,10 @@ export const types = {
     const n = { ...cur, ...p };
     db.prepare(`UPDATE agent_types SET name=?, description=?, role=?, provider=?, model=?, system_prompt=?, permission=?, color=? WHERE id=?`)
       .run(n.name, n.description, n.role, n.provider, n.model, n.system_prompt, n.permission, n.color, id);
-    if (p.skill_ids) types.setSkills(id, p.skill_ids);
+    if (p.skill_ids || p.skill_loads) types.setSkills(id, p.skill_ids ?? cur.skill_ids, p.skill_loads);
     return types.get(id);
   },
-  setSkills(id: string, ids: string[]) {
-    db.transaction(() => {
-      db.prepare('DELETE FROM type_skills WHERE type_id=?').run(id);
-      for (const s of ids) db.prepare('INSERT OR IGNORE INTO type_skills VALUES (?,?)').run(id, s);
-    })();
-  },
+  setSkills: (id: string, ids: string[], loads?: Record<string, SkillLoad>) => assignSkills('type', id, ids, loads),
   remove: (id: string) => db.prepare('DELETE FROM agent_types WHERE id=?').run(id).changes > 0,
 };
 
@@ -153,7 +208,7 @@ function colonyRow(r: any): Colony {
   const agent_ids = (db.prepare('SELECT id FROM agents WHERE colony_id=? ORDER BY name').all(r.id) as any[]).map((x) => x.id);
   let inherit = DEFAULT_INHERIT;
   try { inherit = { ...DEFAULT_INHERIT, ...JSON.parse(r.inherit) }; } catch { /* keep defaults */ }
-  return { ...r, inherit, skill_ids, agent_ids };
+  return { ...r, inherit, skill_ids, skill_loads: loadsOf('colony', r.id), agent_ids };
 }
 export const colonies = {
   list: () => (db.prepare('SELECT * FROM colonies ORDER BY name').all() as any[]).map(colonyRow),
@@ -163,7 +218,7 @@ export const colonies = {
     db.prepare('INSERT INTO colonies VALUES (?,?,?,?,?,?,?,?)').run(
       id, p.name, p.color ?? '', p.cwd ?? '', (p.permission ?? 'acceptEdits') as Permission, p.system_prompt ?? '',
       JSON.stringify({ ...DEFAULT_INHERIT, ...(p.inherit ?? {}) }), now());
-    colonies.setSkills(id, p.skill_ids ?? []);
+    colonies.setSkills(id, p.skill_ids ?? [], p.skill_loads);
     if (p.agent_ids) colonies.setMembers(id, p.agent_ids);
     return colonies.get(id)!;
   },
@@ -172,16 +227,11 @@ export const colonies = {
     const n = { ...cur, ...p, inherit: { ...cur.inherit, ...(p.inherit ?? {}) } };
     db.prepare('UPDATE colonies SET name=?, color=?, cwd=?, permission=?, system_prompt=?, inherit=? WHERE id=?')
       .run(n.name, n.color, n.cwd, n.permission, n.system_prompt, JSON.stringify(n.inherit), id);
-    if (p.skill_ids) colonies.setSkills(id, p.skill_ids);
+    if (p.skill_ids || p.skill_loads) colonies.setSkills(id, p.skill_ids ?? cur.skill_ids, p.skill_loads);
     if (p.agent_ids) colonies.setMembers(id, p.agent_ids);
     return colonies.get(id);
   },
-  setSkills(id: string, ids: string[]) {
-    db.transaction(() => {
-      db.prepare('DELETE FROM colony_skills WHERE colony_id=?').run(id);
-      for (const s of ids) db.prepare('INSERT OR IGNORE INTO colony_skills VALUES (?,?)').run(id, s);
-    })();
-  },
+  setSkills: (id: string, ids: string[], loads?: Record<string, SkillLoad>) => assignSkills('colony', id, ids, loads),
   /** Replaces membership; an agent belongs to at most one colony. */
   setMembers(id: string, agentIds: string[]) {
     db.transaction(() => {
@@ -208,14 +258,16 @@ function agentRow(r: any): Agent {
     // Colony context comes first so the agent's own instructions have the last word.
     system_prompt: [follows('prompt') ? col!.system_prompt.trim() : '', String(r.system_prompt ?? '').trim()].filter(Boolean).join('\n\n'),
     skill_ids: [...new Set([...(follows('skills') ? col!.skill_ids : []), ...skill_ids])],
+    // The agent's own choice for a skill wins over its colony's.
+    skill_loads: { ...(follows('skills') ? col!.skill_loads : {}), ...loadsOf('agent', r.id) } as Record<string, SkillLoad>,
     inherited,
   };
-  return { ...r, skill_ids, worker_ids, overrides, effective };
+  return { ...r, skill_ids, skill_loads: loadsOf('agent', r.id), worker_ids, overrides, effective };
 }
 
 /** The agent as it actually runs: colony-inherited values already folded into cwd/permission/prompt/skills. */
 export function resolved(a: Agent): Agent {
-  return { ...a, cwd: a.effective.cwd, permission: a.effective.permission, system_prompt: a.effective.system_prompt, skill_ids: a.effective.skill_ids };
+  return { ...a, cwd: a.effective.cwd, permission: a.effective.permission, system_prompt: a.effective.system_prompt, skill_ids: a.effective.skill_ids, skill_loads: a.effective.skill_loads };
 }
 
 export const agents = {
@@ -227,7 +279,7 @@ export const agents = {
     db.prepare('INSERT INTO agents (id,name,description,role,type_id,provider,model,system_prompt,permission,cwd,session_id,status,created_at,updated_at,colony_id,overrides) VALUES (?,?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?)').run(
       id, p.name, p.description ?? '', p.role, p.type_id ?? null, p.provider, p.model ?? '', p.system_prompt ?? '',
       (p.permission ?? 'acceptEdits') as Permission, p.cwd ?? '', 'idle', t, t, p.colony_id ?? null, JSON.stringify(p.overrides ?? []));
-    agents.setSkills(id, p.skill_ids ?? []);
+    agents.setSkills(id, p.skill_ids ?? [], p.skill_loads);
     agents.setWorkers(id, p.worker_ids ?? []);
     return agents.get(id)!;
   },
@@ -236,7 +288,7 @@ export const agents = {
     const n = { ...cur, ...p };
     db.prepare(`UPDATE agents SET name=?, description=?, role=?, type_id=?, provider=?, model=?, system_prompt=?, permission=?, cwd=?, colony_id=?, overrides=?, updated_at=? WHERE id=?`)
       .run(n.name, n.description, n.role, n.type_id, n.provider, n.model, n.system_prompt, n.permission, n.cwd, n.colony_id ?? null, JSON.stringify(n.overrides ?? []), now(), id);
-    if (p.skill_ids) agents.setSkills(id, p.skill_ids);
+    if (p.skill_ids || p.skill_loads) agents.setSkills(id, p.skill_ids ?? cur.skill_ids, p.skill_loads);
     if (p.worker_ids) agents.setWorkers(id, p.worker_ids);
     return agents.get(id);
   },
@@ -256,12 +308,7 @@ export const agents = {
       ON CONFLICT(agent_id, session_id) DO UPDATE SET last_seen=excluded.last_seen`)
       .run(a.id, a.provider, sessionId, a.effective.cwd, now(), now(), kind, fromId ?? null, task ? task.slice(0, 500) : null);
   },
-  setSkills(id: string, ids: string[]) {
-    db.transaction(() => {
-      db.prepare('DELETE FROM agent_skills WHERE agent_id=?').run(id);
-      for (const s of ids) db.prepare('INSERT OR IGNORE INTO agent_skills VALUES (?,?)').run(id, s);
-    })();
-  },
+  setSkills: (id: string, ids: string[], loads?: Record<string, SkillLoad>) => assignSkills('agent', id, ids, loads),
   setWorkers(id: string, ids: string[]) {
     db.transaction(() => {
       db.prepare('DELETE FROM assignments WHERE orchestrator_id=?').run(id);

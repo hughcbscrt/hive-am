@@ -48,7 +48,7 @@ Navegador ── WebSocket directo ──▶ ws://<hostname>:4400/ws
 | Método y ruta | Cuerpo | Respuesta / notas |
 |---|---|---|
 | `GET /api/agents` | — | Lista de agentes con `queued` (mensajes en cola) y `live` (¿hay turno en curso?). Cada agente incluye `effective` (valores ya resueltos con la colonia). |
-| `POST /api/agents` | `name`, `role`, `provider`, `cwd`, y opcionales `description`, `model`, `system_prompt`, `permission`, `skill_ids`, `worker_ids`, `type_id`, `colony_id`, `overrides` | El agente creado. 400 si falta el nombre, el proveedor/rol es inválido, la carpeta no existe, el nombre ya existe o no queda ninguna carpeta efectiva. |
+| `POST /api/agents` | `name`, `role`, `provider`, `cwd`, y opcionales `description`, `model`, `system_prompt`, `permission`, `skill_ids`, `skill_loads`, `worker_ids`, `type_id`, `colony_id`, `overrides` | El agente creado. 400 si falta el nombre, el proveedor/rol es inválido, la carpeta no existe, el nombre ya existe o no queda ninguna carpeta efectiva. |
 | `GET /api/agents/:id` | — | Un agente. |
 | `PATCH /api/agents/:id` | Cualquier subconjunto de los campos anteriores | El agente actualizado. Si cambia el `provider`, se descarta la sesión actual. |
 | `DELETE /api/agents/:id` | — | Detiene su turno en curso y lo elimina. `{ ok: true }` |
@@ -85,16 +85,20 @@ Lecturas: [documento 13, §13.4](13-explorador-de-cambios-git.md#134-api-de-lect
 |---|---|---|
 | `GET /api/skills` | — | Lista |
 | `GET /api/skills/usage` | — | `{ [skillId]: { agents, types } }` (cuenta agentes y tipos que la usan; **no** cuenta colonias) |
-| `POST /api/skills` | `{ name, description?, content? }` | La skill. 400 si el nombre existe. |
+| `POST /api/skills` | `{ name, description?, content?, load? }` | La skill (`load`: modo **sugerido** al asignarla). 400 si el nombre existe. |
 | `PATCH /api/skills/:id` | subconjunto | La skill |
 | `DELETE /api/skills/:id` | — | `{ ok: true }` |
+| `POST /api/skills/read` | `{ from, name }` | Lo usa el MCP `hive` (`skill_read`): `{ name, content }` de una skill que el agente `from` tiene; 400 con la lista de sus skills si el nombre no existe |
+| `GET /api/agents/:id/notebook` | — | `{ content, version, size, max, updated_at, updated_by, enabled }` (`enabled`: el agente tiene la skill Notebook) |
+| `PUT /api/agents/:id/notebook` | `{ content, version? }` | Edición del usuario. 400 si pasa de 8000 caracteres o si `version` ya no es la actual (el agente escribió mientras tanto). Solo origen local. |
+| `POST /api/notebook/read` · `/add` · `/rewrite` | `{ from, … }` | Los usa el MCP `hive` (`notebook_read`, `notebook_add`, `notebook_rewrite`) |
 
 ### Tipos de agente
 
 | Método y ruta | Cuerpo | Respuesta |
 |---|---|---|
-| `GET /api/types` | — | Lista (cada tipo con `skill_ids`) |
-| `POST /api/types` | `name`, `role`, `provider` y opcionales `description`, `model`, `system_prompt`, `permission`, `skill_ids` | El tipo |
+| `GET /api/types` | — | Lista (cada tipo con `skill_ids` y `skill_loads`) |
+| `POST /api/types` | `name`, `role`, `provider` y opcionales `description`, `model`, `system_prompt`, `permission`, `skill_ids`, `skill_loads` | El tipo |
 | `PATCH /api/types/:id` | subconjunto | El tipo |
 | `DELETE /api/types/:id` | — | `{ ok: true }` |
 | `POST /api/types/:id/spawn` | `{ name, cwd?, description?, colony_id? }` | Crea un **agente** copiando los valores del tipo |
@@ -103,8 +107,8 @@ Lecturas: [documento 13, §13.4](13-explorador-de-cambios-git.md#134-api-de-lect
 
 | Método y ruta | Cuerpo | Respuesta |
 |---|---|---|
-| `GET /api/colonies` | — | Lista (con `skill_ids`, `agent_ids`, `inherit`) |
-| `POST /api/colonies` | `name`, y opcionales `color`, `cwd`, `permission`, `system_prompt`, `skill_ids`, `inherit`, `agent_ids` | La colonia |
+| `GET /api/colonies` | — | Lista (con `skill_ids`, `skill_loads`, `agent_ids`, `inherit`) |
+| `POST /api/colonies` | `name`, y opcionales `color`, `cwd`, `permission`, `system_prompt`, `skill_ids`, `skill_loads`, `inherit`, `agent_ids` | La colonia |
 | `PATCH /api/colonies/:id` | subconjunto; `agent_ids` **reemplaza** la membresía | La colonia |
 | `DELETE /api/colonies/:id` | — | `{ ok: true }` |
 

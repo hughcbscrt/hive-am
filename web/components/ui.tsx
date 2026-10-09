@@ -1,10 +1,11 @@
 'use client';
-import { createContext, useCallback, useContext, useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { Check, ChevronLeft, Folder, Maximize2, Minimize2, X } from 'lucide-react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { Check, ChevronLeft, Folder, Maximize2, Minimize2, Search, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { PROVIDERS, initials, permissions, providerBlurb } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n';
-import type { Agent, ModelInfo, Permission, Provider, ProviderInfo, Skill } from '@/lib/types';
+import { ALWAYS_BUDGET, estTokens, fmtTok, skillWeight } from '@/lib/tokens';
+import type { Agent, ModelInfo, Permission, Provider, ProviderInfo, Skill, SkillLoad } from '@/lib/types';
 
 /* ---------- toasts ---------- */
 const ToastCtx = createContext<(msg: string, kind?: 'ok' | 'err') => void>(() => undefined);
@@ -88,8 +89,8 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 export function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: ReactNode }) {
   return <div className="field"><label>{label}</label>{children}{error ? <span className="field-err">{error}</span> : hint ? <span className="hint">{hint}</span> : null}</div>;
 }
-export function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { id: T; label: string }[] }) {
-  return <div className="seg" role="group">{options.map((o) => <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)}>{o.label}</button>)}</div>;
+export function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { id: T; label: string; disabled?: boolean; title?: string }[] }) {
+  return <div className="seg" role="group">{options.map((o) => <button key={o.id} type="button" aria-pressed={value === o.id} disabled={o.disabled} title={o.title} onClick={() => onChange(o.id)}>{o.label}</button>)}</div>;
 }
 
 /* ---------- domain pickers ---------- */
@@ -124,28 +125,92 @@ export function ModelField({ provider, value, onChange }: { provider: Provider; 
   );
 }
 
-export function PermissionField({ value, onChange }: { value: Permission; onChange: (v: Permission) => void }) {
+export function PermissionField({ value, onChange, locked = [] }: { value: Permission; onChange: (v: Permission) => void; locked?: Permission[] }) {
   const { t } = useI18n();
   const list = permissions();
   return (
     <Field label={t('permission.title')} hint={list.find((p) => p.id === value)?.hint}>
-      <Segmented value={value} onChange={onChange} options={list.map((p) => ({ id: p.id, label: p.label }))} />
+      <Segmented value={value} onChange={onChange} options={list.map((p) => ({ id: p.id, label: p.label, disabled: locked.includes(p.id), title: locked.includes(p.id) ? t('permission.lockedByConnection') : undefined }))} />
     </Field>
   );
 }
 
-export function SkillPicker({ skills, value, onChange }: { skills: Skill[]; value: string[]; onChange: (v: string[]) => void }) {
+/**
+ * Skills of an agent, type or colony. The chosen ones are pills; each pill says how that skill is loaded for THIS agent
+ * (always in the instructions, or read on demand) and a click flips it. To add more, search the library: the list shows
+ * each match with the start of its description, so you can tell skills apart without opening them.
+ */
+export function SkillPicker({ skills, value, loads, onChange }: { skills: Skill[]; value: string[]; loads: Record<string, SkillLoad>; onChange: (ids: string[], loads: Record<string, SkillLoad>) => void }) {
   const { t } = useI18n();
+  const [q, setQ] = useState('');
+  const [focus, setFocus] = useState(false);
+  const [hi, setHi] = useState(0);
+  const loadOf = (s: Skill): SkillLoad => loads[s.id] ?? s.load;
+  const picked = value.map((id) => skills.find((s) => s.id === id)).filter((s): s is Skill => !!s);
+  const always = picked.reduce((n, s) => n + skillWeight({ ...s, load: loadOf(s) }), 0);
+  const needle = q.trim().toLowerCase();
+  const options = skills.filter((s) => !value.includes(s.id) && (!needle || `${s.name} ${s.description}`.toLowerCase().includes(needle)));
+  const show = focus || !!needle;
+  useEffect(() => { setHi(0); }, [q]);
+  const list = useRef<HTMLDivElement>(null);
+  // Opening the list below the fold of a scrolling panel: bring it into view.
+  useEffect(() => { if (show) list.current?.scrollIntoView({ block: 'nearest' }); }, [show, q]);
   if (!skills.length) return <p className="hint">{t('skillPicker.empty')}</p>;
-  const toggle = (id: string) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
+
+  // Only the skills that are picked keep an entry, each with an explicit choice.
+  const commit = (ids: string[], next: Record<string, SkillLoad>) => onChange(ids, Object.fromEntries(ids.map((id) => [id, next[id] ?? skills.find((s) => s.id === id)?.load ?? 'always'])));
+  const add = (s: Skill) => { commit([...value, s.id], { ...loads, [s.id]: s.load }); setQ(''); };
+  const remove = (id: string) => commit(value.filter((x) => x !== id), loads);
+  const flip = (s: Skill) => commit(value, { ...loads, [s.id]: loadOf(s) === 'always' ? 'on_demand' : 'always' });
+  const key = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHi((h) => Math.min(h + 1, options.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHi((h) => Math.max(h - 1, 0)); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (options[hi]) add(options[hi]); }
+    else if (e.key === 'Escape') { setQ(''); e.currentTarget.blur(); }
+    else if (e.key === 'Backspace' && !q && picked.length) remove(picked[picked.length - 1].id);
+  };
   return (
     <div className="skillpick">
-      {skills.map((s) => (
-        <button key={s.id} type="button" className="skillrow" aria-pressed={value.includes(s.id)} onClick={() => toggle(s.id)}>
-          <span className="check">{value.includes(s.id) && <Check size={13} strokeWidth={3} />}</span>
-          <span><b style={{ fontWeight: 600 }}>{s.name}</b>{s.description && <span className="hint" style={{ display: 'block' }}>{s.description}</span>}</span>
-        </button>
-      ))}
+      {picked.length > 0 && (
+        <div className="skillpills">
+          {picked.map((s) => {
+            const lazy = loadOf(s) === 'on_demand', tok = fmtTok(estTokens(s.content));
+            return (
+              <span key={s.id} className="skillpill" title={s.description || undefined}>
+                {s.name}
+                <button type="button" className={`skillmode${lazy ? ' lazy' : ''}`} onClick={() => flip(s)} aria-pressed={lazy}
+                  title={t(lazy ? 'skillPicker.mode.lazy.hint' : 'skillPicker.mode.always.hint', { tokens: tok })}>
+                  {t(lazy ? 'skillPicker.mode.lazy' : 'skillPicker.mode.always')}
+                </button>
+                <button type="button" onClick={() => remove(s.id)} aria-label={t('skillPicker.remove', { name: s.name })} title={t('skillPicker.remove', { name: s.name })}><X size={12} /></button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+      {picked.length > 0 && (
+        <p className={`hint${always > ALWAYS_BUDGET ? ' warn' : ''}`} style={{ margin: 0 }}>
+          {t('skillPicker.weight', { always: fmtTok(always), onDemand: picked.filter((s) => loadOf(s) === 'on_demand').length })}{always > ALWAYS_BUDGET ? ` ${t('skillPicker.heavy')}` : ''}
+        </p>
+      )}
+      <div className="search">
+        <Search size={15} aria-hidden />
+        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} onKeyDown={key}
+          placeholder={t('skillPicker.search')} aria-label={t('skillPicker.search')} role="combobox" aria-expanded={show} aria-controls="skill-options" aria-autocomplete="list" />
+      </div>
+      {show && (
+        <div className="skillopts" id="skill-options" role="listbox" ref={list}>
+          {options.length === 0
+            ? <p className="hint" style={{ margin: 0, padding: '8px 10px' }}>{needle ? t('skillPicker.noMatch', { query: q.trim() }) : t('skillPicker.allAdded')}</p>
+            : options.map((s, i) => (
+              <button key={s.id} type="button" role="option" aria-selected={i === hi} className={`skillopt${i === hi ? ' on' : ''}`}
+                onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setHi(i)} onClick={() => add(s)}>
+                <b>{s.name} <span className="skillopt-w">~{fmtTok(estTokens(s.content))} tokens</span></b>
+                <span className="hint">{s.description || t('common.noDescription')}</span>
+              </button>
+            ))}
+        </div>
+      )}
     </div>
   );
 }

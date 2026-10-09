@@ -6,6 +6,7 @@ hive-am guarda datos en **cuatro** lugares. Entender cuál guarda qué es clave:
 |---|---|---|
 | `~/.hive-am/hive-am.db` | hive-am | Configuración: agentes, tipos, skills, colonias, relaciones, punteros a sesiones, registro de delegaciones |
 | `~/.hive-am/mcp/<agentId>.json` | hive-am | Configuración MCP temporal por agente (solo Claude) |
+| `~/.hive-am/inbox/<agentId>/<fecha>/` | hive-am | Archivos que las personas enviaron a un agente por una conexión; se borran a los 14 días ([14.6.2](14-conexiones-externas.md#1462-archivos-recibidos)) |
 | Almacenes nativos de cada CLI | **cada CLI** | Las **conversaciones** (mensajes, herramientas, uso de tokens) |
 | `localStorage` del navegador | la interfaz | Preferencias de vista (tema, panel, posiciones del lienzo) |
 
@@ -45,7 +46,22 @@ erDiagram
 | `name` | TEXT, UNIQUE | Nombre único |
 | `description` | TEXT | Una línea |
 | `content` | TEXT | Markdown con las instrucciones |
+| `load` | TEXT | **Sugerencia** para cuando se asigna la skill: `always` o `on_demand`. Las nuevas nacen `on_demand` si pasan de 2000 caracteres, y `always` si no. Cómo se carga de verdad lo decide cada asignación (7.3.3) |
 | `created_at`, `updated_at` | INTEGER | ms |
+
+Al instalar, `skills.seedDefaults` (`server/src/skills/defaults.ts`) añade **una vez** las skills que vienen con hive-am, anotando cada una en `seeded_skills (slug)`. A partir de ahí son skills normales: se editan o se borran, y una skill borrada **no vuelve** a crearse en el siguiente arranque. Si ya existía una con ese nombre, la nueva se añade como «Nombre (hive-am)». Una versión futura de hive-am que traiga más skills las añade una sola vez, y nunca modifica las que ya tienes. Su id es `default-<slug>`. Las que vienen con hive-am se crean `on_demand`, salvo Notebook (`always`).
+
+### Tabla `agent_notebooks`
+
+Cuaderno de cada agente (ver [7.3.2](07-agentes-tipos-skills-colonias.md#732-el-cuaderno-del-agente)). Va en tabla aparte para que no viaje con el listado de agentes.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `agent_id` | TEXT PK | `ON DELETE CASCADE` |
+| `content` | TEXT | Markdown (máx. 8000 caracteres) |
+| `version` | INTEGER | Sube con cada cambio |
+| `seen` | INTEGER | Última versión que la conversación viva del agente ya contiene |
+| `updated_at`, `updated_by` | INTEGER, TEXT | `agent` o `user` |
 
 ### Tabla `agent_types`
 
@@ -62,7 +78,7 @@ Plantillas de agente.
 | `color` | Reservado; hoy solo se rellena en el seed |
 | `created_at` | |
 
-Tabla puente `type_skills (type_id, skill_id)`, ambas con `ON DELETE CASCADE`.
+Tabla puente `type_skills (type_id, skill_id, load)`, ambas con `ON DELETE CASCADE`. `load` (`always` / `on_demand`) es cómo se carga **esa** skill para ese tipo; igual en `agent_skills` y `colony_skills`.
 
 ### Tabla `agents`
 
@@ -83,7 +99,7 @@ Tabla puente `type_skills (type_id, skill_id)`, ambas con `ON DELETE CASCADE`.
 
 Tablas puente:
 
-- `agent_skills (agent_id, skill_id)`: skills propias del agente (`CASCADE` en ambos lados).
+- `agent_skills (agent_id, skill_id, load)`: skills propias del agente (`CASCADE` en ambos lados).
 - `assignments (orchestrator_id, worker_id)`: **relaciones** de delegación (`CASCADE`). Es la fuente de verdad de qué orquestador puede delegar a qué worker.
 
 ### Tabla `colonies`
@@ -176,7 +192,7 @@ Solo preferencias de vista; si se borran, la interfaz funciona igual.
 | `hive-cfg-open` | `1` \| `0` | `agents/[id]/page.tsx`: si el panel de ajustes del agente queda abierto |
 | `hive-rel-pos-v2` | JSON `{ id: {x, y} }` | `relations/page.tsx`: posiciones de nodos que arrastraste a mano |
 | `hive-locale` | `en` \| `es` | `lib/i18n`: idioma de la interfaz (nunca se refleja en la URL) |
-| `hive-git-view` | JSON `{ theme, whitespace, tabSize }` | `lib/gitPrefs.ts`: tema, espacios visibles y tabulador del visor de código |
+| `hive-git-view` | JSON `{ theme, whitespace, tabSize }` | `lib/git/gitPrefs.ts`: tema, espacios visibles y tabulador del visor de código |
 | `hive-switcher-collapsed` | `1` \| `0` | `agents/[id]/page.tsx`: si la lista lateral de agentes está contraída |
 
 La clave anterior `hive-rel-pos` ya no se usa (se abandonó al rediseñar el lienzo).
