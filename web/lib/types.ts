@@ -35,6 +35,14 @@ export interface Connection {
 }
 export interface AllowedChat { id: string; name?: string }
 export interface ConnectionThread { id: string; external_key: string; title: string; last_user: string | null; last_activity: number; created_at: number; muted: boolean }
+export type ScheduleRunStatus = 'delivered' | 'failed' | 'skipped_muted' | 'skipped_busy' | 'skipped_missed' | 'skipped_disabled' | 'skipped_reassigned';
+/** A recurring schedule (`cron`, `every`) or a pending one-shot wake-up (`once`) an agent set for itself. */
+export interface ScheduleItem {
+  id: string; agent_id: string; agent_name: string; connection_id: string | null; thread_id: string | null; place: string;
+  kind: 'cron' | 'every' | 'once' | 'watch'; expr: string; tz: string; description: string; note: string; enabled: boolean; next_due: number | null;
+  created_at: number; last_fired_at: number | null; fire_count: number; last_status: ScheduleRunStatus | null; last_detail: string | null;
+}
+export interface ScheduleRun { id: number; fired_at: number; status: ScheduleRunStatus; detail: string | null; duration_ms: number | null }
 export interface ModelInfo { id: string; label: string }
 
 export interface Usage { input: number; output: number; cacheRead: number; cacheWrite: number; reasoning: number; credits?: number; contextPct?: number }

@@ -24,6 +24,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
   const [allowed, setAllowed] = useState<AllowedUser[]>(connection?.allowed ?? []);
   const [lang, setLang] = useState<'es' | 'en'>(connection?.config.lang === 'en' ? 'en' : 'es');
   const [silent, setSilent] = useState<Silent>(connection?.config.on_silent ?? 'notice');
+  const [effort, setEffort] = useState<string>(connection?.config.effort ?? '');
   const [groupMode, setGroupMode] = useState<GroupMode>(connection?.config.group_mode === 'open' ? 'open' : 'mention');
   const [chats, setChats] = useState<AllowedChat[]>(connection?.config.chats ?? []);
   const [aliases, setAliases] = useState<string>((connection?.config.aliases ?? []).join(', '));
@@ -70,7 +71,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
     if (Object.keys(e).length) return;
     setSaving(true);
     const body = { kind: 'telegram', name: name.trim(), agent_id: agentId, enabled, allowed: allowed.filter((u) => u.id.trim()), config: {
-      ...(token.trim() ? { token: token.trim() } : {}), lang, on_silent: silent, group_mode: groupMode, files, vision,
+      ...(token.trim() ? { token: token.trim() } : {}), lang, on_silent: silent, effort, group_mode: groupMode, files, vision,
       chats: chats.filter((c) => c.id.trim()), aliases: aliases.split(',').map((x) => x.trim()).filter(Boolean),
     } };
     try {
@@ -188,6 +189,9 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
         <Field label={t('conn.lang')}><Segmented value={lang} onChange={setLang} options={[{ id: 'es', label: t('conn.lang.es') }, { id: 'en', label: t('conn.lang.en') }]} /></Field>
         <Field label={t('conn.silent')}>
           <Segmented value={silent} onChange={setSilent} options={(['notice', 'send_text', 'ignore'] as Silent[]).map((s) => ({ id: s, label: t(`conn.silent.${s}`) }))} />
+        </Field>
+        <Field label={t('conn.effort')} hint={t('conn.effort.hint')}>
+          <Segmented value={effort} onChange={setEffort} options={[{ id: '', label: t('conn.effort.default') }, { id: 'low', label: t('conn.effort.low') }, { id: 'medium', label: t('conn.effort.medium') }, { id: 'high', label: t('conn.effort.high') }]} />
         </Field>
         <Field label={t('conn.enabled')} hint={t('conn.enabled.hint')}>
           <Segmented value={enabled ? 'on' : 'off'} onChange={(v) => setEnabled(v === 'on')} options={[{ id: 'on', label: t('common.yes') }, { id: 'off', label: t('conn.status.stopped') }]} />

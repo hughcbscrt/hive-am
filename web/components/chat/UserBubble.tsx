@@ -1,12 +1,12 @@
-import { Ear, Paperclip, Send } from 'lucide-react';
+import { Clock, Ear, Paperclip, Send } from 'lucide-react';
 import { parseChannelPrompt } from '@/lib/channel';
 import { useI18n } from '@/lib/i18n/index';
 
 /** A user message. Ones that arrived from Telegram/Slack carry a header; they are shown with who wrote them and where. */
-export function UserBubble({ text }: { text: string }) {
+export function UserBubble({ text, badge }: { text: string; badge?: string }) {
   const { t } = useI18n();
   const ch = parseChannelPrompt(text);
-  if (!ch) return <div className="msg user"><div className="bubble">{text}</div></div>;
+  if (!ch) return <div className={`msg user${badge ? ' queued' : ''}`}><div className="bubble">{text}</div>{badge && <span className="queued-tag"><Clock size={11} aria-hidden />{badge}</span>}</div>;
   return (
     <div className="msg user">
       <div className="bubble channel">

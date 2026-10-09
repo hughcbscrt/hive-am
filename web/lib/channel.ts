@@ -1,5 +1,5 @@
 /** The header hive-am puts in front of a message that arrived from Telegram/Slack (see server/src/connections/prompt.ts). */
-const HEADER = /^\[hive:channel\] (.+?) · Place: (.+?) · Thread: (.+?) · From: (.+?)((?: · (?:Addressed|Muted): \w+)*)\nMessage:\n([\s\S]*)$/;
+const HEADER = /^\[hive:channel\] (.+?) · Place: (.+?) · Thread: (.+?) · From: (.+?)((?: · (?:Addressed|Muted): \w+| · To: [^·\n]+)*)(?: · Now: [^\n]*)?\nMessage:\n([\s\S]*)$/;
 const CONTEXT = '\n\n[hive:context]\n';
 const FILES = '\n\n[hive:files]\n';
 
