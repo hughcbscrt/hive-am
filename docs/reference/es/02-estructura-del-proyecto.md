@@ -8,7 +8,7 @@ hive-am/
 ├── package-lock.json
 ├── README.md                 # resumen y arranque rápido
 ├── .gitignore
-├── docs/                     # esta documentación
+├── docs/                     # esta documentación (reference/es y reference/en)
 ├── server/                   # @hive-am/server — backend Node + TypeScript
 │   ├── package.json
 │   ├── tsconfig.json

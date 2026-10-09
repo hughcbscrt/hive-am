@@ -61,7 +61,7 @@ Los tokens nunca llegan al agente: el MCP llama a `POST /api/channel/reply` en e
 
 - **Mínimo «Editar archivos».** Claude bloquea todas las herramientas MCP en modo `plan` («Solo lectura»), incluida `channel_reply`, así que un agente con una conexión activa no puede estar en `plan`. El servidor lo exige al crear o editar la conexión y también al cambiar el permiso del agente o de su colonia: la actualización se **revierte** (transacción) si dejaría a un agente vinculado en `plan`.
 - **«Acceso total»** está permitido; la interfaz muestra una advertencia: cualquiera de la lista podrá hacer que el agente ejecute comandos en la máquina.
-- **OpenCode no traduce el permiso** (ver [documento 12](12-operacion-y-problemas.md)): ese agente puede editar y ejecutar aunque esté en solo lectura. La interfaz lo indica.
+- Los tres niveles de permiso se aplican en los tres proveedores ([documento 12](12-operacion-y-problemas.md)), también OpenCode y Kiro.
 - El formulario del agente deshabilita «Solo lectura» mientras tenga conexiones activas, y el panel de la conexión ofrece un botón **Permitir editar archivos**.
 - **Comandos del chat:**
 

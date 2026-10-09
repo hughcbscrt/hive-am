@@ -1,6 +1,6 @@
 # 4. Almacenamiento
 
-hive-am guarda datos en **cuatro** lugares. Entender cuál guarda qué es clave:
+hive-am guarda datos en **cinco** lugares. Entender cuál guarda qué es clave:
 
 | Lugar | Quién lo escribe | Qué contiene |
 |---|---|---|

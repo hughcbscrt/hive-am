@@ -132,7 +132,7 @@ Las fuentes se cargan con `next/font/google` en `layout.tsx`, por lo que **la pr
 
 ### Convención y una lección aprendida
 
-Los selectores son **globales**: un nombre de clase genérico puede chocar con otro componente. Se han corregido tres casos:
+Los selectores son **globales**: un nombre de clase genérico puede chocar con otro componente. Se han corregido cuatro casos:
 
 | Choque | Síntoma | Solución |
 |---|---|---|

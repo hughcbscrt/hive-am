@@ -74,7 +74,7 @@ Data lives in `~/.hive-am/hive-am.db` (override with `HIVE_AM_HOME`). The server
 | **Full access** | `bypassPermissions` | no restrictions | `--trust-all-tools` |
 
 In *Edit files* the agent cannot touch `.git` or private keys (`*.pem`, `*.key`) and cannot write outside its folder. Details and the
-few differences between providers are in [docs/06](docs/06-proveedores.md) and [docs/12](docs/12-operacion-y-problemas.md).
+few differences between providers are in [docs/06](docs/reference/en/06-providers.md) and [docs/12](docs/reference/en/12-operations-and-troubleshooting.md).
 
 ## Connections (Telegram)
 
@@ -84,7 +84,7 @@ few differences between providers are in [docs/06](docs/06-proveedores.md) and [
 
 The agent answers through a `channel_reply` tool: its plain text is never delivered. Only authorized people and groups reach it,
 checked on the server. The bot token is stored in `~/.hive-am/hive-am.db` and never returned by the API; see the note about it in
-[docs/14](docs/14-conexiones-externas.md).
+[docs/14](docs/reference/en/14-external-connections.md).
 
 ## How it is built
 
@@ -97,19 +97,19 @@ checked on the server. The bot token is stored in `~/.hive-am/hive-am.db` and ne
 
 ## Documentation
 
-Full documentation in Spanish: **[docs/README.md](docs/README.md)**.
+Full documentation in English and Spanish: **[English](docs/reference/en/README.md)** · **[Español](docs/reference/es/README.md)**.
 
 | Topic | Where |
 |---|---|
-| Overview and architecture | [docs/01](docs/01-vision-general.md) |
-| Folder structure | [docs/02](docs/02-estructura-del-proyecto.md) |
-| Storage and database | [docs/04](docs/04-almacenamiento.md) |
-| Providers and permissions | [docs/06](docs/06-proveedores.md) |
-| Agents, types, skills and colonies | [docs/07](docs/07-agentes-tipos-skills-colonias.md) |
-| Orchestration and relations | [docs/09](docs/09-orquestacion-y-relaciones.md) |
-| Changes explorer (git) | [docs/13](docs/13-explorador-de-cambios-git.md) |
-| External connections | [docs/14](docs/14-conexiones-externas.md) |
-| Operation and troubleshooting | [docs/12](docs/12-operacion-y-problemas.md) |
+| Overview and architecture | [docs/01](docs/reference/en/01-overview.md) |
+| Folder structure | [docs/02](docs/reference/en/02-project-structure.md) |
+| Storage and database | [docs/04](docs/reference/en/04-storage.md) |
+| Providers and permissions | [docs/06](docs/reference/en/06-providers.md) |
+| Agents, types, skills and colonies | [docs/07](docs/reference/en/07-agents-types-skills-colonies.md) |
+| Orchestration and relations | [docs/09](docs/reference/en/09-orchestration-and-relations.md) |
+| Changes explorer (git) | [docs/13](docs/reference/en/13-changes-explorer-git.md) |
+| External connections | [docs/14](docs/reference/en/14-external-connections.md) |
+| Operation and troubleshooting | [docs/12](docs/reference/en/12-operations-and-troubleshooting.md) |
 
 ## Known limits
 

@@ -1,5 +1,7 @@
 # Documentación de hive-am
 
+> 🇬🇧 [Read in English](../en/README.md)
+
 hive-am es un administrador de agentes de programación. Permite crear **orquestadores** y **subagentes** sobre tres CLIs ya instalados en tu máquina (**Claude Code**, **OpenCode** y **Kiro**), agruparlos en **colonias**, darles **skills**, conversar con ellos desde el navegador y ver todo su historial, aun después de un apagón.
 
 Esta carpeta describe el proyecto completo: cómo está organizado, cómo se ejecuta, dónde se guarda cada dato y cómo se comunican las piezas.
