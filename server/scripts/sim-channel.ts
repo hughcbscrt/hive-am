@@ -27,14 +27,14 @@ await adapter.say('general:t1', 'hello again', 'stranger', 'in-x2');
 check(adapter.sent.length === 1 && adapter.sent[0].text.includes('stranger'), 'stranger is refused once with their id');
 adapter.sent.length = 0;
 
-await adapter.say('deploys:A', 'Remember this secret code word for later: PINEAPPLE. Answer with channel_reply, one short sentence.', 'maria');
+await adapter.say('deploys:A', 'Remember my favorite fruit for later: PINEAPPLE. Answer with channel_reply, one short sentence.', 'maria');
 show('thread A');
 const real = (s: { text: string }) => !s.text.startsWith('⚠️');
 const a = adapter.sent.filter((s) => s.to.thread === 'A' && real(s));
 check(a.length >= 1, 'thread A got a reply through channel_reply');
 
 adapter.sent.length = 0;
-await adapter.say('ops:B', 'What was the secret code word I told you before? Answer with channel_reply, only the word.', 'maria');
+await adapter.say('ops:B', 'What was my favorite fruit that I told you before? Answer with channel_reply, only the word.', 'maria');
 show('thread B');
 const b = adapter.sent.filter((s) => s.to.thread === 'B' && real(s));
 check(b.length >= 1, 'thread B got a reply');
