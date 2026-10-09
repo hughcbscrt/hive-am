@@ -41,6 +41,9 @@ hive-am/
 │       │   ├── manager.ts    # adaptadores en marcha, channel_reply y channel_mute
 │       │   ├── telegram.ts   # adaptador de Telegram (long polling)
 │       │   ├── format.ts     # partir mensajes y Markdown → HTML de Telegram
+│       │   ├── files.ts      # archivos recibidos: descarga, carpeta por agente, límites y limpieza
+│       │   ├── outbound.ts   # qué archivos puede enviar un agente a un chat (rutas permitidas y prohibidas)
+│       │   ├── vision.ts     # descripción de imágenes con un modelo aparte, para agentes que no ven
 │       │   ├── prompt.ts     # cabecera de origen que recibe el agente
 │       │   ├── public.ts     # lo que la API devuelve (sin secretos) y fusión de config
 │       │   ├── rules.ts      # permiso mínimo de un agente con conexión
@@ -62,7 +65,9 @@ hive-am/
     ├── package.json
     ├── tsconfig.json
     ├── next.config.mjs       # proxy /api → servidor, distDir configurable
+    ├── public/logo.png       # logo de la app (PNG con fondo transparente)
     ├── app/
+    │   ├── favicon.ico, icon.png, apple-icon.png   # favicon e iconos (Next los detecta por nombre)
     │   ├── layout.tsx        # raíz: fuentes, metadatos, <Shell>
     │   ├── globals.css       # TODOS los estilos (tokens, tema claro/oscuro, componentes)
     │   ├── page.tsx          # Colony (panal)
@@ -158,7 +163,7 @@ No existen aún carpetas de pruebas automatizadas; la verificación se describe 
 | `providers/claude.ts`, `opencode.ts`, `kiro.ts` | Un generador asíncrono por proveedor que produce `StreamEvent`. |
 | `providers/preamble.ts` | `withInstructions`: antepone las instrucciones al mensaje (OpenCode y Kiro siempre; Claude solo al reanudar una sesión cuyas instrucciones cambiaron). |
 | `history/*.ts` | Lectura de transcripciones nativas y normalización a `ChatMessage[]`. |
-| `mcp/dispatch.mjs` | Servidor MCP mínimo por stdio; solo habla con la API HTTP de hive-am. Anuncia las herramientas según `HIVE_CAPS`: `dispatch`, `channel`, `memory` y `skills`. |
+| `mcp/dispatch.mjs` | Servidor MCP mínimo por stdio; solo habla con la API HTTP de hive-am. Anuncia las herramientas según `HIVE_CAPS`: `dispatch`, `channel` (incluye enviar archivos), `memory` y `skills`. |
 
 ## Frontend: responsabilidad de cada archivo
 

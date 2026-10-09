@@ -88,6 +88,20 @@ const allTools = [
   },
   {
     cap: 'channel',
+    name: 'channel_send_file',
+    description: 'Send a file (image, PDF, report, document…) to the person or group whose message you are handling now. Give the full path of a file inside your working folder (create or copy it there first). Credentials, keys and databases are never sent. Do NOT use the platform API or any bot token yourself: this tool is the only way.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Full path of the file to send.' },
+        caption: { type: 'string', description: 'Optional short text shown with the file.' },
+      },
+      required: ['path'],
+      additionalProperties: false,
+    },
+  },
+  {
+    cap: 'channel',
     name: 'channel_mute',
     description: 'Keep quiet in the thread of the message you are handling (muted=true), or start taking part again (muted=false). Use it when people ask you to stop answering / be quiet / not to reply anymore, and when they ask you to talk again. It only affects this one thread (a group chat or a topic); other threads are untouched. While muted you are only woken when someone mentions you, replies to you or uses a command. Say a short goodbye with channel_reply first if it fits.',
     inputSchema: {
@@ -145,6 +159,15 @@ async function call(name, args) {
     const tip = left < j.max * 0.2 ? ` The notebook is nearly full (${j.size}/${j.max}): tidy it soon with notebook_rewrite.` : '';
     if (name === 'notebook_add') return `${j.added ? 'Saved.' : j.note}${tip} (version ${j.version})`;
     return `Notebook replaced (version ${j.version}, ${j.size}/${j.max} characters).`;
+  }
+  if (name === 'channel_send_file') {
+    const r = await fetch(`${API}/api/channel/send-file`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: FROM, path: args.path, caption: args.caption }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `channel_send_file failed (${r.status})`);
+    return `Sent ${j.name} (${j.kind}).`;
   }
   if (name === 'channel_mute') {
     const r = await fetch(`${API}/api/channel/mute`, {

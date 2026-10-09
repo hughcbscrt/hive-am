@@ -5,9 +5,10 @@ import { readdirSync, statSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { agents, colonies, db, dispatches, resolved, skills, types } from './db.js';
-import { ChannelError, channelMute, channelReply, connectionStatus, startConnection, stopConnection, testConnection } from './connections/manager.js';
+import { ChannelError, SendError, channelMute, channelReply, channelSendFile, connectionStatus, startConnection, stopConnection, testConnection } from './connections/manager.js';
 import { mergeConfig, publicConnection } from './connections/public.js';
 import { channelPermissionError } from './connections/rules.js';
+import { validVision } from './connections/vision.js';
 import { NOTEBOOK_MAX, NotebookError, notebooks } from './skills/notebook.js';
 import { NOTEBOOK_SKILL_ID } from './skills/defaults.js';
 import { connections, threads } from './connections/store.js';
@@ -319,6 +320,7 @@ function validateConnection(kind: string, config: Record<string, any>, agentId: 
   if (missing.length) throw bad(`Missing: ${missing.join(', ')}`);
   if (config.on_silent !== undefined && !['notice', 'send_text', 'ignore'].includes(config.on_silent)) throw bad('on_silent must be notice, send_text or ignore');
   if (config.group_mode !== undefined && !['mention', 'open'].includes(config.group_mode)) throw bad('group_mode must be mention or open');
+  if (config.vision !== undefined && config.vision !== null && !validVision(config.vision)) throw bad('vision must be { provider, model } or empty');
   if (config.chats !== undefined && (!Array.isArray(config.chats) || config.chats.length > 50)) throw bad('chats must be a list of at most 50 groups');
   if (config.aliases !== undefined && (!Array.isArray(config.aliases) || config.aliases.length > 10)) throw bad('aliases must be a list of at most 10 names');
   if (agentId) {
@@ -456,6 +458,11 @@ route('POST', '/api/channel/reply', async ({ req }) => {
   const { from, text } = await body(req);
   try { return await channelReply(String(from ?? ''), String(text ?? '')); }
   catch (e) { if (e instanceof ChannelError) throw bad(e.message); throw e; }
+});
+route('POST', '/api/channel/send-file', async ({ req }) => {
+  const { from, path, caption } = await body(req);
+  try { return await channelSendFile(String(from ?? ''), String(path ?? ''), caption === undefined ? undefined : String(caption)); }
+  catch (e) { if (e instanceof ChannelError || e instanceof SendError) throw bad(e.message); throw e; }
 });
 route('POST', '/api/channel/mute', async ({ req }) => {
   const { from, muted } = await body(req);

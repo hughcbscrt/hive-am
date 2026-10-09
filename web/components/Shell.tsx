@@ -8,12 +8,7 @@ import { I18nProvider, LOCALES, useI18n } from '@/lib/i18n';
 import { Toaster } from './ui';
 
 function HiveMark() {
-  return (
-    <svg width="30" height="34" viewBox="0 0 30 34" aria-hidden>
-      <polygon points="15,1 28,8.5 28,25.5 15,33 2,25.5 2,8.5" fill="var(--honey)" />
-      <polygon points="15,9 21.5,12.75 21.5,21.25 15,25 8.5,21.25 8.5,12.75" fill="var(--bg-deep)" />
-    </svg>
-  );
+  return <img src="/icon.png" width={34} height={34} alt="" aria-hidden className="brand-mark" />;
 }
 
 /** Language switch at the top of the rail. The choice lives in localStorage; URLs never change. */

@@ -1,8 +1,31 @@
-import type { StreamEvent, TurnOptions } from '../types.js';
+import type { Permission, StreamEvent, TurnOptions } from '../types.js';
+import { DATA_DIR } from '../db.js';
+import { join } from 'node:path';
+
+const INBOX_ROOT = join(DATA_DIR, 'inbox');
 import { spawnLines, safeJson } from './spawn.js';
 import { dispatchMcpConfigOpencode } from '../mcp-config.js';
 import { opencodeSessionDir } from '../history/opencode.js';
 import { withInstructions } from './preamble.js';
+
+/**
+ * What OpenCode may do for each permission level. It has no such modes, so they are written as its own rules (a `deny` holds even with `--auto`):
+ * read-only changes nothing; editing changes files of the project (including .env, never .git or keys), runs no commands and stays in the agent's folder
+ * (OpenCode's "external directory" is whatever lies outside the folder the process starts in, which is the agent's effective folder) plus the
+ * folder where received files are saved; full access leaves everything open.
+ */
+export function opencodePermissions(level: Permission): Record<string, unknown> {
+  if (level === 'bypassPermissions') return {};
+  const protectedFiles = { '.git/**': 'deny', '*.pem': 'deny', '*.key': 'deny' };   // .env stays editable: configuring a project needs it
+  if (level === 'plan') return { edit: 'deny', bash: 'deny', task: 'deny' };
+  return {
+    read: { '*': 'allow' },   // OpenCode denies reading .env files unless told otherwise
+    edit: { '*': 'allow', ...protectedFiles },
+    bash: 'deny',
+    task: 'deny',
+    external_directory: { '*': 'deny', [`${INBOX_ROOT}/**`]: 'allow' },
+  };
+}
 
 /** OpenCode: `opencode run --format json`; parts arrive whole, so deltas are derived from per-part length. */
 export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> {
@@ -21,7 +44,7 @@ export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> 
 
   // Turns are non-interactive: OpenCode's `question` tool would be dismissed and end the turn with exit code 1, so
   // deny it and the agent asks in plain text instead.
-  const config = { permission: { question: 'deny' }, ...(o.mcpCaps.length ? dispatchMcpConfigOpencode(agent.id, o.mcpCaps) : {}) };
+  const config = { permission: { question: 'deny', ...opencodePermissions(agent.permission) }, ...(o.mcpCaps.length ? dispatchMcpConfigOpencode(agent.id, o.mcpCaps) : {}) };
   const env: Record<string, string> = { OPENCODE_CONFIG_CONTENT: JSON.stringify(config) };
 
   const seen = new Map<string, number>();

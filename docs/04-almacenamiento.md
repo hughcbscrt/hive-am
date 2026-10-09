@@ -6,6 +6,7 @@ hive-am guarda datos en **cuatro** lugares. Entender cuál guarda qué es clave:
 |---|---|---|
 | `~/.hive-am/hive-am.db` | hive-am | Configuración: agentes, tipos, skills, colonias, relaciones, punteros a sesiones, registro de delegaciones |
 | `~/.hive-am/mcp/<agentId>.json` | hive-am | Configuración MCP temporal por agente (solo Claude) |
+| `~/.hive-am/inbox/<agentId>/<fecha>/` | hive-am | Archivos que las personas enviaron a un agente por una conexión; se borran a los 14 días ([14.6.2](14-conexiones-externas.md#1462-archivos-recibidos)) |
 | Almacenes nativos de cada CLI | **cada CLI** | Las **conversaciones** (mensajes, herramientas, uso de tokens) |
 | `localStorage` del navegador | la interfaz | Preferencias de vista (tema, panel, posiciones del lienzo) |
 

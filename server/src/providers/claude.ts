@@ -4,14 +4,22 @@ import type { StreamEvent, TurnOptions } from '../types.js';
 import { spawnLines, safeJson } from './spawn.js';
 import { DATA_DIR } from '../db.js';
 import { dispatchMcpConfig } from '../mcp-config.js';
+import { existsSync } from 'node:fs';
+import { inboxDir } from '../connections/files.js';
 import { withInstructions } from './preamble.js';
+
+/** What editing a project must not touch: the repository's own data and private keys (.env stays editable, like in OpenCode). */
+export const CLAUDE_EDIT_DENY = ['Edit(**/.git/**)', 'Edit(**/*.pem)', 'Edit(**/*.key)'];
 
 /** Claude Code: `claude -p` with stream-json; the prompt goes through stdin, the session is resumed by id. */
 export async function* runClaude(o: TurnOptions): AsyncGenerator<StreamEvent> {
   const { agent } = o;
   const args = ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', agent.permission];
+  if (agent.permission === 'acceptEdits') args.push('--disallowedTools', ...CLAUDE_EDIT_DENY);
   if (agent.session_id) args.push('--resume', agent.session_id);
   if (agent.model) args.push('--model', agent.model);
+  // Files people sent through a connection live outside the working folder; let the agent read them.
+  if (existsSync(inboxDir(agent.id))) args.push('--add-dir', inboxDir(agent.id));
   // The system prompt of a session is fixed when it starts: `--append-system-prompt` is ignored on `--resume`. So a
   // resumed conversation whose instructions changed (skills, team, notebook…) gets them as an update inside the message.
   if (o.instructions) args.push('--append-system-prompt', o.instructions);

@@ -5,8 +5,8 @@ import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
 import { ago } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n';
-import type { AllowedChat, AllowedUser, Connection, ConnectionThread } from '@/lib/types';
-import { Drawer, Field, Hex, Modal, Segmented, useToast } from './ui';
+import type { AllowedChat, AllowedUser, Connection, ConnectionThread, Provider } from '@/lib/types';
+import { Drawer, Field, Hex, ModelField, Modal, Segmented, useToast } from './ui';
 
 type Silent = 'notice' | 'send_text' | 'ignore';
 type GroupMode = 'mention' | 'open';
@@ -27,6 +27,8 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
   const [groupMode, setGroupMode] = useState<GroupMode>(connection?.config.group_mode === 'open' ? 'open' : 'mention');
   const [chats, setChats] = useState<AllowedChat[]>(connection?.config.chats ?? []);
   const [aliases, setAliases] = useState<string>((connection?.config.aliases ?? []).join(', '));
+  const [files, setFiles] = useState<boolean>(connection?.config.files !== false);
+  const [vision, setVision] = useState<{ provider: Provider; model: string } | null>(connection?.config.vision ?? null);
   const [enabled, setEnabled] = useState(connection?.enabled ?? true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -68,7 +70,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
     if (Object.keys(e).length) return;
     setSaving(true);
     const body = { kind: 'telegram', name: name.trim(), agent_id: agentId, enabled, allowed: allowed.filter((u) => u.id.trim()), config: {
-      ...(token.trim() ? { token: token.trim() } : {}), lang, on_silent: silent, group_mode: groupMode,
+      ...(token.trim() ? { token: token.trim() } : {}), lang, on_silent: silent, group_mode: groupMode, files, vision,
       chats: chats.filter((c) => c.id.trim()), aliases: aliases.split(',').map((x) => x.trim()).filter(Boolean),
     } };
     try {
@@ -162,6 +164,26 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
             </Field>
           </div>
         </Field>
+
+        <Field label={t('conn.files')} hint={t('conn.files.hint')}>
+          <Segmented value={files ? 'on' : 'off'} onChange={(v) => setFiles(v === 'on')} options={[{ id: 'on', label: t('common.yes') }, { id: 'off', label: t('conn.files.off') }]} />
+        </Field>
+
+        {files && (
+          <Field label={t('conn.vision')} hint={t(vision ? 'conn.vision.hint.other' : 'conn.vision.hint.agent')}>
+            <div className="col" style={{ gap: 8 }}>
+              <Segmented value={vision ? 'other' : 'agent'} onChange={(v) => setVision(v === 'other' ? { provider: 'claude', model: 'haiku' } : null)} options={[{ id: 'agent', label: t('conn.vision.agent') }, { id: 'other', label: t('conn.vision.other') }]} />
+              {vision && (
+                <div className="col" style={{ gap: 8 }}>
+                  <select className="input" value={vision.provider} onChange={(e) => setVision({ provider: e.target.value as Provider, model: '' })} aria-label={t('form.provider')}>
+                    {(['claude', 'opencode', 'kiro'] as Provider[]).map((p) => <option key={p} value={p}>{p === 'claude' ? 'Claude Code' : p === 'opencode' ? 'OpenCode' : 'Kiro'}</option>)}
+                  </select>
+                  <ModelField provider={vision.provider} value={vision.model} onChange={(m) => setVision({ ...vision, model: m })} />
+                </div>
+              )}
+            </div>
+          </Field>
+        )}
 
         <Field label={t('conn.lang')}><Segmented value={lang} onChange={setLang} options={[{ id: 'es', label: t('conn.lang.es') }, { id: 'en', label: t('conn.lang.en') }]} /></Field>
         <Field label={t('conn.silent')}>

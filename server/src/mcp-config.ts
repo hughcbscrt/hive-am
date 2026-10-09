@@ -15,9 +15,16 @@ export const dispatchMcpConfigOpencode = (agentId: string, caps: string[]) => ({
   mcp: { hive: { type: 'local', command: [process.execPath, script], environment: env(agentId, caps), enabled: true } },
 });
 
-/** Kiro agent profile (~/.kiro/agents/<name>.json): Kiro only loads MCP servers from config files, so each orchestrator gets its own profile. */
-export const dispatchKiroProfile = (agentId: string, name: string, caps: string[]) => ({
-  name, description: 'hive-am orchestrator profile (generated)', prompt: null,
-  mcpServers: { hive: { command: process.execPath, args: [script], env: env(agentId, caps) } },
-  tools: ['*'], allowedTools: ['@hive'], includeMcpJson: false,
+/** What a Kiro profile trusts and which paths it may write (`toolsSettings`, the format Kiro 2.x reads; `permissions.rules` is 3.x only). */
+export interface KiroAccess { trusted: string[]; toolsSettings?: Record<string, unknown> }
+
+/**
+ * Kiro agent profile (~/.kiro/agents/<name>.json). Kiro only loads MCP servers from config files, so an agent with hive tools gets its
+ * own profile; so does one with path limits. With a profile `--trust-tools` no longer applies: what is trusted is listed here.
+ */
+export const kiroProfile = (agentId: string, name: string, caps: string[], access: KiroAccess = { trusted: [] }) => ({
+  name, description: 'hive-am agent profile (generated)', prompt: null,
+  mcpServers: caps.length ? { hive: { command: process.execPath, args: [script], env: env(agentId, caps) } } : {},
+  tools: ['*'], allowedTools: [...access.trusted, ...(caps.length ? ['@hive'] : [])], includeMcpJson: false,
+  ...(access.toolsSettings ? { toolsSettings: access.toolsSettings } : {}),
 });

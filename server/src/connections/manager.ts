@@ -1,5 +1,7 @@
 import { agents } from '../db.js';
 import { liveOrigin, notifyAgentsChanged } from '../runtime.js';
+import { cleanInbox } from './files.js';
+import { resolveSendable } from './outbound.js';
 import { handleInbound } from './router.js';
 import { connections, threadMessages, threads } from './store.js';
 import type { AdapterStatus, ChannelAdapter, ChannelKind, Connection } from './types.js';
@@ -41,7 +43,12 @@ export async function stopConnection(id: string): Promise<void> {
   try { await a.stop(); } catch { /* already down */ }
 }
 
-export const startAll = () => Promise.all(connections.list().filter((c) => c.enabled).map((c) => startConnection(c.id)));
+export const startAll = () => {
+  // Received files are kept for a while, then removed.
+  cleanInbox();
+  setInterval(() => cleanInbox(), 6 * 3_600_000).unref();
+  return Promise.all(connections.list().filter((c) => c.enabled).map((c) => startConnection(c.id)));
+};
 export const stopAll = () => Promise.all([...running.keys()].map(stopConnection));
 
 export async function testConnection(id: string): Promise<string> {
@@ -53,6 +60,8 @@ export async function testConnection(id: string): Promise<string> {
 }
 
 export class ChannelError extends Error {}
+
+export { SendError } from './outbound.js';
 
 /** `channel_mute`: the agent keeps quiet in the thread it is handling (or starts talking there again). */
 export function channelMute(agentId: string, muted: boolean): { muted: boolean; place: string } {
@@ -77,4 +86,21 @@ export async function channelReply(agentId: string, text: string): Promise<{ sen
   threadMessages.record(thread.id, 'out', externalId, { name: agents.get(agentId)?.name }, text);
   origin.replied = true;
   return { sent: true, parts: 1 };
+}
+
+/** `channel_send_file`: sends a file from the agent's working folder (or inbox) to the thread of the message it is handling. */
+export async function channelSendFile(agentId: string, path: string, caption?: string): Promise<{ sent: boolean; name: string; kind: string }> {
+  const agent = agents.get(agentId);
+  if (!agent) throw new ChannelError('Unknown agent');
+  const origin = liveOrigin(agentId);
+  if (!origin) throw new ChannelError('No channel message is being handled right now, so there is nobody to send the file to.');
+  const adapter = running.get(origin.connectionId);
+  if (!adapter?.sendFile) throw new ChannelError('This connection cannot send files.');
+  const thread = threads.get(origin.threadId);
+  if (!thread) throw new ChannelError('The thread no longer exists.');
+  const file = resolveSendable(agent, path);   // throws SendError with the reason
+  const { externalId } = await adapter.sendFile(thread.target, file, caption?.trim() || undefined);
+  threadMessages.record(thread.id, 'out', externalId, { name: agent.name }, `${caption?.trim() ? `${caption.trim()} ` : ''}[sent file: ${file.name}]`);
+  origin.replied = true;
+  return { sent: true, name: file.name, kind: file.kind };
 }

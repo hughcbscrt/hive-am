@@ -171,7 +171,7 @@ Toda la interfaz está disponible en **inglés** y **español**. El sistema es p
 
 ### Selector de idioma
 
-- Está **arriba de la barra lateral**, debajo del logo: un control `EN | ES` (`LanguageSwitch` en `components/Shell.tsx`).
+- Está **arriba de la barra lateral**, debajo del logo (`/icon.png`, el mismo del favicon; se oculta cuando la barra se colapsa): un control `EN | ES` (`LanguageSwitch` en `components/Shell.tsx`).
 - El cambio es **inmediato** y no recarga la página.
 - **Nada del idioma aparece en la URL**: las rutas (`/agents`, `/relations`, …) son las mismas en ambos idiomas. La elección se guarda solo en `localStorage` (`hive-locale`).
 - Idioma inicial: el guardado en `localStorage`; si no hay, el del navegador (`es*` → español, cualquier otro → inglés). También se actualiza `<html lang>`.

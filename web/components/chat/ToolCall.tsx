@@ -1,6 +1,6 @@
 'use client';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { BookOpen, Bot, Check, ChevronRight, Copy, FilePen, FilePlus, FileText, Globe, ListChecks, MessageSquare, Search, Terminal, Volume2, VolumeX, Waypoints, Wrench } from 'lucide-react';
+import { BookOpen, Bot, Paperclip, Check, ChevronRight, Copy, FilePen, FilePlus, FileText, Globe, ListChecks, MessageSquare, Search, Terminal, Volume2, VolumeX, Waypoints, Wrench } from 'lucide-react';
 import { fmtDur } from '@/lib/format';
 import { translate as tr, useI18n } from '@/lib/i18n/index';
 import type { Block } from '@/lib/types';
@@ -62,6 +62,12 @@ export function describe(tool: Tool): Described {
   if (n.endsWith('skillread') || wrappedSkill) {
     let nm = str(input.name); if (wrappedSkill) { try { nm = JSON.parse(wrappedSkill[1]); } catch { /* keep */ } }
     return { icon: <BookOpen size={14} />, label: tr('tool.skillRead'), summary: nm, body: null };
+  }
+  const wrappedSend = typeof input.code === 'string' ? /tools\.hive\.channel_send_file\(\s*\{\s*path\s*:\s*("(?:[^"\\]|\\.)*")/.exec(input.code) : null;
+  if (n.endsWith('channelsendfile') || wrappedSend) {
+    let p = str(input.path); if (wrappedSend) { try { p = JSON.parse(wrappedSend[1]); } catch { /* keep */ } }
+    const cap = str(input.caption);
+    return { icon: <Paperclip size={14} />, label: tr('tool.channelSendFile'), summary: p.replace(/^.*[\\/]/, ''), body: <Kv rows={[[tr('tool.k.path'), <span key="p" className="mono">{p}</span>], ...(cap ? [[tr('tool.k.caption'), <span key="c">{cap}</span>] as [string, ReactNode]] : [])]} /> };
   }
   const wrappedMute = typeof input.code === 'string' ? /tools\.hive\.channel_mute\(\s*\{\s*muted\s*:\s*(true|false)/.exec(input.code) : null;
   if (n.endsWith('channelmute') || wrappedMute) {

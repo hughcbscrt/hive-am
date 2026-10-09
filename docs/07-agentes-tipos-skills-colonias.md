@@ -24,9 +24,11 @@ Un agente es **configuración + puntero a sesión**. Campos (`server/src/types.t
 
 | Permiso | Claude | OpenCode | Kiro |
 |---|---|---|---|
-| `plan` (Read-only) | `--permission-mode plan` | Sin efecto (siempre `--auto`) | Sin `--trust-all-tools` |
-| `acceptEdits` (Edit files) | `--permission-mode acceptEdits` | Sin efecto | `--trust-all-tools` |
-| `bypassPermissions` (Full access) | `--permission-mode bypassPermissions` | Sin efecto | `--trust-all-tools` |
+| `plan` (Read-only) | `--permission-mode plan` | Deniega `edit`, `bash` y `task` | Ninguna herramienta de confianza |
+| `acceptEdits` (Edit files) | `--permission-mode acceptEdits`, sin `.git` ni llaves | Edita (incluido `.env`), sin comandos, sin `.git` ni llaves, solo en su carpeta | Edita (incluido `.env`), sin comandos, sin `.git` ni llaves, solo en su carpeta |
+| `bypassPermissions` (Full access) | `--permission-mode bypassPermissions` | Sin restricciones (`--auto`) | `--trust-all-tools` |
+
+Claude es el único que en «Edit files» deja pasar los comandos de archivos (`touch`, `mv`…); los otros dos bloquean todos. Los tres niveles se comprueban con `server/scripts/sim-readonly.ts`.
 
 Detalle y límites en el [documento 6](06-proveedores.md) y el [12](12-operacion-y-problemas.md).
 
@@ -178,5 +180,17 @@ Si la carpeta efectiva queda vacía al empezar un turno, el turno falla con: *"T
 4. **Equipo** (solo orquestadores): ver [documento 9](09-orquestacion-y-relaciones.md#95-instrucciones-del-orquestador).
 5. **Conexiones** (si el agente tiene alguna): cómo llegan los mensajes de un canal y cómo responder; ver [documento 14](14-conexiones-externas.md).
 6. **Cuaderno** (si tiene la skill Notebook): cómo usarlo, y aparte el texto actual de sus notas, que no cuenta para el hash de instrucciones ([7.3.2](#732-el-cuaderno-del-agente)).
+
+### Dónde viven las reglas que recibe un agente
+
+| Origen | Qué aporta | Dónde se cambia |
+|---|---|---|
+| Interfaz | System prompt del agente y de la colonia, skills (siempre / a demanda), nombre, rol, descripción y carpeta, subagentes, texto del cuaderno | Formularios de agente, tipo y colonia; pestaña Cuaderno |
+| Código: `server/src/instructions.ts` | Reglas fijas en inglés: identidad, equipo, sección del canal (incluidas «Groups» y «Files»), cuaderno y skills a demanda | Solo editando el código; ningún ajuste de la interfaz las modifica |
+| Código: `server/mcp/dispatch.mjs` | Descripción de cada herramienta MCP (`channel_send_file` indica que no se use el token del bot) | Solo código |
+| Código: `server/src/connections/prompt.ts` | Cabecera de cada mensaje de un canal (`[hive:channel]`, `[hive:files]`, `[hive:context]`) | Solo código |
+| Código: `server/src/providers/opencode.ts` | Configuración que prohíbe la herramienta `question` | Solo código |
+
+Las instrucciones **orientan al modelo, no lo obligan**. Lo que el servidor sí hace cumplir: a quién responde cada conexión (personas y grupos autorizados), el permiso del agente (lo aplica el CLI en los tres proveedores; probado con `sim-readonly.ts`) y qué archivos pueden salir (`connections/outbound.ts`). Por ejemplo, la regla «no busques el token del bot» es una instrucción; el token sigue en la base de datos local ([14.6.3](14-conexiones-externas.md)).
 
 Cómo llegan al CLI: por `--append-system-prompt` en Claude (al crear la sesión; si cambian después, como bloque de actualización en el mensaje) y como preámbulo en el mensaje en OpenCode y Kiro ([documento 6](06-proveedores.md#66-preámbulo-de-instrucciones-providerspreamblets)).

@@ -13,6 +13,8 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 | Explorador de carpetas | `GET /api/fs/dirs` lista subcarpetas de cualquier ruta legible. |
 | Explorador de cambios (git) | Las lecturas no escriben nada; las acciones (commit, pull, push, ramas) nunca fuerzan ni omiten *hooks* y rechazan peticiones que no vengan de la propia app. Todo limitado a la carpeta del agente; rechaza rutas fuera de ella (también por enlaces simbólicos) y cualquier ruta con `.git`. Detalle en el [documento 13](13-explorador-de-cambios-git.md#135-seguridad). |
 | Secretos | Los CLIs usan su propia sesión. La única credencial que guarda hive-am es el **token del bot** de cada conexión externa, en `~/.hive-am/hive-am.db`: la API nunca lo devuelve (solo `{ set, hint }`). La base contiene además tus prompts, skills y el cuaderno de cada agente en texto plano; el cuaderno rechaza credenciales ([7.3.2](07-agentes-tipos-skills-colonias.md#732-el-cuaderno-del-agente)). |
+| Archivos enviados | El agente solo envía por la herramienta `channel_send_file`, que rechaza rutas fuera de su carpeta de trabajo, credenciales, llaves, bases de datos y datos de hive-am ([14.6.3](14-conexiones-externas.md#1463-archivos-enviados-por-el-agente)). El token del bot sigue siendo legible para un agente con acceso a archivos (está en la base de datos): no lo necesita, pero no se le impide. |
+| Archivos recibidos | Se guardan en `~/.hive-am/inbox/` (14 días, 20 MB cada uno, nunca se ejecutan) solo si vienen de personas autorizadas. Si la conexión usa un modelo de imágenes, cada imagen se envía a ese proveedor. Su contenido puede intentar dar instrucciones al agente: las instrucciones le indican tratarlo como datos, pero conviene dar permisos acordes. |
 | Conexiones externas | Solo responden a personas de la lista (o a miembros de un grupo autorizado); un agente con conexión necesita al menos «Editar archivos» y autorizar un grupo le da ese acceso a todos sus miembros ([documento 14](14-conexiones-externas.md#145-permisos)). |
 | Lectores de historial | Validan los ids de sesión (Claude: `^[\w-]+$`; Kiro: UUID) y abren la base de OpenCode en solo lectura. |
 
@@ -26,8 +28,8 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 
 | # | Limitación | Detalle |
 |---|---|---|
-| 1 | **Kiro orquesta mediante un perfil generado** | Escribe `~/.kiro/agents/hive-<agentId>.json` por cada orquestador Kiro con subagentes (se queda ahí al borrar el agente). |
-| 2 | **Permisos en OpenCode** | Siempre `--auto`; `plan` (solo lectura) y el resto de permisos **no se aplican** a OpenCode. |
+| 1 | **Kiro usa un perfil generado** | Escribe `~/.kiro/agents/hive-<agentId>.json` por cada agente Kiro que tenga herramientas de hive (subagentes, canales, cuaderno, skills a demanda) o permiso «Editar archivos». Se reescribe en cada turno y se queda ahí al borrar el agente. |
+| 2 | **Permisos en Kiro y OpenCode** | Los tres niveles se aplican en los tres proveedores (comprobado con `sim-readonly.ts`). En Claude, «Editar archivos» deja pasar solo los comandos de archivos; en OpenCode y Kiro bloquea todos los comandos. En «Editar archivos» los tres protegen `.git` y las llaves, no salen de la carpeta del agente y pueden editar `.env`. Kiro necesita un perfil propio para eso (ver 6.5). |
 | 3 | **System prompt en OpenCode/Kiro (y Claude al reanudar)** | Viaja dentro del mensaje (preámbulo), no como instrucción de sistema del CLI. Claude solo aplica `--append-system-prompt` al crear la sesión, así que una actualización de instrucciones en una sesión reanudada también va en el mensaje. Se oculta en la interfaz, pero el modelo lo ve como parte del mensaje. |
 | 4 | **Turno en vuelo en un apagón** | Se pierde el turno a medias; la sesión queda intacta y el agente vuelve a `idle` al reiniciar. El mensaje hay que reenviarlo. |
 | 5 | **`PATCH` de agente valida la carpeta efectiva después de guardar** | Si dejas al agente sin carpeta efectiva, el cambio ya quedó guardado cuando se devuelve el error. |
@@ -98,7 +100,9 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
    HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4422 npx tsx scripts/sim-groups.ts    claude haiku   # grupos: charla, silencio, /mute
    HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4423 npx tsx scripts/sim-notebook.ts  claude haiku   # cuaderno del agente
    HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4424 npx tsx scripts/sim-skills.ts    claude haiku   # skills siempre / a demanda
+   HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4431 npx tsx scripts/sim-readonly.ts  opencode opencode-go/deepseek-v4.1-flash   # los tres permisos: solo leer / editar / acceso total
    ```
+   Con Kiro el modelo hay que indicarlo (`auto`, `claude-haiku-4.5`…): los modelos de OpenCode que usan por defecto algunos scripts no existen allí y el CLI termina con código 1.
 
    El proveedor (`claude`, `opencode`, `kiro`) es el primer argumento; todas terminan con `ALL PASSED` o `N FAILED`.
 7. **Delegación:** crear un orquestador (Claude u OpenCode), conectarle un worker y pedirle que delegue; comprobar la fila en `GET /api/dispatches`, la sesión de delegación en `GET /api/agents/<worker>/sessions` y que el chat directo del worker no cambió.

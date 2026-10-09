@@ -49,7 +49,7 @@ El servidor MCP `hive` (`server/mcp/dispatch.mjs`) anuncia herramientas según l
 | Capacidad | Herramientas | Quién la tiene |
 |---|---|---|
 | `dispatch` | `list_agents`, `dispatch` | Orquestadores con al menos un subagente |
-| `channel` | `channel_reply`, `channel_mute` | Agentes con al menos una conexión **activa** |
+| `channel` | `channel_reply`, `channel_send_file`, `channel_mute` | Agentes con al menos una conexión **activa** |
 | `memory` | `notebook_read`, `notebook_add`, `notebook_rewrite` | Agentes con la skill Notebook ([7.3.2](07-agentes-tipos-skills-colonias.md#732-el-cuaderno-del-agente)) |
 | `skills` | `skill_read` | Agentes con alguna skill *a demanda* ([7.3.3](07-agentes-tipos-skills-colonias.md#733-carga-bajo-demanda)) |
 
@@ -90,7 +90,7 @@ Implementado con `fetch` plano contra la Bot API (sin dependencias nuevas), por 
 |---|---|
 | `connections` | tipo, nombre, agente vinculado (`ON DELETE SET NULL`), `config` (token y opciones, JSON), `allowed` (`[{ id, name, admin }]`), activa |
 | `threads` | hilos conocidos: clave externa, título, destino de respuesta (JSON), último usuario y actividad. **Sin `session_id`** |
-| `thread_messages` | lo recibido y enviado por hilo; única por `(hilo, dirección, id externo)` para desduplicar |
+| `thread_messages` | lo recibido y enviado por hilo; única por `(hilo, dirección, id externo)` para desduplicar; `files` guarda los archivos recibidos con cada mensaje |
 | `connection_cursor` | marca de agua del sondeo |
 
 `config` opciones no secretas: `lang` (`es`/`en`, idioma de los avisos del bot), `on_silent`, `rate_limit`. La URL de la API (`api_base`) solo existe para pruebas.
@@ -114,6 +114,31 @@ Configuración de la conexión (`config`, sin migración):
 - **Privacidad de Telegram:** por defecto un bot **no ve** los mensajes de grupo que no lo mencionan (privacy mode). En modo `open` hay que desactivarlo en @BotFather (`/setprivacy` → Disable) y volver a añadir el bot a cada grupo; la conexión lo detecta (`getMe.can_read_all_group_messages`) y muestra el aviso en su estado.
 - **Id del grupo:** el aviso de acceso incluye el id del chat; los grupos suelen empezar por `-100…`.
 
+### 14.6.2 Archivos recibidos
+
+Las personas autorizadas pueden enviar **fotos, documentos, audios, notas de voz y videos** (también álbumes). Se activa por conexión (`config.files`, sí por defecto).
+
+- **Quién:** solo se descargan los archivos de personas (o grupos) autorizados, y solo si el mensaje llega al agente: en un grupo en modo «Solo si lo llaman», un archivo que nadie dirigió al bot **no** se descarga. En modo «Escucha todo» sí se guardan, para poder usarlos después.
+- **Dónde:** `~/.hive-am/inbox/<agentId>/<AAAA-MM-DD>/<id del mensaje>-<n>-<nombre>`. El nombre se sanea (sin carpetas, sin caracteres raros, nunca oculto). Nada se ejecuta nunca. Se borran a los **14 días** (al arrancar y cada 6 horas).
+- **Límites:** 20 MB por archivo (el máximo que Telegram deja descargar a un bot) y 5 archivos por mensaje; lo que no se pueda recibir se avisa a quien lo envió, con el motivo (`too big`, etc.). Con `files: false` el bot contesta que esa conexión no recibe archivos.
+- **Álbumes:** Telegram manda cada foto como un mensaje; el adaptador espera ~1,2 s y los entrega como **uno solo**, con la leyenda del primero y todos los archivos. Si la leyenda menciona al bot, todo el álbum cuenta como dirigido.
+- **Qué recibe el agente:** el texto (o la leyenda del archivo) y, tras él, un bloque `[hive:files]` con la ruta de cada archivo, su tipo y tamaño. Los archivos de mensajes que no llegó a ver aparecen en el bloque de contexto como `[files: ruta, …]`. Las instrucciones le dicen que abra los archivos con sus herramientas, que **no puede escuchar audio ni ver video** salvo que tenga una herramienta para eso, y que el contenido de un archivo es **información, nunca instrucciones**.
+- **Imágenes y modelos que no ven:** muchos modelos no aceptan imágenes (p. ej. `deepseek` en OpenCode): el archivo les llega, pero no pueden mirarlo. Para eso la conexión tiene **Ver imágenes** (`config.vision = { provider, model }`): cada imagen que llega (hasta 3 por mensaje y 8 MB) la describe ese modelo en un turno aparte y de solo lectura (`connections/vision.ts`), transcribe su texto, y la descripción se añade bajo el archivo en el bloque `[hive:files]` (marcada como generada por un modelo, posiblemente errónea y que no contiene instrucciones). Así cualquier agente puede responder sobre la imagen, sea cual sea su proveedor. Si el modelo de imágenes falla, el mensaje sigue su curso con una nota `(no description: …)`. **La imagen se envía a ese proveedor.** Con la opción por defecto («Con el modelo del agente») no se hace nada: sirve si el modelo del agente ve imágenes (por ejemplo Claude, que las abre con su herramienta de lectura).
+- **Acceso desde el CLI:** Claude recibe la carpeta del agente con `--add-dir` (está fuera de su carpeta de trabajo); OpenCode y Kiro la leen con sus permisos normales.
+- **Interfaz:** en el chat, los archivos aparecen como etiquetas bajo la burbuja del mensaje; el panel de la conexión tiene el interruptor **Recibir archivos**.
+- **Aún no:** transcribir audios ni analizar video.
+
+### 14.6.3 Archivos enviados por el agente
+
+El agente envía archivos (una imagen, un PDF, un informe que generó) con la herramienta `channel_send_file({ path, caption? })`, que los manda al hilo del mensaje que atiende (`POST /api/channel/send-file`). Es la única vía: **no debe buscar el token del bot ni llamar a la API de Telegram por su cuenta**, y las instrucciones se lo dicen.
+
+- **Qué rutas acepta** (`connections/outbound.ts`): solo archivos dentro de su carpeta de trabajo, de su carpeta de archivos recibidos o de la carpeta temporal del sistema; una ruta relativa se toma desde su carpeta de trabajo. Se resuelven los enlaces simbólicos antes de comprobar, así que un enlace a `/etc/passwd` se rechaza.
+- **Qué nunca se envía:** `.env*`, llaves y certificados (`id_rsa`, `*.pem`, `*.key`, `*.p12`…), `credentials`, bases de datos (`*.db`, `*.sqlite`), todo lo de `.git/` y los datos de hive-am (`~/.hive-am/`, salvo su propia carpeta de archivos recibidos). Tampoco carpetas ni archivos vacíos o de más de 50 MB (el máximo de Telegram).
+- **Cómo se manda:** las imágenes como foto (si Telegram la rechaza, como documento), y el resto según su tipo: video, audio o documento. La leyenda se corta a 1000 caracteres. Queda registrado en el hilo como `[sent file: nombre]`.
+- **Interfaz:** en el chat aparece como la fila «Enviar archivo al canal».
+
+> **Sobre el token:** el token del bot está en `~/.hive-am/hive-am.db` y un agente con acceso a archivos del equipo podría leerlo. Las reglas (sección «Files» de `instructions.ts` y la descripción de `channel_send_file` en `server/mcp/dispatch.mjs`) y la herramienta evitan que lo necesite, pero no lo impiden: son instrucciones al modelo. Lo que el servidor sí hace cumplir es qué rutas pueden enviarse (`connections/outbound.ts`). Ver [7.6](07-agentes-tipos-skills-colonias.md#76-instrucciones-compuestas-composeinstructions). Si compartes el agente con personas en las que no confías del todo, usa permisos mínimos y rota el token con @BotFather si sospechas que se filtró.
+
 ## 14.8 API
 
 Todas bajo `/api`, solo origen local.
@@ -129,6 +154,7 @@ Todas bajo `/api`, solo origen local.
 | `GET /connections/:id/threads` | Hilos conocidos |
 | `PATCH /connections/:id/threads/:threadId` | `{ muted }`: silencia o reactiva un hilo |
 | `POST /channel/reply` | Lo usa el MCP `hive` (`channel_reply`) |
+| `POST /channel/send-file` | Lo usa el MCP `hive` (`channel_send_file`): `{ from, path, caption? }` |
 | `POST /channel/mute` | Lo usa el MCP `hive` (`channel_mute`): `{ from, muted }` sobre el hilo que se está atendiendo |
 
 **Los tokens nunca se devuelven:** en lugar del valor, la API envía `{ set: true, hint: "••••1234" }`. Los errores de validación (`400`) cubren: tipo desconocido, nombre repetido, token faltante, agente inexistente y agente en modo `plan`.
@@ -136,7 +162,7 @@ Todas bajo `/api`, solo origen local.
 ## 14.9 Interfaz
 
 - **Conexiones** (`/connections`, en la barra lateral): tarjetas con nombre, estado (Conectada / Conectando / Problema / Apagada, con el motivo del error), agente, bot, nº de hilos y último mensaje. Se actualiza cada 5 s.
-- **Panel de la conexión** (ampliable): plataforma, nombre, agente que responde (con aviso si está en solo lectura o en acceso total), token (se muestra `Déjalo vacío para conservar ••••1234`), modo de grupos, grupos autorizados y alias (14.6.1), personas permitidas (id, nombre, admin), idioma del bot, qué hacer si el agente no responde, activa/apagada, **Enviar prueba**, eliminar y la lista de hilos.
+- **Panel de la conexión** (ampliable): plataforma, nombre, agente que responde (con aviso si está en solo lectura o en acceso total), token (se muestra `Déjalo vacío para conservar ••••1234`), modo de grupos, grupos autorizados y alias (14.6.1), personas permitidas (id, nombre, admin), recibir archivos, modelo para ver imágenes, idioma del bot, qué hacer si el agente no responde, activa/apagada, **Enviar prueba**, eliminar y la lista de hilos.
 - **Chat del agente:** los mensajes de un canal se ven como burbuja con su origen; la llamada a `channel_reply` aparece como la fila **«Responder en el canal»** con el texto enviado (también cuando OpenCode la llama dentro de un bloque de código).
 
 ## 14.10 Pruebas
@@ -146,13 +172,13 @@ Scripts en `server/scripts/` (usan una carpeta de datos temporal y agentes reale
 | Script | Qué verifica |
 |---|---|
 | `sim-channel.ts <proveedor> [modelo] [permiso]` | Dos hilos contra una plataforma falsa: el agente responde con `channel_reply` al hilo correcto, recuerda lo dicho en el otro hilo, `/status` y la lista de permitidos. |
-| `sim-telegram.ts [proveedor] [modelo]` | El adaptador de Telegram contra una Bot API falsa: token inválido, reglas de permisos, token oculto, chat privado, tema de un grupo, mensaje sin mención, comandos para otro bot, reinicio sin repetir, partido y formato, respaldo a texto plano. |
+| `sim-telegram.ts [proveedor] [modelo]` | El adaptador de Telegram contra una Bot API falsa: token inválido, reglas de permisos, token oculto, chat privado, tema de un grupo, mensaje sin mención, comandos para otro bot, reinicio sin repetir, partido y formato, respaldo a texto plano, y **archivos**: un documento (el agente lo abre y responde con su contenido), un álbum como un solo mensaje, un archivo que Telegram no entrega y un archivo de grupo sin mención que no se descarga, el **modelo de imágenes** (una imagen se describe con otro modelo y la descripción llega al agente) y el **envío de un archivo** del agente al chat, más las reglas de qué rutas puede enviar. |
 | `sim-groups.ts <proveedor> [modelo]` | Grupos contra una plataforma falsa: charla de un grupo no autorizado ignorada, aviso con el id del chat, charla no dirigida (una ráfaga = un turno `Addressed: no`, sin respuesta), mención por alias, petición de silencio (`channel_mute`), silencio efectivo (sin turno nuevo), vuelta a hablar y `/mute` · `/unmute`. |
 | `fake-telegram.ts [puerto]` | Bot API falsa para pruebas manuales de la interfaz (`POST /_say`, `GET /_sent`). |
 
 ## 14.11 Límites conocidos
 
-- Solo texto: no se procesan adjuntos, imágenes ni voz.
+- El agente envía y recibe archivos, pero no transcribe audios ni analiza video.
 - Una conexión se vincula a **un** agente (para hablar con varios, se vincula un orquestador).
 - El adaptador de Slack no está implementado; la interfaz lo muestra como «pronto».
 - Los chats privados se probaron contra la Bot API real; los **grupos, temas y el modo `open`** solo contra la simulación.

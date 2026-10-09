@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { db } from '../db.js';
-import type { AllowedUser, Connection, ChannelKind, Target, Thread } from './types.js';
+import type { AllowedUser, Connection, ChannelKind, SavedFile, Target, Thread } from './types.js';
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS connections (
@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS connection_cursor (
 for (const col of ['muted INTEGER NOT NULL DEFAULT 0', 'seen_id INTEGER NOT NULL DEFAULT 0']) {
   try { db.exec(`ALTER TABLE threads ADD COLUMN ${col}`); } catch { /* already there */ }
 }
+try { db.exec('ALTER TABLE thread_messages ADD COLUMN files TEXT'); } catch { /* already there */ }
 
 const now = () => Date.now();
 const json = <T>(s: string, fallback: T): T => { try { return JSON.parse(s) as T; } catch { return fallback; } };
@@ -88,6 +89,8 @@ export const threadMessages = {
     return db.prepare('INSERT OR IGNORE INTO thread_messages (thread_id,direction,external_id,user_id,user_name,text,ts) VALUES (?,?,?,?,?,?,?)')
       .run(threadId, direction, externalId, who.id ?? null, who.name ?? null, text, now()).changes > 0;
   },
+  /** Remembers the files saved for an inbound message, so they can be listed later as context. */
+  setFiles: (threadId: string, externalId: string, files: SavedFile[]) => { db.prepare("UPDATE thread_messages SET files=? WHERE thread_id=? AND direction='in' AND external_id=?").run(JSON.stringify(files), threadId, externalId); },
   /** Id of the newest message of the thread (0 when none). */
   lastId: (threadId: string) => (db.prepare('SELECT MAX(id) AS m FROM thread_messages WHERE thread_id=?').get(threadId) as { m: number | null }).m ?? 0,
   /** Messages people wrote that the agent has not been shown yet (after `afterId`, before `beforeId`), oldest first. */

@@ -4,19 +4,34 @@ import { withInstructions } from './preamble.js';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { dispatchKiroProfile } from '../mcp-config.js';
+import { kiroProfile, type KiroAccess } from '../mcp-config.js';
+
+/** Tools trusted when editing a project: files and the web, never the shell. */
+export const KIRO_EDIT_TOOLS = ['fs_read', 'grep', 'glob', 'web_fetch', 'web_search'];
+
+/**
+ * Editing writes only inside the agent's folder (dotfiles such as .env included) and never to the repository's data or private keys:
+ * the same limits as in the other providers. `fs_write` is not trusted as a whole, so a path outside `allowedPaths` cannot be approved.
+ */
+export const kiroEditAccess = (cwd: string): KiroAccess => ({
+  trusted: KIRO_EDIT_TOOLS,
+  toolsSettings: { fs_write: { allowedPaths: [`${cwd}/**`, `${cwd}/.*`], deniedPaths: ['**/.git/**', '**/*.pem', '**/*.key'] } },
+});
 
 /** Kiro CLI: `kiro-cli chat --no-interactive --output-format stream-json`, which streams ACP session updates as JSON lines. */
 export async function* runKiro(o: TurnOptions): AsyncGenerator<StreamEvent> {
   const { agent } = o;
   const args = ['chat', '--no-interactive', '--output-format', 'stream-json'];
-  if (o.mcpCaps.length) {   // delegation tools come from a generated agent profile that declares the hive MCP server
+  const access = agent.permission === 'acceptEdits' ? kiroEditAccess(agent.cwd) : undefined;
+  if (o.mcpCaps.length || access) {   // tools and path limits both come from a generated agent profile
     const name = `hive-${agent.id}`;
     const dir = join(homedir(), '.kiro', 'agents'); mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, `${name}.json`), JSON.stringify(dispatchKiroProfile(agent.id, name, o.mcpCaps), null, 2));
+    writeFileSync(join(dir, `${name}.json`), JSON.stringify(kiroProfile(agent.id, name, o.mcpCaps, access), null, 2));
     args.push('--agent', name);
   }
-  if (agent.permission !== 'plan') args.push('--trust-all-tools');
+  // A tool that is not trusted cannot ask (the turn is not interactive), so it fails: read-only trusts nothing (but the hive tools of its profile), editing trusts what the
+  // profile lists (above), full access trusts everything.
+  if (agent.permission === 'bypassPermissions') args.push('--trust-all-tools');
   if (agent.session_id) args.push('--resume-id', agent.session_id);
   if (agent.model) args.push('--model', agent.model);
   const prompt = withInstructions(o.prompt, o.instructions, !!agent.session_id, o.refreshInstructions);

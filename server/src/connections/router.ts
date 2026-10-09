@@ -1,5 +1,7 @@
 import { agents } from '../db.js';
 import { liveTurn, queueDepth, sendTurn, stopAgent } from '../runtime.js';
+import { saveAttachments } from './files.js';
+import { describeImages, validVision } from './vision.js';
 import { channelPrompt } from './prompt.js';
 import { connections, threadMessages, threads } from './store.js';
 import type { AllowedChat, AllowedUser, ChannelAdapter, Connection, Inbound, OnSilent, Origin, Thread } from './types.js';
@@ -22,6 +24,8 @@ const T = {
   status: (name: string, state: string, cwd: string, q: number) => ({ es: `${name} · ${state} · ${cwd}${q ? ` · ${q} en cola` : ''}`, en: `${name} · ${state} · ${cwd}${q ? ` · ${q} queued` : ''}` }),
   adminOnly: { es: 'Solo un administrador puede usar /new.', en: 'Only an admin can use /new.' },
   confirmNew: { es: 'Esto borra el contexto compartido de TODAS las conversaciones del agente. Responde `/new confirmar` para continuar.', en: 'This wipes the shared context of ALL of the agent’s conversations. Reply `/new confirm` to continue.' },
+  filesOff: { es: 'Esta conexión no recibe archivos.', en: 'This connection does not receive files.' },
+  fileFailed: (list: { name: string; reason: string }[]) => ({ es: `No pude recibir: ${list.map((f) => `${f.name} (${f.reason})`).join('; ')}`, en: `I could not receive: ${list.map((f) => `${f.name} (${f.reason})`).join('; ')}` }),
   newDone: { es: '🆕 Conversación nueva.', en: '🆕 New conversation.' },
   muted: { es: '🔇 Me quedo callado en este hilo. Menciónenme o respondan a un mensaje mío para que vuelva a hablar.', en: '🔇 I\'ll stay quiet in this thread. Mention me or reply to one of my messages to bring me back.' },
   unmuted: { es: '🔊 Listo, vuelvo a participar en este hilo.', en: '🔊 Done, I\'m back in this thread.' },
@@ -80,6 +84,19 @@ export async function handleInbound(connectionId: string, adapter: ChannelAdapte
   const agent = conn.agent_id ? agents.get(conn.agent_id) : undefined;
   if (!agent) { if (addressed) await reply(say(conn, T.noAgent)); return; }
 
+  if (m.attachments?.length && !m.command) {
+    if (conn.config.files === false) { if (addressed) await reply(say(conn, T.filesOff)); }
+    else {
+      if (addressed) await adapter.busy(m.target, 'working').catch(() => undefined);
+      const { saved, failed } = await saveAttachments(agent.id, adapter, m);
+      if (validVision(conn.config.vision)) await describeImages(agent, conn.config.vision, saved);
+      m.files = saved;
+      if (saved.length) threadMessages.setFiles(thread.id, m.externalId, saved);
+      if (failed.length && addressed) await reply(say(conn, T.fileFailed(failed)));
+    }
+    if (!m.text.trim() && !m.files?.length) return; // only files, and none could be saved: nothing to hand over
+  }
+
   if (m.command) {
     const { name, args } = m.command;
     if (name === 'stop') { await reply(say(conn, stopAgent(agent.id) ? T.stopped : T.nothingToStop)); return; }
@@ -136,7 +153,7 @@ async function deliver(conn: Connection, adapter: ChannelAdapter, thread: Thread
   const ahead = queueDepth(agent.id) + (liveTurn(agent.id) ? 1 : 0);
   if (addressed && ahead > 0) await reply(say(conn, T.queued(ahead)));
 
-  const unseen = threadMessages.unseen(thread.id, fresh.seen_id, msgId).map((r) => ({ name: r.user_name ?? r.user_id ?? '?', text: r.text as string }));
+  const unseen = threadMessages.unseen(thread.id, fresh.seen_id, msgId).map((r) => ({ name: r.user_name ?? r.user_id ?? '?', text: r.text as string, files: r.files ? JSON.parse(r.files) : undefined }));
   threads.markSeen(thread.id, msgId);
 
   const origin: Origin = { connectionId: conn.id, threadId: thread.id, externalKey: m.externalKey, platform: conn.kind, place: m.place, userName: m.userName, addressed, replied: false };
