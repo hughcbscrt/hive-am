@@ -2,12 +2,52 @@
   "name": "hive-am",
   "private": true,
   "version": "0.1.0",
-  "description": "Agent manager: orchestrator/subagents over Claude Code, OpenCode and Kiro with native session resume",
-  "workspaces": ["server", "web"],
+  "description": "A colony of coding agents: orchestrators and subagents over Claude Code, OpenCode and Kiro, with real session resume, a browser UI and Telegram.",
+  "keywords": [
+    "ai-agents",
+    "coding-agents",
+    "agent-manager",
+    "orchestrator",
+    "subagents",
+    "claude-code",
+    "opencode",
+    "kiro",
+    "telegram",
+    "mcp",
+    "cli"
+  ],
+  "homepage": "https://github.com/hughcbscrt/hive-am#readme",
+  "bugs": {
+    "url": "https://github.com/hughcbscrt/hive-am/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hughcbscrt/hive-am.git"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Hugo Hernández Valdez",
+    "url": "https://github.com/hughcbscrt"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "linux",
+    "darwin"
+  ],
+  "workspaces": [
+    "server",
+    "web"
+  ],
   "scripts": {
     "dev": "concurrently -n server,web -c yellow,cyan \"npm run dev -w server\" \"npm run dev -w web\"",
     "build": "npm run build -w web",
-    "typecheck": "npm run typecheck -w server && npm run typecheck -w web"
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "release": "make release",
+    "npm:build": "node scripts/build-npm.mjs"
   },
-  "devDependencies": { "concurrently": "^9.0.0" }
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
 }

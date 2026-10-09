@@ -122,3 +122,28 @@ navegador ──HTTP──▶ Next (4401) ──proxy──▶ servidor (4400)
 ```
 
 Un orquestador que delega provoca, a su vez, otro `spawn` (el del subagente) dentro del mismo servidor.
+
+## Publicar una versión
+
+El repositorio tiene un `Makefile` con las dos tareas de publicación (`make help` las lista):
+
+**1) Release: subir versión, actualizar el changelog, commit, tag y push**
+
+```bash
+make release-preview BUMP=minor     # muestra la versión nueva y la entrada del changelog, sin cambiar nada
+make release BUMP=minor             # patch (por defecto) | minor | major | una versión exacta como 1.2.3
+```
+
+`make release` (ejecuta `scripts/release.mjs`) exige el árbol limpio en `main` y al día con `origin`, y hace en orden: comprobación de tipos, subir `version` en los paquetes raíz, `server` y `web` (y en `package-lock.json`), añadir una entrada a `CHANGELOG.md` con los asuntos de los commits desde el último tag, commit `release vX.Y.Z`, crear el tag anotado `vX.Y.Z` y subir la rama y el tag. `PUSH=0` hace el commit y el tag sin subirlos; `ALLOW_BRANCH=1` permite publicar desde otra rama.
+
+**2) Publicar en npm**
+
+```bash
+npm login                           # una vez
+make npm-pack                       # construye dist/npm y lista lo que se publicaría
+make npm-publish                    # construye y publica (NPM_TAG=next para una etiqueta de prueba)
+```
+
+`make npm-build` arma el paquete en `dist/npm` (ignorado por git): el servidor compilado a JavaScript (`server/dist`), el script MCP, la interfaz web ya construida (`web/.next`), el lanzador `hive-am` (`bin/hive-am.mjs`) y un `package.json` con solo las dependencias de ejecución. `make npm-publish` antes comprueba que hayas iniciado sesión en npm, que esa versión no esté ya publicada y que `HEAD` sea el tag `vX.Y.Z` con el árbol limpio (`FORCE=1` omite lo último).
+
+Ya publicado, `npx hive-am` (o `npm install -g hive-am` y `hive-am`) arranca el servidor y la interfaz. **Limitación de la versión empaquetada:** la API usa siempre el puerto 4400 (la interfaz está construida para hablar con él); solo se puede cambiar el de la interfaz, con `HIVE_AM_WEB_PORT`.

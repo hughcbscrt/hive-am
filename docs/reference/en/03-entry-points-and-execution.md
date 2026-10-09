@@ -122,3 +122,28 @@ browser ──HTTP──▶ Next (4401) ──proxy──▶ server (4400)
 ```
 
 An orchestrator that delegates causes, in turn, another `spawn` (the subagent's) inside the same server.
+
+## Releasing and publishing
+
+The repository has a `Makefile` for the two release tasks (`make help` lists them):
+
+**1) Release: bump versions, update the changelog, commit, tag and push**
+
+```bash
+make release-preview BUMP=minor     # shows the new version and the changelog entry, changes nothing
+make release BUMP=minor             # patch (default) | minor | major | an exact version such as 1.2.3
+```
+
+`make release` (it runs `scripts/release.mjs`) requires a clean working tree on `main`, up to date with `origin`, and does this in order: type-check, bump `version` in the root, `server` and `web` packages (and `package-lock.json`), add an entry to `CHANGELOG.md` with the commit subjects since the last tag, commit `release vX.Y.Z`, create the annotated tag `vX.Y.Z` and push the branch and the tag. `PUSH=0` commits and tags without pushing; `ALLOW_BRANCH=1` allows releasing from another branch.
+
+**2) Publish to npm**
+
+```bash
+npm login                           # once
+make npm-pack                       # builds dist/npm and lists what would be published
+make npm-publish                    # builds and publishes (NPM_TAG=next for a pre-release tag)
+```
+
+`make npm-build` assembles the package in `dist/npm` (git-ignored): the server compiled to JavaScript (`server/dist`), the MCP script, the built web UI (`web/.next`), the `hive-am` launcher (`bin/hive-am.mjs`) and a `package.json` with only the runtime dependencies. `make npm-publish` first checks that you are logged in to npm, that this version is not already published and that `HEAD` is the release tag `vX.Y.Z` with a clean tree (`FORCE=1` skips the last check).
+
+Once published, `npx hive-am` (or `npm install -g hive-am` and `hive-am`) starts the server and the UI. **Limitation of the packaged build:** the API always uses port 4400 (the UI is built to talk to it); only the UI port can change, with `HIVE_AM_WEB_PORT`.
