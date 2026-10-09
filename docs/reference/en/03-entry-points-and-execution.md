@@ -15,6 +15,10 @@ npm run dev          # starts server (:4400) and web (:4401) together
 
 Open `http://localhost:4401`.
 
+### From npm
+
+Without cloning the repository: `npx hive-am` (or `npm install -g hive-am` and then `hive-am`). It starts the API server (port 4400) and the UI (port 4401, change it with `HIVE_AM_WEB_PORT`) from the published package. The API port is fixed in the packaged build. See [Releasing and publishing](#releasing-and-publishing).
+
 ### Scripts
 
 | Where | Script | What it does |

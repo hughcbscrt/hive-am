@@ -10,6 +10,8 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/hive-am"><img alt="npm version" src="https://img.shields.io/npm/v/hive-am?style=flat-square&color=cb3837&logo=npm&logoColor=white" /></a>
+  <a href="https://www.npmjs.com/package/hive-am"><img alt="npm downloads" src="https://img.shields.io/npm/dm/hive-am?style=flat-square&color=cb3837" /></a>
   <a href="https://github.com/hughcbscrt/hive-am/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/hughcbscrt/hive-am?style=flat-square&color=bf963d" /></a>
   <a href="https://github.com/hughcbscrt/hive-am/pulls?q=is%3Apr"><img alt="Pull requests" src="https://img.shields.io/github/issues-pr-closed/hughcbscrt/hive-am?style=flat-square&color=bf963d" /></a>
   <a href="https://github.com/hughcbscrt/hive-am/issues"><img alt="Issues" src="https://img.shields.io/github/issues/hughcbscrt/hive-am?style=flat-square&color=bf963d" /></a>
@@ -52,7 +54,29 @@ Plain CLI processes, one per turn, not ACP. Turns are serialized per agent.
 
 ## Quick start
 
-You need Node 20+ and at least one of the three CLIs installed and logged in.
+You need **Node 20+** (macOS or Linux) and at least one of the three CLIs installed and logged in (`claude`, `opencode` or `kiro-cli`).
+
+### From npm
+
+```bash
+npx hive-am                 # run it without installing anything
+```
+
+or install it once and run it whenever you want:
+
+```bash
+npm install -g hive-am
+hive-am
+```
+
+Open <http://127.0.0.1:4401>, create an agent pointing at a folder, and send it a message.
+
+- The API server uses port **4400** and the web UI port **4401**. Change the UI port with `HIVE_AM_WEB_PORT=4500 hive-am`; the API port is fixed in the packaged build.
+- Stop it with `Ctrl+C`.
+- Update with `npm install -g hive-am@latest` (with `npx`, use `npx hive-am@latest`).
+- `hive-am --help` and `hive-am --version` show the options and the installed version.
+
+### From source
 
 ```bash
 git clone git@github.com:hughcbscrt/hive-am.git
@@ -60,8 +84,6 @@ cd hive-am
 npm install
 npm run dev        # server :4400 (API + WebSocket) and Next.js UI :4401
 ```
-
-Open <http://127.0.0.1:4401>, create an agent pointing at a folder, and send it a message.
 
 Data lives in `~/.hive-am/hive-am.db` (override with `HIVE_AM_HOME`). The server only listens on `127.0.0.1`.
 
