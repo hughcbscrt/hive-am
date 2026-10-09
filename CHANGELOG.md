@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-09
+
 ### Added
 
 - Agent manager over Claude Code, OpenCode and Kiro, resuming each CLI's native session.
@@ -20,4 +22,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/commits
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/hughcbscrt/hive-am/releases/tag/v1.0.0
