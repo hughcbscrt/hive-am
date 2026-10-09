@@ -74,7 +74,7 @@ Skills with empty content are skipped. `GET /api/skills/usage` counts the agents
 
 ### 7.3.1 Skills that ship with hive-am
 
-On install, seven skills ready to assign are created (suggested **on demand** except Notebook): **Notebook** (the agent's notebook), **Git workflow**, **Pull requests**, **Code review**, **Release checklist**, **Running tests** and **Log triage**. They are the same as any other skill: no category and no protection, they can be edited or deleted, and a deleted one is not recreated (4, `seeded_skills`). They are general instructions and only cost prompt in the agents you assign them to. The only one tied to a function is **Notebook** (id `default-notebook`): without it an agent does not have the notebook tools.
+On install, nine skills ready to assign are created (suggested **on demand** except Notebook, Chat channels and Wake-ups): **Notebook** (the agent's notebook), **Wake-ups** (tell the person later; its tool `wake_me` exists only with the skill, see [14.6.7](14-external-connections.md#1467-telling-the-person-later-the-wake-ups-skill-and-wake_me)), **Chat channels** (how to behave in Telegram/Slack; it is assigned by itself, see [14.6.6](14-external-connections.md#1466-the-chat-channels-skill)), **Git workflow**, **Pull requests**, **Code review**, **Release checklist**, **Running tests** and **Log triage**. They are the same as any other skill: no category and no protection, they can be edited or deleted, and a deleted one is not recreated (4, `seeded_skills`). They are general instructions and only cost prompt in the agents you assign them to. Three are tied to a function: **Notebook** (id `default-notebook`): without it an agent does not have the notebook tools; **Wake-ups** (id `default-wakeups`): without it an agent does not have `wake_me`; and **Chat channels** (id `default-channels`). The last two are added to an agent when a connection starts answering through it.
 
 ### 7.3.2 The agent's notebook
 
@@ -186,7 +186,7 @@ If the effective folder is empty when a turn starts, the turn fails with: *"This
 | Origin | What it contributes | Where it is changed |
 |---|---|---|
 | Interface | Agent and colony system prompt, skills (always / on demand), name, role, description and folder, subagents, notebook text | Agent, type and colony forms; Notebook tab |
-| Code: `server/src/instructions.ts` | Fixed rules in English: identity, team, channel section (including "Groups" and "Files"), notebook and on-demand skills | Only by editing the code; no interface setting modifies them |
+| Code: `server/src/instructions.ts` | Fixed rules in English: identity, team, a short channel section (tool names, aliases and the secrets rule), notebook and on-demand skills. How to behave in chats (groups, files, silence, secrets) is the **Chat channels** skill, editable in Skills | Only by editing the code; no interface setting modifies them |
 | Code: `server/mcp/dispatch.mjs` | Description of each MCP tool (`channel_send_file` says not to use the bot token) | Code only |
 | Code: `server/src/connections/prompt.ts` | Header of each channel message (`[hive:channel]`, `[hive:files]`, `[hive:context]`) | Code only |
 | Code: `server/src/providers/opencode.ts` | Configuration that forbids the `question` tool | Code only |

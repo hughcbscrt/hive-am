@@ -149,7 +149,7 @@ No existen aún carpetas de pruebas automatizadas; la verificación se describe 
 | `db.ts` | Crea las tablas, aplica migraciones ligeras, expone `skills`, `types`, `colonies`, `agents`, `dispatches` y la función `resolved()`; guarda también cómo se carga cada skill asignada. |
 | `types.ts` | `Agent`, `Colony`, `AgentType`, `Skill`, `StreamEvent`, `Block`, `ChatMessage`, `Usage`, `TurnOptions`, etc. |
 | `seed.ts` | Si la base está vacía crea 2 skills y 3 tipos (Queen, Builder, Reviewer). |
-| `skills/defaults.ts` | Las siete skills que vienen con hive-am (`skills.seedDefaults` las crea una sola vez); ver [7.3](07-agentes-tipos-skills-colonias.md#73-skills). |
+| `skills/defaults.ts` | Las nueve skills que vienen con hive-am (`skills.seedDefaults` las crea una sola vez); ver [7.3](07-agentes-tipos-skills-colonias.md#73-skills). |
 | `skills/notebook.ts` | El cuaderno de cada agente: tabla `agent_notebooks`, límites, notas sin duplicados, rechazo de credenciales y versiones. |
 | `connections/*` | Conexiones externas (Telegram): adaptador, enrutador de mensajes, grupos, silencio y herramientas del canal; ver [documento 14](14-conexiones-externas.md). |
 | `models.ts` | Modelos disponibles por proveedor; caché de 10 minutos. |
