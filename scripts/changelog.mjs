@@ -39,7 +39,7 @@ const repoUrl = () => {
 /** { lang, intro, unreleased: { Added: [...], ... }, releases: [{ version, date, body }] } */
 export function load() {
   const text = existsSync(FILE) ? readFileSync(FILE, 'utf8') : '';
-  const lang = /Sin publicar|Registro de cambios|### (Añadido|Corregido)/.test(text) || !text ? 'es' : 'en';
+  const lang = /Sin publicar|Registro de cambios|### (Añadido|Corregido)/.test(text) ? 'es' : 'en';   // English unless the file is already in Spanish
   const unreleased = Object.fromEntries(TYPES.map((t) => [t.key, []]));
   const releases = [];
   if (!text) return { lang, intro: T[lang].intro, unreleased, releases };

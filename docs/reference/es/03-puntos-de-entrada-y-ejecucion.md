@@ -135,7 +135,7 @@ make release-preview BUMP=minor     # muestra la versión nueva y la entrada del
 make release BUMP=minor             # patch (por defecto) | minor | major | una versión exacta como BUMP=1.0.0
 ```
 
-`CHANGELOG.md` sigue [Keep a Changelog 1.1.0](https://keepachangelog.com/es-ES/1.1.0/): arriba la sección "Sin publicar", después una sección por versión, con los cambios agrupados en **Añadido, Cambiado, Obsoleto, Eliminado, Corregido** y **Seguridad**, y los enlaces de comparación al final. Se escribe en español por defecto; si los títulos del archivo están en inglés, se mantiene en inglés.
+`CHANGELOG.md` sigue [Keep a Changelog 1.1.0](https://keepachangelog.com/es-ES/1.1.0/): arriba la sección "Sin publicar", después una sección por versión, con los cambios agrupados en **Añadido, Cambiado, Obsoleto, Eliminado, Corregido** y **Seguridad**, y los enlaces de comparación al final. Se escribe en inglés; si los títulos del archivo están en español, se mantiene en español.
 
 `make release` (ejecuta `scripts/release.mjs`) exige el árbol limpio en `main` y todo subido, y hace en orden:
 
