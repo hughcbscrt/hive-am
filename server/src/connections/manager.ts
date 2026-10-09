@@ -1,10 +1,15 @@
+import { readFileSync } from 'node:fs';
 import { agents } from '../db.js';
 import { liveOrigin, notifyAgentsChanged } from '../runtime.js';
 import { cleanInbox } from './files.js';
 import { resolveSendable } from './outbound.js';
+import { syncChannelSkill } from './channel-skill.js';
 import { handleInbound } from './router.js';
+import { findSecret, SECRET_REFUSAL } from './secrets.js';
 import { connections, threadMessages, threads } from './store.js';
 import type { AdapterStatus, ChannelAdapter, ChannelKind, Connection } from './types.js';
+
+const TEXTUAL = /\.(txt|md|csv|json|svg|log|ya?ml|toml|ini|conf|sh|sql)$/i; // files whose text is checked for secrets before they are sent
 
 type Factory = (c: Connection) => ChannelAdapter;
 const factories = new Map<ChannelKind, Factory>();
@@ -22,6 +27,7 @@ export async function startConnection(id: string): Promise<void> {
   await stopConnection(id);
   const c = connections.get(id);
   if (!c || !c.enabled) return;
+  syncChannelSkill(c.agent_id);
   const make = factories.get(c.kind);
   if (!make) return;
   const adapter = make(c);
@@ -82,6 +88,12 @@ export async function channelReply(agentId: string, text: string): Promise<{ sen
   if (!adapter) throw new ChannelError('The connection is not running.');
   const thread = threads.get(origin.threadId);
   if (!thread) throw new ChannelError('The thread no longer exists.');
+  if (origin.mention && !origin.mentioned && adapter.mention) {
+    text = `${adapter.mention(origin.mention)} ${text}`;
+    origin.mentioned = true;
+  }
+  const leak = findSecret(text);
+  if (leak) { console.warn(`[connections] blocked a reply of agent ${agentId}: it seemed to contain ${leak}`); throw new ChannelError(SECRET_REFUSAL(leak)); }
   const { externalId } = await adapter.send(thread.target, text);
   threadMessages.record(thread.id, 'out', externalId, { name: agents.get(agentId)?.name }, text);
   origin.replied = true;
@@ -99,6 +111,8 @@ export async function channelSendFile(agentId: string, path: string, caption?: s
   const thread = threads.get(origin.threadId);
   if (!thread) throw new ChannelError('The thread no longer exists.');
   const file = resolveSendable(agent, path);   // throws SendError with the reason
+  const leak = findSecret(caption ?? '') ?? (TEXTUAL.test(file.name) && file.size <= 2 * 1024 * 1024 ? findSecret(readFileSync(file.path, 'utf8')) : null);
+  if (leak) { console.warn(`[connections] blocked a file of agent ${agentId}: it seemed to contain ${leak}`); throw new ChannelError(SECRET_REFUSAL(leak).replace('the message', `the ${caption && findSecret(caption) ? 'caption' : 'file'}`)); }
   const { externalId } = await adapter.sendFile(thread.target, file, caption?.trim() || undefined);
   threadMessages.record(thread.id, 'out', externalId, { name: agent.name }, `${caption?.trim() ? `${caption.trim()} ` : ''}[sent file: ${file.name}]`);
   origin.replied = true;

@@ -92,6 +92,8 @@ export const threadMessages = {
   /** Remembers the files saved for an inbound message, so they can be listed later as context. */
   setFiles: (threadId: string, externalId: string, files: SavedFile[]) => { db.prepare("UPDATE thread_messages SET files=? WHERE thread_id=? AND direction='in' AND external_id=?").run(JSON.stringify(files), threadId, externalId); },
   /** Id of the newest message of the thread (0 when none). */
+  /** The people who wrote in a thread recently (not the agent). */
+  senders: (threadId: string) => db.prepare("SELECT DISTINCT user_id AS id, user_name AS name FROM (SELECT user_id, user_name FROM thread_messages WHERE thread_id=? AND direction='in' AND user_name IS NOT NULL ORDER BY id DESC LIMIT 300)").all(threadId) as { id: string; name: string }[],
   lastId: (threadId: string) => (db.prepare('SELECT MAX(id) AS m FROM thread_messages WHERE thread_id=?').get(threadId) as { m: number | null }).m ?? 0,
   /** Messages people wrote that the agent has not been shown yet (after `afterId`, before `beforeId`), oldest first. */
   unseen: (threadId: string, afterId: number, beforeId: number, limit = 30) =>

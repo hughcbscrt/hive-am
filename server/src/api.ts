@@ -11,6 +11,10 @@ import { channelPermissionError } from './connections/rules.js';
 import { validVision } from './connections/vision.js';
 import { NOTEBOOK_MAX, NotebookError, notebooks } from './skills/notebook.js';
 import { NOTEBOOK_SKILL_ID } from './skills/defaults.js';
+import { WakeError, listWakeups, removeWakeup, scheduleWake } from './wake.js';
+import { WatchError, cancelWatchFor, createWatch, pendingWatches, removeWatch } from './watch.js';
+import { ScheduleError, cancelFor, createSchedule, listAll, listFor, removeSchedule, runsOf, setEnabled } from './schedules.js';
+import { syncChannelSkill } from './connections/channel-skill.js';
 import { connections, threads } from './connections/store.js';
 import { dispatch, liveIsDirect, liveOrigin, liveTurn, notifyAgentsChanged, queueDepth, sendTurn, stopAgent } from './runtime.js';
 import { mcpCaps } from './instructions.js';
@@ -318,6 +322,7 @@ const REQUIRED: Record<string, string[]> = { telegram: ['token'], slack: ['bot_t
 function validateConnection(kind: string, config: Record<string, any>, agentId: string | null | undefined, enabled: boolean) {
   const missing = (REQUIRED[kind] ?? []).filter((k) => typeof config[k] !== 'string' || !config[k].trim());
   if (missing.length) throw bad(`Missing: ${missing.join(', ')}`);
+  if (config.effort !== undefined && !["", "low", "medium", "high"].includes(config.effort)) throw bad('effort must be empty, low, medium or high');
   if (config.on_silent !== undefined && !['notice', 'send_text', 'ignore'].includes(config.on_silent)) throw bad('on_silent must be notice, send_text or ignore');
   if (config.group_mode !== undefined && !['mention', 'open'].includes(config.group_mode)) throw bad('group_mode must be mention or open');
   if (config.vision !== undefined && config.vision !== null && !validVision(config.vision)) throw bad('vision must be { provider, model } or empty');
@@ -348,6 +353,7 @@ route('POST', '/api/connections', async ({ req }) => {
   const config = cleanGroupConfig(mergeConfig({}, p.config)); const enabled = p.enabled !== false;
   validateConnection(p.kind, config, p.agent_id, enabled);
   const c = connections.create({ kind: p.kind, name, agent_id: p.agent_id || null, config, allowed: cleanAllowed(p.allowed), enabled });
+  syncChannelSkill(c.agent_id);
   await startConnection(c.id); notifyAgentsChanged();
   return publicConnection(connections.get(c.id)!);
 });
@@ -361,12 +367,15 @@ route('PATCH', '/api/connections/:id', async ({ req, params }) => {
   const enabled = p.enabled !== undefined ? !!p.enabled : cur.enabled;
   validateConnection(cur.kind, config, agent_id, enabled);
   connections.update(cur.id, { name, config, agent_id, enabled, allowed: p.allowed !== undefined ? cleanAllowed(p.allowed) : cur.allowed });
+  syncChannelSkill(cur.agent_id, agent_id);
   await startConnection(cur.id); notifyAgentsChanged();
   return publicConnection(connections.get(cur.id)!);
 });
 route('DELETE', '/api/connections/:id', async ({ params }) => {
   await stopConnection(params[0]);
+  const gone = connections.get(params[0]);
   if (!connections.remove(params[0])) throw notFound('Connection not found');
+  syncChannelSkill(gone?.agent_id);
   notifyAgentsChanged();
   return { ok: true };
 });
@@ -468,6 +477,49 @@ route('POST', '/api/channel/mute', async ({ req }) => {
   const { from, muted } = await body(req);
   try { return channelMute(String(from ?? ''), muted !== false); }
   catch (e) { if (e instanceof ChannelError) throw bad(e.message); throw e; }
+});
+route('POST', '/api/wake', async ({ req }) => {
+  const { from, minutes, note } = await body(req);
+  try { return scheduleWake(String(from ?? ''), minutes, note); }
+  catch (e) { if (e instanceof WakeError) throw bad(e.message); throw e; }
+});
+// Recurring schedules and pending wake-ups: the agent's tools (`from` is its id) and the interface.
+const scheduleGuard = <T>(fn: () => T): T => { try { return fn(); } catch (e) { if (e instanceof ScheduleError) throw bad(e.message); throw e; } };
+route('POST', '/api/wake-when-done', async ({ req }) => {
+  const b = await body(req);
+  try { const r = createWatch(String(b.from ?? ''), b); return r; }
+  catch (e) { if (e instanceof WatchError) throw bad(e.message); throw e; }
+});
+route('POST', '/api/schedules/create', async ({ req }) => {
+  const b = await body(req);
+  return scheduleGuard(() => { const r = createSchedule(String(b.from ?? ''), b); return { id: r.schedule.id, schedule: r.schedule.kind === 'every' ? `every ${r.schedule.expr} min` : `${r.schedule.expr} (${r.schedule.tz})`, next: r.next, where: r.where }; });
+});
+route('POST', '/api/schedules/list', async ({ req }) => { const b = await body(req); return { schedules: listFor(String(b.from ?? '')) }; });
+route('POST', '/api/schedules/cancel', async ({ req }) => {
+  const b = await body(req); const from = String(b.from ?? ''), id = String(b.id ?? '');
+  try { cancelWatchFor(from, id); return { cancelled: true }; } catch (e) { if (!(e instanceof WatchError)) throw e; }   // not one of its watches: a schedule then
+  scheduleGuard(() => cancelFor(from, id)); return { cancelled: true };
+});
+route('GET', '/api/schedules', () => {
+  const once = listWakeups().map((w) => ({
+    id: w.id, agent_id: w.agent_id, connection_id: w.connection_id, thread_id: w.thread_id, kind: 'once', expr: '', tz: '', note: w.note, enabled: true, next_due: w.due_at, created_at: w.created_at,
+    last_fired_at: null, fire_count: 0, last_status: null, last_detail: null, agent_name: agents.get(w.agent_id)?.name ?? '?', place: '', description: 'once',
+  }));
+  const watching = pendingWatches().map((w) => ({
+    id: w.id, agent_id: w.agent_id, connection_id: w.connection_id, thread_id: w.thread_id, kind: 'watch', expr: String(w.pid), tz: '', note: w.note, enabled: true, next_due: w.deadline, created_at: w.started_at,
+    last_fired_at: null, fire_count: 0, last_status: null, last_detail: null, agent_name: agents.get(w.agent_id)?.name ?? '?', place: '',
+    description: `process ${w.pid}${w.file ? ` · file ${w.file}` : ''}${w.log ? ` · log ${w.log}` : ''}`,
+  }));
+  return [...listAll(), ...once, ...watching];
+});
+route('GET', '/api/schedules/:id/runs', ({ params }) => runsOf(params[0]));
+route('PATCH', '/api/schedules/:id', async ({ req, params }) => {
+  const b = await body(req);
+  return setEnabled(params[0], !!b.enabled) ?? (() => { throw notFound('Schedule not found'); })();
+});
+route('DELETE', '/api/schedules/:id', ({ params }) => {
+  if (!removeSchedule(params[0]) && !removeWakeup(params[0]) && !removeWatch(params[0])) throw notFound('Schedule not found');
+  return { ok: true };
 });
 route('GET', '/api/dispatches', () => dispatches.recent());
 

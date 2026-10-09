@@ -33,6 +33,10 @@ export interface Inbound {
   /** Files that came with the message; the router downloads them (after the sender is authorized) and fills `files`. */
   attachments?: Attachment[];
   files?: SavedFile[];
+  /** Another person of the chat this message is addressed to (a reply to them, an @mention of them): the agent stays out of it unless it is called too. */
+  directedAt?: string;
+  /** Who a scheduled message is for (a person asked for it in a group): the agent's first reply starts with a mention of them. */
+  mention?: { id: string; name: string };
 }
 
 export interface AdapterStatus { state: 'connecting' | 'connected' | 'error' | 'stopped'; detail?: string; lastEventAt?: number }
@@ -45,13 +49,15 @@ export interface ChannelAdapter {
   stop(): Promise<void>;
   /** Send markdown-ish text; the adapter formats it for the platform and splits it when too long. */
   send(to: Target, text: string): Promise<{ externalId: string }>;
-  /** Progress cue for the message being handled: «typing…» / a reaction. */
-  busy(to: Target, state: 'working' | 'done' | 'failed'): Promise<void>;
+  /** Progress cue for the message being handled: «typing…» / a reaction. `ref` is the message: a chat keeps its cue until every message that asked for it is done. */
+  busy(to: Target, state: 'working' | 'done' | 'failed', ref?: string): Promise<void>;
   status(): AdapterStatus;
   /** Sends a file (checked beforehand by outbound.ts) to a chat. */
   sendFile?(to: Target, file: { path: string; name: string; kind: FileKind; mime: string }, caption?: string): Promise<{ externalId: string }>;
   /** Downloads one attachment to `dest` and returns its size in bytes; throws when it is too big or gone. */
   download?(att: Attachment, dest: string): Promise<number>;
+  /** How to write a mention of a person (in the markdown-ish text `send` takes), so the platform notifies them. */
+  mention?(user: { id: string; name: string }): string;
   /** Checks the credentials and greets the allowed users; returns a one-line description (e.g. the bot's name). */
   test?(userIds: string[]): Promise<string>;
 }
@@ -91,4 +97,11 @@ export interface Origin {
   addressed: boolean;
   /** Set once the agent has sent something back, so a silent turn can be noticed. */
   replied: boolean;
+  /** Who wrote the message (the person a later reminder is for) and whether it was in a group. */
+  userId: string; group: boolean;
+  /** Mention this person at the start of the first reply (scheduled messages asked for in a group). */
+  mention?: { id: string; name: string };
+  mentioned?: boolean;
+  /** Reasoning effort this connection asks for (`low`/`medium`/`high`); unset keeps each CLI's own default. */
+  effort?: string;
 }
