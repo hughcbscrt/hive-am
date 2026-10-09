@@ -10,14 +10,19 @@ FORCE   ?=
 ALLOW_BRANCH ?=
 PUSH    ?= 1
 
-.PHONY: help typecheck build release-preview release npm-build npm-pack npm-check npm-publish publish clean
+.PHONY: help typecheck build changelog-add changelog-show release-preview release npm-build npm-pack npm-check npm-publish publish clean
 
 help: ## Show this help
 	@echo "hive-am $(VERSION)"
 	@echo
-	@echo "1) Release (bump versions, update CHANGELOG.md, commit, tag, push)"
-	@echo "     make release-preview [BUMP=patch|minor|major|x.y.z]   show the new version and changelog entry"
-	@echo "     make release [BUMP=patch|minor|major|x.y.z]           do it (needs a clean tree on main, up to date with origin)"
+	@echo "0) Changelog (Keep a Changelog: Added, Changed, Deprecated, Removed, Fixed, Security)"
+	@echo "     make changelog-add [TYPE=Added|Changed|Deprecated|Removed|Fixed|Security] [MSG=\"...\"]   add an entry to 'Unreleased'"
+	@echo "     make changelog-show                                       print what is waiting for the next release"
+	@echo
+	@echo "1) Release (asks for the changes, bumps versions, updates CHANGELOG.md, commits, tags and pushes)"
+	@echo "     make release-preview [BUMP=patch|minor|major|x.y.z]   show the new version and the changelog entry"
+	@echo "     make release [BUMP=patch|minor|major|x.y.z]           do it (clean tree on main, everything pushed)"
+	@echo "       YES=1            do not ask for confirmation"
 	@echo "       PUSH=0           commit and tag locally without pushing"
 	@echo "       ALLOW_BRANCH=1   release from a branch other than main"
 	@echo
@@ -34,11 +39,17 @@ typecheck: ## Type-check server and web
 build: ## Build the web UI (development build folder)
 	npm run build
 
+changelog-add: ## Add an entry to the unreleased section
+	node scripts/changelog.mjs add "$(TYPE)" "$(MSG)"
+
+changelog-show: ## Print the unreleased section
+	node scripts/changelog.mjs show
+
 release-preview: ## Show what a release would do
 	node scripts/release.mjs $(BUMP) --dry-run
 
 release: ## Bump versions, update the changelog, commit, tag and push
-	node scripts/release.mjs $(BUMP) $(if $(filter 0,$(PUSH)),--no-push,) $(if $(ALLOW_BRANCH),--allow-branch,)
+	node scripts/release.mjs $(BUMP) $(if $(filter 0,$(PUSH)),--no-push,) $(if $(ALLOW_BRANCH),--allow-branch,) $(if $(YES),--yes,)
 
 npm-build: ## Assemble the npm package in dist/npm
 	node scripts/build-npm.mjs

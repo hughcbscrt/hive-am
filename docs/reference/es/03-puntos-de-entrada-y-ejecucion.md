@@ -127,14 +127,22 @@ Un orquestador que delega provoca, a su vez, otro `spawn` (el del subagente) den
 
 El repositorio tiene un `Makefile` con las dos tareas de publicación (`make help` las lista):
 
-**1) Release: subir versión, actualizar el changelog, commit, tag y push**
+**1) Release: pedir los cambios, subir versión, actualizar el changelog, commit, tag y push**
 
 ```bash
+make changelog-add TYPE=Added MSG="Lo que agregaste"   # en cualquier momento: deja una entrada en "Sin publicar"
 make release-preview BUMP=minor     # muestra la versión nueva y la entrada del changelog, sin cambiar nada
-make release BUMP=minor             # patch (por defecto) | minor | major | una versión exacta como 1.2.3
+make release BUMP=minor             # patch (por defecto) | minor | major | una versión exacta como BUMP=1.0.0
 ```
 
-`make release` (ejecuta `scripts/release.mjs`) exige el árbol limpio en `main` y al día con `origin`, y hace en orden: comprobación de tipos, subir `version` en los paquetes raíz, `server` y `web` (y en `package-lock.json`), añadir una entrada a `CHANGELOG.md` con los asuntos de los commits desde el último tag, commit `release vX.Y.Z`, crear el tag anotado `vX.Y.Z` y subir la rama y el tag. `PUSH=0` hace el commit y el tag sin subirlos; `ALLOW_BRANCH=1` permite publicar desde otra rama.
+`CHANGELOG.md` sigue [Keep a Changelog 1.1.0](https://keepachangelog.com/es-ES/1.1.0/): arriba la sección "Sin publicar", después una sección por versión, con los cambios agrupados en **Añadido, Cambiado, Obsoleto, Eliminado, Corregido** y **Seguridad**, y los enlaces de comparación al final. Se escribe en español por defecto; si los títulos del archivo están en inglés, se mantiene en inglés.
+
+`make release` (ejecuta `scripts/release.mjs`) exige el árbol limpio en `main` y todo subido, y hace en orden:
+
+1. **Pide los cambios.** Si "Sin publicar" ya tiene entradas las muestra y pregunta si quieres agregar más; si está vacía, lista los commits desde el último tag como referencia y pide las entradas tipo por tipo (una por línea; una línea vacía pasa al siguiente tipo). Sin terminal y sin entradas se detiene en lugar de publicar una versión vacía.
+2. Muestra la sección nueva y pide confirmación (`YES=1` omite las preguntas).
+3. Comprueba los tipos, sube `version` en los paquetes raíz, `server` y `web` (y en `package-lock.json`) y mueve las entradas de "Sin publicar" a la versión nueva con la fecha de hoy.
+4. Hace el commit `release vX.Y.Z`, crea el tag anotado `vX.Y.Z` y sube la rama **y el tag**. `PUSH=0` hace el commit y el tag sin subirlos; `ALLOW_BRANCH=1` permite publicar desde otra rama.
 
 **2) Publicar en npm**
 

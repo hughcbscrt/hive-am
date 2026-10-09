@@ -127,14 +127,22 @@ An orchestrator that delegates causes, in turn, another `spawn` (the subagent's)
 
 The repository has a `Makefile` for the two release tasks (`make help` lists them):
 
-**1) Release: bump versions, update the changelog, commit, tag and push**
+**1) Release: ask for the changes, bump versions, update the changelog, commit, tag and push**
 
 ```bash
+make changelog-add TYPE=Added MSG="What you added"   # any time: queue an entry under "Unreleased"
 make release-preview BUMP=minor     # shows the new version and the changelog entry, changes nothing
-make release BUMP=minor             # patch (default) | minor | major | an exact version such as 1.2.3
+make release BUMP=minor             # patch (default) | minor | major | an exact version such as BUMP=1.0.0
 ```
 
-`make release` (it runs `scripts/release.mjs`) requires a clean working tree on `main`, up to date with `origin`, and does this in order: type-check, bump `version` in the root, `server` and `web` packages (and `package-lock.json`), add an entry to `CHANGELOG.md` with the commit subjects since the last tag, commit `release vX.Y.Z`, create the annotated tag `vX.Y.Z` and push the branch and the tag. `PUSH=0` commits and tags without pushing; `ALLOW_BRANCH=1` allows releasing from another branch.
+`CHANGELOG.md` follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/): an "Unreleased" section on top, then one section per version, with the changes grouped as **Added, Changed, Deprecated, Removed, Fixed** and **Security**, and comparison links at the bottom. It is written in Spanish by default; if the file's headings are in English, it stays in English.
+
+`make release` (it runs `scripts/release.mjs`) requires a clean working tree on `main`, with everything pushed, and does this in order:
+
+1. **Asks for the changes.** If "Unreleased" already has entries it shows them and asks whether to add more; if it is empty it lists the commits since the last tag as a reference and asks for the entries type by type (one per line, an empty line moves to the next type). With no terminal and no entries it stops instead of publishing an empty release.
+2. Shows the new section and asks for confirmation (`YES=1` skips the questions).
+3. Type-checks, bumps `version` in the root, `server` and `web` packages (and `package-lock.json`) and moves the "Unreleased" entries to the new version with today's date.
+4. Commits `release vX.Y.Z`, creates the annotated tag `vX.Y.Z` and pushes the branch **and the tag**. `PUSH=0` commits and tags without pushing; `ALLOW_BRANCH=1` allows releasing from another branch.
 
 **2) Publish to npm**
 
