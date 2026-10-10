@@ -1,7 +1,7 @@
 import type { Agent, ChatMessage } from '../types.js';
-import { readClaude } from './claude.js';
-import { readOpencode } from './opencode.js';
-import { readKiro } from './kiro.js';
+import { claudeSig, readClaude } from './claude.js';
+import { opencodeSig, readOpencode } from './opencode.js';
+import { kiroSig, readKiro } from './kiro.js';
 
 /** The conversation lives in each CLI's own store; hive-am only keeps the pointer. */
 export function readHistory(a: Pick<Agent, 'provider' | 'cwd' | 'session_id'>, sessionId = a.session_id): ChatMessage[] {
@@ -16,4 +16,15 @@ export function readHistory(a: Pick<Agent, 'provider' | 'cwd' | 'session_id'>, s
     console.error('[history]', a.provider, sessionId, e);
     return [];
   }
+}
+
+/** A cheap fingerprint of a conversation: it only changes when something was added to it. `null` when it cannot be found. */
+export function historySig(a: Pick<Agent, 'provider' | 'cwd'>, sessionId: string): string | null {
+  try {
+    switch (a.provider) {
+      case 'claude': return claudeSig(a.cwd, sessionId);
+      case 'opencode': return opencodeSig(sessionId);
+      case 'kiro': return kiroSig(sessionId);
+    }
+  } catch { return null; }
 }

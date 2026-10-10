@@ -24,6 +24,12 @@ export function claudeFile(cwd: string, sessionId: string): string | null {
   return null;
 }
 
+/** Changes when the conversation changes (used to cache what is computed from it). */
+export function claudeSig(cwd: string, sessionId: string): string | null {
+  const f = claudeFile(cwd, sessionId); if (!f) return null;
+  try { const st = statSync(f); return `${st.mtimeMs}:${st.size}`; } catch { return null; }
+}
+
 // Parsing a long transcript (tens of MB) takes about a second and the UI asks for it often: keep the last results while the file is unchanged.
 const cache = new Map<string, { sig: string; msgs: ChatMessage[] }>();
 
@@ -34,7 +40,7 @@ export function readClaude(cwd: string, sessionId: string): ChatMessage[] {
   if (hit && hit.sig === sig) return hit.msgs;
   const msgs = parseClaude(file);
   cache.delete(file); cache.set(file, { sig, msgs });
-  if (cache.size > 4) cache.delete(cache.keys().next().value as string);
+  if (cache.size > 8) cache.delete(cache.keys().next().value as string);
   return msgs;
 }
 

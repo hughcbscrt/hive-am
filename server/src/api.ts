@@ -22,6 +22,8 @@ import { readHistory } from './history/index.js';
 import { listModels } from './models.js';
 import type { Provider } from './types.js';
 import { sessionStats } from './stats.js';
+import { summaryOf } from './sessions-summary.js';
+import { emptyUsage } from './pricing.js';
 import { createReadStream } from 'node:fs';
 import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git/repo.js';
 import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './git/switch.js';
@@ -229,15 +231,14 @@ gitWrite('unresolve', (cwd, b) => gitUnresolve(cwd, String(b.path ?? '')));
 // ---- sessions across all managed agents ----
 route('GET', '/api/sessions', () => {
   const byAgent = new Map(agents.list().map((a) => [a.id, a]));
+  // Never reads a conversation here: sizes and costs come from a cache that fills in the background (`pending` rows are still being read).
   return agents.allSessions().map((s) => {
     const a = byAgent.get(s.agent_id)!;
-    const msgs = readHistory({ provider: s.provider, cwd: s.cwd, session_id: s.session_id }, s.session_id);
-    const first = msgs.find((m) => m.role === 'user')?.blocks.find((b) => b.type === 'text');
-    const st = sessionStats(msgs);
+    const { summary, fresh } = summaryOf({ provider: s.provider, cwd: s.cwd, session_id: s.session_id });
     return {
-      ...s, current: a.session_id === s.session_id, message_count: msgs.length,
-      usage: st.usage, cost: st.cost, tool_calls: st.toolCalls, model: st.models[0]?.model ?? null,
-      preview: first && first.type === 'text' ? first.text.slice(0, 160) : '',
+      ...s, current: a.session_id === s.session_id, pending: !fresh,
+      message_count: summary?.message_count ?? 0, usage: summary?.usage ?? emptyUsage(), cost: summary?.cost ?? null,
+      tool_calls: summary?.tool_calls ?? 0, model: summary?.model ?? null, preview: summary?.preview ?? '',
     };
   });
 });

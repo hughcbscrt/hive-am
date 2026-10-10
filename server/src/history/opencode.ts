@@ -7,6 +7,16 @@ import { estimateCost } from '../pricing.js';
 
 const DB = join(homedir(), '.local', 'share', 'opencode', 'opencode.db');
 
+/** Changes when the conversation changes (used to cache what is computed from it). */
+export function opencodeSig(sessionId: string): string | null {
+  if (!existsSync(DB)) return null;
+  const db = new Database(DB, { readonly: true, fileMustExist: true });
+  try {
+    const r = db.prepare('SELECT COUNT(*) n, COALESCE(MAX(time_created), 0) t FROM session_message WHERE session_id=?').get(sessionId) as { n: number; t: number };
+    return `${r.n}:${r.t}`;
+  } catch { return null; } finally { db.close(); }
+}
+
 export function readOpencode(sessionId: string): ChatMessage[] {
   if (!existsSync(DB)) return [];
   const db = new Database(DB, { readonly: true, fileMustExist: true });

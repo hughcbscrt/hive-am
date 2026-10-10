@@ -1,10 +1,16 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Block, ChatMessage, MsgMeta } from '../types.js';
 
 const DIR = join(homedir(), '.kiro', 'sessions', 'cli');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Changes when the conversation changes (used to cache what is computed from it). */
+export function kiroSig(sessionId: string): string | null {
+  if (!UUID.test(sessionId)) return null;
+  try { const st = statSync(join(DIR, `${sessionId}.jsonl`)); return `${st.mtimeMs}:${st.size}`; } catch { return null; }
+}
 
 export function readKiro(sessionId: string): ChatMessage[] {
   if (!UUID.test(sessionId)) return [];
