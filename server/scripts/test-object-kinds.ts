@@ -127,6 +127,30 @@ check((await objectLogs(web.id, {})).text === '', 'and has no logs');
 check(await rejects(() => createObject({ name: 'bad-http', kind: 'http', config: { folder: 'x' } }), /absolute/), 'its folder must be absolute');
 check((await stateOf(createObject({ name: 'gone-http', kind: 'http', config: { folder: join(dir, 'nope') } }))).status === 'error', 'a folder that is not there makes it an error');
 
+// ---------------------------------------------------------------- variables of hive-am (no env file needed)
+const bare = mkdtempSync(join(tmpdir(), 'http-bare-'));
+writeFileSync(join(bare, 'one.http'), `GET {{host}}/vars/{{who}}\nAuthorization: Bearer {{token}}\n`);
+const vobj = createObject({ name: 'own-vars', kind: 'http', config: { folder: bare, env: 'local', variables: { $shared: { who: { value: 'everyone' } }, local: { host: { value: `http://127.0.0.1:${port}` }, token: { value: 'HIDDEN-TOKEN-777', secret: true } }, other: { host: { value: `http://127.0.0.1:${port}/other` } } } } });
+check(httpScan(vobj.id).environments.join() === 'local,other', 'the environments of hive-am are listed when there is no env file');
+check(await rejects(() => httpRun(bare, 'one.http', 0, 'local'), /Variables of this object/), 'without them the request is refused and says where to define them');
+const hv = { local: { host: { value: `http://127.0.0.1:${port}` }, token: { value: 'HIDDEN-TOKEN-777' } }, $shared: { who: { value: 'everyone' } } };
+const vr = await httpRun(bare, 'one.http', 0, 'local', hv);
+check(vr.status === 200 && seen.at(-1)!.url === '/vars/everyone' && seen.at(-1)!.headers.authorization === 'Bearer HIDDEN-TOKEN-777', 'with them it runs: environment values and the shared ones are filled in');
+check(JSON.stringify(vobj.config).includes('HIDDEN-TOKEN-777') === false && (vobj.config as any).variables.local.token.set === true && (vobj.config as any).variables.local.token.value === '', 'a secret is hidden in what the API returns, and says there is one');
+check(JSON.stringify(viewOf(objectsStore.get(vobj.id)!)).includes('HIDDEN-TOKEN-777') === false, 'in every view of the object');
+const kept = updateObject(vobj.id, { config: { folder: bare, env: 'local', variables: { local: { host: { value: `http://127.0.0.1:${port}` }, token: { value: '', secret: true } }, $shared: { who: { value: 'changed' } } } } });
+check((objectsStore.get(vobj.id)!.config as any).variables.local.token.value === 'HIDDEN-TOKEN-777' && (kept.config as any).variables.local.token.set === true, 'saving a secret left empty keeps the stored value');
+const swapped = updateObject(vobj.id, { config: { folder: bare, env: 'local', variables: { local: { host: { value: `http://127.0.0.1:${port}` }, token: { value: 'NEW-ONE', secret: true } }, $shared: { who: { value: 'everyone' } } } } });
+check((objectsStore.get(vobj.id)!.config as any).variables.local.token.value === 'NEW-ONE' && !JSON.stringify(swapped).includes('NEW-ONE'), 'typing a new value replaces it, and it is not returned either');
+check((await httpRun(bare, 'one.http', 0, 'local', (objectsStore.get(vobj.id)!.config as any).variables)).status === 200, 'the stored (real) values are the ones that are sent');
+// an env file wins over hive-am's own value
+writeFileSync(join(bare, 'http-client.env.json'), JSON.stringify({ local: { who: 'from-file' } }));
+await httpRun(bare, 'one.http', 0, 'local', { local: { host: { value: `http://127.0.0.1:${port}` }, token: { value: 't' }, who: { value: 'from-hive' } } });
+check(seen.at(-1)!.url === '/vars/from-file', 'when an env file defines the same variable, the file wins');
+check(httpScan(vobj.id).fileVars.local.join() === 'who', 'and the scan says which variables the files define');
+check(await rejects(() => createObject({ name: 'bad-var', kind: 'http', config: { folder: bare, variables: { dev: { '1bad': { value: 'x' } } } } }), /valid variable name/), 'a bad variable name is refused');
+await removeObject(vobj.id);
+
 // ---------------------------------------------------------------- clusters
 const colony = colonies.create({ name: 'cluster-colony', color: '#2f8f5b', cwd: dir, permission: 'acceptEdits', system_prompt: '', skill_ids: [] } as any);
 const other = colonies.create({ name: 'other-colony', color: '#d4663f', cwd: dir, permission: 'acceptEdits', system_prompt: '', skill_ids: [] } as any);

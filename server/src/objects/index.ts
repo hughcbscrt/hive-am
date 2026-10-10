@@ -3,7 +3,7 @@ import { dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stop
 import { describeHttp, httpCount, runHttp, scanHttp } from './http.js';
 import { ObjectError, type ClusterConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
 import { forgetServer, serverLogs, serverState, startServer, stopServer } from './runner.js';
-import { objectsStore } from './store.js';
+import { maskConfig, objectsStore } from './store.js';
 
 export { ObjectError } from './model.js';
 export { objectsStore } from './store.js';
@@ -59,7 +59,7 @@ export async function refreshStates(): Promise<boolean> {
   return diff;
 }
 
-export const viewOf = (o: ObjectRow): ObjectView => ({ ...o, state: states.get(o.id) ?? { status: 'unknown', detail: 'checking…' } });
+export const viewOf = (o: ObjectRow): ObjectView => ({ ...maskConfig(o), state: states.get(o.id) ?? { status: 'unknown', detail: 'checking…' } });
 export const listObjects = (): ObjectView[] => objectsStore.list().map(viewOf);
 
 let timer: ReturnType<typeof setInterval> | undefined, busy = false;
@@ -142,9 +142,9 @@ export async function objectLogs(id: string, q: { tail?: number; after?: string 
 export const statsOf = async (id: string) => { const { objectStats } = await import('./stats.js'); return objectStats(get(id)); };
 
 /** The requests of an HTTP object, and running one of them. */
-export const httpScan = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return scanHttp((o.config as HttpConfig).folder); };
-export const httpDescribe = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return describeHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env); };
-export const httpRun = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return runHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env); };
+export const httpScan = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return scanHttp((o.config as HttpConfig).folder, (o.config as HttpConfig).variables); };
+export const httpDescribe = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return describeHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables); };
+export const httpRun = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return runHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables); };
 
 /** Deleting an object also removes what hive-am made for it (see docker.ts for what is left alone). */
 export async function removeObject(id: string): Promise<boolean> {

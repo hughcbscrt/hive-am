@@ -1,7 +1,10 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { randomInt, randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { ObjectError } from './model.js';
+import { ObjectError, type HttpVariable } from './model.js';
+
+/** Variables defined in hive-am, per environment (see HttpConfig). */
+type Hive = Record<string, Record<string, HttpVariable>> | undefined;
 
 /**
  * HTTP requests as an object: a folder of `.http` / `.rest` files in the format of the IntelliJ and VS Code REST clients. hive-am lists the
@@ -21,7 +24,7 @@ const ENV_FILES = ['http-client.env.json', 'http-client.private.env.json'];
 
 export interface HttpRequestItem { id: string; index: number; name: string; method: string; url: string; headers: { name: string; value: string }[]; body?: string; line: number; variables: string[] }
 export interface HttpFile { relFile: string; requests: HttpRequestItem[]; fileVariables: Record<string, string> }
-export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; truncated: boolean }
+export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; /** Names of the variables the env files define, per environment (so the interface can say which of its own they override). */ fileVars: Record<string, string[]>; truncated: boolean }
 export interface HttpRun {
   request: { method: string; url: string; headers: { name: string; value: string }[]; body?: string };
   status: number; statusText: string; durationMs: number; size: number;
@@ -102,7 +105,7 @@ const readJson = (file: string): Record<string, Record<string, unknown>> | null 
 };
 
 /** Environment variables for a file: the env files from the folder of the file up to the root (the nearest wins), the private one over the public one. */
-function envVars(root: string, fileAbs: string, env: string | undefined): { vars: Record<string, string>; names: string[]; files: string[] } {
+function envVars(root: string, fileAbs: string, env: string | undefined, hive?: Hive): { vars: Record<string, string>; names: string[]; files: string[] } {
   const dirs: string[] = []; for (let d = dirname(fileAbs); ; d = dirname(d)) { dirs.push(d); if (d === root || !d.startsWith(root)) break; }
   const merged: Record<string, Record<string, unknown>> = {}; const files: string[] = [];
   for (const d of dirs.reverse()) for (const f of ENV_FILES) {
@@ -111,15 +114,17 @@ function envVars(root: string, fileAbs: string, env: string | undefined): { vars
     files.push(relative(root, p));
     for (const [k, v] of Object.entries(j)) if (v && typeof v === 'object') merged[k] = { ...(merged[k] ?? {}), ...(v as Record<string, unknown>) };
   }
-  const names = Object.keys(merged).filter((k) => k !== '$shared');
+  const names = [...new Set([...Object.keys(merged), ...Object.keys(hive ?? {})])].filter((k) => k !== '$shared').sort();
   const vars: Record<string, string> = {};
+  // hive-am's own variables fill in first; whatever an env file defines wins over them.
+  for (const [k, v] of Object.entries({ ...(hive?.$shared ?? {}), ...(env ? hive?.[env] ?? {} : {}) })) vars[k] = v.value;
   for (const [k, v] of Object.entries({ ...(merged.$shared ?? {}), ...(env ? merged[env] ?? {} : {}) })) vars[k] = typeof v === 'string' ? v : JSON.stringify(v);
   return { vars, names, files };
 }
 
-export function scanHttp(folder: string): HttpScan {
+export function scanHttp(folder: string, hive?: Hive): HttpScan {
   const root = realFolder(folder);
-  const files: HttpFile[] = []; const envNames = new Set<string>(); const envFiles = new Set<string>();
+  const files: HttpFile[] = []; const envNames = new Set<string>(Object.keys(hive ?? {}).filter((k) => k !== '$shared')); const envFiles = new Set<string>(); const fileVars: Record<string, Set<string>> = {};
   let truncated = false, total = 0;
   const walk = (dir: string, depth: number) => {
     let entries; try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
@@ -127,14 +132,14 @@ export function scanHttp(folder: string): HttpScan {
     for (const e of entries) {
       const abs = join(dir, e.name);
       if (e.isDirectory()) { if (depth < MAX_DEPTH && !SKIP.has(e.name) && !e.name.startsWith('.')) walk(abs, depth + 1); continue; }
-      if (ENV_FILES.includes(e.name)) { envFiles.add(relative(root, abs)); for (const k of Object.keys(readJson(abs) ?? {})) if (k !== '$shared') envNames.add(k); continue; }
+      if (ENV_FILES.includes(e.name)) { envFiles.add(relative(root, abs)); for (const [k, vars] of Object.entries(readJson(abs) ?? {})) { if (k !== '$shared') envNames.add(k); const set = (fileVars[k] ??= new Set()); for (const name of Object.keys(vars ?? {})) set.add(name); } continue; }
       if (!/\.(http|rest)$/i.test(e.name)) continue;
       if (files.length >= MAX_FILES || total >= MAX_REQUESTS) { truncated = true; return; }
       try { const f = parseHttpFile(readFileSync(abs, 'utf8'), relative(root, abs)); if (f.requests.length) { files.push(f); total += f.requests.length; } } catch { /* unreadable file */ }
     }
   };
   walk(root, 0);
-  return { folder: root, files, environments: [...envNames].sort(), envFiles: [...envFiles].sort(), truncated };
+  return { folder: root, files, environments: [...envNames].sort(), envFiles: [...envFiles].sort(), fileVars: Object.fromEntries(Object.entries(fileVars).map(([k, v]) => [k, [...v].sort()])), truncated };
 }
 
 const MASK = /^(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api-key|x-auth-token|x-access-token)$/i;
@@ -156,30 +161,30 @@ const substitute = (text: string, vars: Record<string, string>, unresolved: Set<
 };
 
 /** The variables a request needs and where each one stands, so the interface can show what is missing before running it. */
-export function describeHttp(folder: string, relFile: string, index: number, env?: string) {
+export function describeHttp(folder: string, relFile: string, index: number, env?: string, hive?: Hive) {
   const root = realFolder(folder);
   const abs = inside(root, relFile);
   const file = parseHttpFile(readFileSync(abs, 'utf8'), relFile);
   const item = file.requests[index]; if (!item) throw new ObjectError(`Request #${index} is not in ${relFile}`);
-  const e = envVars(root, abs, env);
+  const e = envVars(root, abs, env, hive);
   const vars = { ...e.vars, ...file.fileVariables };
   return { item, missing: item.variables.filter((v) => dynamic(v) === undefined && !(v in vars)), environments: e.names };
 }
 
-export async function runHttp(folder: string, relFile: string, index: number, env?: string): Promise<HttpRun> {
+export async function runHttp(folder: string, relFile: string, index: number, env?: string, hive?: Hive): Promise<HttpRun> {
   const root = realFolder(folder);
   const abs = inside(root, relFile);
   if (!/\.(http|rest)$/i.test(abs)) throw new ObjectError('That is not a .http file');
   const file = parseHttpFile(readFileSync(abs, 'utf8'), relFile);
   const item = file.requests[index]; if (!item) throw new ObjectError(`Request #${index} is not in ${relFile}`);
-  const e = envVars(root, abs, env);
+  const e = envVars(root, abs, env, hive);
   if (env && !e.names.includes(env)) throw new ObjectError(`The environment "${env}" is not in the env files`);
   const vars = { ...e.vars, ...file.fileVariables };
   const unresolved = new Set<string>();
   const url = substitute(item.url, vars, unresolved);
   const headers = item.headers.map((h) => ({ name: h.name, value: substitute(h.value, vars, unresolved) }));
   let body = item.body === undefined ? undefined : substitute(item.body, vars, unresolved);
-  if (unresolved.size) throw new ObjectError(`Missing values for: ${[...unresolved].map((v) => `{{${v}}}`).join(', ')}${e.names.length ? '. Pick an environment that defines them.' : '. Define them in the file (@name = value) or in an http-client.env.json.'}`);
+  if (unresolved.size) throw new ObjectError(`Missing values for: ${[...unresolved].map((v) => `{{${v}}}`).join(', ')}${e.names.length ? '. Pick an environment that defines them.' : '. Define them in the file (@name = value), in an http-client.env.json, or in the Variables of this object.'}`);
 
   // `< ./file` as the whole body: the content of a file next to the .http file (inside the folder).
   const inc = body && /^<\s+(\S+)\s*$/.exec(body.trim());
