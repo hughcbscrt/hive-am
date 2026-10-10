@@ -1,6 +1,6 @@
 'use client';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, ChevronUp, File, FileCode, FileImage, FileText, Folder, FolderOpen, GitBranch, ListChecks, RefreshCw, Search, Undo2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, File, FileCode, FileImage, FileText, Folder, FolderOpen, GitBranch, History, ListChecks, RefreshCw, Search, Undo2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api } from '@/lib/api';
@@ -8,7 +8,7 @@ import { useI18n } from '@/lib/i18n/index';
 import { fmtBytes, fmtDateTime, fmtNum } from '@/lib/format';
 import { changeMarks, hunkRange, parseDiff, type ChangeGroup, type ChangeMarks, type Hunk } from '@/lib/git/diff';
 import { buildTree, defaultExpanded, flatten, type Row, type TreeNode } from '@/lib/git/gitTree';
-import type { Agent, GitChange, GitChangeStatus, GitDiffResult, GitFileResult, GitTagInfo } from '@/lib/types';
+import type { Agent, GitChange, GitChangeStatus, GitDiffResult, GitFileResult, GitRefs, GitTagInfo, GrepHit } from '@/lib/types';
 import type { useGit } from '@/lib/git/useGit';
 import { CopyBtn } from '@/components/chat/ToolCall';
 import { isCodeFile, languageOf } from '@/lib/git/highlight';
@@ -16,6 +16,10 @@ import { useHighlighted } from '@/lib/git/useHighlighted';
 import { useGitPrefs } from '@/lib/git/gitPrefs';
 import { GitSettings } from './GitSettings';
 import { TagList, TagView } from './TagBrowser';
+import { CommitPreview } from './ChangesPreview';
+import { CompareList, CompareView, type CompareSel } from './Compare';
+import { RefPicker, useRefs } from './RefPicker';
+import { RefFile } from './RefFile';
 import { CodeCell } from './Code';
 import { DiffView } from './DiffView';
 import { ROW_H, VirtualLines } from './VirtualLines';
@@ -65,7 +69,7 @@ const GUTTER_CH = 6;           // line-number column, in characters
 const BLAME_PX = 210;          // blame column width
 
 /** The file, line by line. Only the rows on screen are in the DOM (see VirtualLines), so size does not matter. */
-export function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew }: { f: GitFileResult; agent: Agent; blame: boolean; onOpenCommit: (sha: string) => void; marks: ChangeMarks | null; allNew: boolean }) {
+export function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew, focusLine }: { f: GitFileResult; agent: Agent; blame: boolean; onOpenCommit: (sha: string) => void; marks: ChangeMarks | null; allNew: boolean; /** Scroll to this line and mark it (a search result). */ focusLine?: { line: number; key: number } }) {
   const groups: ChangeGroup[] = marks?.groups ?? [];
   // Clicking a change mark opens that block of the diff right under it.
   const [peek, setPeek] = useState<{ row: number; block: number } | null>(null);
@@ -118,7 +122,7 @@ export function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew
       {blameErr && <div className="gx-banner">{blameErr}</div>}
       {blame?.truncated && <div className="gx-banner">{t('git.blame.truncated', { count: blame.lines.length })}</div>}
       <div className="vf-main" style={{ ['--vl-left' as never]: `${left}px` }}>
-        <VirtualLines count={html.length} width={`calc(${left}px + ${GUTTER_CH}ch + ${widest}ch + 40px)`} overlay={peek && groups[peek.block] ? { top: peekTop(groups[peek.block], peek.row), node: <ChangePeek path={f.path} hunk={groups[peek.block].view} index={peek.block} extent={extent} onClose={() => setPeek(null)} total={groups.length} onGo={goTo} /> } : undefined} reveal={reveal} render={(i) => {
+        <VirtualLines count={html.length} width={`calc(${left}px + ${GUTTER_CH}ch + ${widest}ch + 40px)`} overlay={peek && groups[peek.block] ? { top: peekTop(groups[peek.block], peek.row), node: <ChangePeek path={f.path} hunk={groups[peek.block].view} index={peek.block} extent={extent} onClose={() => setPeek(null)} total={groups.length} onGo={goTo} /> } : undefined} reveal={focusLine ? { top: Math.max(0, focusLine.line - 4) * ROW_H, bottom: (focusLine.line + 2) * ROW_H, key: focusLine.key } : reveal} render={(i) => {
           const sha = blame?.lines[i]; const c = sha ? blame!.commits[sha] : undefined; const run = runs?.[i];
           // What changed since the last commit: green = added, blue = modified, a red edge where lines were removed.
           const kind = f.source === 'worktree' ? (allNew ? 'add' : marks?.lines.get(i + 1)) : undefined;
@@ -126,7 +130,7 @@ export function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew
           const delAfter = !!marks && i === html.length - 1 && marks.removedBefore.has(html.length + 1);
           const block = !marks || f.source !== 'worktree' ? undefined : marks.blockOfLine.get(i + 1) ?? (delBefore ? marks.blockOfRemoval.get(i + 1) : delAfter ? marks.blockOfRemoval.get(html.length + 1) : undefined);
           return (
-            <div key={i} className={`vl-row ${run ? `bl-g${run.g}` : ''} ${kind ? `m-${kind}` : ''} ${delBefore ? 'm-delb' : delAfter ? 'm-dela' : ''} ${block !== undefined ? 'has-peek' : ''} ${extent && i + 1 >= extent.from && i + 1 <= extent.to ? 'in-peek' : ''}`}
+            <div key={i} className={`vl-row ${focusLine && i + 1 === focusLine.line ? 'm-hit' : ''} ${run ? `bl-g${run.g}` : ''} ${kind ? `m-${kind}` : ''} ${delBefore ? 'm-delb' : delAfter ? 'm-dela' : ''} ${block !== undefined ? 'has-peek' : ''} ${extent && i + 1 >= extent.from && i + 1 <= extent.to ? 'in-peek' : ''}`}
               onClick={block !== undefined ? (e) => { if ((e.target as HTMLElement).closest('.bl-btn')) return; if (!(e.target as HTMLElement).closest('.vl-ln') && !window.getSelection()?.isCollapsed) return; if (peek?.row === i) { setPeek(null); return; } setPeek({ row: i, block }); setReveal({ top: i * ROW_H, bottom: peekTop(groups[block], i) + peekHeight(groups[block]), key: Date.now() }); } : undefined}
               title={block !== undefined ? t('git.peek.hint') : undefined}>
               {blame && (
@@ -145,14 +149,14 @@ export function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew
   );
 }
 
-function Preview({ agent, path, ignored = false, change, stamp, onOpenCommit, onDiscard, onDiscardHunk, onDiscardLines }: { agent: Agent; path: string; ignored?: boolean; change?: GitChange; stamp: number; onOpenCommit: (sha: string) => void; onDiscard: (c: GitChange) => void; onDiscardHunk: (path: string, index: number, header: string) => void; onDiscardLines: (path: string, index: number, header: string, lines: number[]) => void }) {
+function Preview({ agent, path, ignored = false, change, stamp, refs, focusLine, onHistory, onOpenCommit, onDiscard, onDiscardHunk, onDiscardLines }: { agent: Agent; path: string; ignored?: boolean; change?: GitChange; stamp: number; refs: GitRefs | null; focusLine?: { line: number; key: number }; onHistory: (path: string) => void; onOpenCommit: (sha: string) => void; onDiscard: (c: GitChange) => void; onDiscardHunk: (path: string, index: number, header: string) => void; onDiscardLines: (path: string, index: number, header: string, lines: number[]) => void }) {
   const { t } = useI18n();
   const [blameOn, setBlameOn] = useState(false);
   // Text changes open on their diff; images (and unchanged files) open on the file itself.
   const wantDiff = !!change && !IMAGE.test(path);
   const isMd = MARKDOWN.test(path);
   // Markdown opens rendered unless it has changes (then the diff comes first); the File tab shows the source.
-  const firstView = wantDiff ? 'diff' : isMd ? 'preview' : 'file';
+  const firstView = focusLine ? 'file' : wantDiff ? 'diff' : isMd ? 'preview' : 'file';
   const [view, setView] = useState<'diff' | 'file' | 'preview'>(firstView);
   const [layout, setLayout] = useState<'unified' | 'split'>('unified');
   const [diff, setDiff] = useState<GitDiffResult | null>(null);
@@ -161,6 +165,9 @@ function Preview({ agent, path, ignored = false, change, stamp, onOpenCommit, on
   const [busy, setBusy] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
   const isImage = IMAGE.test(path);
+  // "View at…": the same file as it was at another branch, tag or commit (read-only).
+  const [atRef, setAtRef] = useState<string | null>(null);
+  useEffect(() => { setAtRef(null); }, [path]);
 
   // A different file: pick the most useful tab for it. A file that stops/starts being changed: adjust too.
   useEffect(() => { setView(firstView); setImgFailed(false); }, [path, wantDiff]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -209,7 +216,9 @@ function Preview({ agent, path, ignored = false, change, stamp, onOpenCommit, on
         <div className="gx-ptools">
           {(change || isMd) && <Segmented value={view} onChange={setView} options={[...(change ? [{ id: 'diff' as const, label: t('git.view.diff') }] : []), ...(isMd ? [{ id: 'preview' as const, label: t('git.view.preview') }] : []), { id: 'file' as const, label: t(isMd ? 'git.view.source' : 'git.view.file') }]} />}
           {view === 'diff' && change && <Segmented value={layout} onChange={setLayout} options={[{ id: 'unified', label: t('git.layout.unified') }, { id: 'split', label: t('git.layout.split') }]} />}
-          {!isImage && !ignored && change?.status !== 'deleted' && change?.status !== 'untracked' && change?.status !== 'conflict' && (() => {
+          {change?.status !== 'untracked' && !ignored && <button type="button" className="btn sm" title={t('git.file.history')} onClick={() => onHistory(path)}><History size={14} />{t('git.file.history')}</button>}
+          {change?.status !== 'untracked' && !ignored && <RefPicker refs={refs} value={atRef ?? ''} onChange={setAtRef} icon={false} label={t('git.file.viewAt')} extra={[{ value: '', label: t('git.file.viewAt') }]} />}
+          {!isImage && !ignored && !atRef && change?.status !== 'deleted' && change?.status !== 'untracked' && change?.status !== 'conflict' && (() => {
             const on = blameOn && view === 'file';
             return <button type="button" className={`btn sm ${on ? 'primary' : ''}`} aria-pressed={on} title={t('git.blame.hint')} onClick={() => { if (view !== 'file') { setView('file'); setBlameOn(true); } else setBlameOn((x) => !x); }}>{t('git.blame')}</button>;
           })()}
@@ -218,7 +227,8 @@ function Preview({ agent, path, ignored = false, change, stamp, onOpenCommit, on
         </div>
       </header>
       {change?.oldPath && <div className="gx-banner">{t('git.renamedFrom', { path: change.oldPath })}</div>}
-      <div className="gx-body">
+      {atRef && <div className="gx-banner row gap-s"><span className="grow">{t('git.file.atRef', { ref: atRef })}</span><button className="btn sm" onClick={() => setAtRef(null)}>{t('git.file.backToCurrent')}</button></div>}
+      {atRef ? <RefFile agent={agent} gitRef={atRef} path={change?.oldPath && atRef ? change.oldPath : path} toolbar={false} /> : <div className="gx-body">
         {err ? <p className="gx-note err">{err}</p> : busy && !parsed && !file ? <p className="gx-note">{t('git.loading')}</p> : view === 'diff' && change ? (
           parsed ? (
             parsed.binary ? <p className="gx-note">{t('git.diff.binary')}</p>
@@ -229,8 +239,8 @@ function Preview({ agent, path, ignored = false, change, stamp, onOpenCommit, on
           <div className="gx-image"><img src={`/api/agents/${agent.id}/git/raw?path=${encodeURIComponent(path)}&v=${stamp}`} alt={name} onError={() => setImgFailed(true)} /></div>
         ) : view === 'preview' && file && file.path === path ? (
           <div className="gx-md md">{file.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: (p) => <a {...p} target="_blank" rel="noreferrer" /> }}>{file.content}</ReactMarkdown></div>
-        ) : file && file.path === path ? <FileView f={file} agent={agent} blame={blameOn} onOpenCommit={onOpenCommit} marks={marks} allNew={wholeNew} /> : isImage && imgFailed ? <p className="gx-note">{t('git.file.binary')}</p> : null}
-      </div>
+        ) : file && file.path === path ? <FileView f={file} agent={agent} blame={blameOn} onOpenCommit={onOpenCommit} marks={marks} allNew={wholeNew} focusLine={focusLine} /> : isImage && imgFailed ? <p className="gx-note">{t('git.file.binary')}</p> : null}
+      </div>}
     </section>
   );
 }
@@ -245,7 +255,14 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
   const [query, setQuery] = useState('');
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
-  const [mode, setMode] = useState<'files' | 'history' | 'tags' | 'stashes'>('files');
+  const [mode, setMode] = useState<'files' | 'history' | 'tags' | 'compare' | 'stashes'>('files');
+  const [histPath, setHistPath] = useState<string | null>(null);       // history of one file
+  const [cmp, setCmp] = useState<CompareSel>({ base: '', head: '' });
+  // Search inside the files (not just names)
+  const [byContent, setByContent] = useState(false);
+  const [hits, setHits] = useState<{ q: string; hits: GrepHit[]; truncated: boolean } | null>(null);
+  const [focusLine, setFocusLine] = useState<{ line: number; key: number } | undefined>();
+  const filterRef = useRef<HTMLInputElement>(null);
   const [tagSel, setTagSel] = useState<GitTagInfo | null>(null);
   const [stashes, setStashes] = useState<StashItem[] | null>(null);
   const [stashSel, setStashSel] = useState<string | null>(null);
@@ -261,6 +278,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
   const listRef = useRef<HTMLDivElement>(null);
 
   const repo = status && status.isRepo ? status : null;
+  const refs = useRefs(agent, repo?.head?.sha);
   const files = tree && tree.isRepo ? tree.files : null;
   const ignoredTop = tree && tree.isRepo ? tree.ignored : null;
   const [ignoredKids, setIgnoredKids] = useState<Record<string, { name: string; dir: boolean }[]>>({});
@@ -288,6 +306,34 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
     api.get<StashItem[]>(`/agents/${agent.id}/git/stashes`).then((l) => { if (!dead) { setStashes(l); setStashSel((s) => (s && l.some((x) => x.sha === s) ? s : l[0]?.sha ?? null)); } }).catch(() => undefined);
     return () => { dead = true; };
   }, [agent.id, repo?.generatedAt]);
+
+  // The last file open in each agent is remembered, so coming back to the tab continues where you left off.
+  const lastKey = `hive-am.git.last.${agent.id}`;
+  useEffect(() => { if (sel) { try { localStorage.setItem(lastKey, sel); } catch { /* private mode */ } } }, [sel, lastKey]);
+  useEffect(() => {
+    if (!root || sel !== null || repo?.changes.length) return;
+    try { const last = localStorage.getItem(lastKey); if (last && files?.includes(last)) setSel(last); } catch { /* private mode */ }
+  }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Searching the content runs git once typing pauses; fewer than 2 characters search nothing.
+  useEffect(() => {
+    const q = query.trim();
+    if (!byContent || q.length < 2) { setHits(null); return; }
+    let dead = false;
+    const id = setTimeout(() => api.get<{ hits: GrepHit[]; truncated: boolean }>(`/agents/${agent.id}/git/grep?q=${encodeURIComponent(q)}`).then((r) => !dead && setHits({ q, ...r })).catch(() => !dead && setHits({ q, hits: [], truncated: false })), 350);
+    return () => { dead = true; clearTimeout(id); };
+  }, [agent.id, byContent, query, repo?.generatedAt]);
+
+  // `/` jumps to the filter; Alt+1…5 switch tabs.
+  useEffect(() => {
+    const TABS = ['files', 'history', 'tags', 'compare', 'stashes'] as const;
+    const key = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null, typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+      if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); setMode('files'); setTimeout(() => filterRef.current?.focus(), 0); }
+      else if (e.altKey && !e.ctrlKey && !e.metaKey && /^[1-5]$/.test(e.key)) { e.preventDefault(); setMode(TABS[Number(e.key) - 1]); }
+    };
+    window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
+  }, []);
 
   const rows: Row[] = useMemo(() => (root ? flatten(root, expanded, { query, onlyChanged }) : []), [root, expanded, query, onlyChanged]);
   const shown = rows.slice(0, TREE_MAX_ROWS);
@@ -412,14 +458,28 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
 
       <div className="gx-main">
         <aside className="gx-tree" aria-label={t('git.filesLabel')}>
-          <div className="gx-tabs"><Segmented value={mode} onChange={setMode} options={[{ id: 'files', label: t('git.tab.files') }, { id: 'history', label: t('git.tab.history') }, { id: 'tags', label: t('git.tab.tags') }, { id: 'stashes', label: `${t('git.tab.stashes')}${stashes?.length ? ` · ${stashes.length}` : ''}` }]} /></div>
+          <div className="gx-tabs"><Segmented value={mode} onChange={setMode} options={[{ id: 'files', label: t('git.tab.files') }, { id: 'history', label: t('git.tab.history') }, { id: 'tags', label: t('git.tab.tags') }, { id: 'compare', label: t('git.tab.compare') }, { id: 'stashes', label: `${t('git.tab.stashes')}${stashes?.length ? ` · ${stashes.length}` : ''}` }]} /></div>
           {mode === 'stashes' ? <StashList stashes={stashes} sel={stashSel} onSelect={setStashSel} onSave={() => setSaveStash(true)} canSave={status.changes.length > 0 && !status.state} />
             : mode === 'tags' ? <TagList agent={agent} sel={tagSel?.name ?? null} onSelect={setTagSel} />
-            : mode === 'history' ? <HistoryList agent={agent} head={status.head?.sha} sel={commitSel} onSelect={setCommitSel} /> : (<>
+            : mode === 'compare' ? <CompareList refs={refs} sel={cmp} onChange={setCmp} />
+            : mode === 'history' ? <HistoryList agent={agent} head={status.head?.sha} sel={commitSel} onSelect={setCommitSel} refs={refs} path={histPath} onClearPath={() => setHistPath(null)} /> : (<>
           <div className="gx-filter">
-            <div className="search"><Search size={14} /><input className="input" placeholder={t('git.filterPlaceholder')} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t('git.filterPlaceholder')} /></div>
-            <Segmented value={onlyChanged ? 'changed' : 'all'} onChange={(v) => setOnlyChanged(v === 'changed')} options={[{ id: 'all', label: t('git.filter.all') }, { id: 'changed', label: `${t('git.filter.changed')}${status.changes.length ? ` · ${status.changes.length}` : ''}` }]} />
+            <div className="search"><Search size={14} /><input ref={filterRef} className="input" placeholder={byContent ? t('git.search.placeholder') : t('git.filterPlaceholder')} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t('git.filterPlaceholder')} /></div>
+            <Segmented value={byContent ? 'content' : 'name'} onChange={(v) => setByContent(v === 'content')} options={[{ id: 'name', label: t('git.search.name') }, { id: 'content', label: t('git.search.content') }]} />
+            {!byContent && <Segmented value={onlyChanged ? 'changed' : 'all'} onChange={(v) => setOnlyChanged(v === 'changed')} options={[{ id: 'all', label: t('git.filter.all') }, { id: 'changed', label: `${t('git.filter.changed')}${status.changes.length ? ` · ${status.changes.length}` : ''}` }]} />}
           </div>
+          {byContent ? (
+            <div className="gx-list gx-hits">
+              {query.trim().length < 2 ? <p className="gx-note">{t('git.search.min')}</p> : !hits || hits.q !== query.trim() ? <p className="gx-note">{t('git.search.searching')}</p> : hits.hits.length === 0 ? <p className="gx-note">{t('git.search.none', { query: hits.q })}</p> : (<>
+                {hits.hits.map((h, i) => (
+                  <button key={`${h.path}:${h.line}:${i}`} type="button" className={`gx-hit ${sel === h.path && focusLine?.line === h.line ? 'sel' : ''}`} onClick={() => { setSel(h.path); setFocusLine({ line: h.line, key: Date.now() }); }} title={`${h.path}:${h.line}`}>
+                    <span className="mono nm">{h.path}<i>:{h.line}</i></span><span className="mono tx">{h.text.trim()}</span>
+                  </button>
+                ))}
+                {hits.truncated && <p className="gx-note">{t('git.search.capped', { count: hits.hits.length })}</p>}
+              </>)}
+            </div>
+          ) : (
           <div className="gx-list" ref={listRef} onKeyDown={onKey} role="tree">
             {!root ? <p className="gx-note">{t('git.loading')}</p> : shown.length === 0 ? (
               <p className="gx-note">{query ? t('git.noMatch', { query }) : onlyChanged ? t('git.clean') : t('git.noFiles')}</p>
@@ -430,7 +490,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
                 <button key={`${node.ignored ? 'i:' : ''}${node.path}`} data-row data-dir={isDir ? '1' : '0'} data-path={node.path} type="button" role="treeitem" aria-level={depth + 1} aria-expanded={isDir ? !!open : undefined} aria-selected={!isDir && sel === node.path}
                   className={`gx-row ${isDir ? 'dir' : 'file'} ${node.ignored ? 'ignored' : ''} ${c ? `changed st-${c.status}` : ''} ${!isDir && sel === node.path ? 'sel' : ''} ${isDir && node.changed ? 'has-changes' : ''}`}
                   style={{ paddingLeft: 8 + depth * 14 }} title={node.ignored ? `${node.path} — ${t('git.ignored.hint')}` : node.path}
-                  onClick={() => (isDir ? openDir(node) : setSel(node.path))}>
+                  onClick={() => (isDir ? openDir(node) : (setFocusLine(undefined), setSel(node.path)))}>
                   <span className="chev">{isDir ? (open ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : null}</span>
                   <span className="ico">{isDir ? (open ? <FolderOpen size={15} /> : <Folder size={15} />) : <FileIcon name={node.name} />}</span>
                   <span className="nm">{node.name}</span>
@@ -445,14 +505,16 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
             {rows.length > shown.length && <p className="gx-note">{t('git.rowsCapped', { count: shown.length })}</p>}
             {tree?.isRepo && tree.truncated && <p className="gx-note">{t('git.treeTruncated', { count: tree.files.length })}</p>}
           </div>
+          )}
           </>)}
         </aside>
 
         {mode === 'stashes' ? (stashes?.find((x) => x.sha === stashSel) ? <StashPreview key={stashSel} agent={agent} stash={stashes.find((x) => x.sha === stashSel)!} a={actions} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.stash.empty')}</p></div></div>)
-          : mode === 'tags' ? (tagSel ? <TagView key={tagSel.name} agent={agent} tag={tagSel} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.tags.select')}</p></div></div>)
-          : mode === 'history' ? (commitSel ? <CommitPreview key={commitSel} agent={agent} sha={commitSel} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.hist.select')}</p></div></div>)
+          : mode === 'compare' ? <CompareView agent={agent} sel={cmp} />
+          : mode === 'tags' ? (tagSel ? <TagView key={tagSel.name} agent={agent} tag={tagSel} onChanged={() => void refresh()} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.tags.select')}</p></div></div>)
+          : mode === 'history' ? (commitSel ? <CommitPreview key={`${commitSel}|${histPath ?? ''}`} agent={agent} sha={commitSel} focus={histPath ?? undefined} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.hist.select')}</p></div></div>)
           : sel && selChange?.status === 'conflict' ? <ConflictResolver key={sel} agent={agent} path={sel} state={status.state} a={actions} onResolved={() => { void refresh(); }} />
-          : sel ? <Preview key={sel} agent={agent} path={sel} ignored={isIgnored(sel)} change={selChange} stamp={status.generatedAt} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} onDiscard={discardFile} onDiscardHunk={discardHunk} onDiscardLines={discardLines} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
+          : sel ? <Preview key={sel} agent={agent} path={sel} ignored={isIgnored(sel)} change={selChange} stamp={status.generatedAt} refs={refs} focusLine={focusLine} onHistory={(p) => { setHistPath(p); setCommitSel(null); setMode('history'); }} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} onDiscard={discardFile} onDiscardHunk={discardHunk} onDiscardLines={discardLines} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
       </div>
       {switchPlan && <SwitchDialog agent={agent} plan={switchPlan} a={actions} onClose={() => setSwitchPlan(null)} onGo={() => { const p = switchPlan; setSwitchPlan(null); void doSwitch(p); }} />}
       {saveStash && <SaveStashDialog a={actions} onClose={() => setSaveStash(false)} />}
@@ -468,63 +530,5 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
       {discardAsk && <DiscardConfirm files={discardAsk.files} all={discardAsk.all} summary={discardAsk.summary} file={discardAsk.file} busy={!!actions.busy} onClose={() => setDiscardAsk(null)} onConfirm={async () => { const go = discardAsk.go; setDiscardAsk(null); await go(); }} />}
       {commitOpen && <CommitDialog changes={status.changes} a={actions} initialMessage={status.mergeMsg} onClose={() => setCommitOpen(false)} />}
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ commit preview (history) */
-
-export function CommitPreview({ agent, sha, embedded = false }: { agent: Agent; sha: string; embedded?: boolean }) {
-  const { t } = useI18n();
-  const [d, setD] = useState<GitCommitDetail | null>(null);
-  const [file, setFile] = useState<string | null>(null);
-  const [diff, setDiff] = useState<GitDiffResult | null>(null);
-  const [layout, setLayout] = useState<'unified' | 'split'>('unified');
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    let dead = false; setD(null); setFile(null); setDiff(null); setErr(null);
-    api.get<GitCommitDetail>(`/agents/${agent.id}/git/commit?sha=${sha}`).then((x) => { if (dead) return; setD(x); setFile(x.files[0]?.path ?? null); }).catch((e) => !dead && setErr(e instanceof Error ? e.message : t('git.loadError')));
-    return () => { dead = true; };
-  }, [agent.id, sha]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const f = d?.files.find((x) => x.path === file);
-  useEffect(() => {
-    if (!f) { setDiff(null); return; }
-    let dead = false; setDiff(null);
-    api.get<GitDiffResult>(`/agents/${agent.id}/git/commit-diff?sha=${sha}&path=${encodeURIComponent(f.path)}${f.oldPath ? `&old=${encodeURIComponent(f.oldPath)}` : ''}`).then((x) => !dead && setDiff(x)).catch((e) => !dead && setErr(e instanceof Error ? e.message : t('git.loadError')));
-    return () => { dead = true; };
-  }, [agent.id, sha, f?.path, f?.oldPath]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const parsed = useMemo(() => (diff && f && diff.path === f.path ? parseDiff(diff.diff) : null), [diff, f]);
-  if (err) return <section className="gx-preview"><p className="gx-note err">{err}</p></section>;
-  if (!d) return <section className="gx-preview"><p className="gx-note">{t('git.loading')}</p></section>;
-  const [subject, ...rest] = d.message.split('\n');
-  const body = rest.join('\n').trim();
-  return (
-    <section className={`gx-preview gx-commitview ${embedded ? 'embedded' : ''}`} aria-label={subject}>
-      <header className="gx-chead">
-        <h3>{subject}</h3>
-        {body && <pre className="gx-cbody">{body}</pre>}
-        <div className="muted small row gap-s wrap"><span className="mono">{d.sha.slice(0, 10)}</span><CopyBtn text={d.sha} label={t('git.info.copySha')} /><span>· {d.author} · {fmtDateTime(d.date)}</span>
-          <span>· {t('git.hist.files', { count: d.files.length })}</span></div>
-      </header>
-      {d.files.length === 0 ? <p className="gx-note">{t('git.hist.noFiles')}</p> : (
-        <div className="gx-cfilelist" role="listbox">
-          {d.files.map((x) => (
-            <button key={x.path} role="option" aria-selected={file === x.path} className={`gx-cfile ${file === x.path ? 'sel' : ''}`} onClick={() => setFile(x.path)} title={x.oldPath ? `${x.oldPath} → ${x.path}` : x.path}>
-              <StatusLetter status={x.status} /><span className="mono nm">{x.path}</span>
-              {(x.additions !== null || x.deletions !== null) && <span className="gx-counts sm"><i className="add">+{x.additions ?? 0}</i><i className="del">−{x.deletions ?? 0}</i></span>}
-            </button>
-          ))}
-        </div>
-      )}
-      {f && (<>
-        <div className="gx-ptools" style={{ padding: '6px 14px' }}><Segmented value={layout} onChange={setLayout} options={[{ id: 'unified', label: t('git.layout.unified') }, { id: 'split', label: t('git.layout.split') }]} /></div>
-        <div className="gx-body">
-          {!parsed ? <p className="gx-note">{t('git.loading')}</p> : parsed.binary ? <p className="gx-note">{t('git.diff.binary')}</p> : parsed.hunks.length === 0 ? <p className="gx-note">{t('git.diff.empty')}</p>
-            : (<>{diff?.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<DiffView parsed={parsed} layout={layout} path={f!.path} /></>)}
-        </div>
-      </>)}
-    </section>
   );
 }

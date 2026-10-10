@@ -94,8 +94,16 @@ export type GitStatus =
     };
 export type GitTree = { isRepo: false; reason: string; message: string } | { isRepo: true; root: string; scope: string; files: string[]; truncated: boolean; ignored: string[] };
 export interface GitDiffResult { path: string; diff: string; truncated: boolean; binary: boolean }
-export interface GitFileResult { path: string; size: number; binary: boolean; truncated: boolean; content: string; source: 'worktree' | 'head' | 'tag' }
+export interface GitFileResult { path: string; size: number; binary: boolean; truncated: boolean; content: string; source: 'worktree' | 'head' | 'tag' | 'ref' }
 
+export interface RefInfo { name: string; sha: string; date: string; subject: string }
+export interface GitRefs { current: string | null; branches: RefInfo[]; remotes: RefInfo[]; tags: RefInfo[] }
+export interface GitCompare {
+  base: { ref: string; sha: string }; head: { ref: string; sha: string }; ahead: number; behind: number;
+  commits: { sha: string; short: string; author: string; date: string; subject: string }[]; commitsTruncated: boolean;
+  files: GitCommitFile[]; truncated: boolean;
+}
+export interface GrepHit { path: string; line: number; text: string }
 export interface GitTagInfo { name: string; sha: string; date: string; subject: string; annotated: boolean }
 export interface GitCommitInfo { sha: string; short: string; author: string; date: string; subject: string; refs: string[]; merge: boolean }
 export interface GitCommitFile { path: string; oldPath?: string; status: 'modified' | 'added' | 'deleted' | 'renamed' | 'typechange'; additions: number | null; deletions: number | null }

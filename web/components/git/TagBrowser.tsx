@@ -1,17 +1,16 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, File, Folder, FolderOpen, Search, Tag } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { ChevronDown, ChevronRight, File, Folder, FolderOpen, GitBranch, Search, Tag } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
-import { fmtBytes, fmtDateTime } from '@/lib/format';
+import { fmtDateTime } from '@/lib/format';
 import { ago } from '@/lib/meta';
 import { buildTree, flatten } from '@/lib/git/gitTree';
-import type { Agent, GitFileResult, GitTagInfo } from '@/lib/types';
-import { Segmented } from '@/components/ui';
+import type { Agent, GitTagInfo } from '@/lib/types';
+import { Segmented, useToast } from '@/components/ui';
 import { CopyBtn } from '@/components/chat/ToolCall';
-import { CommitPreview, FileView } from './GitExplorer';
+import { RefFile } from './RefFile';
+import { CommitPreview } from './ChangesPreview';
 
 /** Browsing tags is read-only: the working folder is never touched, everything is read from the tag's own commit. */
 
@@ -49,22 +48,27 @@ export function TagList({ agent, sel, onSelect, onLoaded }: { agent: Agent; sel:
   );
 }
 
-const MARKDOWN = /\.(md|markdown|mdx)$/i;
-
 /** One tag: the files as they were at that tag, and what the tag's commit changed. */
-export function TagView({ agent, tag }: { agent: Agent; tag: GitTagInfo }) {
+export function TagView({ agent, tag, onChanged }: { agent: Agent; tag: GitTagInfo; onChanged?: () => void }) {
   const { t } = useI18n();
+  const toast = useToast();
+  const [newBr, setNewBr] = useState<string | null>(null);
+  const [brErr, setBrErr] = useState('');
+  const validBr = !!newBr && /^[\w./-]+$/.test(newBr) && !newBr.startsWith('-') && !newBr.endsWith('/') && !newBr.includes('..');
+  const createBranch = async () => {
+    if (!newBr || !validBr) return;
+    try { await api.post(`/agents/${agent.id}/git/branch-create`, { branch: newBr, from: tag.name }); toast(t('git.tags.branchCreated', { branch: newBr })); setNewBr(null); setBrErr(''); onChanged?.(); }
+    catch (e) { setBrErr(e instanceof Error ? e.message : 'error'); }
+  };
   const [tab, setTab] = useState<'files' | 'changes'>('files');
   const [files, setFiles] = useState<string[] | null>(null);
   const [truncated, setTruncated] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState<string | null>(null);
-  const [file, setFile] = useState<GitFileResult | null>(null);
   const [err, setErr] = useState('');
-  const [md, setMd] = useState<'preview' | 'source'>('preview');
 
-  useEffect(() => { setTab('files'); setSel(null); setFile(null); setQuery(''); setExpanded(new Set()); }, [tag.name]);
+  useEffect(() => { setTab('files'); setSel(null); setQuery(''); setExpanded(new Set()); }, [tag.name]);
   useEffect(() => {
     let dead = false; setFiles(null); setErr('');
     api.get<{ files: string[]; truncated: boolean }>(`/agents/${agent.id}/git/tag-tree?tag=${encodeURIComponent(tag.name)}`)
@@ -72,17 +76,9 @@ export function TagView({ agent, tag }: { agent: Agent; tag: GitTagInfo }) {
       .catch((e) => !dead && setErr(e instanceof Error ? e.message : t('git.loadError')));
     return () => { dead = true; };
   }, [agent.id, tag.name]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!sel) { setFile(null); return; }
-    let dead = false; setFile(null); setMd('preview');
-    api.get<GitFileResult>(`/agents/${agent.id}/git/tag-file?tag=${encodeURIComponent(tag.name)}&path=${encodeURIComponent(sel)}`).then((r) => !dead && setFile(r)).catch((e) => !dead && setErr(e instanceof Error ? e.message : t('git.loadError')));
-    return () => { dead = true; };
-  }, [agent.id, tag.name, sel]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const root = useMemo(() => (files ? buildTree(files, []) : null), [files]);
   const rows = useMemo(() => (root ? flatten(root, expanded, { query, onlyChanged: false }).slice(0, 3000) : []), [root, expanded, query]);
   const toggle = (p: string) => setExpanded((s) => { const n = new Set(s); if (n.has(p)) n.delete(p); else n.add(p); return n; });
-  const isMd = !!sel && MARKDOWN.test(sel);
 
   return (
     <section className="gx-preview gx-tagview" aria-label={tag.name}>
@@ -90,7 +86,14 @@ export function TagView({ agent, tag }: { agent: Agent; tag: GitTagInfo }) {
         <h3><Tag size={16} style={{ verticalAlign: '-2px', marginRight: 6 }} />{tag.name}</h3>
         {tag.subject && <div>{tag.subject}</div>}
         <div className="muted small row gap-s wrap"><span className="gx-chip soft">{tag.annotated ? t('git.tags.annotated') : t('git.tags.lightweight')}</span><span className="mono">{tag.sha.slice(0, 10)}</span><CopyBtn text={tag.sha} label={t('git.info.copySha')} /><span>· {fmtDateTime(tag.date)}</span>{files && <span>· {t('git.tags.nfiles', { count: files.length })}</span>}</div>
-        <div style={{ marginTop: 8 }}><Segmented value={tab} onChange={setTab} options={[{ id: 'files', label: t('git.tags.files') }, { id: 'changes', label: t('git.tags.changes') }]} /></div>
+        <div className="row gap-s wrap" style={{ marginTop: 8 }}>
+          {newBr === null ? <button className="btn sm" onClick={() => setNewBr('')}><GitBranch size={14} />{t('git.tags.newBranch')}</button> : (<>
+            <input className="input mono" style={{ maxWidth: 240 }} autoFocus placeholder={t('git.tags.branchName')} value={newBr} onChange={(e) => { setNewBr(e.target.value.trim()); setBrErr(''); }} aria-label={t('git.tags.branchName')} onKeyDown={(e) => { if (e.key === 'Enter') void createBranch(); if (e.key === 'Escape') setNewBr(null); }} />
+            <button className="btn primary sm" disabled={!validBr} onClick={() => void createBranch()}>{t('git.tags.createBranch')}</button>
+            <button className="btn ghost sm" onClick={() => { setNewBr(null); setBrErr(''); }}>{t('common.cancel')}</button></>)}
+        </div>
+        {brErr && <p className="gx-note err" style={{ margin: 0 }}>{brErr}</p>}
+        <div style={{ marginTop: 4 }}><Segmented value={tab} onChange={setTab} options={[{ id: 'files', label: t('git.tags.files') }, { id: 'changes', label: t('git.tags.changes') }]} /></div>
       </header>
       {tab === 'changes' ? <CommitPreview key={tag.sha} agent={agent} sha={tag.sha} embedded /> : err ? <p className="gx-note err">{err}</p> : !root ? <p className="gx-note">{t('git.loading')}</p> : (
         <div className="gx-tagfiles">
@@ -112,20 +115,7 @@ export function TagView({ agent, tag }: { agent: Agent; tag: GitTagInfo }) {
             </div>
           </div>
           <div className="gx-tagfile">
-            {!sel ? <div className="gx-empty"><p>{t('git.tags.pick')}</p></div> : !file ? <p className="gx-note">{t('git.loading')}</p> : (
-              <>
-                <div className="gx-ptools" style={{ padding: '6px 14px' }}>
-                  <span className="mono small grow" title={sel} style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{sel}</span><span className="muted small">{fmtBytes(file.size)}</span>
-                  {isMd && !file.binary && <Segmented value={md} onChange={setMd} options={[{ id: 'preview', label: t('git.view.preview') }, { id: 'source', label: t('git.view.source') }]} />}
-                  <CopyBtn text={sel} label={t('git.copyPath')} />
-                </div>
-                <div className="gx-body">
-                  {file.binary ? <p className="gx-note">{t('git.file.binary')}</p>
-                    : isMd && md === 'preview' ? <div className="gx-md md">{file.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: (p) => <a {...p} target="_blank" rel="noreferrer" /> }}>{file.content}</ReactMarkdown></div>
-                    : <FileView f={file} agent={agent} blame={false} onOpenCommit={() => undefined} marks={null} allNew={false} />}
-                </div>
-              </>
-            )}
+            {!sel ? <div className="gx-empty"><p>{t('git.tags.pick')}</p></div> : <RefFile agent={agent} gitRef={tag.name} path={sel} />}
           </div>
         </div>
       )}
