@@ -719,6 +719,10 @@ export const en = {
   "sessions.select": "Select a session to read its transcript.",
   "sessions.openAgent": "Open agent",
   "sessions.loading": "Loading transcript…",
+  "sessions.counting": "Reading this conversation…",
+  "sessions.older": "Show {count} earlier messages",
+  "sessions.showMore": "Show all (~{count}k characters)",
+  "sessions.showLess": "Show less",
   "sessions.noMessages": "The CLI has no readable messages for this session.",
 
   // ---- rel ----

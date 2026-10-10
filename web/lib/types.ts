@@ -72,7 +72,7 @@ export type StreamEvent =
 
 export interface SessionRow {
   agent_id: string; agent_name: string; agent_role: Role; provider: Provider; session_id: string; cwd: string;
-  first_seen: number; last_seen: number; current: boolean; message_count: number; preview: string;
+  first_seen: number; last_seen: number; current: boolean; /** still being read in the background: size and cost may be missing or old */ pending?: boolean; message_count: number; preview: string;
   usage: Usage; cost: number | null; tool_calls: number; model: string | null;
   kind: 'direct' | 'delegation'; from_name: string | null; task: string | null;
 }

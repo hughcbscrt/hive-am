@@ -717,6 +717,10 @@ export const es: Record<DictKey, string> = {
   "sessions.select": "Selecciona una sesión para leer su transcripción.",
   "sessions.openAgent": "Abrir agente",
   "sessions.loading": "Cargando transcripción…",
+  "sessions.counting": "Leyendo esta conversación…",
+  "sessions.older": "Ver {count} mensajes anteriores",
+  "sessions.showMore": "Ver todo (~{count}k caracteres)",
+  "sessions.showLess": "Ver menos",
   "sessions.noMessages": "El CLI no tiene mensajes legibles para esta sesión.",
 
   // ---- rel ----

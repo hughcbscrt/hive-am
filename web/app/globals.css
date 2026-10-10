@@ -312,6 +312,12 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .react-flow__attribution { display: none; }
 
 /* ---------- sessions ---------- */
+.sx-ws .switcher-head .seg { align-self: flex-start; }
+.sx-head { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--line); }
+.sx-transcript { flex: 1; min-height: 0; max-height: none; padding: 20px 24px 40px; }
+.sx-transcript .msg { max-width: 920px; width: 100%; }
+.sx-fold:not(.open) .sx-fold-body { max-height: 220px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 60%, transparent); mask-image: linear-gradient(#000 60%, transparent); }
+.sx-fold > .btn { margin-top: 6px; }
 .sess-grid { display: grid; grid-template-columns: minmax(360px, 460px) 1fr; gap: 20px; align-items: start; }
 .sess { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-top: 0; }
 .sess:hover { background: var(--surface-2); } .sess[aria-current='true'] { background: var(--honey-soft); box-shadow: inset 3px 0 0 var(--honey); }
