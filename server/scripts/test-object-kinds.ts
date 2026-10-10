@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { colonies } from '../src/db.js';
-import { ObjectError, createObject, httpDescribe, httpScan, objectAction, objectLogs, refreshStates, removeObject, stateOf, updateObject, viewOf } from '../src/objects/index.js';
+import { ObjectError, createObject, httpDescribe, httpRun as runForObject, httpScan, httpSession, httpSessionClear, httpSessionSet, objectAction, objectLogs, refreshStates, removeObject, stateOf, updateObject, viewOf } from '../src/objects/index.js';
 import { parseHttpFile, runHttp as httpRun } from '../src/objects/http.js';
 import { objectsStore } from '../src/objects/store.js';
 
@@ -22,6 +22,8 @@ const seen: { method: string; url: string; headers: Record<string, unknown>; bod
 const target = createServer((req, res) => {
   let b = ''; req.on('data', (d) => (b += d)); req.on('end', () => {
     seen.push({ method: req.method!, url: req.url!, headers: req.headers, body: b });
+    if (req.url === '/login') { res.setHeader('content-type', 'application/json'); res.setHeader('x-session', 'sess-42'); return void res.end(JSON.stringify({ token: 'tok-' + Date.now().toString(36), id: 17, user: 'ana', roles: ['admin'] })); }
+    if (req.url === '/me') { const a = String(req.headers.authorization ?? ''); res.setHeader('content-type', 'application/json'); res.statusCode = a.startsWith('Bearer tok-') ? 200 : 401; return void res.end(JSON.stringify({ user: a.startsWith('Bearer tok-') ? 'ana' : null, auth: a })); }
     if (req.url === '/slow') return void setTimeout(() => res.end('late'), 2000);
     if (req.url === '/bin') { res.setHeader('content-type', 'image/png'); return void res.end(Buffer.from([137, 80, 78, 71, 0, 1, 2])); }
     res.setHeader('content-type', 'application/json'); res.setHeader('x-hello', 'world'); res.statusCode = req.url === '/missing' ? 404 : 200;
@@ -128,6 +130,86 @@ check(await rejects(() => objectAction(web.id, 'start'), /not started or stopped
 check((await objectLogs(web.id, {})).text === '', 'and has no logs');
 check(await rejects(() => createObject({ name: 'bad-http', kind: 'http', config: { folder: 'x' } }), /absolute/), 'its folder must be absolute');
 check((await stateOf(createObject({ name: 'gone-http', kind: 'http', config: { folder: join(dir, 'nope') } }))).status === 'error', 'a folder that is not there makes it an error');
+
+// ---------------------------------------------------------------- chains: handlers keep values for the next request
+const chain = mkdtempSync(join(tmpdir(), 'http-chain-'));
+writeFileSync(join(chain, 'flow.http'), `@host = http://127.0.0.1:${port}
+@token = from-file
+
+### Login
+# @name login
+POST {{host}}/login
+Content-Type: application/json
+
+{"user":"ana"}
+
+> {%
+  client.global.set("token", response.body.token);
+  client.global.set("who", response.body.user);
+  client.test("login answered 200", function () { client.assert(response.status === 200, "status"); });
+%}
+
+### Me
+GET {{host}}/me
+Authorization: Bearer {{token}}
+
+> {%
+  client.test("me is ana", function () { client.assert(response.body.user === "ana", "wrong user"); });
+  client.test("deliberately wrong", function () { client.assert(response.status === 201, "expected 201"); });
+%}
+
+### Uses the login answer
+GET {{host}}/items/{{login.response.body.id}}/{{login.response.headers.X-Session}}/{{login.response.body.roles[0]}}
+
+### Unsupported handler
+GET {{host}}/items/1
+
+> {% for (let i = 0; i < 3; i++) { client.global.set("loop", i); } %}
+
+### Handler file
+GET {{host}}/items/2
+
+> ./checks.js
+`);
+const chainObj = createObject({ name: 'chain', kind: 'http', config: { folder: chain } });
+const cs = httpScan(chainObj.id);
+check(cs.setBy.token?.join() === 'login' && cs.setBy.who?.join() === 'login', 'the scan knows which requests keep which variables (read from their handlers)');
+check(!cs.used.some((u) => u.name.includes('.response.')) && cs.files[0].requests[4].refs.join() === '' && cs.files[0].requests[2].refs.join() === 'login', 'references to answers are not "variables to define", and the request knows which answers it uses');
+check(cs.files[0].requests[1].script?.includes('login answered') !== true && cs.files[0].requests[0].script?.includes('client.global.set("token"') === true, 'the handler is kept with its request, not in the body');
+check(cs.files[0].requests[0].body === '{"user":"ana"}', 'and the body stays clean');
+
+const before = httpDescribe(chainObj.id, 'flow.http', 2);
+check(before.needsRun.join() === 'login' && before.missing.length === 3, 'before login, the request that uses its answer says it must be run first');
+check(await rejects(() => runForObject(chainObj.id, 'flow.http', 2), /“login”.*run it first/), 'and running it is refused with that reason');
+const noTok = await runForObject(chainObj.id, 'flow.http', 1);
+check(noTok.status === 401 && JSON.parse(noTok.body).auth === 'Bearer from-file', 'without a login the file’s own @token is used (and the server says 401)');
+
+const lg = await runForObject(chainObj.id, 'flow.http', 0);
+check(lg.status === 200 && lg.set.join() === 'token,who' && lg.tests.length === 1 && lg.tests[0].passed && !lg.scriptError, 'the login handler keeps the token, runs its test, and the answer says what it kept');
+check(httpSession(chainObj.id).globals.who === 'ana' && httpSession(chainObj.id).responses.some((r) => r.name === 'login'), 'the session shows the kept values and the answers it remembers');
+const me = await runForObject(chainObj.id, 'flow.http', 1);
+check(me.status === 200 && JSON.parse(me.body).user === 'ana', 'the next request uses what the handler kept: it overrides the @token of the file');
+check(me.tests.length === 2 && me.tests[0].passed && !me.tests[1].passed && me.tests[1].message === 'expected 201', 'its tests are reported one by one, with the message of the one that failed');
+const ref = await runForObject(chainObj.id, 'flow.http', 2);
+check(ref.status === 200 && ref.request.url.endsWith('/items/17/sess-42/admin'), 'the answer of a named request is used with {{name.response.body…}}, headers and array indexes');
+const unsupported = await runForObject(chainObj.id, 'flow.http', 3);
+check(unsupported.status === 200 && /"for" is not supported/.test(unsupported.scriptError ?? '') && httpSession(chainObj.id).globals.loop === undefined, 'a handler with something unsupported is not run, and says so; the request itself is still sent');
+const hf = await runForObject(chainObj.id, 'flow.http', 4);
+check(hf.status === 200 && hf.scriptFile === './checks.js', 'a handler file is reported (hive-am does not run files)');
+check(httpDescribe(chainObj.id, 'flow.http', 2).missing.length === 0 && httpDescribe(chainObj.id, 'flow.http', 2).needsRun.length === 0, 'after the login nothing is missing for the request that uses it');
+
+httpSessionSet(chainObj.id, 'extra', 'by-hand');
+check(httpSession(chainObj.id).globals.extra === 'by-hand', 'a value can be set by hand in the session');
+check(await rejects(() => httpSessionSet(chainObj.id, 'bad name', 'x'), /not a valid variable name/), 'with a valid name');
+httpSessionClear(chainObj.id, 'extra');
+check(httpSession(chainObj.id).globals.extra === undefined && httpSession(chainObj.id).globals.token !== undefined, 'one value can be forgotten without the others');
+httpSessionClear(chainObj.id);
+check(Object.keys(httpSession(chainObj.id).globals).length === 0 && httpSession(chainObj.id).responses.length === 0, 'forgetting everything also forgets the answers');
+check(await rejects(() => runForObject(chainObj.id, 'flow.http', 2), /run it first/), 'and then the chain has to be run again');
+const otherObj = createObject({ name: 'chain2', kind: 'http', config: { folder: chain } });
+await runForObject(otherObj.id, 'flow.http', 0);
+check(httpSession(chainObj.id).globals.token === undefined && httpSession(otherObj.id).globals.token !== undefined, 'each HTTP object has its own session');
+await removeObject(otherObj.id); await removeObject(chainObj.id);
 
 // ---------------------------------------------------------------- variables of hive-am (no env file needed)
 const bare = mkdtempSync(join(tmpdir(), 'http-bare-'));

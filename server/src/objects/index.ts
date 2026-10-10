@@ -1,6 +1,6 @@
 import { bus } from '../runtime.js';
 import { dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
-import { describeHttp, httpCount, runHttp, scanHttp } from './http.js';
+import { describeHttp, dropSession, runHttp, scanHttp, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
 import { ObjectError, type ClusterConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
 import { forgetServer, serverLogs, serverState, startServer, stopServer } from './runner.js';
 import { forgetSupervision, resetSupervision, supervise } from './supervisor.js';
@@ -152,15 +152,21 @@ export const statsOf = async (id: string) => { const { objectStats } = await imp
 
 /** The requests of an HTTP object, and running one of them. */
 export const httpScan = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return scanHttp((o.config as HttpConfig).folder, (o.config as HttpConfig).variables); };
-export const httpDescribe = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return describeHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables); };
-export const httpRun = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return runHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables); };
+export const httpDescribe = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return describeHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id)); };
+export const httpRun = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return runHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id)); };
+
+/** The values kept while an HTTP object is used (see http.ts): look at them, set one, forget one or all. */
+const httpObject = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return o; };
+export const httpSession = (id: string) => sessionView(httpObject(id).id);
+export const httpSessionSet = (id: string, name: string, value: string) => { sessionSet(httpObject(id).id, name, value); return sessionView(id); };
+export const httpSessionClear = (id: string, name?: string) => { sessionClear(httpObject(id).id, name); return sessionView(id); };
 
 /** Deleting an object also removes what hive-am made for it (see docker.ts for what is left alone). */
 export async function removeObject(id: string): Promise<boolean> {
   const o = objectsStore.get(id); if (!o) return false;
   if (o.kind === 'server') { await stopServer(o.id, o.config as ServerConfig).catch(() => undefined); forgetServer(o.id); }
   else if (o.kind === 'docker') await removeDocker(o.id, o.config as DockerConfig);
-  states.delete(id); counts.delete(id); forgetSupervision(id);
+  states.delete(id); counts.delete(id); forgetSupervision(id); dropSession(id);
   const ok = objectsStore.remove(id); changed();
   return ok;
 }

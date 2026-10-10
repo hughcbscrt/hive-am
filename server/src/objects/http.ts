@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { randomInt, randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { runScript, type ScriptResponse, type ScriptTest } from './http-script.js';
 import { ObjectError, type HttpVariable } from './model.js';
 
 /** Variables defined in hive-am, per environment (see HttpConfig). */
@@ -22,17 +23,27 @@ const SKIP = new Set(['node_modules', '.git', 'target', 'dist', 'build', '.idea'
 const METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', 'TRACE', 'CONNECT']);
 const ENV_FILES = ['http-client.env.json', 'http-client.private.env.json'];
 
-export interface HttpRequestItem { id: string; index: number; name: string; method: string; url: string; headers: { name: string; value: string }[]; body?: string; line: number; variables: string[] }
+export interface HttpRequestItem {
+  id: string; index: number; name: string; method: string; url: string; headers: { name: string; value: string }[]; body?: string; line: number;
+  /** The plain {{variables}} it uses. */ variables: string[];
+  /** The requests whose answers it uses ({{login.response.body.token}} → "login"). */ refs: string[];
+  /** Its name when the file gives one (`### name` or `# @name x`): the one other requests can refer to. */ named?: string;
+  /** The response handler (`> {% … %}`), and a handler file it points to (`> file.js`, not run by hive-am). */ script?: string; scriptFile?: string;
+}
 export interface HttpFile { relFile: string; requests: HttpRequestItem[]; fileVariables: Record<string, string> }
-export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; /** Names of the variables the env files define, per environment (so the interface can say which of its own they override). */ fileVars: Record<string, string[]>; /** Every {{variable}} the requests use (not the generated {{$…}} ones), with how many requests use each. */ used: { name: string; count: number }[]; /** The ones a file defines itself with `@name = value`. */ fileDefined: string[]; truncated: boolean }
+export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; /** Names of the variables the env files define, per environment (so the interface can say which of its own they override). */ fileVars: Record<string, string[]>; /** The variables that response handlers keep (client.global.set), and the requests that do it. */ setBy: Record<string, string[]>; /** Every {{variable}} the requests use (not the generated {{$…}} ones), with how many requests use each. */ used: { name: string; count: number }[]; /** The ones a file defines itself with `@name = value`. */ fileDefined: string[]; truncated: boolean }
 export interface HttpRun {
+  /** What the response handler did: tests, what it logged, the variables it kept, and why it could not run (if so). */
+  tests: ScriptTest[]; logs: string[]; set: string[]; scriptError?: string; scriptFile?: string;
   request: { method: string; url: string; headers: { name: string; value: string }[]; body?: string };
   status: number; statusText: string; durationMs: number; size: number;
   headers: { name: string; value: string }[]; body: string; truncated: boolean; binary: boolean; contentType: string;
 }
 
-const VAR = /\{\{\s*([$A-Za-z0-9_.-]+)\s*\}\}/g;
-const variablesIn = (...texts: (string | undefined)[]) => { const out = new Set<string>(); for (const t of texts) for (const m of (t ?? '').matchAll(VAR)) out.add(m[1]); return [...out]; };
+const VAR = /\{\{\s*([$A-Za-z0-9_.\[\]-]+)\s*\}\}/g;
+const REF = /^([\w-]+)\.response\.(body|headers|status)(?:\.(.*))?$/;
+const variablesIn = (...texts: (string | undefined)[]) => { const out = new Set<string>(); for (const t of texts) for (const m of (t ?? '').matchAll(VAR)) if (!REF.test(m[1])) out.add(m[1]); return [...out]; };
+const refsIn = (...texts: (string | undefined)[]) => { const out = new Set<string>(); for (const t of texts) for (const m of (t ?? '').matchAll(VAR)) { const r = REF.exec(m[1]); if (r) out.add(r[1]); } return [...out]; };
 
 /** One `.http` file → its requests. */
 export function parseHttpFile(content: string, relFile: string): HttpFile {
@@ -44,19 +55,24 @@ export function parseHttpFile(content: string, relFile: string): HttpFile {
 
   const finish = () => {
     if (!cur) return;
-    const body: string[] = []; let inHandler = false;
+    const body: string[] = []; let inHandler = false; const scripts: string[] = []; let current: string[] = []; let scriptFile: string | undefined;
     for (const l of cur.body) {
       const t = l.trim();
-      if (!inHandler && (t.startsWith('> {%') || t.startsWith('>! {%'))) { inHandler = !t.endsWith('%}') || t === '> {%'; continue; }
-      if (inHandler) { if (t.endsWith('%}')) inHandler = false; continue; }
-      if (t.startsWith('> ') || t.startsWith('<> ')) continue;           // a handler file, a saved response
+      if (!inHandler && (t.startsWith('> {%') || t.startsWith('>! {%'))) {
+        const rest = t.replace(/^>!?\s*\{%/, '');
+        if (rest.includes('%}')) { scripts.push(rest.slice(0, rest.lastIndexOf('%}'))); continue; }       // all in one line
+        inHandler = true; current = rest.trim() ? [rest] : []; continue;
+      }
+      if (inHandler) { if (t.endsWith('%}')) { current.push(l.slice(0, l.lastIndexOf('%}'))); scripts.push(current.join('\n')); inHandler = false; } else current.push(l); continue; }
+      if (t.startsWith('<> ')) continue;                                  // a saved response
+      if (t.startsWith('> ')) { scriptFile = t.slice(2).trim(); continue; }  // a handler file
       body.push(l);
     }
     while (body.length && !body[body.length - 1].trim()) body.pop();
     while (body.length && !body[0].trim()) body.shift();
     const text = body.length ? body.join('\n') : undefined;
     const index = requests.length;
-    requests.push({ id: `${relFile}#${index}`, index, name: cur.name || `${cur.method} ${cur.url.replace(/^(https?:\/\/[^/]+|\{\{[^}]+\}\})/, '').split('?')[0] || '/'}`, method: cur.method, url: cur.url, headers: cur.headers, body: text, line: cur.line, variables: variablesIn(cur.url, text, ...cur.headers.map((h) => h.value)) });
+    requests.push({ id: `${relFile}#${index}`, index, name: cur.name || `${cur.method} ${cur.url.replace(/^(https?:\/\/[^/]+|\{\{[^}]+\}\})/, '').split('?')[0] || '/'}`, method: cur.method, url: cur.url, headers: cur.headers, body: text, line: cur.line, variables: variablesIn(cur.url, text, ...cur.headers.map((h) => h.value)), refs: refsIn(cur.url, text, ...cur.headers.map((h) => h.value)), named: /^[\w-]+$/.test(cur.name ?? '') ? cur.name : undefined, script: scripts.length ? scripts.join('\n') : undefined, scriptFile });
     cur = null;
   };
 
@@ -141,7 +157,10 @@ export function scanHttp(folder: string, hive?: Hive): HttpScan {
   walk(root, 0);
   const count = new Map<string, number>(); for (const f of files) for (const r of f.requests) for (const v of r.variables) if (!v.startsWith('$')) count.set(v, (count.get(v) ?? 0) + 1);
   const fileDefined = [...new Set(files.flatMap((f) => Object.keys(f.fileVariables)))].sort();
-  return { folder: root, files, environments: [...envNames].sort(), envFiles: [...envFiles].sort(), used: [...count].map(([name, n]) => ({ name, count: n })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)), fileDefined, fileVars: Object.fromEntries(Object.entries(fileVars).map(([k, v]) => [k, [...v].sort()])), truncated };
+  // The variables that response handlers keep, found by reading the handlers (not by running them).
+  const setBy: Record<string, string[]> = {};
+  for (const f of files) for (const r of f.requests) for (const m of (r.script ?? '').matchAll(/client\.global\.set\(\s*["'`]([\w.-]+)["'`]/g)) (setBy[m[1]] ??= []).push(r.named ?? r.name);
+  return { folder: root, setBy, files, environments: [...envNames].sort(), envFiles: [...envFiles].sort(), used: [...count].map(([name, n]) => ({ name, count: n })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)), fileDefined, fileVars: Object.fromEntries(Object.entries(fileVars).map(([k, v]) => [k, [...v].sort()])), truncated };
 }
 
 const MASK = /^(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api-key|x-auth-token|x-access-token)$/i;
@@ -154,26 +173,71 @@ const dynamic = (key: string): string | undefined => {
   if (key === '$randomInt') return String(randomInt(0, 1000));
   return undefined;
 };
-const substitute = (text: string, vars: Record<string, string>, unresolved: Set<string>): string => {
+
+/**
+ * What lives while an HTTP object is used: the values its response handlers keep (`client.global.set`) and the last answer of each named
+ * request (to write `{{login.response.body.token}}`). It is in memory: it ends when hive-am stops, and it can be looked at, changed and
+ * cleared from the interface. These values win over the ones from environments and files, because something set them on purpose, later.
+ */
+export interface StoredResponse { status: number; headers: Record<string, string>; body: unknown; text: string; at: number }
+export interface HttpSession { globals: Record<string, string>; responses: Map<string, StoredResponse> }
+const sessions = new Map<string, HttpSession>();
+export const sessionOf = (objectId: string): HttpSession => { let s = sessions.get(objectId); if (!s) sessions.set(objectId, s = { globals: {}, responses: new Map() }); return s; };
+export const dropSession = (objectId: string) => { sessions.delete(objectId); };
+export function sessionView(objectId: string) {
+  const s = sessionOf(objectId);
+  return { globals: { ...s.globals }, responses: [...s.responses].map(([name, r]) => ({ name, status: r.status, at: r.at })) };
+}
+export function sessionSet(objectId: string, name: string, value: string) {
+  if (!/^[A-Za-z_][\w.-]{0,80}$/.test(name)) throw new ObjectError(`"${name}" is not a valid variable name`);
+  if (value.length > 8000) throw new ObjectError('The value is too long');
+  sessionOf(objectId).globals[name] = value;
+}
+/** Forgets one value, or (without a name) every value and every stored answer. */
+export function sessionClear(objectId: string, name?: string) {
+  const s = sessionOf(objectId);
+  if (name) delete s.globals[name]; else { s.globals = {}; s.responses.clear(); }
+}
+
+/** `{{login.response.body.$.token}}`, `{{login.response.headers.X-Token}}`, `{{login.response.status}}`: a piece of the last answer of a named request. */
+function fromResponse(s: HttpSession | undefined, key: string): string | undefined {
+  const m = REF.exec(key); if (!m) return undefined;
+  const r = s?.responses.get(m[1]); if (!r) return undefined;
+  if (m[2] === 'status') return String(r.status);
+  if (m[2] === 'headers') return r.headers[(m[3] ?? '').toLowerCase()];
+  const path = (m[3] ?? '*').replace(/^\$\.?/, '');
+  if (path === '*' || path === '') return r.text;
+  let cur: unknown = r.body;
+  for (const part of path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean)) {
+    if (cur === null || typeof cur !== 'object' || ['__proto__', 'constructor', 'prototype'].includes(part)) return undefined;
+    cur = (cur as Record<string, unknown>)[part];
+  }
+  return cur === undefined ? undefined : typeof cur === 'string' ? cur : JSON.stringify(cur);
+}
+
+const substitute = (text: string, vars: Record<string, string>, unresolved: Set<string>, session?: HttpSession): string => {
   let out = text;
-  for (let pass = 0; pass < 5 && VAR.test(out); pass++) { VAR.lastIndex = 0; out = out.replace(VAR, (whole, k: string) => dynamic(k) ?? vars[k] ?? whole); }
+  for (let pass = 0; pass < 5 && VAR.test(out); pass++) { VAR.lastIndex = 0; out = out.replace(VAR, (whole, k: string) => dynamic(k) ?? vars[k] ?? fromResponse(session, k) ?? whole); }
   VAR.lastIndex = 0;
   for (const m of out.matchAll(VAR)) unresolved.add(m[1]);
   return out;
 };
 
 /** The variables a request needs and where each one stands, so the interface can show what is missing before running it. */
-export function describeHttp(folder: string, relFile: string, index: number, env?: string, hive?: Hive) {
+export function describeHttp(folder: string, relFile: string, index: number, env?: string, hive?: Hive, session?: HttpSession) {
   const root = realFolder(folder);
   const abs = inside(root, relFile);
   const file = parseHttpFile(readFileSync(abs, 'utf8'), relFile);
   const item = file.requests[index]; if (!item) throw new ObjectError(`Request #${index} is not in ${relFile}`);
   const e = envVars(root, abs, env, hive);
-  const vars = { ...e.vars, ...file.fileVariables };
-  return { item, missing: item.variables.filter((v) => dynamic(v) === undefined && !(v in vars)), environments: e.names };
+  const vars = { ...e.vars, ...file.fileVariables, ...(session?.globals ?? {}) };
+  // Answers of other requests this one uses: a reference to a request that has not been run in this session is missing too.
+  const refMissing = [...(item.url + (item.body ?? '') + item.headers.map((x) => x.value).join('\n')).matchAll(VAR)].map((m) => m[1]).filter((k) => REF.test(k) && fromResponse(session, k) === undefined);
+  const missing = [...item.variables.filter((v) => dynamic(v) === undefined && !(v in vars)), ...new Set(refMissing)];
+  return { item, missing, needsRun: [...new Set(refMissing.map((k) => REF.exec(k)![1]))], environments: e.names };
 }
 
-export async function runHttp(folder: string, relFile: string, index: number, env?: string, hive?: Hive): Promise<HttpRun> {
+export async function runHttp(folder: string, relFile: string, index: number, env?: string, hive?: Hive, session: HttpSession = { globals: {}, responses: new Map() }): Promise<HttpRun> {
   const root = realFolder(folder);
   const abs = inside(root, relFile);
   if (!/\.(http|rest)$/i.test(abs)) throw new ObjectError('That is not a .http file');
@@ -181,11 +245,13 @@ export async function runHttp(folder: string, relFile: string, index: number, en
   const item = file.requests[index]; if (!item) throw new ObjectError(`Request #${index} is not in ${relFile}`);
   const e = envVars(root, abs, env, hive);
   if (env && !e.names.includes(env)) throw new ObjectError(`The environment "${env}" is not in the env files`);
-  const vars = { ...e.vars, ...file.fileVariables };
+  const vars = { ...e.vars, ...file.fileVariables, ...session.globals };
   const unresolved = new Set<string>();
-  const url = substitute(item.url, vars, unresolved);
-  const headers = item.headers.map((h) => ({ name: h.name, value: substitute(h.value, vars, unresolved) }));
-  let body = item.body === undefined ? undefined : substitute(item.body, vars, unresolved);
+  const url = substitute(item.url, vars, unresolved, session);
+  const headers = item.headers.map((h) => ({ name: h.name, value: substitute(h.value, vars, unresolved, session) }));
+  let body = item.body === undefined ? undefined : substitute(item.body, vars, unresolved, session);
+  const needRun = [...new Set([...unresolved].filter((k) => REF.test(k)).map((k) => REF.exec(k)![1]))];
+  if (needRun.length) throw new ObjectError(`This request uses the answer of ${needRun.map((n) => `“${n}”`).join(', ')}, which has not been run in this session: run ${needRun.length > 1 ? 'them' : 'it'} first (or the whole file, in order).`);
   if (unresolved.size) throw new ObjectError(`Missing values for: ${[...unresolved].map((v) => `{{${v}}}`).join(', ')}${e.names.length ? '. Pick an environment that defines them.' : '. Define them in the file (@name = value), in an http-client.env.json, or in the Variables of this object.'}`);
 
   // `< ./file` as the whole body: the content of a file next to the .http file (inside the folder).
@@ -205,11 +271,19 @@ export async function runHttp(folder: string, relFile: string, index: number, en
     const contentType = res.headers.get('content-type') ?? '';
     const binary = buf.subarray(0, 4000).includes(0) || /^(image|audio|video)\//.test(contentType) || /octet-stream|zip|pdf/.test(contentType);
     const truncated = buf.length > MAX_RESPONSE;
+    const text = binary ? '' : buf.subarray(0, MAX_RESPONSE).toString('utf8');
+    // The answer, as the handlers and the other requests see it: JSON when it is JSON.
+    let parsed: unknown = text;
+    if (!binary && (/json/i.test(contentType) || /^\s*[[{]/.test(text))) { try { parsed = JSON.parse(text); } catch { parsed = text; } }
+    const lower = Object.fromEntries([...res.headers.entries()].map(([k, v]) => [k.toLowerCase(), v]));
+    if (item.named) session.responses.set(item.named, { status: res.status, headers: lower, body: parsed, text, at: Date.now() });
+    const handled = item.script ? runScript(item.script, { status: res.status, headers: lower, body: parsed, text, contentType } as ScriptResponse, session.globals) : null;
     return {
+      tests: handled?.tests ?? [], logs: handled?.logs ?? [], set: handled?.set ?? [], scriptError: handled?.error, scriptFile: item.scriptFile,
       request: { method: item.method, url: target.toString(), headers: headers.map((h) => ({ name: h.name, value: mask(h.name, h.value) })), body: hasBody ? body : undefined },
       status: res.status, statusText: res.statusText, durationMs, size: buf.length,
       headers: [...res.headers.entries()].map(([name, value]) => ({ name, value })),
-      body: binary ? '' : buf.subarray(0, MAX_RESPONSE).toString('utf8'), truncated, binary, contentType,
+      body: text, truncated, binary, contentType,
     };
   } catch (err) {
     if ((err as Error).name === 'AbortError') throw new ObjectError(`The request took more than ${TIMEOUT_MS / 1000} s and was cancelled`);
