@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { Check, Eye, EyeOff, Info, Lock, Plus, Trash2, X } from 'lucide-react';
+import { SOURCE_TONE, sourceLabel } from './VarsTable';
+import type { VarInfo } from '@/lib/types';
 import { useI18n } from '@/lib/i18n/index';
 import type { HttpVariable } from '@/lib/types';
 import { Suggest } from './Suggest';
@@ -15,9 +17,9 @@ type Status = 'here' | 'all' | 'envfile' | 'atfile' | 'handler' | 'missing';
  * (and which ones still have no value) and suggests those names when you add one. A secret is hidden once saved and replaced only when a
  * new value is typed. What an env file, or an @name line in a .http file, defines wins over these values.
  */
-export function VarsEditor({ value, onChange, fileEnvs = [], fileVars = {}, used = [], fileDefined = [], setBy = {} }: {
+export function VarsEditor({ value, onChange, fileEnvs = [], fileVars = {}, used = [], fileDefined = [], setBy = {}, fixed = [] }: {
   value: Vars; onChange: (v: Vars) => void; fileEnvs?: string[]; fileVars?: Record<string, string[]>;
-  used?: { name: string; count: number }[]; fileDefined?: string[]; setBy?: Record<string, string[]>;
+  used?: { name: string; count: number }[]; fileDefined?: string[]; setBy?: Record<string, string[]>; fixed?: VarInfo[];
 }) {
   const { t } = useI18n();
   const names = [ALL, ...[...new Set([...Object.keys(value), ...fileEnvs])].filter((k) => k !== ALL).sort()];
@@ -85,15 +87,15 @@ export function VarsEditor({ value, onChange, fileEnvs = [], fileVars = {}, used
       </div>
 
       <div className="vars-used">
-        <div className="eyebrow">{t('vars.used.title')}</div>
-        {used.length === 0 ? <p className="muted small" style={{ margin: 0 }}>{t('vars.used.none')}</p> : (<>
-          <p className="muted small" style={{ margin: '0 0 6px' }}>{t('vars.used.hint')}</p>
-          <div className="chips">{used.map((u) => { const st = statusOf(u.name); return (
-            <button key={u.name} type="button" className={`vused ${st}`} disabled={st === 'here' || st === 'envfile' || st === 'atfile' || st === 'handler'} onClick={() => addVar(u.name)}
-              title={`${st === 'handler' ? t('vars.status.handler', { name: setBy[u.name]?.[0] ?? '' }) : t(`vars.status.${st}`)} · ${t('vars.used.count', { count: u.count })}`}>
-              {st === 'here' ? <Check size={12} /> : st === 'missing' ? <Plus size={12} /> : null}<code>{u.name}</code><small>{st === 'handler' ? t('vars.status.handler', { name: setBy[u.name]?.[0] ?? '' }) : t(`vars.status.${st}`)}</small>
-            </button>); })}</div>
-        </>)}
+        <div className="eyebrow">{t('vars.fixed.title')}</div>
+        <p className="muted small" style={{ margin: '0 0 6px' }}>{t('vars.fixed.hint')}</p>
+        {fixed.length === 0 ? <p className="muted small" style={{ margin: 0 }}>{t('vars.fixed.none')}</p> : (
+          <table className="ivt-table"><thead><tr><th>{t('iv.col.name')}</th><th>{t('iv.col.value')}</th><th>{t('iv.col.source')}</th></tr></thead><tbody>
+            {fixed.map((v) => (
+              <tr key={`${v.source}:${v.from}:${v.name}`} className="ivt-row"><td><code className="mono ivt-name">{v.name}</code></td>
+                <td className="ivt-val"><span className="mono ivt-text">{v.hidden ? '••••••' : v.secret ? '••••••••' : v.value}</span></td>
+                <td><span className={`ivt-src ${SOURCE_TONE[v.source]}`}>{sourceLabel(t, v.source, v.from)}</span></td></tr>))}
+          </tbody></table>)}
       </div>
     </div>
   );

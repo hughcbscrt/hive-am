@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, ChevronDown, ChevronRight, Eye, File, KeyRound, ListChecks, Play, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
+import { useHive } from '@/lib/store';
 import { fmtBytes } from '@/lib/format';
 import type { HttpConfig, HttpFile, HttpInspection, HttpRequestItem, HttpRun, HttpScan, HttpSessionView, ObjectView } from '@/lib/types';
 import { Segmented } from '@/components/ui';
@@ -16,6 +17,8 @@ const parseJson = (s: string): unknown | undefined => { try { return JSON.parse(
 interface Result { run?: HttpRun; error?: string; at: number }
 interface HistEntry { n: number; file: string; req: HttpRequestItem; env: string; result: Result }
 let histN = 0;
+/** The environment where the values added from the runner go (created the first time). */
+const DEFAULT_ENV = 'default';
 const methodTone = (m: string) => (m === 'GET' ? 'get' : m === 'POST' ? 'post' : m === 'DELETE' ? 'del' : m === 'PUT' || m === 'PATCH' ? 'put' : 'other');
 const statusTone = (s: number) => (s >= 200 && s < 300 ? 'ok' : s >= 300 && s < 400 ? 'warn' : 'err');
 const testsFailed = (r?: Result) => !!r?.run && (r.run.tests.some((x) => !x.passed) || !!r.run.scriptError);
@@ -36,6 +39,7 @@ function prettyBody(run: HttpRun): string {
  */
 export function HttpWorkspace({ object: o, onOpenVars, pane = 'requests', onGoRequests }: { object: ObjectView; onOpenVars: () => void; pane?: 'requests' | 'history'; onGoRequests?: () => void }) {
   const { t } = useI18n();
+  const { refresh } = useHive();
   const [scan, setScan] = useState<HttpScan | null>(null);
   const [err, setErr] = useState('');
   const [env, setEnv] = useState((o.config as HttpConfig).env ?? '');
@@ -123,7 +127,13 @@ export function HttpWorkspace({ object: o, onOpenVars, pane = 'requests', onGoRe
 
   const forget = (name?: string) => api.del<HttpSessionView>(`/objects/${o.id}/http/session${name ? `?name=${encodeURIComponent(name)}` : ''}`).then(setSession).catch(() => undefined);
   const [newName, setNewName] = useState(''); const [newValue, setNewValue] = useState(''); const [adding, setAdding] = useState(false);
-  const setValue = () => { if (!newName.trim()) return; api.post<HttpSessionView>(`/objects/${o.id}/http/session`, { name: newName.trim(), value: newValue }).then((s) => { setSession(s); setNewName(''); setNewValue(''); setAdding(false); }).catch(() => undefined); };
+  const setValue = () => {
+    const name = newName.trim(); if (!name) return;
+    const cfg = o.config as HttpConfig, vars = { ...(cfg.variables ?? {}) };
+    vars[DEFAULT_ENV] = { ...(vars[DEFAULT_ENV] ?? {}), [name]: { value: newValue } };
+    api.patch(`/objects/${o.id}`, { config: { folder: cfg.folder, env: cfg.env, variables: vars } })
+      .then(() => { setNewName(''); setNewValue(''); setAdding(false); setEnv(DEFAULT_ENV); return refresh(['objects']); }).catch(() => undefined);
+  };
   const kept = Object.entries(session.globals);
   const setVar = (name: string, value: string) => api.post<HttpSessionView>(`/objects/${o.id}/http/session`, { name, value }).then(setSession).catch(() => undefined);
   const runNamed = (n: string) => { const r = byName.current.get(n); if (r) { setFile(fileOf.current.get(r.id) ?? file); setSel(r); setTab('body'); void run(r); } };
@@ -133,22 +143,17 @@ const sessionBlock = (
           <div className="hw-session-body" style={{ padding: 16 }}>
           <b>{t('hw.session')}</b>
 
-            {kept.length === 0 && session.responses.length === 0 && !adding && <p className="muted small" style={{ margin: 0 }}>{t('hw.session.empty')}</p>}
+            {kept.length === 0 && !adding && <p className="muted small" style={{ margin: 0 }}>{t('hw.session.empty')}</p>}
             {kept.map(([k, v]) => (
               <div key={k} className="hw-kv"><code className="mono" title={k}>{k}</code><span className="mono val" title={v}>{v}</span>
                 <button className="btn ghost icon sm" onClick={() => void forget(k)} aria-label={t('hw.session.forget')} title={t('hw.session.forget')}><X size={13} /></button></div>))}
-            {session.responses.length > 0 && (<div className="hw-ans"><div className="eyebrow">{t('hw2.remembered')}</div>
-              {session.responses.map((r) => { const j = parseJson(r.body); const op = openAns === r.name; return (
-                <div key={r.name}><button className="hw-ans-head" onClick={() => setOpenAns(op ? null : r.name)} aria-expanded={op}>{op ? <ChevronDown size={13} /> : <ChevronRight size={13} />}<code className="mono">{r.name}</code><b className={`hr-st ${statusTone(r.status)}`}>{r.status}</b><span className="muted small">{new Date(r.at).toLocaleTimeString()}</span></button>
-                  {op && <div className="hw-ans-body">{j !== undefined ? <JsonTree value={j} refBase={`${r.name}.response.body`} /> : <pre className="mono small" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{r.body.slice(0, 2000)}</pre>}</div>}</div>); })}
-              <p className="muted small" style={{ margin: '4px 0 0' }}>{t('hw2.remembered.hint')}</p></div>)}
             {adding ? (
               <div className="hw-kv-add"><input className="input mono" placeholder={t('hw.session.name')} value={newName} onChange={(e) => setNewName(e.target.value)} aria-label={t('hw.session.name')} />
                 <input className="input mono" placeholder={t('hw.session.value')} value={newValue} onChange={(e) => setNewValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') setValue(); }} aria-label={t('hw.session.value')} />
                 <button className="btn primary icon sm" onClick={setValue} aria-label={t('hw.session.add')}><Check size={14} /></button><button className="btn ghost icon sm" onClick={() => setAdding(false)} aria-label={t('common.cancel')}><X size={14} /></button></div>
             ) : (
               <div className="row gap-s" style={{ marginTop: 6 }}><button className="btn sm" onClick={() => setAdding(true)}><Plus size={13} />{t('hw.session.add')}</button>
-                {(kept.length > 0 || session.responses.length > 0) && <button className="btn ghost sm" onClick={() => void forget()}><Trash2 size={13} />{t('hw.session.clear')}</button>}</div>)}
+                {kept.length > 0 && <button className="btn ghost sm" onClick={() => void forget()}><Trash2 size={13} />{t('hw.session.clear')}</button>}</div>)}
             <p className="muted small" style={{ margin: '6px 0 0' }}>{t('hw.session.hint')}</p>
           </div>
   );

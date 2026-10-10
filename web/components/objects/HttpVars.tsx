@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
-import type { HttpConfig, HttpScan, ObjectView } from '@/lib/types';
+import type { HttpConfig, HttpInspection, HttpScan, ObjectView } from '@/lib/types';
 import { useToast } from '@/components/ui';
 import { VarsEditor, type Vars } from './VarsEditor';
 
@@ -16,9 +16,11 @@ export function HttpVars({ object: o }: { object: ObjectView }) {
   const base = useMemo(() => (cfg.variables ?? {}) as Vars, [o.updated_at]); // eslint-disable-line react-hooks/exhaustive-deps
   const [vars, setVars] = useState<Vars>(base);
   const [scan, setScan] = useState<HttpScan | null>(null);
+  const [fixed, setFixed] = useState<HttpInspection['vars']>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   useEffect(() => { api.get<HttpScan>(`/objects/${o.id}/http`).then(setScan).catch(() => undefined); }, [o.id, o.updated_at]);
+  useEffect(() => { api.get<HttpInspection>(`/objects/${o.id}/http/variables`).then((r) => setFixed(r.vars.filter((v) => v.source === 'file' || v.source === 'envfile'))).catch(() => undefined); }, [o.id, o.updated_at]);
   const dirty = JSON.stringify(vars) !== JSON.stringify(base);
 
   const save = async () => {
@@ -32,7 +34,7 @@ export function HttpVars({ object: o }: { object: ObjectView }) {
     <div className="oc">
       <div className="oc-form">
         <p className="muted" style={{ marginTop: 0 }}>{t('vars.hint')}</p>
-        <VarsEditor value={vars} onChange={setVars} fileEnvs={scan ? Object.keys(scan.fileVars).filter((e) => e !== '$shared') : []} fileVars={scan?.fileVars} used={scan?.used} fileDefined={scan?.fileDefined} setBy={scan?.setBy} />
+        <VarsEditor value={vars} onChange={setVars} fileEnvs={scan ? Object.keys(scan.fileVars).filter((e) => e !== '$shared') : []} fileVars={scan?.fileVars} used={scan?.used} fileDefined={scan?.fileDefined} setBy={scan?.setBy} fixed={fixed} />
         {err && <p className="gx-note err">{err}</p>}
       </div>
       <div className="savebar oc-bar">
