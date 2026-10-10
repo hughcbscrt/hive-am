@@ -15,6 +15,7 @@ const DEFAULT_CHATTER_PER_MINUTE = 10; // times per minute that chatter nobody a
 const NUDGE = '[hive:channel] System reminder: your last turn ended without calling `channel_reply`, so the person received nothing. If you had an answer, send it now with `channel_reply` (if the tool says it is unknown, call it again: it was still connecting). If you chose not to answer, say so in one short sentence with `channel_reply`.';
 export const EFFORTS = ['low', 'medium', 'high'];
 const QUIET_MS = 4000;   // group chatter is handed over once it pauses this long, so a burst is one turn
+const LONG_TURN_MS = 45_000; // an unaddressed turn this long did real work: if it never replied, remind it
 const QUIET_RETRIES = 15; // while the agent is busy the hand-over waits (about a minute); after this it is left as context for the next turn
 
 const T = {
@@ -171,7 +172,13 @@ async function deliver(conn: Connection, adapter: ChannelAdapter, thread: Thread
 
   const origin: Origin = { connectionId: conn.id, threadId: thread.id, externalKey: m.externalKey, platform: conn.kind, place: m.place, userName: m.userName, userId: m.userId, group: !!m.group, mention: m.mention, addressed, replied: false, effort: EFFORTS.includes(conn.config.effort) ? conn.config.effort : undefined };
   if (addressed) await adapter.busy(m.target, 'working', m.externalId).catch(() => undefined);
+  const startedAt = Date.now();
   let res = await sendTurn(agent.id, channelPrompt(conn.kind, m, { addressed, muted: fresh.muted, unseen }), 'user', undefined, undefined, origin);
+  // Chatter nobody aimed at the agent may be left unanswered, but a turn that worked for a while and ended without `channel_reply`
+  // produced a result nobody will ever see (the agent wrote it as plain text). Remind it once.
+  if (!addressed && res.ok && !origin.replied && !threads.get(thread.id)?.muted && Date.now() - startedAt > LONG_TURN_MS) {
+    res = await sendTurn(agent.id, NUDGE, 'user', undefined, undefined, origin);
+  }
   // Someone talked to the agent and it ended without answering: usually a tool that failed at the start of the turn and a model that gave up.
   // One reminder (same conversation, same origin) fixes that; staying quiet on purpose (muted thread) is respected.
   if (addressed && res.ok && !origin.replied && !threads.get(thread.id)?.muted) {
