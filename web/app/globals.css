@@ -853,3 +853,13 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
   ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink) 24%, transparent); border-radius: 10px; border: 2px solid transparent; background-clip: content-box; }
   ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--ink) 42%, transparent); background-clip: content-box; }
 }
+
+/* Tags: a tag's files (tree + reader) and its commit. */
+.gx-tagview { display: flex; flex-direction: column; min-height: 0; }
+.gx-tagfiles { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); border-top: 1px solid var(--line); }
+.gx-tagtree { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); }
+.gx-tagtree .gx-list { flex: 1; overflow-y: auto; }
+.gx-tagfile { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.gx-tagfile .gx-body { flex: 1; min-height: 0; }
+.gx-commitview.embedded { flex: 1; min-height: 0; border-top: 1px solid var(--line); }
+@media (max-width: 900px) { .gx-tagfiles { grid-template-columns: 1fr; } .gx-tagtree { max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--line); } }

@@ -8,13 +8,14 @@ import { useI18n } from '@/lib/i18n/index';
 import { fmtBytes, fmtDateTime, fmtNum } from '@/lib/format';
 import { changeMarks, hunkRange, parseDiff, type ChangeGroup, type ChangeMarks, type Hunk } from '@/lib/git/diff';
 import { buildTree, defaultExpanded, flatten, type Row, type TreeNode } from '@/lib/git/gitTree';
-import type { Agent, GitChange, GitChangeStatus, GitDiffResult, GitFileResult } from '@/lib/types';
+import type { Agent, GitChange, GitChangeStatus, GitDiffResult, GitFileResult, GitTagInfo } from '@/lib/types';
 import type { useGit } from '@/lib/git/useGit';
 import { CopyBtn } from '@/components/chat/ToolCall';
 import { isCodeFile, languageOf } from '@/lib/git/highlight';
 import { useHighlighted } from '@/lib/git/useHighlighted';
 import { useGitPrefs } from '@/lib/git/gitPrefs';
 import { GitSettings } from './GitSettings';
+import { TagList, TagView } from './TagBrowser';
 import { CodeCell } from './Code';
 import { DiffView } from './DiffView';
 import { ROW_H, VirtualLines } from './VirtualLines';
@@ -64,7 +65,7 @@ const GUTTER_CH = 6;           // line-number column, in characters
 const BLAME_PX = 210;          // blame column width
 
 /** The file, line by line. Only the rows on screen are in the DOM (see VirtualLines), so size does not matter. */
-function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew }: { f: GitFileResult; agent: Agent; blame: boolean; onOpenCommit: (sha: string) => void; marks: ChangeMarks | null; allNew: boolean }) {
+export function FileView({ f, agent, blame: blameOn, onOpenCommit, marks, allNew }: { f: GitFileResult; agent: Agent; blame: boolean; onOpenCommit: (sha: string) => void; marks: ChangeMarks | null; allNew: boolean }) {
   const groups: ChangeGroup[] = marks?.groups ?? [];
   // Clicking a change mark opens that block of the diff right under it.
   const [peek, setPeek] = useState<{ row: number; block: number } | null>(null);
@@ -244,7 +245,8 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
   const [query, setQuery] = useState('');
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
-  const [mode, setMode] = useState<'files' | 'history' | 'stashes'>('files');
+  const [mode, setMode] = useState<'files' | 'history' | 'tags' | 'stashes'>('files');
+  const [tagSel, setTagSel] = useState<GitTagInfo | null>(null);
   const [stashes, setStashes] = useState<StashItem[] | null>(null);
   const [stashSel, setStashSel] = useState<string | null>(null);
   const [saveStash, setSaveStash] = useState(false);
@@ -410,8 +412,9 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
 
       <div className="gx-main">
         <aside className="gx-tree" aria-label={t('git.filesLabel')}>
-          <div className="gx-tabs"><Segmented value={mode} onChange={setMode} options={[{ id: 'files', label: t('git.tab.files') }, { id: 'history', label: t('git.tab.history') }, { id: 'stashes', label: `${t('git.tab.stashes')}${stashes?.length ? ` · ${stashes.length}` : ''}` }]} /></div>
+          <div className="gx-tabs"><Segmented value={mode} onChange={setMode} options={[{ id: 'files', label: t('git.tab.files') }, { id: 'history', label: t('git.tab.history') }, { id: 'tags', label: t('git.tab.tags') }, { id: 'stashes', label: `${t('git.tab.stashes')}${stashes?.length ? ` · ${stashes.length}` : ''}` }]} /></div>
           {mode === 'stashes' ? <StashList stashes={stashes} sel={stashSel} onSelect={setStashSel} onSave={() => setSaveStash(true)} canSave={status.changes.length > 0 && !status.state} />
+            : mode === 'tags' ? <TagList agent={agent} sel={tagSel?.name ?? null} onSelect={setTagSel} />
             : mode === 'history' ? <HistoryList agent={agent} head={status.head?.sha} sel={commitSel} onSelect={setCommitSel} /> : (<>
           <div className="gx-filter">
             <div className="search"><Search size={14} /><input className="input" placeholder={t('git.filterPlaceholder')} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t('git.filterPlaceholder')} /></div>
@@ -446,6 +449,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
         </aside>
 
         {mode === 'stashes' ? (stashes?.find((x) => x.sha === stashSel) ? <StashPreview key={stashSel} agent={agent} stash={stashes.find((x) => x.sha === stashSel)!} a={actions} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.stash.empty')}</p></div></div>)
+          : mode === 'tags' ? (tagSel ? <TagView key={tagSel.name} agent={agent} tag={tagSel} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.tags.select')}</p></div></div>)
           : mode === 'history' ? (commitSel ? <CommitPreview key={commitSel} agent={agent} sha={commitSel} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.hist.select')}</p></div></div>)
           : sel && selChange?.status === 'conflict' ? <ConflictResolver key={sel} agent={agent} path={sel} state={status.state} a={actions} onResolved={() => { void refresh(); }} />
           : sel ? <Preview key={sel} agent={agent} path={sel} ignored={isIgnored(sel)} change={selChange} stamp={status.generatedAt} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} onDiscard={discardFile} onDiscardHunk={discardHunk} onDiscardLines={discardLines} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
@@ -469,7 +473,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
 
 /* ------------------------------------------------------------------ commit preview (history) */
 
-function CommitPreview({ agent, sha }: { agent: Agent; sha: string }) {
+export function CommitPreview({ agent, sha, embedded = false }: { agent: Agent; sha: string; embedded?: boolean }) {
   const { t } = useI18n();
   const [d, setD] = useState<GitCommitDetail | null>(null);
   const [file, setFile] = useState<string | null>(null);
@@ -497,7 +501,7 @@ function CommitPreview({ agent, sha }: { agent: Agent; sha: string }) {
   const [subject, ...rest] = d.message.split('\n');
   const body = rest.join('\n').trim();
   return (
-    <section className="gx-preview gx-commitview" aria-label={subject}>
+    <section className={`gx-preview gx-commitview ${embedded ? 'embedded' : ''}`} aria-label={subject}>
       <header className="gx-chead">
         <h3>{subject}</h3>
         {body && <pre className="gx-cbody">{body}</pre>}
