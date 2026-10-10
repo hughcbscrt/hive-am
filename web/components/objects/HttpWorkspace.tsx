@@ -12,6 +12,7 @@ import { JsonTree } from './JsonTree';
 import { VarsTable } from './VarsTable';
 import { HttpSource } from './HttpSource';
 import { CopyAs } from './CopyAs';
+import { NewRequest } from './NewRequest';
 
 const parseJson = (s: string): unknown | undefined => { try { return JSON.parse(s); } catch { return undefined; } };
 
@@ -58,6 +59,7 @@ export function HttpWorkspace({ object: o, onOpenVars, pane = 'requests', onGoRe
   const [insp, setInsp] = useState<HttpInspection | null>(null);
   const [fileInsp, setFileInsp] = useState<HttpInspection | null>(null);
   const [openAns, setOpenAns] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [hist, setHist] = useState<HistEntry[]>([]);
   const [histSel, setHistSel] = useState<number | null>(null);
   const [session, setSession] = useState<HttpSessionView>({ globals: {}, responses: [] });
@@ -197,6 +199,7 @@ const sessionBlock = (
           <label className="row gap-s small grow"><span className="muted">{t('http.env')}</span>
             <select className="select" style={{ width: 'auto', padding: '4px 10px', flex: 1 }} value={env} onChange={(e) => setEnv(e.target.value)}>
               <option value="">{t('http.noEnv')}</option>{scan.environments.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+          <button className="btn ghost icon sm" onClick={() => setCreating(true)} aria-label={t('hw2.new.title')} title={t('hw2.new.title')}><Plus size={15} /></button>
           <button className="btn ghost icon sm" onClick={() => { load(); void loadSession(); }} aria-label={t('http.rescan')} title={t('http.rescan')}><RefreshCw size={15} /></button>
         </div>
         {scan.envFiles.length === 0 && scan.environments.length === 0 && <p className="muted small hw-hint">{t('hw.noEnvFile')} <button className="btn sm" onClick={onOpenVars}>{t('hw.editVars')}</button></p>}
@@ -309,6 +312,7 @@ const sessionBlock = (
           </div>
         ) : <div className="gx-empty"><p>{t('hw.pickFile')}</p></div>}
       </section>
+      {creating && <NewRequest objectId={o.id} files={scan.files} defaultFile={file} onClose={() => setCreating(false)} onCreated={(f) => { setCreating(false); setFile(f); setSel(null); setFileTab('source'); setOpen((x) => new Set(x).add(f)); load(); }} />}
     </div>
   );
 }

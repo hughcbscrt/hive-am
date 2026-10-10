@@ -158,3 +158,4 @@ El ejecutor muestra cuánto vale cada variable ahora mismo, no solo su nombre:
 
 API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/objects/:id/http/file`.
 - **Copiar como…**: junto a Ejecutar, copia la petición como cURL, wget, HTTPie, PowerShell, fetch, axios, Python, Go, PHP, Java, C#, Ruby, Rust o un mensaje HTTP crudo, con los valores vigentes; lo que no tiene valor queda como `{{nombre}}` y las cabeceras de credenciales se pueden ocultar. API: `GET /api/objects/:id/http/export?file=&index=&format=&env=&redact=1`.
+- **Nueva petición**: el **+** junto al entorno agrega una petición a un archivo (o a un `.http` nuevo) desde un formulario o pegando un comando cURL. `Authorization: Basic usuario clave` se envía codificado. API: `POST /api/objects/:id/http/file` crea un archivo y nunca sobrescribe uno.

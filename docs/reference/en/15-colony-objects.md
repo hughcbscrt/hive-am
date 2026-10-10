@@ -158,3 +158,4 @@ The runner shows what each variable is worth right now, not only its name:
 
 API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/objects/:id/http/file`.
 - **Copy as…**: next to Run, copies the request as cURL, wget, HTTPie, PowerShell, fetch, axios, Python, Go, PHP, Java, C#, Ruby, Rust or a raw HTTP message, with the values in effect now; what has no value stays as `{{name}}` and credential headers can be hidden. API: `GET /api/objects/:id/http/export?file=&index=&format=&env=&redact=1`.
+- **New request**: the **+** next to the environment adds a request to a file (or a new `.http` file) from a form or from a pasted cURL command. `Authorization: Basic user password` is sent encoded. API: `POST /api/objects/:id/http/file` creates a file and never overwrites one.

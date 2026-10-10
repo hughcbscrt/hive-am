@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { randomInt, randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { runScript, type ScriptResponse, type ScriptTest } from './http-script.js';
@@ -178,6 +178,12 @@ export function scanHttp(folder: string, hive?: Hive): HttpScan {
 const MASK = /^(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api-key|x-auth-token|x-access-token)$/i;
 const mask = (name: string, value: string) => (MASK.test(name) ? `${value.slice(0, Math.min(6, Math.floor(value.length / 3)))}••••` : value);
 
+/** `Authorization: Basic user password` (or `user:password`) as the encoded header; an already encoded one is left alone. */
+const basicAuth = (name: string, value: string): string => {
+  if (name.toLowerCase() !== 'authorization') return value;
+  const m = /^Basic\s+(\S+?)(?:\s+|:)(.+)$/i.exec(value.trim());
+  return m ? `Basic ${Buffer.from(`${m[1]}:${m[2]}`).toString('base64')}` : value;
+};
 const dynamic = (key: string): string | undefined => {
   if (key === '$uuid' || key === '$guid') return randomUUID();
   if (key === '$timestamp') return String(Math.floor(Date.now() / 1000));
@@ -325,6 +331,21 @@ export function readHttpFile(folder: string, relFile: string): string {
   if (st.size > MAX_FILE_EDIT) throw new ObjectError('The file is too large to open here');
   return readFileSync(abs, 'utf8');
 }
+/** Creates a new .http / .rest file inside the folder (it never overwrites one). */
+export function createHttpFile(folder: string, relFile: string, content: string): string {
+  const root = realFolder(folder);
+  if (!/^[\w .@()+/-]+\.(http|rest)$/i.test(relFile) || relFile.split('/').some((p) => p.startsWith('.') || !p)) throw new ObjectError('Use a name that ends in .http or .rest, with letters, numbers, spaces, - _ . and folders inside the project');
+  const abs = resolve(root, relFile);
+  const r = relative(root, abs); if (r.startsWith('..') || isAbsolute(r)) throw new ObjectError('That path is outside the folder');
+  if (existsSync(abs)) throw new ObjectError('A file with that name already exists');
+  if (Buffer.byteLength(content) > MAX_FILE_EDIT) throw new ObjectError('The file is too large');
+  // the deepest folder that exists must be inside the project once links are resolved (a link could lead out)
+  let anc = dirname(abs); while (!existsSync(anc)) anc = dirname(anc);
+  const real = relative(root, realpathSync(anc)); if (real.startsWith('..') || isAbsolute(real)) throw new ObjectError('That path is outside the folder');
+  mkdirSync(dirname(abs), { recursive: true });
+  writeFileSync(abs, content, { encoding: 'utf8', flag: 'wx' });
+  return r;
+}
 export function writeHttpFile(folder: string, relFile: string, content: string): void {
   const root = realFolder(folder); const abs = inside(root, relFile);
   if (!/\.(http|rest)$/i.test(abs)) throw new ObjectError('Only .http and .rest files can be saved here');
@@ -354,7 +375,7 @@ export function exportHttp(folder: string, relFile: string, index: number, forma
   const unresolved = new Set<string>();
   const sess = session ?? { globals: {}, responses: new Map() };
   const url = substitute(item.url, vars, unresolved, sess);
-  const headers = item.headers.map((h) => { const v = substitute(h.value, vars, unresolved, sess); return { name: h.name, value: redact ? mask(h.name, v) : v }; });
+  const headers = item.headers.map((h) => { const v = basicAuth(h.name, substitute(h.value, vars, unresolved, sess)); return { name: h.name, value: redact ? mask(h.name, v) : v }; });
   let body = item.body === undefined ? undefined : substitute(item.body, vars, unresolved, sess);
   const inc = body && /^<\s+(\S+)\s*$/.exec(body.trim());
   if (inc) { try { const pth = inside(root, join(relative(root, dirname(abs)), inc[1])); if (statSync(pth).size <= MAX_INCLUDE) body = readFileSync(pth, 'utf8'); } catch { /* left as written */ } }
@@ -415,6 +436,7 @@ export async function runHttp(folder: string, relFile: string, index: number, en
   const unresolved = new Set<string>();
   const url = substitute(item.url, vars, unresolved, session);
   const headers = item.headers.map((h) => ({ name: h.name, value: substitute(h.value, vars, unresolved, session) }));
+  for (const h of headers) h.value = basicAuth(h.name, h.value);
   let body = item.body === undefined ? undefined : substitute(item.body, vars, unresolved, session);
   const needRun = [...new Set([...unresolved].filter((k) => REF.test(k)).map((k) => REF.exec(k)![1]))];
   if (needRun.length) throw new ObjectError(`This request uses the answer of ${needRun.map((n) => `“${n}”`).join(', ')}, which has not been run in this session: run ${needRun.length > 1 ? 'them' : 'it'} first (or the whole file, in order).`);

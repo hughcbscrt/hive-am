@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { colonies } from '../src/db.js';
-import { ObjectError, createObject, httpExport, httpDescribe, httpFileRead, httpFileWrite, httpInspect, httpRun as runForObject, httpScan, httpSession, httpSessionClear, httpSessionSet, objectAction, objectLogs, refreshStates, removeObject, stateOf, updateObject, viewOf } from '../src/objects/index.js';
+import { ObjectError, createObject, httpExport, httpFileCreate, httpDescribe, httpFileRead, httpFileWrite, httpInspect, httpRun as runForObject, httpScan, httpSession, httpSessionClear, httpSessionSet, objectAction, objectLogs, refreshStates, removeObject, stateOf, updateObject, viewOf } from '../src/objects/index.js';
 import { parseHttpFile, runHttp as httpRun } from '../src/objects/http.js';
 import { objectsStore } from '../src/objects/store.js';
 
@@ -264,6 +264,11 @@ const ses = byName(httpInspect(io.id, 'i.http', 1, 'dev').vars);
 check(ses.who.value === 'from-session' && ses.who.source === 'session' && ses.who.overridden.length === 3, 'a value of the session beats everything, and the rest is listed under it');
 httpSessionClear(io.id);
 
+writeFileSync(join(insp, 'basic.http'), '### b\nGET http://h/\nAuthorization: Basic ana s3cret\n');
+check(httpExport(io.id, 'basic.http', 0, 'curl', 'dev').text.includes(`Authorization: Basic ${Buffer.from('ana:s3cret').toString('base64')}`), 'Authorization: Basic user password is sent encoded');
+// files: create
+check(httpFileCreate(io.id, 'new/made.http', '### x\nGET http://h/\n').file === 'new/made.http' && httpFileRead(io.id, 'new/made.http').content.includes('GET http://h/'), 'a new .http file can be created (folders included)');
+check(await rejects(async () => httpFileCreate(io.id, 'new/made.http', ''), /already exists/) && await rejects(async () => httpFileCreate(io.id, '../out.http', ''), /Use a name/) && await rejects(async () => httpFileCreate(io.id, 'notes.txt', ''), /Use a name/), 'but never over an existing one, outside the folder or with another extension');
 // files: read and save
 check(httpFileRead(io.id, 'i.http').content.startsWith('@who = from-file'), 'a .http file can be read');
 httpFileWrite(io.id, 'i.http', httpFileRead(io.id, 'i.http').content.replace('from-file', 'edited'));
