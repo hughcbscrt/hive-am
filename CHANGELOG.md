@@ -8,9 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- Objects screen: **Objects** in the rail opens a screen like an agent's, with a collapsible list at the left and, for each object, tabs: Summary (state, uptime, CPU and memory with history, Docker network and disk, details, latest output), Logs on a whole screen (search, only matches, follow, wrap, text size, pause, copy, download, error and warning colours, per-member colours for clusters) and Settings in place (unsaved-changes bar, save and restart, delete). The Colony map links to it.
+- HTTP requests as a screen: pick the `.http` file you want, see its requests, run one or the whole file; and **Variables** of its own per environment (for when there is no env file; env files win), with **secrets** that are hidden once saved and never returned by the API (stored unencrypted on this machine).
+- Keeping servers healthy: restart after a failure or always, with a growing wait and a limit (then it says it gave up); health checks (HTTP, port, command) that mark it unhealthy and can restart it; stop timeout; log rotation while it runs. Docker containers: memory, CPU, network, log size and stop timeout (the container is created again when one of them changes).
 - Terminals: a bottom panel (Ctrl+`) with real shells (a pty each, kept by the server, replayed when a page attaches) and the logs of objects in tabs; from an agent, a server object or a container. Only this machine can reach them (loopback host and origin), `HIVE_AM_TERMINALS=0` turns them off, `node-pty` is an optional dependency.
 - HTTP-requests objects: a folder of `.http` / `.rest` files with environments (`http-client.env.json` and the private one), file and generated variables, bodies from a file and a runner to send the requests and read the answers; nothing is sent while a variable is missing, and credentials are hidden in the echoed request.
-- Boss objects: group servers and containers of a colony to start them in order, stop them in reverse, see one state and read their logs together with the name of each member.
+- Cluster objects (first called *boss*): group servers and containers of a colony to start them in order, stop them in reverse, see one state and read their logs together with the name of each member; a table of members with one-by-one actions and a start order you can change.
 - Agents that look after colony objects: a "Colony objects" skill gives an agent `object_list`, `object_logs` and `object_action` (start, stop, restart) for the objects of its own colony; read-only agents cannot act, nothing can be created or changed by an agent, and the log says who asked. A "Create a manager agent" button in the object panel sets one up.
 - Colony objects: servers (a command hive-am keeps running, with its own process group and log file, found again after a restart) and Docker (a container hive-am creates, a compose project, or an existing container that is never removed) as hexagons on the Colony map, with state, start / stop / restart and live logs. API under `/api/objects`; changes only from the local app.
 - Git explorer: a Compare tab (two branches, tags or commits: files, commits in between and diffs, pictures before and after), history search by message, author or content, by branch or tag, and by hash; history of a single file; "View at…" to read a file as it was at any ref; search inside the files; creating a branch from a tag (without switching) and deleting local branches; `/` and `Alt+1…5` shortcuts and the last open file remembered per agent.
@@ -18,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- *Boss* objects are now called **clusters** (existing ones are converted; the API still accepts `boss`).
 - One path picker for every folder or file field (agent, colony and server folders, the compose file, Docker volumes), including a file mode.
 - Your messages in the web chat (and in Sessions) are no longer inverted bubbles: light with a thin border in the light theme and dark in the dark theme.
 - Tooltips: every `title` in the interface now shows a styled tooltip (after a short pause, or on keyboard focus) instead of the browser's own, in both themes. Icon-only elements keep the text as their accessible name.

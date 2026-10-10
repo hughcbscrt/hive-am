@@ -117,23 +117,33 @@ export interface StashDetail { sha: string; untrackedSha: string | null; untrack
 export interface GitListing { path: string; entries: { name: string; dir: boolean }[]; truncated: boolean }
 
 // ---- colony objects (servers and Docker containers) ----
-export type ObjectKind = 'server' | 'docker' | 'http' | 'boss';
+export type ObjectKind = 'server' | 'docker' | 'http' | 'cluster';
 export type ObjectStatus = 'running' | 'starting' | 'stopped' | 'error' | 'unknown' | 'ready';
-export interface ServerConfig { cwd: string; start: string; stop?: string; env?: Record<string, string>; port?: number }
+export interface HealthConfig { kind: 'http' | 'tcp' | 'command'; target: string; intervalSec?: number; timeoutSec?: number; retries?: number; restartWhenUnhealthy?: boolean }
+export interface ServerConfig {
+  cwd: string; start: string; stop?: string; env?: Record<string, string>; port?: number;
+  restart?: 'no' | 'on-failure' | 'always'; maxRestarts?: number; health?: HealthConfig; stopTimeoutSec?: number; logMaxMb?: number;
+}
 export interface DockerConfig {
   mode: 'container' | 'compose' | 'existing';
   image?: string; ports?: string[]; volumes?: string[]; env?: Record<string, string>; restart?: 'no' | 'always' | 'unless-stopped' | 'on-failure'; command?: string;
   file?: string; project?: string; services?: string[]; container?: string;
+  memory?: string; cpus?: number; network?: string; stopTimeoutSec?: number; logMaxMb?: number;
 }
-export interface HttpConfig { folder: string; env?: string }
-export interface BossConfig { members: string[] }
+export interface HttpVariable { value: string; secret?: boolean; set?: boolean }
+export interface HttpConfig { folder: string; env?: string; variables?: Record<string, Record<string, HttpVariable>> }
+export interface ClusterConfig { members: string[] }
 export interface ObjectState { status: ObjectStatus; detail?: string; pid?: number; since?: number }
-export interface ObjectView { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig | HttpConfig | BossConfig; state: ObjectState; created_at: number; updated_at: number }
+export interface ObjectView { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig | HttpConfig | ClusterConfig; state: ObjectState; created_at: number; updated_at: number }
 
 // ---- HTTP-requests objects ----
 export interface HttpRequestItem { id: string; index: number; name: string; method: string; url: string; headers: { name: string; value: string }[]; body?: string; line: number; variables: string[] }
 export interface HttpFile { relFile: string; requests: HttpRequestItem[]; fileVariables: Record<string, string> }
-export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; truncated: boolean }
+export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; fileVars: Record<string, string[]>; truncated: boolean }
+export interface ObjectStats {
+  cpu: number | null; memBytes: number | null; memLimitBytes: number | null; pids: number | null; net?: string | null; block?: string | null;
+  info: Record<string, string | number | null>; services?: { name: string; state: string; health: string; ports: string }[];
+}
 export interface HttpRun {
   request: { method: string; url: string; headers: { name: string; value: string }[]; body?: string };
   status: number; statusText: string; durationMs: number; size: number; headers: { name: string; value: string }[]; body: string; truncated: boolean; binary: boolean; contentType: string;

@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Boxes, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, SquareTerminal, Sun, Users, Plug } from 'lucide-react';
+import { Boxes, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, Server, SquareTerminal, Sun, Users, Plug } from 'lucide-react';
 import { HiveProvider, useHive } from '@/lib/store';
 import { I18nProvider, LOCALES, useI18n } from '@/lib/i18n';
 import { Toaster } from './ui';
@@ -32,7 +32,7 @@ function LanguageSwitch() {
 function Nav() {
   const path = usePathname();
   const { t } = useI18n();
-  const { agents, types, skills, connections, connected } = useHive();
+  const { agents, types, skills, connections, objects, connected } = useHive();
   const dock = useDock();
   const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
   useEffect(() => { try { const saved = localStorage.getItem('hive-theme') as 'light' | 'dark' | null; if (saved) { setTheme(saved); document.documentElement.dataset.theme = saved; } } catch { /* ignore */ } }, []);
@@ -52,6 +52,7 @@ function Nav() {
       <div className="brand"><HiveMark /><div>hive-am<small>{t('app.tagline')}</small></div></div>
       <LanguageSwitch />
       {item('/', t('nav.colony'), <Hexagon size={18} />, running || undefined)}
+      {item('/objects', t('nav.objects'), <Server size={18} />, objects.length || undefined)}
       {item('/agents', t('nav.agents'), <Users size={18} />, agents.length)}
       {item('/relations', t('nav.relations'), <Network size={18} />)}
       {item('/connections', t('nav.connections'), <Plug size={18} />, connections.length || undefined)}

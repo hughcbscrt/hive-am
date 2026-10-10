@@ -40,7 +40,7 @@ have installed; it does not replace them and it never copies your conversations 
 - **Files and images.** People send documents and photos to the agent; the agent sends files back. An optional image model can describe pictures for models that cannot see them.
 - **Permissions that hold.** *Read-only*, *Edit files* and *Full access* are enforced by the CLI itself in all three providers.
 - **Changes explorer.** A Git tab per agent: file tree with highlighting, diff viewer, history, commit, pull, push and branches.
-- **Objects.** Servers, Docker containers, HTTP requests (`.http` files) and bosses that group them live in a colony as hexagons: start, stop, read logs, run requests; agents can look after them.
+- **Objects.** Servers, Docker containers, HTTP requests (`.http` files) and clusters that group them live in a colony as hexagons: start, stop, read logs, run requests; agents can look after them.
 - **Terminals.** A bottom panel (Ctrl+`) with real shells and object logs, reachable only from this machine.
 - **Local and private.** The server binds to `127.0.0.1`. Data lives in `~/.hive-am/`.
 

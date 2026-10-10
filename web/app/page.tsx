@@ -82,7 +82,7 @@ export default function Colony() {
   const [creating, setCreating] = useState<{ colonyId?: string; manager?: boolean } | null>(null);
   const [editing, setEditing] = useState<Colony | 'new' | null>(null);
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
-  const [editingObject, setEditingObject] = useState<ObjectView | { colonyId?: string } | null>(null);
+  const [creatingObject, setCreatingObject] = useState<{ colonyId?: string } | null>(null);
   const [feed, setFeed] = useState<Dispatch[]>([]);
   useEffect(() => { const load = () => api.get<Dispatch[]>('/dispatches').then(setFeed).catch(() => undefined); load(); const iv = setInterval(load, 6000); return () => clearInterval(iv); }, []);
 
@@ -100,8 +100,8 @@ export default function Colony() {
   const k = avail ? Math.min(1, (avail - 24) / fullW) : 1;
   const pos = new Map<string, { x: number; y: number }>();
   for (const c of clusters) for (const cell of c.cells) { if (cell.agent) pos.set(cell.agent.id, { x: cell.x + margin, y: cell.y + margin }); if (cell.object) pos.set(cell.object.id, { x: cell.x + margin, y: cell.y + margin }); }
-  // A boss is joined to the objects it groups.
-  const bossLinks = objects.filter((o) => o.kind === 'boss').flatMap((b) => (b.config as { members: string[] }).members.map((m) => ({ from: b.id, to: m })));
+  // A cluster is joined to the objects it groups.
+  const clusterLinks = objects.filter((o) => o.kind === 'cluster').flatMap((b) => (b.config as { members: string[] }).members.map((m) => ({ from: b.id, to: m })));
   const [deleting, setDeleting] = useState<string | null>(null);
   const selected = agents.find((a) => a.id === sel) ?? null;
   const selectedObject = objects.find((o) => o.id === sel) ?? null;
@@ -132,7 +132,7 @@ export default function Colony() {
         <div><div className="row gap-s"><h1>{t('nav.colony')}</h1><HelpPopover label={t('colony.helpLabel')} title={t('colony.howTitle')}>{t('colony.howBody')}</HelpPopover></div><p>{t('colony.page.subtitle')}</p></div>
         <div className="row">
           <button className="btn" onClick={() => setEditing('new')}><Plus size={16} />{t('colony.newTitle')}</button>
-          <button className="btn" onClick={() => setEditingObject({})}><Plus size={16} />{t('obj.new')}</button>
+          <button className="btn" onClick={() => setCreatingObject({})}><Plus size={16} />{t('obj.new')}</button>
           <button className="btn primary" onClick={() => setCreating({})}><Plus size={16} />{t('newAgent.title')}</button>
         </div>
       </div>
@@ -236,7 +236,7 @@ export default function Colony() {
                     </g>
                   );
                 })}
-                {bossLinks.map((l) => {
+                {clusterLinks.map((l) => {
                   const a = pos.get(l.from), b = pos.get(l.to); if (!a || !b) return null;
                   const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, r = S * 0.62;
                   const sel2 = sel === l.from || sel === l.to;
@@ -258,7 +258,7 @@ export default function Colony() {
           </div>
         </div>
 
-          {selectedObject ? <ObjectPanel key={selectedObject.id} object={selectedObject} onEdit={() => setEditingObject(selectedObject)} onCreateManager={() => setCreating({ colonyId: selectedObject.colony_id ?? undefined, manager: true })} /> : selected ? (
+          {selectedObject ? <ObjectPanel key={selectedObject.id} object={selectedObject} onCreateManager={() => setCreating({ colonyId: selectedObject.colony_id ?? undefined, manager: true })} /> : selected ? (
             <aside className="side-float card card-pad col" style={{ gap: 14 }} aria-label={selected.name}>
               <div className="card-corner row gap-s"><button className="btn ghost icon sm" onClick={() => setEditingAgent(selected.id)} aria-label={t('colony.settingsFor', { name: selected.name })} title={t('colony.agentSettings')}><SlidersHorizontal size={17} /></button><button className="btn ghost icon sm" onClick={() => setSel(null)} aria-label={t('common.close')} title={`${t('common.close')} (Esc)`}><X size={16} /></button></div>
               <div className="row gap-l" style={{ paddingRight: 70 }}><Hex agent={selected} size="lg" /><div className="grow"><h2 style={{ fontSize: 22 }}>{selected.name}</h2><div className="row gap-s wrap" style={{ marginTop: 6 }}><RoleChip role={selected.role} /><StatusChip status={selected.status} /></div></div></div>
@@ -296,7 +296,7 @@ export default function Colony() {
       {deleting && agents.find((a) => a.id === deleting) && <DeleteAgentModal agent={agents.find((a) => a.id === deleting)!} onClose={() => setDeleting(null)} onDeleted={() => setSel(null)} />}
       {creating && <NewAgentDrawer presetColonyId={creating.colonyId} manager={creating.manager} onClose={() => setCreating(null)} onCreated={(id) => setSel(id)} />}
       {editingAgent && agents.find((a) => a.id === editingAgent) && <AgentEditDrawer key={editingAgent} agent={agents.find((a) => a.id === editingAgent)!} onClose={() => setEditingAgent(null)} />}
-      {editingObject && <ObjectEditor key={'id' in editingObject ? editingObject.id : 'new'} object={'id' in editingObject ? editingObject : undefined} presetColonyId={'colonyId' in editingObject ? editingObject.colonyId : undefined} onClose={() => setEditingObject(null)} onSaved={(id) => setSel(id)} />}
+      {creatingObject && <ObjectEditor presetColonyId={creatingObject.colonyId} onClose={() => setCreatingObject(null)} onSaved={(id) => setSel(id)} />}
       {editing && <ColonyEditor colony={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />}
     </div>
   );
