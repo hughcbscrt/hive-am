@@ -28,7 +28,7 @@ import { createReadStream } from 'node:fs';
 import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git/repo.js';
 import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './git/switch.js';
 import { gitCompare, gitCompareDiff, gitGrep, gitImageAt, gitRefs } from './git/browse.js';
-import { GitOpError, gitBlame, gitBranchDelete, gitRefFile, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitTagFile, gitTagTree, gitTags, gitUnresolve, type PullMode } from './git/ops.js';
+import { GitOpError, gitBlame, gitBranchCreate, gitBranchDelete, gitRefFile, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitTagFile, gitTagTree, gitTags, gitUnresolve, type PullMode } from './git/ops.js';
 
 const exec = promisify(execFile);
 const PROVIDERS: Record<Provider, { bin: string; label: string }> = {
@@ -230,7 +230,8 @@ gitWrite('commit', (cwd, b) => gitCommitChanges(cwd, String(b.message ?? ''), Ar
 gitWrite('fetch', (cwd) => gitFetch(cwd));
 gitWrite('pull', (cwd, b) => gitPull(cwd, (['ff-only', 'merge', 'rebase'].includes(b.mode) ? b.mode : 'ff-only') as PullMode));
 gitWrite('push', (cwd) => gitPush(cwd));
-gitWrite('switch', (cwd, b) => gitSwitch(cwd, String(b.branch ?? ''), !!b.create, b.from ? String(b.from) : undefined));
+gitWrite('switch', (cwd, b) => gitSwitch(cwd, String(b.branch ?? ''), !!b.create));
+gitWrite('branch-create', (cwd, b) => gitBranchCreate(cwd, String(b.branch ?? ''), String(b.from ?? '')));
 gitWrite('branch-delete', (cwd, b) => gitBranchDelete(cwd, String(b.branch ?? ''), !!b.force));
 gitWrite('merge', (cwd, b) => gitMerge(cwd, String(b.branch ?? '')));
 gitWrite('merge-abort', (cwd) => gitMergeAbort(cwd));

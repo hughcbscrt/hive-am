@@ -311,12 +311,18 @@ export async function gitPush(cwd: string): Promise<GitResult> {
   });
 }
 
-export async function gitSwitch(cwd: string, branch: string, create = false, from?: string): Promise<GitResult> {
+export async function gitSwitch(cwd: string, branch: string, create = false): Promise<GitResult> {
   const { root } = await repoOf(cwd);
   await validBranch(root, branch);
-  // A new branch can start from a tag, another branch or a commit instead of where we are.
-  const start = create && from ? [await resolveRef(root, from)] : [];
-  return exclusive(root, async () => done((await run(root, create ? ['switch', '-c', branch, ...start] : ['switch', branch])).out || `On ${branch}`));
+  return exclusive(root, async () => done((await run(root, create ? ['switch', '-c', branch] : ['switch', branch])).out || `On ${branch}`));
+}
+
+/** Creates a branch at a tag, another branch or a commit WITHOUT switching to it: the working folder is not touched. */
+export async function gitBranchCreate(cwd: string, branch: string, from: string): Promise<GitResult> {
+  const { root } = await repoOf(cwd);
+  await validBranch(root, branch);
+  const sha = await resolveRef(root, from);
+  return exclusive(root, async () => done((await run(root, ['branch', '--', branch, sha])).out || `Created ${branch}`));
 }
 
 /** Deletes a local branch. Without `force` git refuses when it has commits that are not merged anywhere. */
