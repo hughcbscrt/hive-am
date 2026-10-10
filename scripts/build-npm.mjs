@@ -47,6 +47,7 @@ const pkg = {
   bin: { 'hive-am': 'bin/hive-am.mjs' },
   files: ['bin', 'server/dist', 'server/mcp', 'server/package.json', 'web/.next', 'web/public', 'web/next.config.mjs', 'README.md', 'LICENSE', 'CHANGELOG.md'],
   dependencies: { ...server.dependencies, ...web.dependencies },
+  optionalDependencies: server.optionalDependencies,   // the terminal library: where it cannot be installed, hive-am still runs and says terminals are off
   engines: { node: '>=20' },
 };
 writeFileSync(join(out, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');

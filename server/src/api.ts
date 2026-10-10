@@ -28,6 +28,7 @@ import { createReadStream } from 'node:fs';
 import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git/repo.js';
 import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './git/switch.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from './objects/agent.js';
+import { TerminalError, closeTerminal, createTerminal, isLocalRequest, listTerminals, terminalsEnabled } from './terminals.js';
 import { ObjectError, createObject, httpDescribe, httpRun, httpScan, listObjects, objectAction, objectLogs, removeObject, updateObject } from './objects/index.js';
 import { gitCompare, gitCompareDiff, gitGrep, gitImageAt, gitRefs } from './git/browse.js';
 import { GitOpError, gitBlame, gitBranchCreate, gitBranchDelete, gitRefFile, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitTagFile, gitTagTree, gitTags, gitUnresolve, type PullMode } from './git/ops.js';
@@ -284,6 +285,16 @@ route('GET', '/api/objects/:id/http', ({ params }) => objectSafe(() => httpScan(
 route('GET', '/api/objects/:id/http/describe', ({ params, url }) => objectSafe(() => httpDescribe(params[0], url.searchParams.get('file') ?? '', Number(url.searchParams.get('index') ?? 0), url.searchParams.get('env') ?? undefined)));
 route('POST', '/api/objects/:id/http/run', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => httpRun(params[0], String(p.file ?? ''), Number(p.index ?? 0), p.env ? String(p.env) : undefined)); });
 route('GET', '/api/objects/:id/logs', ({ params, url }) => objectSafe(() => objectLogs(params[0], { tail: url.searchParams.get('tail') ? Number(url.searchParams.get('tail')) : undefined, after: url.searchParams.get('after') ?? undefined })));
+
+// ---- terminals (real shells shown in the bottom panel; see terminals.ts) ----
+const termGuard = (req: IncomingMessage) => { if (!isLocalRequest(req)) throw new HttpError(403, 'Terminals can only be used from this machine'); };
+route('GET', '/api/terminals', ({ req }) => { termGuard(req); return { enabled: terminalsEnabled(), terminals: listTerminals() }; });
+route('POST', '/api/terminals', async ({ req }) => {
+  termGuard(req); localOnly(req);
+  const p = await body(req);
+  try { return await createTerminal(p); } catch (e) { if (e instanceof TerminalError) throw bad(e.message); throw e; }
+});
+route('DELETE', '/api/terminals/:id', ({ req, params }) => { termGuard(req); localOnly(req); if (!closeTerminal(params[0])) throw notFound('Terminal not found'); return { ok: true }; });
 
 // ---- skills ----
 const checkLoad = (v: unknown) => { if (v !== undefined && v !== 'always' && v !== 'on_demand') throw bad('load must be always or on_demand'); };
