@@ -3,6 +3,7 @@ import { dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stop
 import { describeHttp, httpCount, runHttp, scanHttp } from './http.js';
 import { ObjectError, type ClusterConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
 import { forgetServer, serverLogs, serverState, startServer, stopServer } from './runner.js';
+import { forgetSupervision, resetSupervision, supervise } from './supervisor.js';
 import { maskConfig, objectsStore } from './store.js';
 
 export { ObjectError } from './model.js';
@@ -40,8 +41,15 @@ function clusterState(o: ObjectRow): ObjectState {
   return { status: 'error', detail: `only ${up}/${total} running · stopped: ${names(members.filter((m) => m.state?.status !== 'running'))}` };
 }
 
+/** The state of a server after what it is configured to do by itself (restart it, check its health, trim its log). */
+async function serverStateSupervised(o: ObjectRow): Promise<ObjectState> {
+  const cfg = o.config as ServerConfig;
+  const base = await serverState(o.id, cfg);
+  return supervise(o, cfg, base, { start: () => startServer(o.id, cfg), restart: async () => { await stopServer(o.id, cfg); await startServer(o.id, cfg); } });
+}
+
 export async function stateOf(o: ObjectRow): Promise<ObjectState> {
-  const s = o.kind === 'server' ? await serverState(o.id, o.config as ServerConfig)
+  const s = o.kind === 'server' ? await serverStateSupervised(o)
     : o.kind === 'docker' ? await dockerState(o.id, o.config as DockerConfig)
     : o.kind === 'http' ? httpState(o) : clusterState(o);
   states.set(o.id, s);
@@ -76,6 +84,7 @@ const get = (id: string): ObjectRow => objectsStore.get(id) ?? (() => { throw ne
 /** Starts, stops or restarts one server or container. */
 async function act(o: ObjectRow, action: 'start' | 'stop' | 'restart'): Promise<void> {
   if (o.kind === 'server') {
+    resetSupervision(o.id);                  // a person decided: the automatic restarts start over
     const c = o.config as ServerConfig;
     if (action === 'start') await startServer(o.id, c);
     else if (action === 'stop') await stopServer(o.id, c);
@@ -151,7 +160,7 @@ export async function removeObject(id: string): Promise<boolean> {
   const o = objectsStore.get(id); if (!o) return false;
   if (o.kind === 'server') { await stopServer(o.id, o.config as ServerConfig).catch(() => undefined); forgetServer(o.id); }
   else if (o.kind === 'docker') await removeDocker(o.id, o.config as DockerConfig);
-  states.delete(id); counts.delete(id);
+  states.delete(id); counts.delete(id); forgetSupervision(id);
   const ok = objectsStore.remove(id); changed();
   return ok;
 }

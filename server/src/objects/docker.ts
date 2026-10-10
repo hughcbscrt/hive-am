@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { ObjectError, splitArgs, type DockerConfig, type ObjectState } from './model.js';
@@ -22,6 +23,16 @@ function dk(args: string[], o: { cwd?: string; timeout?: number } = {}): Promise
   });
 }
 const fail = (r: Out, what: string) => new ObjectError(`${what}: ${(r.err || r.out).trim().split('\n').slice(-3).join(' ').slice(0, 400) || `docker exited with ${r.code}`}`);
+
+/** What makes a container different from another one when hive-am creates it: if it changes, the container is created again on the next start. */
+const CFG_FIELDS = ['image', 'ports', 'volumes', 'env', 'restart', 'command', 'memory', 'cpus', 'network', 'logMaxMb'] as const;
+export const cfgHash = (c: DockerConfig) => createHash('sha1').update(JSON.stringify(CFG_FIELDS.map((k) => c[k] ?? null))).digest('hex').slice(0, 12);
+const stopArgs = (c: DockerConfig) => (c.stopTimeoutSec ? ['-t', String(c.stopTimeoutSec)] : []);
+/** The hash a container was created with (empty when it does not exist). */
+async function createdWith(name: string): Promise<string | null> {
+  const r = await dk(['inspect', '-f', '{{index .Config.Labels "hive-am.cfg"}}', name]);
+  return r.code === 0 ? r.out.trim() : null;
+}
 
 /** The name hive-am gives to a container it creates. */
 export const containerName = (id: string) => `hive-am-${id.slice(0, 8)}`;
@@ -71,10 +82,17 @@ export async function startDocker(id: string, c: DockerConfig): Promise<void> {
     return;
   }
   const name = nameOf(id, c);
-  const exists = (await dk(['inspect', '-f', '{{.Id}}', name])).code === 0;
+  let exists = (await dk(['inspect', '-f', '{{.Id}}', name])).code === 0;
+  // A container hive-am created with other settings than the ones now configured is created again (what is inside it is lost, as with any recreate).
+  if (exists && c.mode === 'container') { const w = await createdWith(name); if (w && w !== cfgHash(c)) { await dk(['rm', '-f', name]); exists = false; } }
   if (exists) { const r = await dk(['start', name]); if (r.code !== 0) throw fail(r, 'could not start it'); return; }
   if (c.mode === 'existing') throw new ObjectError(`There is no container named ${name}`);
-  const args = ['run', '-d', '--name', name, '--label', `hive-am.object=${id}`];
+  const args = ['run', '-d', '--name', name, '--label', `hive-am.object=${id}`, '--label', `hive-am.cfg=${cfgHash(c)}`];
+  if (c.memory) args.push('--memory', c.memory);
+  if (c.cpus) args.push('--cpus', String(c.cpus));
+  if (c.network) args.push('--network', c.network);
+  if (c.logMaxMb) args.push('--log-opt', `max-size=${Math.max(1, Math.round(c.logMaxMb * 1024))}k`, '--log-opt', 'max-file=3');
+  if (c.stopTimeoutSec) args.push('--stop-timeout', String(c.stopTimeoutSec));
   if (c.restart && c.restart !== 'no') args.push('--restart', c.restart);
   for (const p of c.ports ?? []) args.push('-p', p);
   for (const v of c.volumes ?? []) args.push('-v', v);
@@ -85,16 +103,17 @@ export async function startDocker(id: string, c: DockerConfig): Promise<void> {
 }
 
 export async function stopDocker(id: string, c: DockerConfig): Promise<void> {
-  if (c.mode === 'compose') { checkCompose(c); const r = await dk(composeArgs(c, ['stop', ...(c.services ?? [])]), { cwd: dirname(c.file!) }); if (r.code !== 0) throw fail(r, 'compose stop failed'); return; }
-  const r = await dk(['stop', nameOf(id, c)]);
+  if (c.mode === 'compose') { checkCompose(c); const r = await dk(composeArgs(c, ['stop', ...stopArgs(c), ...(c.services ?? [])]), { cwd: dirname(c.file!), timeout: 300_000 }); if (r.code !== 0) throw fail(r, 'compose stop failed'); return; }
+  const r = await dk(['stop', ...stopArgs(c), nameOf(id, c)], { timeout: 300_000 });
   if (r.code !== 0 && !/No such container/i.test(r.err)) throw fail(r, 'could not stop it');
 }
 
 export async function restartDocker(id: string, c: DockerConfig): Promise<void> {
-  if (c.mode === 'compose') { checkCompose(c); const r = await dk(composeArgs(c, ['restart', ...(c.services ?? [])]), { cwd: dirname(c.file!) }); if (r.code !== 0) throw fail(r, 'compose restart failed'); return; }
+  if (c.mode === 'compose') { checkCompose(c); const r = await dk(composeArgs(c, ['restart', ...stopArgs(c), ...(c.services ?? [])]), { cwd: dirname(c.file!), timeout: 300_000 }); if (r.code !== 0) throw fail(r, 'compose restart failed'); return; }
   const name = nameOf(id, c);
   if ((await dk(['inspect', '-f', '{{.Id}}', name])).code !== 0) return startDocker(id, c);
-  const r = await dk(['restart', name]); if (r.code !== 0) throw fail(r, 'could not restart it');
+  if (c.mode === 'container') { const w = await createdWith(name); if (w && w !== cfgHash(c)) { await dk(['stop', ...stopArgs(c), name], { timeout: 300_000 }); return startDocker(id, c); } }   // changed settings: created again
+  const r = await dk(['restart', ...stopArgs(c), name], { timeout: 300_000 }); if (r.code !== 0) throw fail(r, 'could not restart it');
 }
 
 /** A container hive-am created goes away with its object; a compose project is only stopped; an existing container is left alone. */

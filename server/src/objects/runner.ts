@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, readSync } from 'node:fs';
+import { appendFileSync, closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, statSync, truncateSync, unlinkSync, writeFileSync, readSync } from 'node:fs';
 import { connect } from 'node:net';
 import { join } from 'node:path';
 import { DATA_DIR } from '../db.js';
@@ -12,7 +12,8 @@ import { ObjectError, type ObjectState, type ServerConfig } from './model.js';
  * Stopping signals the whole group (the shell, `npm`, `node`…): first politely, then for good.
  */
 const DIR = join(DATA_DIR, 'objects');
-const LOG_MAX = 5 * 1024 * 1024;       // a bigger log is set aside when the object starts
+const LOG_MAX = 5 * 1024 * 1024;       // a bigger log is set aside when the object starts (and while it runs: see rotateLog)
+const logMaxBytes = (cfg: ServerConfig) => Math.round((cfg.logMaxMb ?? 5) * 1024 * 1024) || LOG_MAX;
 const STOP_GRACE_MS = Number(process.env.HIVE_AM_OBJECT_STOP_MS) || 8000;
 const STARTING_MS = 120_000;           // with a port: how long "starting" is believed before it counts as stopped working
 
@@ -57,7 +58,7 @@ export async function startServer(id: string, cfg: ServerConfig): Promise<void> 
   if (!existsSync(cfg.cwd)) throw new ObjectError(`The folder ${cfg.cwd} does not exist`);
   mkdirSync(DIR, { recursive: true });
   const { log } = files(id);
-  try { if (statSync(log).size > LOG_MAX) renameSync(log, `${log}.1`); } catch { /* no log yet */ }
+  try { if (statSync(log).size > logMaxBytes(cfg)) renameSync(log, `${log}.1`); } catch { /* no log yet */ }
   note(id, `▶ ${cfg.start}   (${new Date().toLocaleString()})`);
   const fd = openSync(log, 'a');
   try {
@@ -95,7 +96,8 @@ export async function stopServer(id: string, cfg: ServerConfig): Promise<void> {
   }
   if (!isAlive(cur.saved.pid, cur.saved.stamp)) return;
   killGroup(cur.saved.pid, 'SIGTERM');
-  for (let waited = 0; waited < STOP_GRACE_MS && isAlive(cur.saved.pid, cur.saved.stamp); waited += 150) await sleep(150);
+  const grace = cfg.stopTimeoutSec ? cfg.stopTimeoutSec * 1000 : STOP_GRACE_MS;
+  for (let waited = 0; waited < grace && isAlive(cur.saved.pid, cur.saved.stamp); waited += 150) await sleep(150);
   if (isAlive(cur.saved.pid, cur.saved.stamp)) { note(id, 'did not stop in time: killing it'); killGroup(cur.saved.pid, 'SIGKILL'); for (let i = 0; i < 20 && isAlive(cur.saved.pid, cur.saved.stamp); i++) await sleep(100); }
 }
 
@@ -127,4 +129,18 @@ export function serverLogs(id: string, o: { tail?: number; after?: number }): { 
 export function forgetServer(id: string): void {
   const { log, state } = files(id);
   for (const f of [log, `${log}.1`, state]) { try { unlinkSync(f); } catch { /* none */ } }
+}
+
+/**
+ * Keeps the log from growing for ever while the server runs. The process writes with O_APPEND to its own file, so the old part is copied
+ * aside and the file is emptied in place (a few lines printed in between can be lost; it is a log, not a ledger).
+ */
+export function rotateLog(id: string, cfg: ServerConfig): boolean {
+  const { log } = files(id);
+  try {
+    if (statSync(log).size <= logMaxBytes(cfg)) return false;
+    copyFileSync(log, `${log}.1`); truncateSync(log, 0);
+    note(id, `log rotated: the earlier part is in ${id}.log.1`);
+    return true;
+  } catch { return false; }
 }
