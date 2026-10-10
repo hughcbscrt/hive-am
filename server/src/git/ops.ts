@@ -47,7 +47,7 @@ export async function exclusive<T>(root: string, fn: () => Promise<T>): Promise<
   try { return await next; } finally { if (locks.get(root) === next) locks.delete(root); }
 }
 
-const SHA = /^[0-9a-f]{4,40}$/i;
+export const SHA = /^[0-9a-f]{4,40}$/i;
 export async function validBranch(root: string, name: string) {
   if (!name || name.startsWith('-') || name.includes('\0')) throw new GitOpError('Invalid branch name');
   await run(root, ['check-ref-format', '--branch', name]).catch(() => { throw new GitOpError(`"${name}" is not a valid branch name`); });
@@ -57,11 +57,42 @@ export async function validBranch(root: string, name: string) {
 
 export interface GitCommit { sha: string; short: string; author: string; date: string; subject: string; refs: string[]; merge: boolean }
 
-export async function gitLog(cwd: string, skip = 0): Promise<{ commits: GitCommit[]; hasMore: boolean }> {
+export interface LogFilter {
+  /** Only commits that touched this file (its renames are followed). */
+  path?: string;
+  /** Text to look for, and where: the commit message, the author, or the lines the commit added or removed. */
+  q?: string; by?: 'message' | 'author' | 'content';
+  /** A branch, tag or commit to start from; `all` is every branch. Default: the current one. */
+  ref?: string;
+}
+
+export async function gitLog(cwd: string, skip = 0, f: LogFilter = {}): Promise<{ commits: GitCommit[]; hasMore: boolean }> {
   const { root, scope } = await repoOf(cwd);
   if (!(await hasHead(root))) return { commits: [], hasMore: false };
-  const { out } = await run(root, ['log', `--skip=${Math.max(0, Math.floor(skip))}`, `--max-count=${LOG_PAGE + 1}`, '--decorate=short',
-    '--format=%H%x1f%h%x1f%an%x1f%aI%x1f%s%x1f%D%x1f%P%x1e', '--', scope || '.']);
+  const q = (f.q ?? '').trim().slice(0, 200);
+  const args = ['log', `--skip=${Math.max(0, Math.floor(skip))}`, `--max-count=${LOG_PAGE + 1}`, '--decorate=short', '--format=%H%x1f%h%x1f%an%x1f%aI%x1f%s%x1f%D%x1f%P%x1e'];
+  if (f.ref === 'all') args.push('--all');
+  else if (f.ref && f.ref !== 'HEAD') args.push(await resolveRef(root, f.ref));
+  if (q) {
+    // A hash (or the start of one) finds that commit directly.
+    if (/^[0-9a-f]{7,40}$/i.test(q) && (!f.by || f.by === 'message')) {
+      const hit = (await run(root, ['rev-parse', '--verify', '--quiet', `${q}^{commit}`], { okCodes: [1] })).out.trim();
+      if (SHA.test(hit)) return gitLogOne(root, hit);
+    }
+    if (f.by === 'author') args.push('--regexp-ignore-case', '--fixed-strings', `--author=${q}`);
+    else if (f.by === 'content') args.push('--regexp-ignore-case', '-S', q);
+    else args.push('--regexp-ignore-case', '--fixed-strings', `--grep=${q}`);
+  }
+  let spec = scope || '.';
+  if (f.path) {
+    if (f.path.includes('\0') || f.path.startsWith('/') || f.path.split('/').includes('..')) throw new PathError('Invalid path');
+    args.push('--follow'); spec = f.path;
+  }
+  const { out } = await run(root, [...args, '--', spec]);
+  return { ...parseLog(out) };
+}
+
+function parseLog(out: string): { commits: GitCommit[]; hasMore: boolean } {
   const all = out.split('\x1e').map((r) => r.trim()).filter(Boolean).map((r) => {
     const [sha, short, author, date, subject, refs, parents] = r.split('\x1f');
     return { sha, short, author, date, subject, refs: (refs ?? '').split(', ').map((x) => x.replace(/^HEAD -> /, '').trim()).filter((x) => x && x !== 'HEAD'), merge: (parents ?? '').trim().split(' ').filter(Boolean).length > 1 };
@@ -69,11 +100,39 @@ export async function gitLog(cwd: string, skip = 0): Promise<{ commits: GitCommi
   return { commits: all.slice(0, LOG_PAGE), hasMore: all.length > LOG_PAGE };
 }
 
+async function gitLogOne(root: string, sha: string) {
+  const { out } = await run(root, ['log', '-1', '--decorate=short', '--format=%H%x1f%h%x1f%an%x1f%aI%x1f%s%x1f%D%x1f%P%x1e', sha]);
+  return { ...parseLog(out), hasMore: false };
+}
+
+/** A branch, tag, remote branch, commit or HEAD~N from the browser, resolved to the commit it names (never an option, never a path). */
+export async function resolveRef(root: string, ref: string): Promise<string> {
+  if (!ref || ref.length > 200 || !/^[\w][\w./@+~^-]*$/.test(ref) || ref.includes('..')) throw new PathError('Invalid reference');
+  const r = await run(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { okCodes: [1] });
+  const sha = r.out.trim();
+  if (!SHA.test(sha)) throw new PathError(`"${ref}" was not found`);
+  return sha;
+}
+
 const isMergeCommit = async (root: string, sha: string) => (await run(root, ['rev-list', '--parents', '-n', '1', sha])).out.trim().split(' ').length > 2;
 
 export interface GitCommitFile { path: string; oldPath?: string; status: 'modified' | 'added' | 'deleted' | 'renamed' | 'typechange'; additions: number | null; deletions: number | null }
 export interface GitCommitDetail { sha: string; author: string; email: string; date: string; message: string; files: GitCommitFile[]; truncated: boolean }
 const MAX_COMMIT_FILES = 500;
+
+/** The files of a `diff-tree --name-status -z` plus its `--numstat -z`, as the explorer lists them (renames and counts included). */
+export function filesFromDiffTree(namesOut: string, numsOut: string): GitCommitFile[] {
+  const counts = parseNumstat(numsOut);
+  const files: GitCommitFile[] = [];
+  const st = namesOut.split('\0');
+  for (let i = 0; i < st.length; i++) {
+    const code = st[i]; if (!code) continue;
+    const k = code[0];
+    if (k === 'R' || k === 'C') { const oldPath = st[++i], path = st[++i]; const c = counts.get(path); files.push({ path, oldPath: k === 'R' ? oldPath : undefined, status: k === 'R' ? 'renamed' : 'added', additions: c?.a ?? null, deletions: c?.d ?? null }); }
+    else { const path = st[++i]; const c = counts.get(path); files.push({ path, status: k === 'A' ? 'added' : k === 'D' ? 'deleted' : k === 'T' ? 'typechange' : 'modified', additions: c?.a ?? null, deletions: c?.d ?? null }); }
+  }
+  return files;
+}
 
 export async function gitCommitDetail(cwd: string, sha: string): Promise<GitCommitDetail> {
   if (!SHA.test(sha)) throw new PathError('Invalid commit');
@@ -86,15 +145,7 @@ export async function gitCommitDetail(cwd: string, sha: string): Promise<GitComm
     run(root, ['diff-tree', '-r', '-M', '--name-status', '-z', '--no-commit-id', ...range]),
     run(root, ['diff-tree', '-r', '-M', '--histogram', '--numstat', '-z', '--no-commit-id', ...range]),
   ]);
-  const counts = parseNumstat(nums.out);
-  const files: GitCommitFile[] = [];
-  const st = names.out.split('\0');
-  for (let i = 0; i < st.length; i++) {
-    const code = st[i]; if (!code) continue;
-    const k = code[0];
-    if (k === 'R' || k === 'C') { const oldPath = st[++i], path = st[++i]; const c = counts.get(path); files.push({ path, oldPath: k === 'R' ? oldPath : undefined, status: k === 'R' ? 'renamed' : 'added', additions: c?.a ?? null, deletions: c?.d ?? null }); }
-    else { const path = st[++i]; const c = counts.get(path); files.push({ path, status: k === 'A' ? 'added' : k === 'D' ? 'deleted' : k === 'T' ? 'typechange' : 'modified', additions: c?.a ?? null, deletions: c?.d ?? null }); }
-  }
+  const files = filesFromDiffTree(names.out, nums.out);
   const [h, author, email, date, ...msg] = meta.out.split('\x1f');
   return { sha: h, author, email, date, message: msg.join('\x1f').trim(), files: files.slice(0, MAX_COMMIT_FILES), truncated: files.length > MAX_COMMIT_FILES };
 }
@@ -184,17 +235,29 @@ export async function gitTagTree(cwd: string, tag: string): Promise<{ tag: strin
 }
 
 const MAX_TAG_FILE = 1_000_000;
-export async function gitTagFile(cwd: string, tag: string, rel: string): Promise<{ path: string; size: number; binary: boolean; truncated: boolean; content: string; source: 'tag' }> {
-  const { root } = await repoOf(cwd);
-  const sha = await tagCommit(root, tag);
+export interface GitRefFile { path: string; size: number; binary: boolean; truncated: boolean; content: string; source: 'tag' | 'ref' }
+
+/** A file as it was at a commit (read-only, nothing is checked out). */
+export async function fileAtCommit(root: string, sha: string, rel: string, source: GitRefFile['source']): Promise<GitRefFile> {
   if (!rel || rel.includes('\0') || rel.startsWith('/') || rel.split('/').includes('..')) throw new PathError('Invalid path');
   // The path must be a file of that commit (not a folder, not a submodule).
   const kind = (await run(root, ['ls-tree', '-z', sha, '--', rel], { raw: true })).out.split('\0')[0] ?? '';
-  if (!/^100\d{3} blob /.test(kind) && !/^120000 blob /.test(kind)) throw new PathError('File not found in this tag');
+  if (!/^100\d{3} blob /.test(kind) && !/^120000 blob /.test(kind)) throw new PathError('File not found at that version');
   const size = Number((await run(root, ['cat-file', '-s', `${sha}:${rel}`])).out) || 0;
   const { out } = await run(root, ['show', `${sha}:${rel}`], { raw: true });
   const binary = out.slice(0, 8000).includes('\0');
-  return { path: rel, size, binary, truncated: !binary && out.length > MAX_TAG_FILE, content: binary ? '' : out.slice(0, MAX_TAG_FILE), source: 'tag' };
+  return { path: rel, size, binary, truncated: !binary && out.length > MAX_TAG_FILE, content: binary ? '' : out.slice(0, MAX_TAG_FILE), source };
+}
+
+export async function gitTagFile(cwd: string, tag: string, rel: string): Promise<GitRefFile> {
+  const { root } = await repoOf(cwd);
+  return fileAtCommit(root, await tagCommit(root, tag), rel, 'tag');
+}
+
+/** Any version of a file: a branch, a tag or a commit. */
+export async function gitRefFile(cwd: string, ref: string, rel: string): Promise<GitRefFile> {
+  const { root } = await repoOf(cwd);
+  return fileAtCommit(root, await resolveRef(root, ref), rel, 'ref');
 }
 
 /* ------------------------------------------------------------------ writes */
@@ -248,10 +311,21 @@ export async function gitPush(cwd: string): Promise<GitResult> {
   });
 }
 
-export async function gitSwitch(cwd: string, branch: string, create = false): Promise<GitResult> {
+export async function gitSwitch(cwd: string, branch: string, create = false, from?: string): Promise<GitResult> {
   const { root } = await repoOf(cwd);
   await validBranch(root, branch);
-  return exclusive(root, async () => done((await run(root, create ? ['switch', '-c', branch] : ['switch', branch])).out || `On ${branch}`));
+  // A new branch can start from a tag, another branch or a commit instead of where we are.
+  const start = create && from ? [await resolveRef(root, from)] : [];
+  return exclusive(root, async () => done((await run(root, create ? ['switch', '-c', branch, ...start] : ['switch', branch])).out || `On ${branch}`));
+}
+
+/** Deletes a local branch. Without `force` git refuses when it has commits that are not merged anywhere. */
+export async function gitBranchDelete(cwd: string, branch: string, force = false): Promise<GitResult> {
+  const { root } = await repoOf(cwd);
+  await validBranch(root, branch);
+  const cur = (await run(root, ['branch', '--show-current'])).out.trim();
+  if (cur === branch) throw new GitOpError('You cannot delete the branch you are on. Switch to another one first.');
+  return exclusive(root, async () => done((await run(root, ['branch', force ? '-D' : '-d', '--', branch])).out || `Deleted ${branch}`));
 }
 
 export async function gitMerge(cwd: string, branch: string): Promise<GitResult> {

@@ -27,7 +27,8 @@ import { emptyUsage } from './pricing.js';
 import { createReadStream } from 'node:fs';
 import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git/repo.js';
 import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './git/switch.js';
-import { GitOpError, gitBlame, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitTagFile, gitTagTree, gitTags, gitUnresolve, type PullMode } from './git/ops.js';
+import { gitCompare, gitCompareDiff, gitGrep, gitImageAt, gitRefs } from './git/browse.js';
+import { GitOpError, gitBlame, gitBranchDelete, gitRefFile, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitTagFile, gitTagTree, gitTags, gitUnresolve, type PullMode } from './git/ops.js';
 
 const exec = promisify(execFile);
 const PROVIDERS: Record<Provider, { bin: string; label: string }> = {
@@ -185,7 +186,13 @@ function localOnly(req: IncomingMessage) {
 const gitWrite = (path: string, fn: (cwd: string, b: any) => Promise<unknown>) =>
   route('POST', `/api/agents/:id/git/${path}`, async ({ req, params }) => { localOnly(req); const b = await body(req); return gitSafe(() => fn(agentCwd(params[0]), b)); });
 
-route('GET', '/api/agents/:id/git/log', ({ params, url }) => gitSafe(() => gitLog(agentCwd(params[0]), Number(url.searchParams.get('skip') ?? 0))));
+route('GET', '/api/agents/:id/git/log', ({ params, url }) => gitSafe(() => {
+  const by = url.searchParams.get('by');
+  return gitLog(agentCwd(params[0]), Number(url.searchParams.get('skip') ?? 0), {
+    path: url.searchParams.get('path') ?? undefined, q: url.searchParams.get('q') ?? undefined, ref: url.searchParams.get('ref') ?? undefined,
+    by: by === 'author' || by === 'content' ? by : 'message',
+  });
+}));
 route('GET', '/api/agents/:id/git/commit', ({ params, url }) => gitSafe(() => gitCommitDetail(agentCwd(params[0]), url.searchParams.get('sha') ?? '')));
 route('GET', '/api/agents/:id/git/commit-diff', ({ params, url }) => gitSafe(() => gitCommitDiff(agentCwd(params[0]), url.searchParams.get('sha') ?? '', qpath(url), url.searchParams.get('old') ?? undefined)));
 route('GET', '/api/agents/:id/git/blame', ({ params, url }) => gitSafe(() => gitBlame(agentCwd(params[0]), qpath(url))));
@@ -205,6 +212,16 @@ route('GET', '/api/agents/:id/git/switch-plan', async ({ params, url }) => {
 });
 route('GET', '/api/agents/:id/git/stashes', ({ params }) => gitSafe(() => listStashes(agentCwd(params[0]))));
 route('GET', '/api/agents/:id/git/stash', ({ params, url }) => gitSafe(() => stashDetail(agentCwd(params[0]), url.searchParams.get('sha') ?? '')));
+route('GET', '/api/agents/:id/git/refs', ({ params }) => gitSafe(() => gitRefs(agentCwd(params[0]))));
+route('GET', '/api/agents/:id/git/compare', ({ params, url }) => gitSafe(() => gitCompare(agentCwd(params[0]), url.searchParams.get('base') ?? '', url.searchParams.get('head') ?? '')));
+route('GET', '/api/agents/:id/git/compare-diff', ({ params, url }) => gitSafe(() => gitCompareDiff(agentCwd(params[0]), url.searchParams.get('base') ?? '', url.searchParams.get('head') ?? '', qpath(url), url.searchParams.get('old') ?? undefined)));
+route('GET', '/api/agents/:id/git/grep', ({ params, url }) => gitSafe(() => gitGrep(agentCwd(params[0]), url.searchParams.get('q') ?? '', url.searchParams.get('case') === '1')));
+route('GET', '/api/agents/:id/git/ref-file', ({ params, url }) => gitSafe(() => gitRefFile(agentCwd(params[0]), url.searchParams.get('ref') ?? '', qpath(url))));
+route('GET', '/api/agents/:id/git/raw-at', async ({ params, url, res }) => {
+  const img = await gitSafe(() => gitImageAt(agentCwd(params[0]), url.searchParams.get('ref') ?? '', qpath(url)));
+  res.writeHead(200, { 'content-type': img.type, 'content-length': img.bytes.length, 'cache-control': 'private, max-age=3600', 'x-content-type-options': 'nosniff', 'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'" });
+  res.end(img.bytes);
+});
 route('GET', '/api/agents/:id/git/tags', ({ params }) => gitSafe(() => gitTags(agentCwd(params[0]))));
 route('GET', '/api/agents/:id/git/tag-tree', ({ params, url }) => gitSafe(() => gitTagTree(agentCwd(params[0]), url.searchParams.get('tag') ?? '')));
 route('GET', '/api/agents/:id/git/tag-file', ({ params, url }) => gitSafe(() => gitTagFile(agentCwd(params[0]), url.searchParams.get('tag') ?? '', qpath(url))));
@@ -213,7 +230,8 @@ gitWrite('commit', (cwd, b) => gitCommitChanges(cwd, String(b.message ?? ''), Ar
 gitWrite('fetch', (cwd) => gitFetch(cwd));
 gitWrite('pull', (cwd, b) => gitPull(cwd, (['ff-only', 'merge', 'rebase'].includes(b.mode) ? b.mode : 'ff-only') as PullMode));
 gitWrite('push', (cwd) => gitPush(cwd));
-gitWrite('switch', (cwd, b) => gitSwitch(cwd, String(b.branch ?? ''), !!b.create));
+gitWrite('switch', (cwd, b) => gitSwitch(cwd, String(b.branch ?? ''), !!b.create, b.from ? String(b.from) : undefined));
+gitWrite('branch-delete', (cwd, b) => gitBranchDelete(cwd, String(b.branch ?? ''), !!b.force));
 gitWrite('merge', (cwd, b) => gitMerge(cwd, String(b.branch ?? '')));
 gitWrite('merge-abort', (cwd) => gitMergeAbort(cwd));
 gitWrite('switch-smart', (cwd, b) => smartSwitch(cwd, String(b.branch ?? '')));
