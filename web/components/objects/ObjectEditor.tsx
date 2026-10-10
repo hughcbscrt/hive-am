@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
 import type { DockerConfig, ObjectKind, ObjectView, ServerConfig } from '@/lib/types';
-import { Drawer, Field, FolderPicker, Modal, Segmented, useToast } from '@/components/ui';
+import { Drawer, Field, FolderPicker, Modal, PathPicker, Segmented, useToast } from '@/components/ui';
 import { KIND, envToText, lines, textToEnv } from './meta';
 
 type Mode = NonNullable<DockerConfig['mode']>;
@@ -98,7 +98,10 @@ export function ObjectEditor({ object, presetColonyId, onClose, onSaved }: { obj
           {d.mode === 'container' && (<>
             <Field label={t('obj.f.image')}>{text('image', { placeholder: 'nginx:alpine', mono: true })}</Field>
             <Field label={t('obj.f.ports')} hint={t('obj.f.ports.hint')}><textarea className="textarea mono" rows={2} value={d.ports} onChange={(e) => set('ports', e.target.value)} placeholder="8080:80" /></Field>
-            <Field label={t('obj.f.volumes')} hint={t('obj.f.volumes.hint')}><textarea className="textarea mono" rows={2} value={d.volumes} onChange={(e) => set('volumes', e.target.value)} /></Field>
+            <Field label={t('obj.f.volumes')} hint={t('obj.f.volumes.hint')}>
+              <textarea className="textarea mono" rows={2} value={d.volumes} onChange={(e) => set('volumes', e.target.value)} />
+              <PathPicker bare value="" buttonLabel={t('obj.f.volumes.add')} onChange={(v) => set('volumes', `${d.volumes.trimEnd()}${d.volumes.trim() ? '\n' : ''}${v}:/data`)} />
+            </Field>
             <Field label={t('obj.f.env')} hint={t('obj.f.env.hint')}><textarea className="textarea mono" rows={3} value={d.env} onChange={(e) => set('env', e.target.value)} /></Field>
             <Field label={t('obj.f.restart')}>
               <select className="select" value={d.restart} onChange={(e) => set('restart', e.target.value)}>
@@ -108,7 +111,7 @@ export function ObjectEditor({ object, presetColonyId, onClose, onSaved }: { obj
             <Field label={t('obj.f.command')}>{text('command', { mono: true })}</Field>
           </>)}
           {d.mode === 'compose' && (<>
-            <Field label={t('obj.f.file')}>{text('file', { placeholder: '/home/me/app/docker-compose.yml', mono: true })}</Field>
+            <PathPicker mode="file" exts={['yml', 'yaml']} value={d.file} onChange={(v) => set('file', v)} label={t('obj.f.file')} hint={t('obj.f.file.hint')} placeholder="/home/you/app/docker-compose.yml" />
             <Field label={t('obj.f.project')}>{text('project', { mono: true })}</Field>
             <Field label={t('obj.f.services')} hint={t('obj.f.services.hint')}>{text('services', { mono: true })}</Field>
           </>)}

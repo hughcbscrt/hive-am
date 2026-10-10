@@ -9,14 +9,21 @@ import { PROVIDERS } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n/index';
 import type { Agent } from '@/lib/types';
 
+/** The skill that gives an agent the tools to look after objects (seeded by the server). */
+export const OBJECTS_SKILL_ID = 'default-objects';
+
 /** Step 1: start from a type (or blank). Step 2: fill in the details. */
-export function NewAgentDrawer({ onClose, onCreated, presetTypeId, presetColonyId }: { onClose: () => void; onCreated?: (id: string) => void; presetTypeId?: string; presetColonyId?: string }) {
+/** `manager`: an agent that looks after the objects of a colony (it starts with the "Colony objects" skill, and edit permission so it can start and stop them). */
+export function NewAgentDrawer({ onClose, onCreated, presetTypeId, presetColonyId, manager = false }: { onClose: () => void; onCreated?: (id: string) => void; presetTypeId?: string; presetColonyId?: string; manager?: boolean }) {
   const { t } = useI18n();
   const { types, agents, refresh, colonies } = useHive();
   const toast = useToast();
   const router = useRouter();
-  const [step, setStep] = useState<'type' | 'form'>(presetTypeId ? 'form' : 'type');
-  const [draft, setDraft] = useState<AgentDraft>({ ...draftFromType(types.find((ty) => ty.id === presetTypeId)), colony_id: presetColonyId ?? null });
+  const [step, setStep] = useState<'type' | 'form'>(presetTypeId || manager ? 'form' : 'type');
+  const [draft, setDraft] = useState<AgentDraft>(() => {
+    const base = { ...draftFromType(types.find((ty) => ty.id === presetTypeId)), colony_id: presetColonyId ?? null };
+    return manager ? { ...base, description: t('obj.manager.description'), permission: 'acceptEdits', skill_ids: [...new Set([...base.skill_ids, OBJECTS_SKILL_ID])], skill_loads: { ...base.skill_loads, [OBJECTS_SKILL_ID]: 'always' } } : base;
+  });
   const [busy, setBusy] = useState(false);
   const [show, setShow] = useState(false);
   const errors = validate(draft, agents, undefined, colonies);
@@ -52,8 +59,8 @@ export function NewAgentDrawer({ onClose, onCreated, presetTypeId, presetColonyI
     );
   }
   return (
-    <Drawer title={t('newAgent.title')} subtitle={draft.type_id ? t('newAgent.fromType', { name: types.find((ty) => ty.id === draft.type_id)?.name ?? '' }) : t('newAgent.blank')} onClose={onClose}
-      footer={<>{!presetTypeId && <button className="btn ghost" onClick={() => setStep('type')}>{t('common.back')}</button>}<button className="btn primary" disabled={busy} onClick={create}>{busy ? t('newAgent.creating') : t('newAgent.create')}</button></>}>
+    <Drawer title={t('newAgent.title')} subtitle={manager ? t('obj.manager.subtitle') : draft.type_id ? t('newAgent.fromType', { name: types.find((ty) => ty.id === draft.type_id)?.name ?? '' }) : t('newAgent.blank')} onClose={onClose}
+      footer={<>{!presetTypeId && !manager && <button className="btn ghost" onClick={() => setStep('type')}>{t('common.back')}</button>}<button className="btn primary" disabled={busy} onClick={create}>{busy ? t('newAgent.creating') : t('newAgent.create')}</button></>}>
       <AgentForm draft={draft} onChange={setDraft} errors={show ? errors : {}} focusName />
     </Drawer>
   );

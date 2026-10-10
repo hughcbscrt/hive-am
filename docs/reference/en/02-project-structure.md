@@ -149,7 +149,7 @@ There are no automated test folders yet; verification is described in [document 
 | `db.ts` | Creates the tables, applies light migrations, exposes `skills`, `types`, `colonies`, `agents`, `dispatches` and the `resolved()` function; it also stores how each assigned skill is loaded. |
 | `types.ts` | `Agent`, `Colony`, `AgentType`, `Skill`, `StreamEvent`, `Block`, `ChatMessage`, `Usage`, `TurnOptions`, etc. |
 | `seed.ts` | If the database is empty it creates 2 skills and 3 types (Queen, Builder, Reviewer). |
-| `skills/defaults.ts` | The nine skills that ship with hive-am (`skills.seedDefaults` creates them only once); see [7.3](07-agents-types-skills-colonies.md#73-skills). |
+| `skills/defaults.ts` | The ten skills that ship with hive-am (`skills.seedDefaults` creates them only once); see [7.3](07-agents-types-skills-colonies.md#73-skills). |
 | `skills/notebook.ts` | Each agent's notebook: `agent_notebooks` table, limits, notes without duplicates, credential rejection and versions. |
 | `connections/*` | External connections (Telegram): adapter, message router, groups, silence and channel tools; see [document 14](14-external-connections.md). |
 | `models.ts` | Models available per provider; 10-minute cache. |

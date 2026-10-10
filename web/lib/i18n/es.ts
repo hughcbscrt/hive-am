@@ -130,6 +130,9 @@ export const es: Record<DictKey, string> = {
   "folder.up": "Subir una carpeta",
   "folder.use": "Usar esta carpeta",
   "folder.empty": "No hay subcarpetas aquí.",
+  "folder.emptyFiles": "No hay carpetas ni archivos que coincidan aquí.",
+  "obj.f.file.hint": "El docker-compose.yml (o .yaml) del proyecto.",
+  "obj.f.volumes.add": "Añadir una carpeta de esta máquina",
 
   // ---- skillPicker ----
   "skillPicker.search": "Buscar skills para añadir…",
@@ -830,6 +833,13 @@ export const es: Record<DictKey, string> = {
   "git.cmp.more": "Se muestran los {count} más recientes.",
   "git.cmp.nofiles": "Sin diferencias en los archivos.",
   "obj.title": "Objetos",
+  "obj.manager.description": "Cuida los servidores y contenedores de la colonia: estado, logs, iniciar, detener y reiniciar.",
+  "obj.manager.subtitle": "Un agente que cuida los objetos de una colonia",
+  "obj.managers": "Quién lo cuida",
+  "obj.managers.none": "Ningún agente cuida todavía los objetos de esta colonia.",
+  "obj.managers.create": "Crear un agente administrador",
+  "obj.managers.ro": "solo lectura",
+  "obj.managers.readonly": "Solo lectura: puede mirar y leer logs, pero no iniciar ni detener.",
   "obj.save": "Guardar",
   "obj.create": "Crear",
   "obj.new": "Nuevo objeto",

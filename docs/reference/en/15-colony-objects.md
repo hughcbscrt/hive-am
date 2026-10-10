@@ -53,10 +53,28 @@ State comes from `docker inspect` (running, restarting, exited with a code, unhe
 
 **Security:** objects run commands, so creating, changing, deleting and acting on them are refused when the request does not come from the local app (same rule as the git actions). Reading is open like the rest of the API, which only listens on `127.0.0.1`.
 
-## 15.5 Tests
+## 15.5 Agents that look after objects
 
-`server/scripts/test-objects.ts` (no model): runs real processes (state, port wait, logs by cursor, stop with grace and kill, restart, exit codes, custom stop command, a server started by another process and found again) and real Docker containers named `hive-am-*` from a local image (create, port mapping, label, logs without timestamps, restart, adopt an existing one, compose), plus the input validation. It skips the Docker part if Docker or the image is missing and never touches a container it did not create.
+An agent with the **Colony objects** skill (`default-objects`, one of the skills that ship with hive-am) gets three tools: `object_list`, `object_logs` and `object_action` (start, stop, restart). To make one, select an object on the map and press **Create a manager agent** in its panel: it opens the new-agent form with the skill, the colony and *Edit files* permission already set (the same skill can be added to any agent from the skill picker). The panel lists who looks after each object.
 
-## 15.6 Not there yet
+The rules are enforced by the server, not just written in the skill:
 
-Terminals (a bottom panel), tools for agents to use objects (`object_list`, `object_action`, `object_logs`), the HTTP-requests object and the *boss* object that groups others are the next steps. Docker objects cannot be created on a remote Docker host, and PM2 is not integrated (a server object keeps its own process).
+- An agent sees only the objects of **its own colony**; one with no colony sees the objects that have none. Another colony's object looks like one that does not exist.
+- A **read-only** agent can list and read logs but cannot start, stop or restart anything. (Claude blocks every MCP tool in read-only mode anyway.)
+- There is **no tool to create, edit or delete** objects, nor to change the command they run: that stays with people.
+- Each action an agent takes is written in the server's log (`[hive-am] manager asked to restart`), so you can tell who did what.
+- An agent without the skill is refused even if it reaches the tools.
+
+API used by the MCP script: `POST /api/agent-objects/list`, `…/action`, `…/logs` with `{ from: <agent id>, … }`.
+
+## 15.6 Choosing folders and files
+
+Every field that holds a path uses the same picker (`PathPicker` in `web/components/ui.tsx`; `FolderPicker` is its folder mode): the folder of an agent or a colony, the folder of a server, the compose file (file mode: it lists the `.yml` / `.yaml` files) and the host side of a Docker volume (the *Add a folder of this machine* button). You can type the path or press Browse, move through the folders and press **Use this folder** (choosing a file, press the file). `GET /api/fs/dirs?path=&files=yml,yaml` lists folders, and files with those extensions.
+
+## 15.7 Tests
+
+`server/scripts/test-objects.ts` and `test-object-tools.ts` (no model; the second goes through the real MCP script and HTTP API): runs real processes (state, port wait, logs by cursor, stop with grace and kill, restart, exit codes, custom stop command, a server started by another process and found again) and real Docker containers named `hive-am-*` from a local image (create, port mapping, label, logs without timestamps, restart, adopt an existing one, compose), plus the input validation. It skips the Docker part if Docker or the image is missing and never touches a container it did not create.
+
+## 15.8 Not there yet
+
+Terminals (a bottom panel), the HTTP-requests object and the *boss* object that groups others are the next steps. Docker objects cannot be created on a remote Docker host, and PM2 is not integrated (a server object keeps its own process).

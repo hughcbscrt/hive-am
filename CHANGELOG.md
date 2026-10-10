@@ -8,12 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- Agents that look after colony objects: a "Colony objects" skill gives an agent `object_list`, `object_logs` and `object_action` (start, stop, restart) for the objects of its own colony; read-only agents cannot act, nothing can be created or changed by an agent, and the log says who asked. A "Create a manager agent" button in the object panel sets one up.
 - Colony objects: servers (a command hive-am keeps running, with its own process group and log file, found again after a restart) and Docker (a container hive-am creates, a compose project, or an existing container that is never removed) as hexagons on the Colony map, with state, start / stop / restart and live logs. API under `/api/objects`; changes only from the local app.
 - Git explorer: a Compare tab (two branches, tags or commits: files, commits in between and diffs, pictures before and after), history search by message, author or content, by branch or tag, and by hash; history of a single file; "View at…" to read a file as it was at any ref; search inside the files; creating a branch from a tag (without switching) and deleting local branches; `/` and `Alt+1…5` shortcuts and the last open file remembered per agent.
 - Tags in the git explorer: a Tags tab lists the repository's tags; each one can be browsed read-only (its files as they were at that tag, with Markdown preview, and the changes of its commit). The working folder is never touched.
 
 ### Changed
 
+- One path picker for every folder or file field (agent, colony and server folders, the compose file, Docker volumes), including a file mode.
 - Your messages in the web chat (and in Sessions) are no longer inverted bubbles: light with a thin border in the light theme and dark in the dark theme.
 - Tooltips: every `title` in the interface now shows a styled tooltip (after a short pause, or on keyboard focus) instead of the browser's own, in both themes. Icon-only elements keep the text as their accessible name.
 - Git explorer, less crowded: one toolbar row (Fetch, Pull and Push are icons with a tooltip and their counts), icon tabs where only the open one shows its name, a single filter row (name/content toggle and a "changes only" button) and a two-row file header with the secondary actions as icons.

@@ -53,10 +53,28 @@ El estado sale de `docker inspect` (corriendo, reiniciando, terminado con un có
 
 **Seguridad:** los objetos ejecutan comandos, así que crearlos, cambiarlos, eliminarlos y actuar sobre ellos se rechaza cuando la petición no viene de la app local (la misma regla que las acciones de git). Leer está abierto como el resto de la API, que solo escucha en `127.0.0.1`.
 
-## 15.5 Pruebas
+## 15.5 Agentes que cuidan objetos
 
-`server/scripts/test-objects.ts` (sin modelo): corre procesos reales (estado, espera del puerto, logs por cursor, detener con gracia y kill, reinicio, códigos de salida, comando de parada propio, un servidor iniciado por otro proceso y vuelto a encontrar) y contenedores Docker reales llamados `hive-am-*` desde una imagen local (crear, mapeo de puertos, etiqueta, logs sin marcas de tiempo, reinicio, adoptar uno existente, compose), más la validación de entradas. Omite la parte de Docker si falta Docker o la imagen y nunca toca un contenedor que no creó.
+Un agente con la skill **Colony objects** (`default-objects`, una de las skills que vienen con hive-am) recibe tres herramientas: `object_list`, `object_logs` y `object_action` (iniciar, detener, reiniciar). Para crear uno, elige un objeto en el mapa y pulsa **Crear un agente administrador** en su panel: abre el formulario de agente nuevo con la skill, la colonia y el permiso *Editar archivos* ya puestos (la misma skill se puede agregar a cualquier agente desde el selector de skills). El panel muestra quién cuida cada objeto.
 
-## 15.6 Lo que falta
+Las reglas las aplica el servidor, no solo las escribe la skill:
 
-Las terminales (un panel inferior), las herramientas para que los agentes usen los objetos (`object_list`, `object_action`, `object_logs`), el objeto de peticiones HTTP y el objeto *jefe* que agrupa otros son los siguientes pasos. Los objetos Docker no se pueden crear en un host Docker remoto y PM2 no está integrado (un objeto servidor mantiene su propio proceso).
+- Un agente ve solo los objetos de **su propia colonia**; uno sin colonia ve los que no tienen. El objeto de otra colonia se ve como si no existiera.
+- Un agente de **solo lectura** puede listar y leer logs pero no iniciar, detener ni reiniciar nada. (Claude bloquea todas las herramientas MCP en solo lectura de todos modos.)
+- **No hay herramienta para crear, editar ni eliminar** objetos, ni para cambiar el comando que corren: eso queda para las personas.
+- Cada acción de un agente queda escrita en el log del servidor (`[hive-am] manager asked to restart`), para saber quién hizo qué.
+- Un agente sin la skill es rechazado aunque llegue a las herramientas.
+
+API que usa el script MCP: `POST /api/agent-objects/list`, `…/action`, `…/logs` con `{ from: <id del agente>, … }`.
+
+## 15.6 Elegir carpetas y archivos
+
+Todo campo que guarda una ruta usa el mismo selector (`PathPicker` en `web/components/ui.tsx`; `FolderPicker` es su modo carpeta): la carpeta de un agente o de una colonia, la carpeta de un servidor, el archivo compose (modo archivo: lista los `.yml` / `.yaml`) y el lado del host de un volumen Docker (el botón *Añadir una carpeta de esta máquina*). Puedes escribir la ruta o pulsar Explorar, moverte por las carpetas y pulsar **Usar esta carpeta** (al elegir un archivo, pulsa el archivo). `GET /api/fs/dirs?path=&files=yml,yaml` lista carpetas, y archivos con esas extensiones.
+
+## 15.7 Pruebas
+
+`server/scripts/test-objects.ts` y `test-object-tools.ts` (sin modelo; el segundo pasa por el script MCP y la API HTTP reales): corre procesos reales (estado, espera del puerto, logs por cursor, detener con gracia y kill, reinicio, códigos de salida, comando de parada propio, un servidor iniciado por otro proceso y vuelto a encontrar) y contenedores Docker reales llamados `hive-am-*` desde una imagen local (crear, mapeo de puertos, etiqueta, logs sin marcas de tiempo, reinicio, adoptar uno existente, compose), más la validación de entradas. Omite la parte de Docker si falta Docker o la imagen y nunca toca un contenedor que no creó.
+
+## 15.8 Lo que falta
+
+Las terminales (un panel inferior), el objeto de peticiones HTTP y el objeto *jefe* que agrupa otros son los siguientes pasos. Los objetos Docker no se pueden crear en un host Docker remoto y PM2 no está integrado (un objeto servidor mantiene su propio proceso).

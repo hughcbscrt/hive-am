@@ -79,7 +79,7 @@ export default function Colony() {
   const [sel, setSel] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const card = useAgentCard();
-  const [creating, setCreating] = useState<{ colonyId?: string } | null>(null);
+  const [creating, setCreating] = useState<{ colonyId?: string; manager?: boolean } | null>(null);
   const [editing, setEditing] = useState<Colony | 'new' | null>(null);
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
   const [editingObject, setEditingObject] = useState<ObjectView | { colonyId?: string } | null>(null);
@@ -244,7 +244,7 @@ export default function Colony() {
           </div>
         </div>
 
-          {selectedObject ? <ObjectPanel key={selectedObject.id} object={selectedObject} onEdit={() => setEditingObject(selectedObject)} /> : selected ? (
+          {selectedObject ? <ObjectPanel key={selectedObject.id} object={selectedObject} onEdit={() => setEditingObject(selectedObject)} onCreateManager={() => setCreating({ colonyId: selectedObject.colony_id ?? undefined, manager: true })} /> : selected ? (
             <aside className="side-float card card-pad col" style={{ gap: 14 }} aria-label={selected.name}>
               <div className="card-corner row gap-s"><button className="btn ghost icon sm" onClick={() => setEditingAgent(selected.id)} aria-label={t('colony.settingsFor', { name: selected.name })} title={t('colony.agentSettings')}><SlidersHorizontal size={17} /></button><button className="btn ghost icon sm" onClick={() => setSel(null)} aria-label={t('common.close')} title={`${t('common.close')} (Esc)`}><X size={16} /></button></div>
               <div className="row gap-l" style={{ paddingRight: 70 }}><Hex agent={selected} size="lg" /><div className="grow"><h2 style={{ fontSize: 22 }}>{selected.name}</h2><div className="row gap-s wrap" style={{ marginTop: 6 }}><RoleChip role={selected.role} /><StatusChip status={selected.status} /></div></div></div>
@@ -280,7 +280,7 @@ export default function Colony() {
       </div>
       {card.node}
       {deleting && agents.find((a) => a.id === deleting) && <DeleteAgentModal agent={agents.find((a) => a.id === deleting)!} onClose={() => setDeleting(null)} onDeleted={() => setSel(null)} />}
-      {creating && <NewAgentDrawer presetColonyId={creating.colonyId} onClose={() => setCreating(null)} onCreated={(id) => setSel(id)} />}
+      {creating && <NewAgentDrawer presetColonyId={creating.colonyId} manager={creating.manager} onClose={() => setCreating(null)} onCreated={(id) => setSel(id)} />}
       {editingAgent && agents.find((a) => a.id === editingAgent) && <AgentEditDrawer key={editingAgent} agent={agents.find((a) => a.id === editingAgent)!} onClose={() => setEditingAgent(null)} />}
       {editingObject && <ObjectEditor key={'id' in editingObject ? editingObject.id : 'new'} object={'id' in editingObject ? editingObject : undefined} presetColonyId={'colonyId' in editingObject ? editingObject.colonyId : undefined} onClose={() => setEditingObject(null)} onSaved={(id) => setSel(id)} />}
       {editing && <ColonyEditor colony={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />}

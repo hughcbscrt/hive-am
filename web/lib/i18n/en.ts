@@ -132,6 +132,9 @@ export const en = {
   "folder.up": "Up one folder",
   "folder.use": "Use this folder",
   "folder.empty": "No subfolders here.",
+  "folder.emptyFiles": "No folders or matching files here.",
+  "obj.f.file.hint": "The docker-compose.yml (or .yaml) of the project.",
+  "obj.f.volumes.add": "Add a folder of this machine",
 
   // ---- skillPicker ----
   "skillPicker.search": "Search skills to add…",
@@ -832,6 +835,13 @@ export const en = {
   "git.cmp.more": "Showing the newest {count}.",
   "git.cmp.nofiles": "No differences in files.",
   "obj.title": "Objects",
+  "obj.manager.description": "Looks after the servers and containers of the colony: state, logs, start, stop and restart.",
+  "obj.manager.subtitle": "An agent that looks after the objects of a colony",
+  "obj.managers": "Who looks after it",
+  "obj.managers.none": "No agent looks after the objects of this colony yet.",
+  "obj.managers.create": "Create a manager agent",
+  "obj.managers.ro": "read-only",
+  "obj.managers.readonly": "Read-only: it can look and read logs, but not start or stop.",
   "obj.save": "Save",
   "obj.create": "Create",
   "obj.new": "New object",

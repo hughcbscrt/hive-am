@@ -569,12 +569,15 @@ route('GET', '/api/dispatches', () => dispatches.recent());
 route('GET', '/api/fs/dirs', ({ url }) => {
   const p = resolve(url.searchParams.get('path') || homedir());
   if (!existsSync(p) || !statSync(p).isDirectory()) throw bad('Not a folder');
-  let entries: string[] = [];
+  // `files=yml,yaml` also lists the files with those extensions (to pick a file, e.g. a compose file).
+  const exts = (url.searchParams.get('files') ?? '').split(',').map((x) => x.trim().toLowerCase().replace(/^\./, '')).filter((x) => /^[a-z0-9]{1,8}$/.test(x));
+  let dirs: string[] = [], files: string[] = [];
   try {
-    entries = readdirSync(p, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && !d.name.startsWith('.') && d.name !== 'node_modules').map((d) => d.name).sort((a, b) => a.localeCompare(b));
+    const all = readdirSync(p, { withFileTypes: true });
+    dirs = all.filter((d) => d.isDirectory() && !d.name.startsWith('.') && d.name !== 'node_modules').map((d) => d.name).sort((a, b) => a.localeCompare(b));
+    if (exts.length) files = all.filter((d) => d.isFile() && exts.includes(d.name.split('.').pop()!.toLowerCase())).map((d) => d.name).sort((a, b) => a.localeCompare(b));
   } catch { /* unreadable */ }
-  return { path: p, parent: p === '/' ? null : dirname(p), dirs: entries.map((n) => ({ name: n, path: join(p, n) })) };
+  return { path: p, parent: p === '/' ? null : dirname(p), dirs: dirs.map((n) => ({ name: n, path: join(p, n) })), files: files.map((n) => ({ name: n, path: join(p, n) })) };
 });
 
 export async function handle(req: IncomingMessage, res: ServerResponse) {
