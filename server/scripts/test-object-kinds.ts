@@ -88,6 +88,8 @@ check(parsed.requests[2].name === 'POST /from-file', 'an unnamed request is name
 const web = createObject({ name: 'api-requests', kind: 'http', config: { folder: dir, env: 'dev' } });
 const scan = httpScan(web.id);
 check(scan.files.length === 2 && scan.files.map((f) => f.relFile).sort().join() === 'api.http,sub/more.rest', 'the scan finds .http and .rest files in sub-folders');
+check(scan.used.map((u) => u.name).includes('token') && scan.used.map((u) => u.name).includes('host') && !scan.used.some((u) => u.name.startsWith('$')), 'the scan lists the variables the requests use (not the generated ones)');
+check(scan.used.find((u) => u.name === 'host')!.count >= 6 && scan.fileDefined.join() === 'version', 'with how many requests use each, and the ones a file defines itself');
 check(scan.environments.join() === 'dev,prod', 'the environments come from the env files ($shared is not one)');
 check((await stateOf(objectsStore.get(web.id)!)).status === 'ready' && /8 requests/.test((await stateOf(objectsStore.get(web.id)!)).detail ?? ''), 'the object is "ready" and says how many requests it has');
 

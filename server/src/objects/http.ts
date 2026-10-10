@@ -24,7 +24,7 @@ const ENV_FILES = ['http-client.env.json', 'http-client.private.env.json'];
 
 export interface HttpRequestItem { id: string; index: number; name: string; method: string; url: string; headers: { name: string; value: string }[]; body?: string; line: number; variables: string[] }
 export interface HttpFile { relFile: string; requests: HttpRequestItem[]; fileVariables: Record<string, string> }
-export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; /** Names of the variables the env files define, per environment (so the interface can say which of its own they override). */ fileVars: Record<string, string[]>; truncated: boolean }
+export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; /** Names of the variables the env files define, per environment (so the interface can say which of its own they override). */ fileVars: Record<string, string[]>; /** Every {{variable}} the requests use (not the generated {{$…}} ones), with how many requests use each. */ used: { name: string; count: number }[]; /** The ones a file defines itself with `@name = value`. */ fileDefined: string[]; truncated: boolean }
 export interface HttpRun {
   request: { method: string; url: string; headers: { name: string; value: string }[]; body?: string };
   status: number; statusText: string; durationMs: number; size: number;
@@ -139,7 +139,9 @@ export function scanHttp(folder: string, hive?: Hive): HttpScan {
     }
   };
   walk(root, 0);
-  return { folder: root, files, environments: [...envNames].sort(), envFiles: [...envFiles].sort(), fileVars: Object.fromEntries(Object.entries(fileVars).map(([k, v]) => [k, [...v].sort()])), truncated };
+  const count = new Map<string, number>(); for (const f of files) for (const r of f.requests) for (const v of r.variables) if (!v.startsWith('$')) count.set(v, (count.get(v) ?? 0) + 1);
+  const fileDefined = [...new Set(files.flatMap((f) => Object.keys(f.fileVariables)))].sort();
+  return { folder: root, files, environments: [...envNames].sort(), envFiles: [...envFiles].sort(), used: [...count].map(([name, n]) => ({ name, count: n })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)), fileDefined, fileVars: Object.fromEntries(Object.entries(fileVars).map(([k, v]) => [k, [...v].sort()])), truncated };
 }
 
 const MASK = /^(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api-key|x-auth-token|x-access-token)$/i;

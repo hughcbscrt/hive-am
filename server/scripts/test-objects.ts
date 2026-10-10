@@ -9,6 +9,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { colonies } from '../src/db.js';
+import { composeServices, listContainers, listImages } from '../src/objects/docker-info.js';
 import { ObjectError, createObject, objectAction, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
 import { objectsStore } from '../src/objects/store.js';
 
@@ -151,6 +152,14 @@ else {
   check(await until(async () => (await st(comp.id)) === 'running'), 'a compose project can be started');
   check((await fetch(`http://127.0.0.1:${cport}/`).then((r) => r.status).catch(() => 0)) === 200, 'and serves');
   check((await objectLogs(comp.id, { tail: 20 })).text.length >= 0, 'its logs can be read');
+  const cs = await composeServices(join(cdir, 'docker-compose.yml'));
+  check(cs.services.join() === 'web' && cs.source === 'docker' && /^[a-z0-9_-]+$/.test(cs.project), 'the services of a compose file are listed, with a project name suggestion');
+  writeFileSync(join(cdir, 'broken.yml'), 'services:\n  alpha:\n    image: ${MISSING_VAR:?must be set}\n  beta:\n    image: x # comment\n  # gamma:\nvolumes:\n  data:\n');
+  const cb = await composeServices(join(cdir, 'broken.yml'));
+  check(cb.services.join() === 'alpha,beta' && cb.source === 'file', 'when Docker cannot read it, the services are taken from the file itself');
+  check(await rejects(() => composeServices('/etc/passwd'), /compose file/) && await rejects(() => composeServices(join(cdir, 'nope.yml')), /does not exist/), 'only existing .yml / .yaml files are read');
+  const lc = await listContainers(); const li = await listImages();
+  check(lc.available && lc.containers.some((c) => c.name === cname && c.managed) && li.images.some((i) => i.ref === image), 'the containers and images of this machine are listed (and the ones hive-am created are marked)');
   const kst = await statsOf(comp.id);
   check(kst.services?.length === 1 && kst.services[0].name === 'web' && kst.services[0].state === 'running', 'a compose project lists its services');
   await objectAction(comp.id, 'stop');

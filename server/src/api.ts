@@ -27,6 +27,7 @@ import { emptyUsage } from './pricing.js';
 import { createReadStream } from 'node:fs';
 import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git/repo.js';
 import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './git/switch.js';
+import { composeServices, listContainers, listImages } from './objects/docker-info.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from './objects/agent.js';
 import { TerminalError, closeTerminal, createTerminal, isLocalRequest, listTerminals, terminalsEnabled } from './terminals.js';
 import { ObjectError, createObject, statsOf, httpDescribe, httpRun, httpScan, listObjects, objectAction, objectLogs, removeObject, updateObject } from './objects/index.js';
@@ -281,6 +282,10 @@ route('POST', '/api/objects', async ({ req }) => { objectGuard(req); const p = a
 route('PATCH', '/api/objects/:id', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => updateObject(params[0], p)); });
 route('DELETE', '/api/objects/:id', async ({ req, params }) => { objectGuard(req); return objectSafe(async () => { if (!(await removeObject(params[0]))) throw notFound('Object not found'); return { ok: true }; }); });
 route('POST', '/api/objects/:id/action', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => objectAction(params[0], p.action)); });
+// What Docker knows, to suggest in the forms (containers, images, the services of a compose file).
+route('GET', '/api/docker/containers', () => listContainers());
+route('GET', '/api/docker/images', () => listImages());
+route('GET', '/api/docker/compose-services', ({ url }) => objectSafe(() => composeServices(url.searchParams.get('file') ?? '')));
 route('GET', '/api/objects/:id/stats', ({ params }) => objectSafe(() => statsOf(params[0])));
 route('GET', '/api/objects/:id/http', ({ params }) => objectSafe(() => httpScan(params[0])));
 route('GET', '/api/objects/:id/http/describe', ({ params, url }) => objectSafe(() => httpDescribe(params[0], url.searchParams.get('file') ?? '', Number(url.searchParams.get('index') ?? 0), url.searchParams.get('env') ?? undefined)));
