@@ -242,7 +242,7 @@ export function describeHttp(folder: string, relFile: string, index: number, env
   const file = parseHttpFile(readFileSync(abs, 'utf8'), relFile);
   const item = file.requests[index]; if (!item) throw new ObjectError(`Request #${index} is not in ${relFile}`);
   const e = envVars(root, abs, env, hive);
-  const vars = { ...e.vars, ...file.fileVariables, ...(session?.globals ?? {}) };
+  const vars = { ...file.fileVariables, ...e.vars, ...(session?.globals ?? {}) };
   // Answers of other requests this one uses: a reference to a request that has not been run in this session is missing too.
   const refMissing = [...(item.url + (item.body ?? '') + item.headers.map((x) => x.value).join('\n')).matchAll(VAR)].map((m) => m[1]).filter((k) => REF.test(k) && fromResponse(session, k) === undefined);
   const missing = [...item.variables.filter((v) => dynamic(v) === undefined && !(v in vars)), ...new Set(refMissing)];
@@ -300,8 +300,8 @@ export function inspectHttp(folder: string, relFile: string | undefined, index: 
     // every source that defines it, strongest first
     const found: { source: VarSource; from: string; value: string; secret: boolean; hidden: boolean }[] = [];
     if (session && name in session.globals) found.push({ source: 'session', from: '', value: session.globals[name], secret: looksSecret(name), hidden: false });
-    for (const f of files) if (name in f.fileVariables) found.push({ source: 'file', from: f.relFile, value: f.fileVariables[name], secret: looksSecret(name), hidden: false });
     for (const l of [...e.layers].reverse()) if (name in l.vars) found.push({ source: l.source, from: l.from === '$shared' ? '$shared' : l.from, value: l.vars[name].value, secret: l.vars[name].secret || looksSecret(name), hidden: l.vars[name].hidden });
+    for (const f of files) if (name in f.fileVariables) found.push({ source: 'file', from: f.relFile, value: f.fileVariables[name], secret: looksSecret(name), hidden: false });
     if (!found.length) return { name, value: null, source: 'missing', from: '', secret: looksSecret(name), hidden: false, overridden: [], usedBy };
     const [w, ...rest] = found;
     return { name, value: w.hidden ? null : w.value, source: w.source, from: w.from, secret: w.secret, hidden: w.hidden, overridden: rest.map((x) => ({ source: x.source, from: x.from, value: x.hidden || x.secret ? null : x.value })), usedBy };
@@ -341,7 +341,7 @@ export async function runHttp(folder: string, relFile: string, index: number, en
   const item = file.requests[index]; if (!item) throw new ObjectError(`Request #${index} is not in ${relFile}`);
   const e = envVars(root, abs, env, hive);
   if (env && !e.names.includes(env)) throw new ObjectError(`The environment "${env}" is not in the env files`);
-  const vars = { ...e.vars, ...file.fileVariables, ...session.globals };
+  const vars = { ...file.fileVariables, ...e.vars, ...session.globals };
   const unresolved = new Set<string>();
   const url = substitute(item.url, vars, unresolved, session);
   const headers = item.headers.map((h) => ({ name: h.name, value: substitute(h.value, vars, unresolved, session) }));

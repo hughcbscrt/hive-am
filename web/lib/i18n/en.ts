@@ -993,7 +993,7 @@ export const en = {
   "vars.scope.env": "These values apply only when you pick “{env}”. When one is missing here, the one from “All environments” is used.",
   "vars.how.title": "How variables work",
   "vars.how.1": "Your .http files write {{name}} where a value goes. When you run a request, each one is replaced by its value.",
-  "vars.how.2": "The value comes from the environment you pick in the runner (dev, qa…), and if it is not there, from “All environments”. An env file, or an @name line inside the .http file, wins over what you set here.",
+  "vars.how.2": "The value comes from the environment you pick in the runner (dev, qa…), and if it is not there, from “All environments”. An env file wins over what you set here, and the environment you pick wins over an @name line inside the .http file.",
   "vars.used.title": "Variables your files use",
   "vars.used.hint": "Click one that is missing to add it here.",
   "vars.status.here": "defined here",

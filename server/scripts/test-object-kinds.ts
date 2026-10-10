@@ -232,7 +232,7 @@ const io = createObject({ name: 'inspected', kind: 'http', config: { folder: ins
 const hv2 = (objectsStore.get(io.id)!.config as any).variables;
 const byName = (vs: { name: string }[]) => Object.fromEntries(vs.map((v) => [v.name, v])) as Record<string, any>;
 const one = byName(httpInspect(io.id, 'i.http', 1, 'dev').vars);
-check(one.who.value === 'from-file' && one.who.source === 'file' && one.who.overridden.map((o: any) => o.source).join() === 'envfile,hive', 'a variable shows its winning source (the @ of the file) and the weaker ones it hides');
+check(one.who.value === 'from-env' && one.who.source === 'envfile' && one.who.overridden.map((o: any) => `${o.source}:${o.value}`).join() === 'hive:from-hive,file:from-file', 'the environment wins over the @ of the file, and the weaker values it hides are listed with their value');
 check(one.host.source === 'envfile' && one.host.from === 'dev' && one.host.overridden[0].source === 'hive', 'an env file wins over hive-am’s own value, and says so');
 check(one.region.source === 'envfile' && one.region.from === '$shared' && one.region.value === 'eu' && one.region.overridden[0].source === 'hive', 'shared values of the env file are told apart from the environment’s');
 check(one.token.value === 'PRIVATE-TOKEN-1' && one.token.secret === true && one.token.source === 'envfile', 'a value from a private env file is flagged secret (the interface masks it)');
@@ -241,7 +241,7 @@ check(JSON.stringify(httpInspect(io.id, undefined, undefined, 'dev')).includes('
 check(one['$uuid'].source === 'dynamic' && one['$uuid'].value === null, 'a generated value is described, not shown');
 check(one.nowhere.source === 'missing' && one['login.response.body.id'].source === 'missing' && one['login.response.body.id'].hint === 'run:login', 'what has no value is missing; a reference to an unrun request says which one to run');
 const pv = httpInspect(io.id, 'i.http', 1, 'dev').preview!;
-check(pv.url.includes('/probe/from-file/PRIVATE-TOKEN-1/••••/eu?id={{login.response.body.id}}&n={{$uuid}}&gone={{nowhere}}'), 'the preview fills in what is known, hides hive’s secrets, and keeps generated and missing ones as they are');
+check(pv.url.includes('/probe/from-env/PRIVATE-TOKEN-1/••••/eu?id={{login.response.body.id}}&n={{$uuid}}&gone={{nowhere}}'), 'the preview fills in what is known, hides hive’s secrets, and keeps generated and missing ones as they are');
 check(pv.headers.find((h) => h.name === 'Authorization')!.value.includes('••••') && !pv.headers.find((h) => h.name === 'Authorization')!.value.includes('PRIVATE'), 'and masks credentials in the headers');
 check(pv.unresolved.sort().join() === 'login.response.body.id,nowhere', 'and lists what is unresolved');
 await runForObject(io.id, 'i.http', 0, 'dev').catch(() => undefined);
@@ -260,7 +260,7 @@ httpSessionClear(io.id);
 // files: read and save
 check(httpFileRead(io.id, 'i.http').content.startsWith('@who = from-file'), 'a .http file can be read');
 httpFileWrite(io.id, 'i.http', httpFileRead(io.id, 'i.http').content.replace('from-file', 'edited'));
-check(byName(httpInspect(io.id, 'i.http', 1, 'dev').vars).who.value === 'edited', 'and saved: the next inspection sees the change');
+check(byName(httpInspect(io.id, 'i.http', 1, 'dev').vars).who.overridden.find((o: any) => o.source === 'file').value === 'edited', 'and saved: the next inspection sees the change');
 check(await rejects(() => httpFileWrite(io.id, '../outside.http', 'x'), /outside the folder/) && await rejects(() => httpFileWrite(io.id, 'http-client.env.json', '{}'), /\.http and \.rest/) && await rejects(() => httpFileWrite(io.id, 'new-file.http', 'x'), /does not exist/), 'saving refuses a path outside the folder, other kinds of file, and creating files');
 check(await rejects(() => httpFileWrite(io.id, 'i.http', 'x'.repeat(1_100_000)), /too large/) && await rejects(() => httpFileRead(io.id, '../x.http'), /outside the folder/), 'and a file that is too large');
 await removeObject(io.id);

@@ -991,7 +991,7 @@ export const es: Record<DictKey, string> = {
   "vars.scope.env": "Estos valores solo aplican cuando eliges “{env}”. Si falta uno aquí, se usa el de “Todos los entornos”.",
   "vars.how.title": "Cómo funcionan las variables",
   "vars.how.1": "Tus archivos .http escriben {{nombre}} donde va un valor. Al ejecutar una petición, cada uno se reemplaza por su valor.",
-  "vars.how.2": "El valor sale del entorno que elijas en el ejecutor (dev, qa…) y, si no está ahí, de “Todos los entornos”. Un archivo env, o una línea @nombre dentro del .http, gana sobre lo que pongas aquí.",
+  "vars.how.2": "El valor sale del entorno que elijas en el ejecutor (dev, qa…) y, si no está ahí, de “Todos los entornos”. Un archivo env gana sobre lo que pongas aquí, y el entorno que elijas gana sobre una línea @nombre dentro del .http.",
   "vars.used.title": "Variables que usan tus archivos",
   "vars.used.hint": "Pulsa una que falte para agregarla aquí.",
   "vars.status.here": "definida aquí",

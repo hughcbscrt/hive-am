@@ -25,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- HTTP variables: the selected environment (env files, then hive-am’s) now wins over an `@name` line in the `.http` file; the value of the session still wins over everything.
+
 - Objects screens use the whole screen: the latest output of the Summary fills the height that is left, and Settings are cards that flow into several columns. States the server writes in English are shown in the interface's language.
 - HTTP variables: *Shared* is now **All environments**, with a short explanation of how variables work and which scope each tab is.
 - *Boss* objects are now called **clusters** (existing ones are converted; the API still accepts `boss`).
