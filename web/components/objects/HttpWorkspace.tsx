@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Eye, File, KeyRound, ListChecks, Play, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronRight, File, KeyRound, ListChecks, Play, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
@@ -56,8 +56,6 @@ export function HttpWorkspace({ object: o, onOpenVars, pane = 'requests', onGoRe
   const [bodyView, setBodyView] = useState<'tree' | 'text'>('tree');
   const [insp, setInsp] = useState<HttpInspection | null>(null);
   const [fileInsp, setFileInsp] = useState<HttpInspection | null>(null);
-  const [allInsp, setAllInsp] = useState<HttpInspection | null>(null);
-  const [showAll, setShowAll] = useState(false);
   const [openAns, setOpenAns] = useState<string | null>(null);
   const [hist, setHist] = useState<HistEntry[]>([]);
   const [histSel, setHistSel] = useState<number | null>(null);
@@ -93,8 +91,7 @@ export function HttpWorkspace({ object: o, onOpenVars, pane = 'requests', onGoRe
   const refreshInsp = useCallback(() => {
     if (sel) void inspect(fileOf.current.get(sel.id), sel.index).then(setInsp).catch(() => setInsp(null)); else setInsp(null);
     if (file) void inspect(file).then(setFileInsp).catch(() => setFileInsp(null));
-    if (showAll) void inspect().then(setAllInsp).catch(() => setAllInsp(null));
-  }, [inspect, sel?.id, file, showAll]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inspect, sel?.id, file]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { refreshInsp(); }, [refreshInsp, session, o.updated_at]);
 
   const run = useCallback(async (r: HttpRequestItem): Promise<Result> => {
@@ -199,13 +196,8 @@ const sessionBlock = (
           <label className="row gap-s small grow"><span className="muted">{t('http.env')}</span>
             <select className="select" style={{ width: 'auto', padding: '4px 10px', flex: 1 }} value={env} onChange={(e) => setEnv(e.target.value)}>
               <option value="">{t('http.noEnv')}</option>{scan.environments.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
-          <button className={`btn ghost icon sm ${showAll ? 'on' : ''}`} onClick={() => setShowAll((s) => !s)} aria-expanded={showAll} aria-label={t('hw2.envEye')} title={t('hw2.envEye')}><Eye size={15} /></button>
           <button className="btn ghost icon sm" onClick={() => { load(); void loadSession(); }} aria-label={t('http.rescan')} title={t('http.rescan')}><RefreshCw size={15} /></button>
         </div>
-        {showAll && (
-          <div className="hw-pop"><div className="row gap-s"><b className="grow">{t('iv.env.title')}</b><button className="btn ghost icon sm" onClick={() => setShowAll(false)} aria-label={t('hw2.cancel')}><X size={14} /></button></div>
-            <p className="muted small" style={{ margin: '2px 0 8px' }}>{t('iv.env.hint')}</p>
-            {allInsp ? <VarsTable vars={allInsp.vars} onSet={setVar} onForget={(n) => void forget(n)} onRun={runNamed} compact /> : <p className="muted small">{t('git.loading')}</p>}</div>)}
         {scan.envFiles.length === 0 && scan.environments.length === 0 && <p className="muted small hw-hint">{t('hw.noEnvFile')} <button className="btn sm" onClick={onOpenVars}>{t('hw.editVars')}</button></p>}
         <div className="gx-filter"><div className="search"><Search size={14} /><input className="input" placeholder={t('http.search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('http.search')} /></div></div>
         <div className="hr-reqs">

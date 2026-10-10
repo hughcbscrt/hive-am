@@ -147,7 +147,7 @@ export interface ObjectStats {
 export interface HttpTest { name: string; passed: boolean; message?: string }
 export interface HttpSessionView { globals: Record<string, string>; responses: { name: string; status: number; at: number; headers: Record<string, string>; body: string }[] }
 export type VarSource = 'session' | 'file' | 'envfile' | 'hive' | 'response' | 'dynamic' | 'missing';
-export interface VarInfo { name: string; value: string | null; source: VarSource; from: string; secret: boolean; hidden: boolean; overridden: { source: VarSource; from: string }[]; usedBy: number; hint?: string }
+export interface VarInfo { name: string; value: string | null; source: VarSource; from: string; secret: boolean; hidden: boolean; overridden: { source: VarSource; from: string; value: string | null }[]; usedBy: number; hint?: string }
 export interface HttpInspection {
   env: string | null; environments: string[]; vars: VarInfo[];
   preview?: { method: string; url: string; headers: { name: string; value: string }[]; body?: string; unresolved: string[] };

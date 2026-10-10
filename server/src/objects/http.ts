@@ -256,7 +256,7 @@ export function describeHttp(folder: string, relFile: string, index: number, env
  * never returned (`hidden`); values from a private env file or with a name like a password are flagged `secret` so the interface masks them.
  */
 export type VarSource = 'session' | 'file' | 'envfile' | 'hive' | 'response' | 'dynamic' | 'missing';
-export interface VarInfo { name: string; value: string | null; source: VarSource; from: string; secret: boolean; hidden: boolean; overridden: { source: VarSource; from: string }[]; usedBy: number; hint?: string }
+export interface VarInfo { name: string; value: string | null; source: VarSource; from: string; secret: boolean; hidden: boolean; overridden: { source: VarSource; from: string; value: string | null }[]; usedBy: number; hint?: string }
 export interface HttpInspection {
   env: string | null; environments: string[];
   vars: VarInfo[];
@@ -304,7 +304,7 @@ export function inspectHttp(folder: string, relFile: string | undefined, index: 
     for (const l of [...e.layers].reverse()) if (name in l.vars) found.push({ source: l.source, from: l.from === '$shared' ? '$shared' : l.from, value: l.vars[name].value, secret: l.vars[name].secret || looksSecret(name), hidden: l.vars[name].hidden });
     if (!found.length) return { name, value: null, source: 'missing', from: '', secret: looksSecret(name), hidden: false, overridden: [], usedBy };
     const [w, ...rest] = found;
-    return { name, value: w.hidden ? null : w.value, source: w.source, from: w.from, secret: w.secret, hidden: w.hidden, overridden: rest.map((x) => ({ source: x.source, from: x.from })), usedBy };
+    return { name, value: w.hidden ? null : w.value, source: w.source, from: w.from, secret: w.secret, hidden: w.hidden, overridden: rest.map((x) => ({ source: x.source, from: x.from, value: x.hidden || x.secret ? null : x.value })), usedBy };
   };
   const vars = [...names].map(infoOf).sort((a, b) => (a.source === 'missing' ? 0 : 1) - (b.source === 'missing' ? 0 : 1) || a.name.localeCompare(b.name));
 

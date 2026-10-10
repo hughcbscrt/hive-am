@@ -1120,6 +1120,8 @@ export const es: Record<DictKey, string> = {
   "vars.fixed.title": "Valores fijos",
   "vars.fixed.hint": "Lo que definen tus archivos .http y env. Aquí son de solo lectura: edítalos en el archivo. Ganan sobre los valores de abajo.",
   "vars.fixed.none": "Ningún valor definido en archivos.",
+  "iv.alsoDefines": "también la define:",
+  "iv.winsOver": "gana: {who}",
   "obj.title": "Objetos",
   "obj.kind.http": "Peticiones HTTP",
   "obj.kind.http.hint": "Una carpeta con archivos .http: elige un entorno y ejecuta sus peticiones.",

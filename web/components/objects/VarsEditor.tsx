@@ -1,8 +1,6 @@
 'use client';
 import { useState } from 'react';
 import { Check, Eye, EyeOff, Info, Lock, Plus, Trash2, X } from 'lucide-react';
-import { SOURCE_TONE, sourceLabel } from './VarsTable';
-import type { VarInfo } from '@/lib/types';
 import { useI18n } from '@/lib/i18n/index';
 import type { HttpVariable } from '@/lib/types';
 import { Suggest } from './Suggest';
@@ -17,9 +15,9 @@ type Status = 'here' | 'all' | 'envfile' | 'atfile' | 'handler' | 'missing';
  * (and which ones still have no value) and suggests those names when you add one. A secret is hidden once saved and replaced only when a
  * new value is typed. What an env file, or an @name line in a .http file, defines wins over these values.
  */
-export function VarsEditor({ value, onChange, fileEnvs = [], fileVars = {}, used = [], fileDefined = [], setBy = {}, fixed = [] }: {
+export function VarsEditor({ value, onChange, fileEnvs = [], fileVars = {}, used = [], fileDefined = [], setBy = {} }: {
   value: Vars; onChange: (v: Vars) => void; fileEnvs?: string[]; fileVars?: Record<string, string[]>;
-  used?: { name: string; count: number }[]; fileDefined?: string[]; setBy?: Record<string, string[]>; fixed?: VarInfo[];
+  used?: { name: string; count: number }[]; fileDefined?: string[]; setBy?: Record<string, string[]>;
 }) {
   const { t } = useI18n();
   const names = [ALL, ...[...new Set([...Object.keys(value), ...fileEnvs])].filter((k) => k !== ALL).sort()];
@@ -86,17 +84,6 @@ export function VarsEditor({ value, onChange, fileEnvs = [], fileVars = {}, used
         {env !== ALL && !fileEnvs.includes(env) && <button type="button" className="btn ghost sm" onClick={delEnv}><X size={14} />{t('vars.delEnv')}</button>}
       </div>
 
-      <div className="vars-used">
-        <div className="eyebrow">{t('vars.fixed.title')}</div>
-        <p className="muted small" style={{ margin: '0 0 6px' }}>{t('vars.fixed.hint')}</p>
-        {fixed.length === 0 ? <p className="muted small" style={{ margin: 0 }}>{t('vars.fixed.none')}</p> : (
-          <table className="ivt-table"><thead><tr><th>{t('iv.col.name')}</th><th>{t('iv.col.value')}</th><th>{t('iv.col.source')}</th></tr></thead><tbody>
-            {fixed.map((v) => (
-              <tr key={`${v.source}:${v.from}:${v.name}`} className="ivt-row"><td><code className="mono ivt-name">{v.name}</code></td>
-                <td className="ivt-val"><span className="mono ivt-text">{v.hidden ? '••••••' : v.secret ? '••••••••' : v.value}</span></td>
-                <td><span className={`ivt-src ${SOURCE_TONE[v.source]}`}>{sourceLabel(t, v.source, v.from)}</span></td></tr>))}
-          </tbody></table>)}
-      </div>
     </div>
   );
 }

@@ -1122,6 +1122,8 @@ export const en = {
   "vars.fixed.title": "Fixed values",
   "vars.fixed.hint": "What your .http files and env files define. They are read-only here: edit them in the file. They win over the values below.",
   "vars.fixed.none": "No values defined in files.",
+  "iv.alsoDefines": "also defines it:",
+  "iv.winsOver": "{who} wins",
   "obj.title": "Objects",
   "obj.kind.http": "HTTP requests",
   "obj.kind.http.hint": "A folder of .http files: pick an environment and run their requests.",

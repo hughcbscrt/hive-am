@@ -59,7 +59,7 @@ export function VarsTable({ vars, onSet, onForget, onRun, compact = false }: {
                   </td>
                   <td>
                     <span className={`ivt-src ${SOURCE_TONE[v.source]}`}>{sourceLabel(t, v.source, v.from)}</span>
-                    {v.overridden.length > 0 && <div className="muted small" style={{ marginTop: 2 }}>{t('iv.overrides', { list: v.overridden.map((o) => sourceLabel(t, o.source, o.from)).join(', ') })}</div>}
+                    {v.overridden.length > 0 && <div className="ivt-over">{v.overridden.map((o, i) => <div key={i} className="small"><b>{sourceLabel(t, o.source, o.from)}</b> {t('iv.alsoDefines')}{o.value !== null && <> <code className="mono">{o.value}</code></>} — {t('iv.winsOver', { who: sourceLabel(t, v.source, v.from) })}</div>)}</div>}
                     {v.source === 'missing' && v.hint?.startsWith('run:') && onRun && <button className="btn sm" style={{ marginTop: 4 }} onClick={() => onRun(v.hint!.slice(4))}>{t('iv.run', { name: v.hint.slice(4) })}</button>}
                   </td>
                   {!compact && <td className="muted small">{v.usedBy || ''}</td>}
