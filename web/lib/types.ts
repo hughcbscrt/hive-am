@@ -115,3 +115,15 @@ export interface SwitchPlan { from: string; to: string; carried: number; overlap
 export interface StashItem { sha: string; message: string; branch: string; date: string; smart: boolean }
 export interface StashDetail { sha: string; untrackedSha: string | null; untracked: string[] }
 export interface GitListing { path: string; entries: { name: string; dir: boolean }[]; truncated: boolean }
+
+// ---- colony objects (servers and Docker containers) ----
+export type ObjectKind = 'server' | 'docker';
+export type ObjectStatus = 'running' | 'starting' | 'stopped' | 'error' | 'unknown';
+export interface ServerConfig { cwd: string; start: string; stop?: string; env?: Record<string, string>; port?: number }
+export interface DockerConfig {
+  mode: 'container' | 'compose' | 'existing';
+  image?: string; ports?: string[]; volumes?: string[]; env?: Record<string, string>; restart?: 'no' | 'always' | 'unless-stopped' | 'on-failure'; command?: string;
+  file?: string; project?: string; services?: string[]; container?: string;
+}
+export interface ObjectState { status: ObjectStatus; detail?: string; pid?: number; since?: number }
+export interface ObjectView { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig; state: ObjectState; created_at: number; updated_at: number }

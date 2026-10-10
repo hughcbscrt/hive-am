@@ -1,13 +1,13 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
 import { api } from './api';
-import type { Agent, AgentType, Block, Colony, Connection, ProviderInfo, Skill, StreamEvent, Usage } from './types';
+import type { Agent, AgentType, Block, Colony, Connection, ObjectView, ProviderInfo, Skill, StreamEvent, Usage } from './types';
 
 export interface LiveTurn { turnId: string; prompt: string; source: 'user' | 'dispatch'; from?: string; blocks: Block[]; error?: string; startedAt: number; usage?: Partial<Usage>; cost?: number; model?: string }
 
 interface State {
   ready: boolean; connected: boolean;
-  agents: Agent[]; types: AgentType[]; skills: Skill[]; colonies: Colony[]; connections: Connection[]; providers: ProviderInfo[];
+  agents: Agent[]; types: AgentType[]; skills: Skill[]; colonies: Colony[]; connections: Connection[]; objects: ObjectView[]; providers: ProviderInfo[];
   live: Record<string, LiveTurn>;
   /** Bumped when a turn finishes so open chats re-read the native transcript. */
   finished: Record<string, number>;
@@ -64,7 +64,7 @@ function reduce(s: State, a: Action): State {
 }
 
 interface Ctx extends State {
-  refresh: (what?: ('agents' | 'types' | 'skills' | 'colonies' | 'connections')[]) => Promise<void>;
+  refresh: (what?: ('agents' | 'types' | 'skills' | 'colonies' | 'connections' | 'objects')[]) => Promise<void>;
   agent: (id: string) => Agent | undefined;
   clearLive: (id: string) => void;
 }
@@ -72,9 +72,9 @@ const C = createContext<Ctx | null>(null);
 export const useHive = () => { const c = useContext(C); if (!c) throw new Error('HiveProvider missing'); return c; };
 
 export function HiveProvider({ children }: { children: ReactNode }) {
-  const [s, d] = useReducer(reduce, { ready: false, connected: false, agents: [], types: [], skills: [], colonies: [], connections: [], providers: [], live: {}, finished: {} });
+  const [s, d] = useReducer(reduce, { ready: false, connected: false, agents: [], types: [], skills: [], colonies: [], connections: [], objects: [], providers: [], live: {}, finished: {} });
 
-  const refresh = useCallback(async (what: ('agents' | 'types' | 'skills' | 'colonies' | 'connections')[] = ['agents', 'types', 'skills', 'colonies', 'connections']) => {
+  const refresh = useCallback(async (what: ('agents' | 'types' | 'skills' | 'colonies' | 'connections' | 'objects')[] = ['agents', 'types', 'skills', 'colonies', 'connections', 'objects']) => {
     const p: Partial<State> = {};
     await Promise.all(what.map(async (w) => {
       if (w === 'agents') p.agents = await api.get<Agent[]>('/agents');
@@ -82,6 +82,7 @@ export function HiveProvider({ children }: { children: ReactNode }) {
       if (w === 'skills') p.skills = await api.get<Skill[]>('/skills');
       if (w === 'colonies') p.colonies = await api.get<Colony[]>('/colonies');
       if (w === 'connections') p.connections = await api.get<Connection[]>('/connections');
+      if (w === 'objects') p.objects = await api.get<ObjectView[]>('/objects');
     })).catch(() => undefined);
     d({ k: 'data', p });
   }, []);
@@ -110,6 +111,7 @@ export function HiveProvider({ children }: { children: ReactNode }) {
       ws.onmessage = (m) => {
         const msg = JSON.parse(m.data);
         if (msg.kind === 'agents_changed') void refresh(['agents', 'colonies', 'connections']);
+        else if (msg.kind === 'objects_changed') void refresh(['objects']);
         else if (msg.kind === 'turn_start') d({ k: 'turn_start', agentId: msg.agentId, turnId: msg.turnId, prompt: msg.prompt, source: msg.source, from: msg.from });
         else if (msg.kind === 'event') d({ k: 'event', agentId: msg.agentId, turnId: msg.turnId, ev: msg.event });
         else if (msg.kind === 'status') d({ k: 'status', agentId: msg.agentId, status: msg.status === 'queued' ? 'running' : msg.status, queued: msg.queued });

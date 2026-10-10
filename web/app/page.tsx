@@ -5,7 +5,7 @@ import { ArrowRight, Plus, Settings2, SlidersHorizontal, Trash2, X } from 'lucid
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
 import { PROVIDERS, ago, shortPath } from '@/lib/meta';
-import type { Agent, Colony, Dispatch } from '@/lib/types';
+import type { Agent, Colony, Dispatch, ObjectView } from '@/lib/types';
 import { Hex, ProviderBadge, RoleChip, StatusChip, useToast } from '@/components/ui';
 import { NewAgentDrawer } from '@/components/agents/NewAgentDrawer';
 import { ColonyEditor } from '@/components/agents/ColonyEditor';
@@ -14,6 +14,9 @@ import { DeleteAgentModal } from '@/components/agents/DeleteAgentModal';
 import { HelpPopover } from '@/components/HelpPopover';
 import { useAgentCard } from '@/components/agents/AgentCard';
 import { useI18n } from '@/lib/i18n';
+import { ObjectPanel } from '@/components/objects/ObjectPanel';
+import { ObjectEditor } from '@/components/objects/ObjectEditor';
+import { KIND } from '@/components/objects/meta';
 
 const S = 74; // hex circumradius
 const W = Math.sqrt(3) * S, H = 2 * S;
@@ -36,7 +39,7 @@ const toXY = ([q, r]: [number, number]) => ({ x: W * (q + r / 2), y: S * 1.5 * r
 const hexPoints = (cx: number, cy: number, R: number) =>
   Array.from({ length: 6 }, (_, i) => { const a = ((60 * i - 30) * Math.PI) / 180; return `${(cx + R * Math.cos(a)).toFixed(1)},${(cy + R * Math.sin(a)).toFixed(1)}`; }).join(' ');
 
-interface Cell { agent: Agent | null; x: number; y: number }
+interface Cell { agent: Agent | null; object?: ObjectView; x: number; y: number }
 interface Cluster { key: string; colony: Colony | null; cells: Cell[]; x: number; y: number; w: number; h: number }
 
 /** Queens first, then the workers they connect to, then the rest — so direct connections sit close together. */
@@ -47,20 +50,22 @@ function orderMembers(members: Agent[]): Agent[] {
   return out;
 }
 
-function layout(agents: Agent[], colonies: Colony[]): { clusters: Cluster[]; width: number; height: number } {
-  const groups: { key: string; colony: Colony | null; members: Agent[] }[] = colonies.map((c) => ({ key: c.id, colony: c, members: agents.filter((a) => a.colony_id === c.id) }));
-  groups.push({ key: 'free', colony: null, members: agents.filter((a) => !a.colony_id || !colonies.some((c) => c.id === a.colony_id)) });
+function layout(agents: Agent[], colonies: Colony[], objects: ObjectView[]): { clusters: Cluster[]; width: number; height: number } {
+  const inColony = (id: string | null) => !!id && colonies.some((c) => c.id === id);
+  const groups: { key: string; colony: Colony | null; members: Agent[]; things: ObjectView[] }[] = colonies.map((c) => ({ key: c.id, colony: c, members: agents.filter((a) => a.colony_id === c.id), things: objects.filter((o) => o.colony_id === c.id) }));
+  groups.push({ key: 'free', colony: null, members: agents.filter((a) => !inColony(a.colony_id)), things: objects.filter((o) => !inColony(o.colony_id)) });
   const clusters: Cluster[] = [];
   let cx = 0, cy = 0, rowH = 0, maxX = 0;
   for (const g of groups) {
-    if (!g.members.length && !g.colony && agents.length > 0) continue; // no empty "free" bucket once agents exist
+    if (!g.members.length && !g.things.length && !g.colony && agents.length + objects.length > 0) continue; // no empty "free" bucket once anything exists
     const ordered = orderMembers(g.members);
-    const coords = spiral(ordered.length + 1).map(toXY);
+    const coords = spiral(ordered.length + g.things.length + 1).map(toXY);
     const minX = Math.min(...coords.map((p) => p.x)) - W / 2, maxXc = Math.max(...coords.map((p) => p.x)) + W / 2;
     const minY = Math.min(...coords.map((p) => p.y)) - H / 2, maxYc = Math.max(...coords.map((p) => p.y)) + H / 2;
     const w = maxXc - minX + PAD * 2, h = maxYc - minY + PAD * 2 + LABEL;
     if (cx > 0 && cx + w > ROW_MAX) { cx = 0; cy += rowH + GAP; rowH = 0; }
-    const cells: Cell[] = coords.map((p, i) => ({ agent: ordered[i] ?? null, x: cx + (p.x - minX) + PAD, y: cy + (p.y - minY) + PAD + LABEL }));
+    // Agents first, then the objects of the colony, then one empty cell to add an agent.
+    const cells: Cell[] = coords.map((p, i) => ({ agent: ordered[i] ?? null, object: g.things[i - ordered.length], x: cx + (p.x - minX) + PAD, y: cy + (p.y - minY) + PAD + LABEL }));
     clusters.push({ key: g.key, colony: g.colony, cells, x: cx, y: cy, w, h });
     cx += w + GAP; rowH = Math.max(rowH, h); maxX = Math.max(maxX, cx - GAP);
   }
@@ -69,7 +74,7 @@ function layout(agents: Agent[], colonies: Colony[]): { clusters: Cluster[]; wid
 
 export default function Colony() {
   const { t } = useI18n();
-  const { agents, colonies, ready, refresh } = useHive();
+  const { agents, colonies, objects, ready, refresh } = useHive();
   const toast = useToast();
   const [sel, setSel] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -77,10 +82,11 @@ export default function Colony() {
   const [creating, setCreating] = useState<{ colonyId?: string } | null>(null);
   const [editing, setEditing] = useState<Colony | 'new' | null>(null);
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
+  const [editingObject, setEditingObject] = useState<ObjectView | { colonyId?: string } | null>(null);
   const [feed, setFeed] = useState<Dispatch[]>([]);
   useEffect(() => { const load = () => api.get<Dispatch[]>('/dispatches').then(setFeed).catch(() => undefined); load(); const iv = setInterval(load, 6000); return () => clearInterval(iv); }, []);
 
-  const { clusters, width, height } = useMemo(() => layout(agents, colonies), [agents, colonies]);
+  const { clusters, width, height } = useMemo(() => layout(agents, colonies, objects), [agents, colonies, objects]);
   const margin = 40;
   // Scale the whole comb down (never up) so it always fits the panel without sideways scrolling.
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -96,6 +102,7 @@ export default function Colony() {
   for (const c of clusters) for (const cell of c.cells) if (cell.agent) pos.set(cell.agent.id, { x: cell.x + margin, y: cell.y + margin });
   const [deleting, setDeleting] = useState<string | null>(null);
   const selected = agents.find((a) => a.id === sel) ?? null;
+  const selectedObject = objects.find((o) => o.id === sel) ?? null;
   useEffect(() => {
     if (!sel) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) setSel(null); };
@@ -107,6 +114,7 @@ export default function Colony() {
   const related = new Set<string>(focus ? [focus, ...links.filter((l) => l.from === focus || l.to === focus).flatMap((l) => [l.from, l.to])] : []);
   const ups = (id: string) => agents.filter((q) => q.role === 'orchestrator' && q.worker_ids.includes(id));
   const running = agents.filter((a) => a.status === 'running').length;
+  const objectsUp = objects.filter((o) => o.state.status === 'running').length;
   const queens = agents.filter((a) => a.role === 'orchestrator').length;
   const name = (id: string) => agents.find((a) => a.id === id)?.name ?? t('colony.removedAgent');
   const selColony = selected ? colonies.find((c) => c.id === selected.colony_id) : undefined;
@@ -122,12 +130,14 @@ export default function Colony() {
         <div><div className="row gap-s"><h1>{t('nav.colony')}</h1><HelpPopover label={t('colony.helpLabel')} title={t('colony.howTitle')}>{t('colony.howBody')}</HelpPopover></div><p>{t('colony.page.subtitle')}</p></div>
         <div className="row">
           <button className="btn" onClick={() => setEditing('new')}><Plus size={16} />{t('colony.newTitle')}</button>
+          <button className="btn" onClick={() => setEditingObject({})}><Plus size={16} />{t('obj.new')}</button>
           <button className="btn primary" onClick={() => setCreating({})}><Plus size={16} />{t('newAgent.title')}</button>
         </div>
       </div>
       <div className="stats">
         <div className="card stat"><b>{agents.length}</b><span>{t('stat.agents', { count: agents.length })}</span></div>
         <div className="card stat"><b>{colonies.length}</b><span>{t('stat.colonies', { count: colonies.length })}</span></div>
+        <div className="card stat" title={objects.length ? t('obj.running', { count: objectsUp }) : undefined}><b>{objects.length}</b><span>{t('stat.objects', { count: objects.length })}</span></div>
         <div className="card stat"><b>{queens}</b><span>{t('stat.orchestrators', { count: queens })}</span></div>
         <div className="card stat"><b>{running}</b><span>{t('stat.working')}</span></div>
         <div className="card stat"><b>{feed.filter((d) => d.status === 'running').length}</b><span>{t('stat.tasks')}</span></div>
@@ -135,7 +145,7 @@ export default function Colony() {
 
       <div className="colony">
         <div className="comb-wrap" ref={wrapRef}>
-          {!ready ? null : agents.length === 0 && colonies.length === 0 ? (
+          {!ready ? null : agents.length === 0 && colonies.length === 0 && objects.length === 0 ? (
             <div className="empty" style={{ border: 0, minHeight: 520, justifyContent: 'center' }}>
               <Hex size="lg" queen label="+" />
               <h3>{t('colony.empty.title')}</h3>
@@ -169,6 +179,18 @@ export default function Colony() {
                   ) : null}
                   {c.cells.map((cell, i) => {
                     const a = cell.agent; const style = { left: cell.x + margin, top: cell.y + margin };
+                    const o = cell.object;
+                    if (o) {
+                      const { icon: Icon, color } = KIND[o.kind];
+                      return (
+                        <button key={o.id} className={`cell fill obj st-${o.state.status} ${o.state.status === 'running' ? 'running' : ''}`} style={{ ...style, ['--c' as any]: color }} aria-pressed={sel === o.id}
+                          onClick={() => setSel(o.id === sel ? null : o.id)} aria-label={`${o.name}, ${t(`obj.kind.${o.kind}`)}, ${t(`obj.status.${o.state.status}`)}`} title={o.state.detail ? `${t(`obj.status.${o.state.status}`)} — ${o.state.detail}` : t(`obj.status.${o.state.status}`)}>
+                          <span className="shape" />
+                          <span className="label"><Icon size={16} /><b>{o.name}</b><small>{t(`obj.status.${o.state.status}`)}</small></span>
+                          <span className={`pip o-${o.state.status}`} />
+                        </button>
+                      );
+                    }
                     if (!a) return (
                       <button key={c.key + 'g' + i} className="cell ghost" style={style} onClick={() => setCreating({ colonyId: c.colony?.id })} aria-label={c.colony ? t('colony.addTo', { name: c.colony.name }) : t('colony.addAgent')}>
                         <svg className="ghost-hex" viewBox="0 0 100 115" preserveAspectRatio="none" aria-hidden><polygon points="50,2 98,29 98,86 50,113 2,86 2,29" /></svg><span className="label"><Plus size={18} />{t('colony.addAgent')}</span>
@@ -222,7 +244,7 @@ export default function Colony() {
           </div>
         </div>
 
-          {selected ? (
+          {selectedObject ? <ObjectPanel key={selectedObject.id} object={selectedObject} onEdit={() => setEditingObject(selectedObject)} /> : selected ? (
             <aside className="side-float card card-pad col" style={{ gap: 14 }} aria-label={selected.name}>
               <div className="card-corner row gap-s"><button className="btn ghost icon sm" onClick={() => setEditingAgent(selected.id)} aria-label={t('colony.settingsFor', { name: selected.name })} title={t('colony.agentSettings')}><SlidersHorizontal size={17} /></button><button className="btn ghost icon sm" onClick={() => setSel(null)} aria-label={t('common.close')} title={`${t('common.close')} (Esc)`}><X size={16} /></button></div>
               <div className="row gap-l" style={{ paddingRight: 70 }}><Hex agent={selected} size="lg" /><div className="grow"><h2 style={{ fontSize: 22 }}>{selected.name}</h2><div className="row gap-s wrap" style={{ marginTop: 6 }}><RoleChip role={selected.role} /><StatusChip status={selected.status} /></div></div></div>
@@ -260,6 +282,7 @@ export default function Colony() {
       {deleting && agents.find((a) => a.id === deleting) && <DeleteAgentModal agent={agents.find((a) => a.id === deleting)!} onClose={() => setDeleting(null)} onDeleted={() => setSel(null)} />}
       {creating && <NewAgentDrawer presetColonyId={creating.colonyId} onClose={() => setCreating(null)} onCreated={(id) => setSel(id)} />}
       {editingAgent && agents.find((a) => a.id === editingAgent) && <AgentEditDrawer key={editingAgent} agent={agents.find((a) => a.id === editingAgent)!} onClose={() => setEditingAgent(null)} />}
+      {editingObject && <ObjectEditor key={'id' in editingObject ? editingObject.id : 'new'} object={'id' in editingObject ? editingObject : undefined} presetColonyId={'colonyId' in editingObject ? editingObject.colonyId : undefined} onClose={() => setEditingObject(null)} onSaved={(id) => setSel(id)} />}
       {editing && <ColonyEditor colony={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />}
     </div>
   );

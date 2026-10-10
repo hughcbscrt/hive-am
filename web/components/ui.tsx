@@ -215,14 +215,14 @@ export function SkillPicker({ skills, value, loads, onChange }: { skills: Skill[
   );
 }
 
-export function FolderPicker({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string }) {
+export function FolderPicker({ value, onChange, error, label, hint }: { value: string; onChange: (v: string) => void; error?: string; label?: string; hint?: string }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [dir, setDir] = useState<{ path: string; parent: string | null; dirs: { name: string; path: string }[] } | null>(null);
   const load = useCallback((p?: string) => api.get<typeof dir>(`/fs/dirs${p ? `?path=${encodeURIComponent(p)}` : ''}`).then(setDir).catch(() => undefined), []);
   useEffect(() => { if (open) void load(value || undefined); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <Field label={t('field.folder')} hint={t('folder.hint')} error={error}>
+    <Field label={label ?? t('field.folder')} hint={hint ?? t('folder.hint')} error={error}>
       <div className="row gap-s">
         <input className="input mono" value={value} onChange={(e) => onChange(e.target.value)} placeholder={t('folder.placeholder')} spellCheck={false} />
         <button type="button" className="btn" onClick={() => setOpen((o) => !o)}><Folder size={16} />{t('folder.browse')}</button>
