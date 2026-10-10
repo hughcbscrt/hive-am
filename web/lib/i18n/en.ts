@@ -780,6 +780,8 @@ export const en = {
   "git.select": "Select a file to preview it.",
   "git.view.diff": "Diff",
   "git.view.file": "File",
+  "git.view.preview": "Preview",
+  "git.view.source": "File",
   "git.layout.unified": "Unified",
   "git.layout.split": "Side by side",
   "git.copyPath": "Copy path",

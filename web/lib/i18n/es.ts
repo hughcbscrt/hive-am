@@ -778,6 +778,8 @@ export const es: Record<DictKey, string> = {
   "git.select": "Selecciona un archivo para previsualizarlo.",
   "git.view.diff": "Diferencias",
   "git.view.file": "Archivo",
+  "git.view.preview": "Vista previa",
+  "git.view.source": "Archivo",
   "git.layout.unified": "Unificada",
   "git.layout.split": "Lado a lado",
   "git.copyPath": "Copiar ruta",

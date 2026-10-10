@@ -531,6 +531,10 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .gx-banner { padding: 7px 16px; font-size: 12.5px; background: var(--honey-soft); border-bottom: 1px solid var(--line); }
 .gx-body { flex: 1; min-height: 0; overflow: auto; }
 .gx-meta { padding: 6px 16px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); font-family: var(--font-mono); }
+.gx-md { padding: 18px 26px 30px; width: 100%; box-sizing: border-box; }
+.gx-md h1, .gx-md h2 { border-bottom: 1px solid var(--line); padding-bottom: .25em; }
+.gx-md img { max-width: 100%; }
+.gx-md blockquote { margin: 0 0 .75em; padding-left: 12px; border-left: 3px solid var(--line); color: var(--muted, inherit); }
 .gx-image { padding: 20px; display: grid; place-items: center; min-height: 220px; background: repeating-conic-gradient(var(--bg-deep) 0 25%, var(--surface) 0 50%) 0 0 / 18px 18px; }
 .gx-image img { max-width: 100%; max-height: 70vh; box-shadow: var(--shadow); background: #fff; border-radius: 4px; }
 .spin { animation: spin 0.9s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
