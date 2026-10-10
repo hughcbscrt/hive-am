@@ -333,6 +333,51 @@ export function writeHttpFile(folder: string, relFile: string, content: string):
   writeFileSync(abs, content, 'utf8');
 }
 
+export const EXPORT_FORMATS = ['curl', 'fetch', 'python', 'httpie', 'http'] as const;
+export type ExportFormat = (typeof EXPORT_FORMATS)[number];
+const sq = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
+const js = (v: string) => JSON.stringify(v);
+
+/**
+ * A request as text to paste somewhere else (cURL, fetch, Python requests, HTTPie, or the raw HTTP message), with the values the runner
+ * would use now. What has no value stays as {{name}}; credential headers can be masked.
+ */
+export function exportHttp(folder: string, relFile: string, index: number, format: ExportFormat, env?: string, hive?: Hive, session?: HttpSession, redact = false): { text: string; unresolved: string[] } {
+  if (!EXPORT_FORMATS.includes(format)) throw new ObjectError(`Unknown format "${format}"`);
+  const root = realFolder(folder);
+  const abs = inside(root, relFile);
+  if (!/\.(http|rest)$/i.test(abs)) throw new ObjectError('That is not a .http file');
+  const file = parseHttpFile(readFileSync(abs, 'utf8'), relFile);
+  const item = file.requests[index]; if (!item) throw new ObjectError(`Request #${index} is not in ${relFile}`);
+  const e = envVars(root, abs, env, hive);
+  const vars = { ...file.fileVariables, ...e.vars, ...(session?.globals ?? {}) };
+  const unresolved = new Set<string>();
+  const sess = session ?? { globals: {}, responses: new Map() };
+  const url = substitute(item.url, vars, unresolved, sess);
+  const headers = item.headers.map((h) => { const v = substitute(h.value, vars, unresolved, sess); return { name: h.name, value: redact ? mask(h.name, v) : v }; });
+  let body = item.body === undefined ? undefined : substitute(item.body, vars, unresolved, sess);
+  const inc = body && /^<\s+(\S+)\s*$/.exec(body.trim());
+  if (inc) { try { const pth = inside(root, join(relative(root, dirname(abs)), inc[1])); if (statSync(pth).size <= MAX_INCLUDE) body = readFileSync(pth, 'utf8'); } catch { /* left as written */ } }
+  const hasBody = body !== undefined && body !== '' && !['GET', 'HEAD'].includes(item.method);
+  const m = item.method;
+  let text: string;
+  if (format === 'curl') {
+    text = `curl ${m === 'GET' ? '' : `-X ${m} `}${sq(url)}` + headers.map((h) => ` \\\n  -H ${sq(`${h.name}: ${h.value}`)}`).join('') + (hasBody ? ` \\\n  --data-raw ${sq(body!)}` : '');
+  } else if (format === 'fetch') {
+    const opts = [`  method: ${js(m)}`, ...(headers.length ? [`  headers: {\n${headers.map((h) => `    ${js(h.name)}: ${js(h.value)}`).join(',\n')}\n  }`] : []), ...(hasBody ? [`  body: ${js(body!)}`] : [])];
+    text = `const res = await fetch(${js(url)}, {\n${opts.join(',\n')}\n});\nconsole.log(res.status, await res.text());`;
+  } else if (format === 'python') {
+    text = `import requests\n\nres = requests.request(\n    ${js(m)},\n    ${js(url)},\n` + (headers.length ? `    headers={\n${headers.map((h) => `        ${js(h.name)}: ${js(h.value)},`).join('\n')}\n    },\n` : '') + (hasBody ? `    data=${js(body!)}.encode(),\n` : '') + `)\nprint(res.status_code, res.text)`;
+  } else if (format === 'httpie') {
+    text = `http${hasBody ? ` --raw ${sq(body!)}` : ''} ${m} ${sq(url)}` + headers.map((h) => ` ${sq(`${h.name}:${h.value}`)}`).join('');
+  } else {
+    let host = ''; try { host = new URL(url).host; } catch { /* not a full URL */ }
+    const hs = headers.some((h) => h.name.toLowerCase() === 'host') || !host ? headers : [{ name: 'Host', value: host }, ...headers];
+    text = `${m} ${url} HTTP/1.1\n${hs.map((h) => `${h.name}: ${h.value}`).join('\n')}${hasBody ? `\n\n${body}` : ''}`;
+  }
+  return { text, unresolved: [...unresolved] };
+}
+
 export async function runHttp(folder: string, relFile: string, index: number, env?: string, hive?: Hive, session: HttpSession = { globals: {}, responses: new Map() }): Promise<HttpRun> {
   const root = realFolder(folder);
   const abs = inside(root, relFile);

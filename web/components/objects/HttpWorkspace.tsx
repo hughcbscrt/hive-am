@@ -11,6 +11,7 @@ import { CopyBtn } from '@/components/chat/ToolCall';
 import { JsonTree } from './JsonTree';
 import { VarsTable } from './VarsTable';
 import { HttpSource } from './HttpSource';
+import { CopyAs } from './CopyAs';
 
 const parseJson = (s: string): unknown | undefined => { try { return JSON.parse(s); } catch { return undefined; } };
 
@@ -233,6 +234,7 @@ const sessionBlock = (
           <div className="hr-reqhead">
             <span className={`hr-m ${methodTone(sel.method)}`}>{sel.method}</span>
             <code className="hr-url grow"><WithVars text={sel.url} /></code>
+            <CopyAs objectId={o.id} file={fileOf.current.get(sel.id) ?? ''} index={sel.index} env={env} />
             <button className="btn primary sm" disabled={!!busy || missing.length > 0} onClick={() => void run(sel)} title="Ctrl+Enter"><Play size={14} />{busy === sel.id ? t('http.running') : t('http.run')}</button>
           </div>
           {sel.refs.length > 0 && <div className="gx-banner">{t('hw.uses', { names: sel.refs.map((n) => `“${n}”`).join(', ') })}</div>}

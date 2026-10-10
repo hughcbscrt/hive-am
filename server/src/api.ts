@@ -30,7 +30,7 @@ import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashAp
 import { composeServices, listContainers, listImages } from './objects/docker-info.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from './objects/agent.js';
 import { TerminalError, closeTerminal, createTerminal, isLocalRequest, listTerminals, terminalsEnabled } from './terminals.js';
-import { ObjectError, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpFileRead, httpFileWrite, httpRun, httpScan, listObjects, objectAction, objectLogs, removeObject, updateObject } from './objects/index.js';
+import { ObjectError, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpRun, httpScan, listObjects, objectAction, objectLogs, removeObject, updateObject } from './objects/index.js';
 import { gitCompare, gitCompareDiff, gitGrep, gitImageAt, gitRefs } from './git/browse.js';
 import { GitOpError, gitBlame, gitBranchCreate, gitBranchDelete, gitRefFile, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitTagFile, gitTagTree, gitTags, gitUnresolve, type PullMode } from './git/ops.js';
 
@@ -288,6 +288,7 @@ route('GET', '/api/docker/images', () => listImages());
 route('GET', '/api/docker/compose-services', ({ url }) => objectSafe(() => composeServices(url.searchParams.get('file') ?? '')));
 route('GET', '/api/objects/:id/stats', ({ params }) => objectSafe(() => statsOf(params[0])));
 route('GET', '/api/objects/:id/http', ({ params }) => objectSafe(() => httpScan(params[0])));
+route('GET', '/api/objects/:id/http/export', ({ params, url }) => objectSafe(() => httpExport(params[0], url.searchParams.get('file') ?? '', Number(url.searchParams.get('index')), (url.searchParams.get('format') ?? 'curl') as never, url.searchParams.get('env') ?? undefined, url.searchParams.get('redact') === '1')));
 route('GET', '/api/objects/:id/http/variables', ({ params, url }) => objectSafe(() => httpInspect(params[0], url.searchParams.get('file') ?? undefined, url.searchParams.has('index') ? Number(url.searchParams.get('index')) : undefined, url.searchParams.get('env') ?? undefined)));
 route('GET', '/api/objects/:id/http/file', ({ params, url }) => objectSafe(() => httpFileRead(params[0], url.searchParams.get('file') ?? '')));
 route('PUT', '/api/objects/:id/http/file', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => httpFileWrite(params[0], String(p.file ?? ''), String(p.content ?? ''))); });
