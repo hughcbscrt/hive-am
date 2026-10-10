@@ -14,6 +14,8 @@ import { HttpSource } from './HttpSource';
 import { CopyAs } from './CopyAs';
 import { NewRequest } from './NewRequest';
 import { RunDiff } from './RunDiff';
+import { AssertEditor } from './AssertEditor';
+import { AuthForm } from './AuthForm';
 
 const parseJson = (s: string): unknown | undefined => { try { return JSON.parse(s); } catch { return undefined; } };
 
@@ -52,7 +54,7 @@ export function HttpWorkspace({ object: o, onOpenVars, pane = 'requests', onGoRe
   const [busy, setBusy] = useState<string | null>(null);
   const [missing, setMissing] = useState<string[]>([]);
   const [needsRun, setNeedsRun] = useState<string[]>([]);
-  const [tab, setTab] = useState<'body' | 'headers' | 'tests' | 'request' | 'vars'>('body');
+  const [tab, setTab] = useState<'body' | 'headers' | 'tests' | 'request' | 'vars' | 'auth'>('body');
   const [fileTab, setFileTab] = useState<'requests' | 'vars' | 'source'>('requests');
   const [bodyView, setBodyView] = useState<'tree' | 'text'>('tree');
   const [insp, setInsp] = useState<HttpInspection | null>(null);
@@ -264,14 +266,16 @@ const sessionBlock = (
           )}
           {note && <div className="gx-banner">{note}</div>}
           <div className="row gap-s" style={{ padding: '8px 16px' }}>
-            <Segmented value={tab} onChange={setTab} options={[{ id: 'body', label: t('http.body') }, { id: 'headers', label: `${t('http.headers')}${res?.run ? ` · ${res.run.headers.length}` : ''}` }, { id: 'tests', label: `${t('hw.tests')}${testsOf(res).length ? ` · ${testsOf(res).filter((x) => x.passed).length}/${testsOf(res).length}` : ''}` }, { id: 'request', label: t('http.request') }, { id: 'vars', label: `${t('hw2.tab.vars')}${insp?.vars.length ? ` · ${insp.vars.length}` : ''}` }]} />
+            <Segmented value={tab} onChange={setTab} options={[{ id: 'body', label: t('http.body') }, { id: 'headers', label: `${t('http.headers')}${res?.run ? ` · ${res.run.headers.length}` : ''}` }, { id: 'tests', label: `${t('hw.tests')}${testsOf(res).length ? ` · ${testsOf(res).filter((x) => x.passed).length}/${testsOf(res).length}` : ''}` }, { id: 'request', label: t('http.request') }, { id: 'vars', label: `${t('hw2.tab.vars')}${insp?.vars.length ? ` · ${insp.vars.length}` : ''}` }, { id: 'auth', label: t('hw2.tab.auth') }]} />
             <span className="grow" />
             {res?.run && <span className="row gap-s small">{res.run.set.length > 0 && <span className="chip" title={res.run.set.join(', ')}>{t('hw.kept', { names: res.run.set.join(', ') })}</span>}<b className={`hr-st ${statusTone(res.run.status)}`}>{res.run.status} {res.run.statusText}</b><span className="muted">{t('http.time', { ms: res.run.durationMs })} · {fmtBytes(res.run.size)}</span></span>}
           </div>
           {res?.run?.scriptError && <div className="gx-banner err">{t('hw.script.error', { error: res.run.scriptError })}</div>}
           {res?.run?.scriptFile && <div className="gx-banner">{t('hw.script.file', { file: res.run.scriptFile })}</div>}
           <div className="hr-out">
-            {tab === 'vars' ? (
+            {tab === 'auth' ? (
+              <AuthForm objectId={o.id} file={fileOf.current.get(sel.id) ?? ''} lines={(scan.files.find((f) => f.relFile === fileOf.current.get(sel.id))?.requests ?? [sel]).map((r) => r.line).reduce<number[]>((a, l) => (l === sel.line ? [l, ...a] : [...a, l]), [])} onSaved={load} />
+            ) : tab === 'vars' ? (
               <div className="hr-pre">{insp ? <VarsTable vars={insp.vars} onSet={setVar} onForget={(n) => void forget(n)} onRun={runNamed} /> : <p className="muted">{t('git.loading')}</p>}</div>
             ) : tab === 'request' ? (
               <div className="hr-pre">
@@ -290,6 +294,8 @@ const sessionBlock = (
               </div>
             ) : tab === 'tests' ? (
               <div className="hr-pre">
+                <AssertEditor objectId={o.id} file={fileOf.current.get(sel.id) ?? ''} line={sel.line} onSaved={load} />
+                <div className="eyebrow" style={{ margin: '14px 0 6px' }}>{t('hw.tests')}</div>
                 {!res?.run ? <p className="muted">{t('http.noResponse')}</p> : testsOf(res).length === 0 && res.run.logs.length === 0 ? <p className="muted">{t('hw.tests.none')}</p> : (<>
                   {testsOf(res).map((x, i) => <div key={i} className={`hw-test ${x.passed ? 'ok' : 'err'}`}>{x.passed ? <Check size={14} /> : <X size={14} />}<b>{x.name}</b>{x.message && <span className="muted"> — {x.message}</span>}</div>)}
                   {res.run.logs.length > 0 && <><div className="eyebrow" style={{ margin: '12px 0 4px' }}>{t('hw.console')}</div><pre>{res.run.logs.join('\n')}</pre></>}</>)}

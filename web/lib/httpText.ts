@@ -92,3 +92,70 @@ export function getRequestHeader(content: string, line: number, name: string): s
   const l = lines.slice(first, end).find((x) => x.split(':')[0].trim().toLowerCase() === name.toLowerCase());
   return l === undefined ? undefined : l.slice(l.indexOf(':') + 1).trim();
 }
+
+// ------------------------------------------------------------------ assertions without code
+/** One check on the answer, as the form shows it. It is saved in the file as a response handler (see `setAssertions`). */
+export interface Assertion { k: 'status' | 'time' | 'header' | 'body' | 'text'; name?: string; op: string; v?: string }
+export const ASSERT_OPS: Record<Assertion['k'], string[]> = {
+  status: ['=', '!=', '2xx', '<', '>'], time: ['<', '>'], header: ['exists', '=', 'contains'], body: ['exists', '=', '!=', 'contains', '>', '<'], text: ['contains'],
+};
+const MARK = '// hive-am:asserts ';
+const lit = (v: string): string => (/^-?\d+(\.\d+)?$/.test(v.trim()) ? v.trim() : /^(true|false|null)$/.test(v.trim()) ? v.trim() : JSON.stringify(v));
+/** `$.a.b[0]` or `a.b[0]` as an expression over `response.body`. */
+export function bodyPath(path: string): string {
+  const p = path.trim().replace(/^\$\.?/, '');
+  let out = 'response.body';
+  for (const m of p.matchAll(/\[(\d+)\]|\["([^"]+)"\]|\.?([^.[\]]+)/g)) out += m[1] !== undefined ? `[${m[1]}]` : /^[A-Za-z_]\w*$/.test(m[2] ?? m[3]) ? `.${m[2] ?? m[3]}` : `[${JSON.stringify(m[2] ?? m[3])}]`;
+  return out;
+}
+/** The condition and a readable label of one assertion. */
+export function assertCode(a: Assertion): { label: string; cond: string } {
+  const v = a.v ?? '';
+  if (a.k === 'status') return a.op === '2xx' ? { label: 'status is 2xx', cond: 'response.status >= 200 && response.status < 300' } : { label: `status ${a.op} ${v}`, cond: `response.status ${a.op === '=' ? '==' : a.op} ${lit(v)}` };
+  if (a.k === 'time') return { label: `time ${a.op} ${v} ms`, cond: `response.time ${a.op} ${Number(v) || 0}` };
+  if (a.k === 'header') {
+    const h = `response.headers.valueOf(${JSON.stringify((a.name ?? '').toLowerCase())})`;
+    return a.op === 'exists' ? { label: `header ${a.name} exists`, cond: `${h} !== undefined` } : a.op === 'contains' ? { label: `header ${a.name} contains ${v}`, cond: `${h} !== undefined && ${h}.includes(${JSON.stringify(v)})` } : { label: `header ${a.name} = ${v}`, cond: `${h} == ${lit(v)}` };
+  }
+  if (a.k === 'text') return { label: `answer contains ${v}`, cond: `response.text.includes(${JSON.stringify(v)})` };
+  const e = bodyPath(a.name ?? '$');
+  const nm = a.name ?? '$';
+  return a.op === 'exists' ? { label: `${nm} exists`, cond: `${e} !== undefined && ${e} !== null` }
+    : a.op === 'contains' ? { label: `${nm} contains ${v}`, cond: `String(${e}).includes(${JSON.stringify(v)})` }
+    : { label: `${nm} ${a.op} ${v}`, cond: `${e} ${a.op === '=' ? '==' : a.op} ${lit(v)}` };
+}
+/** The handler block that holds the assertions (the rows travel in its first line so they can be edited again). */
+export function assertionsBlock(rows: Assertion[]): string {
+  const json = JSON.stringify(rows).replace(/%\}/g, '%\\u007d');
+  const tests = rows.map((a) => { const { label, cond } = assertCode(a); return `client.test(${JSON.stringify(label)}, function () { client.assert(${cond}, ${JSON.stringify(`expected ${label}`)}); });`; });
+  return ['> {%', `${MARK}${json}`, ...tests, '%}'].join('\n');
+}
+function requestRegion(lines: string[], line: number): { start: number; end: number } {
+  let end = line; while (end < lines.length && !/^#{3,}/.test(lines[end].trim())) end++;
+  return { start: line - 1, end };
+}
+/** The assertions saved for the request that starts at `line` (1-based). */
+export function getAssertions(content: string, line: number): Assertion[] {
+  const lines = content.split('\n'); const { start, end } = requestRegion(lines, line);
+  const i = lines.slice(start, end).findIndex((l) => l.startsWith(MARK));
+  if (i < 0) return [];
+  try { const r = JSON.parse(lines[start + i].slice(MARK.length)); return Array.isArray(r) ? r : []; } catch { return []; }
+}
+/** Writes the assertions into the request that starts at `line`: replaces the block it made before, or adds one at the end. */
+export function setAssertions(content: string, line: number, rows: Assertion[]): string {
+  const lines = content.split('\n'); const { start, end } = requestRegion(lines, line);
+  const i = lines.slice(start, end).findIndex((l) => l.startsWith(MARK));
+  const block = rows.length ? assertionsBlock(rows).split('\n') : [];
+  if (i >= 0) {
+    let a = start + i; let b = a; while (b < end && !lines[b].trim().endsWith('%}')) b++;
+    if (a > start && lines[a - 1].trim() === '> {%') a--;
+    // taking the block away also takes the blank line that was added before it
+    if (!block.length && a > start && !lines[a - 1].trim()) a--;
+    lines.splice(a, b - a + 1, ...block);
+    return lines.join('\n');
+  }
+  if (!block.length) return content;
+  let at = end; while (at > start + 1 && !lines[at - 1].trim()) at--;
+  lines.splice(at, 0, '', ...block);
+  return lines.join('\n');
+}

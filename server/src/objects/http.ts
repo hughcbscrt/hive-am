@@ -465,7 +465,7 @@ export async function runHttp(folder: string, relFile: string, index: number, en
     if (!binary && (/json/i.test(contentType) || /^\s*[[{]/.test(text))) { try { parsed = JSON.parse(text); } catch { parsed = text; } }
     const lower = Object.fromEntries([...res.headers.entries()].map(([k, v]) => [k.toLowerCase(), v]));
     if (item.named) session.responses.set(item.named, { status: res.status, headers: lower, body: parsed, text, at: Date.now() });
-    const handled = item.script ? runScript(item.script, { status: res.status, headers: lower, body: parsed, text, contentType } as ScriptResponse, session.globals) : null;
+    const handled = item.script ? runScript(item.script, { status: res.status, headers: lower, body: parsed, text, contentType, time: durationMs } as ScriptResponse, session.globals) : null;
     return {
       tests: handled?.tests ?? [], logs: handled?.logs ?? [], set: handled?.set ?? [], scriptError: handled?.error, scriptFile: item.scriptFile,
       request: { method: item.method, url: target.toString(), headers: headers.map((h) => ({ name: h.name, value: mask(h.name, h.value) })), body: hasBody ? body : undefined },

@@ -11,7 +11,7 @@
  */
 export class ScriptError extends Error {}
 
-export interface ScriptResponse { status: number; headers: Record<string, string>; body: unknown; text: string; contentType: string }
+export interface ScriptResponse { status: number; headers: Record<string, string>; body: unknown; text: string; contentType: string; /** How long the answer took, in ms (`response.time`). */ time?: number }
 export interface ScriptTest { name: string; passed: boolean; message?: string }
 export interface ScriptResult { tests: ScriptTest[]; logs: string[]; set: string[]; cleared: string[]; error?: string }
 
@@ -203,7 +203,7 @@ export function runScript(script: string, response: ScriptResponse, globals: Rec
   };
 
   const headersObj = { valueOf: new Native('valueOf', ([n]) => response.headers[String(n).toLowerCase()]), valuesOf: new Native('valuesOf', ([n]) => (response.headers[String(n).toLowerCase()] === undefined ? [] : [response.headers[String(n).toLowerCase()]])) };
-  const responseObj = { status: response.status, body: response.body, headers: headersObj, contentType: { mimeType: response.contentType.split(';')[0].trim(), charset: /charset=([^;]+)/i.exec(response.contentType)?.[1] ?? 'utf-8' } };
+  const responseObj = { status: response.status, time: response.time ?? 0, text: response.text, body: response.body, headers: headersObj, contentType: { mimeType: response.contentType.split(';')[0].trim(), charset: /charset=([^;]+)/i.exec(response.contentType)?.[1] ?? 'utf-8' } };
   const clientObj = {
     global: {
       set: new Native('set', ([n, v]) => { const name = text(n); if (!/^[A-Za-z_][\w.-]{0,80}$/.test(name)) throw new ScriptError(`"${name}" is not a valid variable name`); globals[name] = text(v); if (!result.set.includes(name)) result.set.push(name); return undefined; }),

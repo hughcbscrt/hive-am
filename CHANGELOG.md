@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- HTTP requests without code: an **Authentication** tab (Bearer, Basic, API key; for one request or all of a file) writes the header the request needs, and **Checks** in the Tests tab (status, time, header, JSON value, text) are saved in the file as a response handler and reported on each run. Handlers can read `response.time` and `response.text`.
 - HTTP history that lasts: the last 100 runs of each HTTP object are kept on disk (request, answer, tests), so they survive a restart; and **compare** any run with the previous one of the same request, or with another, as status, time, size, changed headers and a line diff of the answer. API: `GET|DELETE /api/objects/:id/http/history`.
 - Suggestions while editing a `.http` file: variables inside `{{ }}` (with their value), answers of named requests and generated values, methods at the start of a request, header names and the values of Content-Type / Accept, and `# @name`. Ctrl+Space opens them, arrows and Enter or Tab accept.
 - New HTTP requests from the screen: a **+** next to the environment opens a form (file, name, method, URL, headers, body) or takes a pasted **cURL** command, and adds the request to an existing `.http` file or to a new one (`POST /api/objects/:id/http/file` creates files, never over an existing one). `Authorization: Basic user password` is sent encoded.

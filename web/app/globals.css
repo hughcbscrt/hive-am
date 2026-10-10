@@ -1100,3 +1100,6 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .rd-hdrs div { padding: 2px 0; } .rd-add, .rd-del { padding: 0 4px; border-radius: 4px; } .rd-add { background: color-mix(in srgb, var(--ok) 20%, var(--surface)); } .rd-del { background: color-mix(in srgb, var(--err) 18%, var(--surface)); text-decoration: line-through; }
 .rd-body { border: 1px solid var(--line); border-radius: 8px; overflow: auto; font-size: 12.5px; line-height: 1.55; background: var(--surface); } .rd-l { display: grid; grid-template-columns: 22px 1fr; white-space: pre-wrap; overflow-wrap: anywhere; } .rd-l span { text-align: center; color: var(--muted); user-select: none; }
 .rd-l.add { background: color-mix(in srgb, var(--ok) 16%, var(--surface)); } .rd-l.del { background: color-mix(in srgb, var(--err) 14%, var(--surface)); } .rd-fold { padding: 2px 22px; color: var(--muted); background: var(--bg-deep); font-size: 11.5px; }
+
+.ae-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; } .ae-row .input { flex: 1; min-width: 120px; } .ae-row .select { width: auto; }
+.hr-detail .seg button { white-space: nowrap; } .hr-detail .seg { flex-wrap: wrap; }
