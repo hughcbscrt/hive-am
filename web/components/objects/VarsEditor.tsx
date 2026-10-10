@@ -7,7 +7,7 @@ import { Suggest } from './Suggest';
 
 export type Vars = Record<string, Record<string, HttpVariable>>;
 const ALL = '$shared';      // what the files call it; to the person it is "All environments"
-type Status = 'here' | 'all' | 'envfile' | 'atfile' | 'missing';
+type Status = 'here' | 'all' | 'envfile' | 'atfile' | 'handler' | 'missing';
 
 /**
  * The variables of an HTTP object, for when there is no env file (or it lacks something). "All environments" holds the values that apply
@@ -15,9 +15,9 @@ type Status = 'here' | 'all' | 'envfile' | 'atfile' | 'missing';
  * (and which ones still have no value) and suggests those names when you add one. A secret is hidden once saved and replaced only when a
  * new value is typed. What an env file, or an @name line in a .http file, defines wins over these values.
  */
-export function VarsEditor({ value, onChange, fileEnvs = [], fileVars = {}, used = [], fileDefined = [] }: {
+export function VarsEditor({ value, onChange, fileEnvs = [], fileVars = {}, used = [], fileDefined = [], setBy = {} }: {
   value: Vars; onChange: (v: Vars) => void; fileEnvs?: string[]; fileVars?: Record<string, string[]>;
-  used?: { name: string; count: number }[]; fileDefined?: string[];
+  used?: { name: string; count: number }[]; fileDefined?: string[]; setBy?: Record<string, string[]>;
 }) {
   const { t } = useI18n();
   const names = [ALL, ...[...new Set([...Object.keys(value), ...fileEnvs])].filter((k) => k !== ALL).sort()];
@@ -32,7 +32,7 @@ export function VarsEditor({ value, onChange, fileEnvs = [], fileVars = {}, used
   const statusOf = (name: string): Status =>
     name in cur ? 'here' : env !== ALL && name in (value[ALL] ?? {}) ? 'all'
     : (fileVars[env] ?? []).includes(name) || (fileVars[ALL] ?? []).includes(name) ? 'envfile'
-    : fileDefined.includes(name) ? 'atfile' : 'missing';
+    : fileDefined.includes(name) ? 'atfile' : setBy[name] ? 'handler' : 'missing';
   const suggestions = used.filter((u) => !(u.name in cur)).map((u) => ({ value: u.name, hint: t('vars.used.count', { count: u.count }) }));
 
   const setVar = (name: string, patch: Partial<HttpVariable>, rename?: string) => {
@@ -89,9 +89,9 @@ export function VarsEditor({ value, onChange, fileEnvs = [], fileVars = {}, used
         {used.length === 0 ? <p className="muted small" style={{ margin: 0 }}>{t('vars.used.none')}</p> : (<>
           <p className="muted small" style={{ margin: '0 0 6px' }}>{t('vars.used.hint')}</p>
           <div className="chips">{used.map((u) => { const st = statusOf(u.name); return (
-            <button key={u.name} type="button" className={`vused ${st}`} disabled={st === 'here' || st === 'envfile' || st === 'atfile'} onClick={() => addVar(u.name)}
-              title={`${t(`vars.status.${st}`)} · ${t('vars.used.count', { count: u.count })}`}>
-              {st === 'here' ? <Check size={12} /> : st === 'missing' ? <Plus size={12} /> : null}<code>{u.name}</code><small>{t(`vars.status.${st}`)}</small>
+            <button key={u.name} type="button" className={`vused ${st}`} disabled={st === 'here' || st === 'envfile' || st === 'atfile' || st === 'handler'} onClick={() => addVar(u.name)}
+              title={`${st === 'handler' ? t('vars.status.handler', { name: setBy[u.name]?.[0] ?? '' }) : t(`vars.status.${st}`)} · ${t('vars.used.count', { count: u.count })}`}>
+              {st === 'here' ? <Check size={12} /> : st === 'missing' ? <Plus size={12} /> : null}<code>{u.name}</code><small>{st === 'handler' ? t('vars.status.handler', { name: setBy[u.name]?.[0] ?? '' }) : t(`vars.status.${st}`)}</small>
             </button>); })}</div>
         </>)}
       </div>

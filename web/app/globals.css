@@ -1049,3 +1049,11 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .ov { flex: 1; min-height: 0; max-width: none; width: 100%; }
 .ov-card.grow { flex: 1; min-height: 240px; } .ov-card.grow .ov-log { flex: 1; min-height: 0; max-height: none; }
 .oc { flex: 1; } .oc-form { max-width: none; }
+
+/* HTTP session and tests */
+.hw-session { border-top: 1px solid var(--line); background: var(--surface); max-height: 45%; overflow-y: auto; flex: none; }
+.hw-session-head { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; color: inherit; font: inherit; padding: 8px 12px; text-align: left; }
+.hw-session-body { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 4px; }
+.hw-kv { display: grid; grid-template-columns: minmax(60px, auto) minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 12px; } .hw-kv code { font-weight: 700; } .hw-kv .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+.hw-kv-add { display: grid; grid-template-columns: 1fr 1.4fr auto auto; gap: 4px; margin-top: 6px; } .hw-kv-add .input { padding: 4px 8px; font-size: 12px; }
+.hw-test { display: flex; align-items: center; gap: 8px; padding: 3px 0; } .hw-test.ok svg { color: var(--ok); } .hw-test.err svg { color: var(--err); }

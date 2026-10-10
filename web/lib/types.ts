@@ -137,14 +137,17 @@ export interface ObjectState { status: ObjectStatus; detail?: string; pid?: numb
 export interface ObjectView { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig | HttpConfig | ClusterConfig; state: ObjectState; created_at: number; updated_at: number }
 
 // ---- HTTP-requests objects ----
-export interface HttpRequestItem { id: string; index: number; name: string; method: string; url: string; headers: { name: string; value: string }[]; body?: string; line: number; variables: string[] }
+export interface HttpRequestItem { id: string; index: number; name: string; method: string; url: string; headers: { name: string; value: string }[]; body?: string; line: number; variables: string[]; refs: string[]; named?: string; script?: string; scriptFile?: string }
 export interface HttpFile { relFile: string; requests: HttpRequestItem[]; fileVariables: Record<string, string> }
-export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; fileVars: Record<string, string[]>; used: { name: string; count: number }[]; fileDefined: string[]; truncated: boolean }
+export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; fileVars: Record<string, string[]>; setBy: Record<string, string[]>; used: { name: string; count: number }[]; fileDefined: string[]; truncated: boolean }
 export interface ObjectStats {
   cpu: number | null; memBytes: number | null; memLimitBytes: number | null; pids: number | null; net?: string | null; block?: string | null;
   info: Record<string, string | number | null>; services?: { name: string; state: string; health: string; ports: string }[];
 }
+export interface HttpTest { name: string; passed: boolean; message?: string }
+export interface HttpSessionView { globals: Record<string, string>; responses: { name: string; status: number; at: number }[] }
 export interface HttpRun {
+  tests: HttpTest[]; logs: string[]; set: string[]; scriptError?: string; scriptFile?: string;
   request: { method: string; url: string; headers: { name: string; value: string }[]; body?: string };
   status: number; statusText: string; durationMs: number; size: number; headers: { name: string; value: string }[]; body: string; truncated: boolean; binary: boolean; contentType: string;
 }

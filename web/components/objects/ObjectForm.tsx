@@ -133,7 +133,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error }: {
             <Suggest value={d.defEnv} onChange={(v) => set('defEnv', v)} mono placeholder="dev" options={[...new Set([...(scan?.environments ?? []), ...Object.keys(d.variables).filter((k) => k !== '$shared')])].map((v) => ({ value: v }))} />
           </Field>
         </Card>
-        <Card title={t('of.vars')} wide><VarsEditor value={d.variables} onChange={(v) => set('variables', v)} fileEnvs={fileEnvs} fileVars={scan?.fileVars} used={scan?.used} fileDefined={scan?.fileDefined} /></Card>
+        <Card title={t('of.vars')} wide><VarsEditor value={d.variables} onChange={(v) => set('variables', v)} fileEnvs={fileEnvs} fileVars={scan?.fileVars} used={scan?.used} fileDefined={scan?.fileDefined} setBy={scan?.setBy} /></Card>
       </>) : d.kind === 'cluster' ? (
         <Card title={t('of.members')} hint={t('obj.f.members.hint')}>
           {(() => {
