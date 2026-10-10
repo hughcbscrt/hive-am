@@ -11,7 +11,8 @@ export type BusMessage =
   | { kind: 'event'; agentId: string; turnId: string; event: StreamEvent }
   | { kind: 'turn_start'; agentId: string; turnId: string; prompt: string; source: 'user' | 'dispatch'; from?: string; channel?: { platform: string; place: string; user: string } }
   | { kind: 'status'; agentId: string; status: 'idle' | 'running' | 'error' | 'queued'; queued: number }
-  | { kind: 'agents_changed' };
+  | { kind: 'agents_changed' }
+  | { kind: 'objects_changed' };
 
 export const bus = new EventEmitter();
 bus.setMaxListeners(0);

@@ -12,6 +12,7 @@ import { migrateChannelSkill } from './connections/channel-skill.js';
 import { armWakeups } from './wake.js';
 import { armSchedules } from './schedules.js';
 import { armWatches } from './watch.js';
+import { armObjects } from './objects/index.js';
 
 skills.seedDefaults(DEFAULT_SKILLS);
 seedIfEmpty();
@@ -19,6 +20,7 @@ migrateChannelSkill();
 armWakeups();
 armSchedules();
 armWatches();
+armObjects();
 
 const server = createServer((req, res) => { void handle(req, res); });
 const wss = new WebSocketServer({ server, path: '/ws' });

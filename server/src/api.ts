@@ -27,6 +27,7 @@ import { emptyUsage } from './pricing.js';
 import { createReadStream } from 'node:fs';
 import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git/repo.js';
 import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './git/switch.js';
+import { ObjectError, createObject, listObjects, objectAction, objectLogs, removeObject, updateObject } from './objects/index.js';
 import { gitCompare, gitCompareDiff, gitGrep, gitImageAt, gitRefs } from './git/browse.js';
 import { GitOpError, gitBlame, gitBranchCreate, gitBranchDelete, gitRefFile, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitTagFile, gitTagTree, gitTags, gitUnresolve, type PullMode } from './git/ops.js';
 
@@ -264,6 +265,17 @@ route('GET', '/api/sessions', () => {
     };
   });
 });
+
+// ---- colony objects (servers and Docker containers hive-am keeps running) ----
+/** They run commands, so, like the git actions, they only accept requests from the local app. */
+const objectGuard = (req: IncomingMessage) => { try { localOnly(req); } catch { throw new HttpError(403, 'Objects can only be changed from the local app'); } };
+const objectSafe = async <T,>(fn: () => Promise<T> | T): Promise<T> => { try { return await fn(); } catch (e) { if (e instanceof ObjectError) throw bad(e.message); throw e; } };
+route('GET', '/api/objects', () => listObjects());
+route('POST', '/api/objects', async ({ req }) => { objectGuard(req); const p = await body(req); return objectSafe(() => createObject(p)); });
+route('PATCH', '/api/objects/:id', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => updateObject(params[0], p)); });
+route('DELETE', '/api/objects/:id', async ({ req, params }) => { objectGuard(req); return objectSafe(async () => { if (!(await removeObject(params[0]))) throw notFound('Object not found'); return { ok: true }; }); });
+route('POST', '/api/objects/:id/action', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => objectAction(params[0], p.action)); });
+route('GET', '/api/objects/:id/logs', ({ params, url }) => objectSafe(() => objectLogs(params[0], { tail: url.searchParams.get('tail') ? Number(url.searchParams.get('tail')) : undefined, after: url.searchParams.get('after') ?? undefined })));
 
 // ---- skills ----
 const checkLoad = (v: unknown) => { if (v !== undefined && v !== 'always' && v !== 'on_demand') throw bad('load must be always or on_demand'); };
