@@ -214,7 +214,7 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .msg.user { align-items: flex-end; }
 .msg.user.queued .bubble { opacity: .6; border: 1px dashed var(--line-strong); }
 .queued-tag { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11.5px; color: var(--muted); }
-.msg .bubble { background: var(--ink); color: var(--bg); padding: 10px 15px; border-radius: 16px 16px 4px 16px; max-width: 80%; white-space: pre-wrap; word-break: break-word; }
+.msg .bubble { background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); padding: 10px 15px; border-radius: 16px 16px 4px 16px; max-width: 80%; white-space: pre-wrap; word-break: break-word; }
 .msg.assistant .who { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); font-weight: 600; }
 .msg .stamp { font-weight: 500; }
 .dispatch-note { align-self: center; font-size: 12.5px; color: var(--muted); display: flex; gap: 8px; align-items: center; padding: 4px 12px; background: var(--honey-soft); border-radius: 99px; }

@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- Your messages in the web chat (and in Sessions) are no longer inverted bubbles: light with a thin border in the light theme and dark in the dark theme.
 - Tooltips: every `title` in the interface now shows a styled tooltip (after a short pause, or on keyboard focus) instead of the browser's own, in both themes. Icon-only elements keep the text as their accessible name.
 - Git explorer, less crowded: one toolbar row (Fetch, Pull and Push are icons with a tooltip and their counts), icon tabs where only the open one shows its name, a single filter row (name/content toggle and a "changes only" button) and a two-row file header with the secondary actions as icons.
 - Sessions screen: a sidebar like the Skills one, a transcript that opens on its latest 100 messages (with a button for earlier ones) and long messages folded behind "show all".
