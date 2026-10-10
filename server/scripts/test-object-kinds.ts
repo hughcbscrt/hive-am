@@ -2,6 +2,7 @@
 // dynamic values, body from a file, response handlers), running a request against a local server, what is refused (a path outside the folder,
 // a missing variable, a bad URL), and clusters (grouping, start order, stop order, state, logs with the member's name, rules). Usage:
 //   HIVE_AM_OBJECT_POLL_MS=60000 HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-object-kinds.ts
+import './_guard.js';
 import { createServer } from 'node:http';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

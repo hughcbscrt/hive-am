@@ -2,6 +2,7 @@
 // "Colony objects" skill, an agent sees only the objects of its own colony, read-only agents cannot act, and nothing can be created or
 // changed. Usage:
 //   HIVE_AM_OBJECT_POLL_MS=60000 HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4482 npx tsx scripts/test-object-tools.ts
+import './_guard.js';
 import { spawn } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';

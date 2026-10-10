@@ -1,6 +1,7 @@
 // Terminals without a model: a real shell over the socket (input, output, resize, replay when another page attaches, exit), who may reach
 // it (another origin or a rebound host name is refused), a shell inside a container, limits and the off switch. Usage:
 //   HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4483 npx tsx scripts/test-terminals.ts
+import './_guard.js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';

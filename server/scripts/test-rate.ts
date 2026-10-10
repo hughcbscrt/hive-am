@@ -1,4 +1,5 @@
 // The sliding-window limit on wake-ups (no model). Usage: npx tsx scripts/test-rate.ts
+import './_guard.js';
 import { allow, forgetRate } from '../src/connections/rate.js';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `got ${JSON.stringify(got)} want ${JSON.stringify(want)}`); if (!ok) fail++; };

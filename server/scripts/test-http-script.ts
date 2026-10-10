@@ -1,6 +1,7 @@
 // The response handlers of .http files, without a model: what they can do (keep values, check the answer, read JSON and headers), what they
 // refuse to do (anything that is not a plain handler: require, process, loops, prototypes), and that they cannot run away. Usage:
 //   npx tsx scripts/test-http-script.ts
+import './_guard.js';
 import { runScript, type ScriptResponse } from '../src/objects/http-script.js';
 
 let fail = 0;

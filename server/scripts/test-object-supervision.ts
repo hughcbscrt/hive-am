@@ -2,6 +2,7 @@
 // growing wait), that stopping by hand is never undone, health checks (http, tcp, command; unhealthy; restart when unhealthy), log rotation,
 // the stop timeout, and the new Docker settings (memory, CPUs, network, log size, stop timeout; recreated when they change). Usage:
 //   HIVE_AM_OBJECT_POLL_MS=60000 HIVE_AM_OBJECT_BACKOFF_MS=150 HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-object-supervision.ts
+import './_guard.js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createServer as tcp } from 'node:net';

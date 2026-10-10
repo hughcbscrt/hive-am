@@ -3,6 +3,7 @@
 //   HIVE_AM_OBJECT_POLL_MS=500 HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-objects.ts
 // The Docker part uses a local image (nginx:1.25-alpine by default; HIVE_TEST_IMAGE) and skips itself when Docker is not available. It never
 // touches a container it did not create.
+import './_guard.js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, existsSync } from 'node:fs';
 import { createServer } from 'node:net';

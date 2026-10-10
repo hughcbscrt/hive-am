@@ -1,5 +1,6 @@
 // "Tell me the moment it finishes", without a model: the watcher sees a process end, a marker file appear, the time run out, and refuses bad input. Usage:
 //   HIVE_AM_WATCH_POLL_MS=300 HIVE_AM_WAKE_MS_PER_MINUTE=1500 HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4480 npx tsx scripts/test-watch.ts
+import './_guard.js';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
