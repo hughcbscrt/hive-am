@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- Markdown preview in the file explorer: `.md` files open rendered, with a Preview tab next to the source (File) and the diff.
 - Chat channels skill: how an agent behaves in Telegram and Slack (answering, files, pictures, groups, keeping quiet, secrets). It is assigned automatically to agents answered through a connection and is editable.
 - Secrets never leave through an external chat: a rule in the skill and a server-side filter on channel replies, captions and text files (known tokens, private keys, JWTs, connection strings, NAME=value assignments).
 - Wake-ups skill with the wake_me tool: an agent can ask to be woken after some minutes, in the same chat thread or web conversation, instead of promising a notice it cannot send. The person who asked in a group is mentioned.
@@ -26,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+- Telegram forum topics: the implicit reply to the topic's first message is no longer read as a message aimed at someone else, so the agent is not left thinking people talk to another person.
+- A long turn on group chatter that ends without `channel_reply` now gets one reminder, so a finished job is not lost as plain text nobody sees.
 - The Telegram typing indicator is refreshed after the agent's own messages, no longer stops early when two turns overlap, logs failures and has a safety cap.
 - An agent that ends a turn aimed at it without answering is reminded once to answer.
 - Emoji such as the alarm clock are sent to Telegram with the emoji selector so they render.
