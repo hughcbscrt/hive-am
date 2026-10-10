@@ -34,6 +34,7 @@ export async function* runKiro(o: TurnOptions): AsyncGenerator<StreamEvent> {
   if (agent.permission === 'bypassPermissions') args.push('--trust-all-tools');
   if (agent.session_id) args.push('--resume-id', agent.session_id);
   if (agent.model) args.push('--model', agent.model);
+  if (o.effort) args.push('--effort', o.effort);
   const prompt = withInstructions(o.prompt, o.instructions, !!agent.session_id, o.refreshInstructions);
   args.push(prompt);
 

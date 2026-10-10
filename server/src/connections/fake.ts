@@ -12,6 +12,7 @@ export class FakeAdapter implements ChannelAdapter {
   async stop() { this.onMessage = null; }
   async send(to: Target, text: string) { this.sent.push({ to, text }); return { externalId: `out-${++this.n}` }; }
   async busy(to: Target, state: 'working' | 'done' | 'failed') { this.cues.push({ to, state }); }
+  mention(u: { id: string; name: string }) { return `@${u.name}`; }
   status(): AdapterStatus { return { state: this.onMessage ? 'connected' : 'stopped' }; }
 
   /** Types a message as `userId` in thread `key`; resolves when the agent's turn is over. */

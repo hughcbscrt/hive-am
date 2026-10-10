@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Boxes, Globe, Hexagon, History, Library, Moon, Network, Sun, Users, Plug } from 'lucide-react';
+import { Boxes, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, Sun, Users, Plug } from 'lucide-react';
 import { HiveProvider, useHive } from '@/lib/store';
 import { I18nProvider, LOCALES, useI18n } from '@/lib/i18n';
 import { Toaster } from './ui';
@@ -51,6 +51,7 @@ function Nav() {
       {item('/agents', t('nav.agents'), <Users size={18} />, agents.length)}
       {item('/relations', t('nav.relations'), <Network size={18} />)}
       {item('/connections', t('nav.connections'), <Plug size={18} />, connections.length || undefined)}
+      {item('/schedules', t('nav.schedules'), <CalendarClock size={18} />)}
       <div className="nav-label">{t('nav.library')}</div>
       {item('/types', t('nav.types'), <Boxes size={18} />, types.length)}
       {item('/skills', t('nav.skills'), <Library size={18} />, skills.length)}

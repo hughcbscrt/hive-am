@@ -125,5 +125,7 @@ export interface TurnOptions {
   refreshInstructions?: boolean;
   /** Hive MCP tool groups this agent gets (`dispatch`, `channel`); empty means no hive MCP at all. */
   mcpCaps: string[];
+  /** Reasoning effort for this turn (`low`/`medium`/`high`); unset keeps the CLI's default. */
+  effort?: string;
   signal: AbortSignal;
 }

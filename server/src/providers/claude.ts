@@ -18,6 +18,7 @@ export async function* runClaude(o: TurnOptions): AsyncGenerator<StreamEvent> {
   if (agent.permission === 'acceptEdits') args.push('--disallowedTools', ...CLAUDE_EDIT_DENY);
   if (agent.session_id) args.push('--resume', agent.session_id);
   if (agent.model) args.push('--model', agent.model);
+  if (o.effort) args.push('--effort', o.effort);
   // Files people sent through a connection live outside the working folder; let the agent read them.
   if (existsSync(inboxDir(agent.id))) args.push('--add-dir', inboxDir(agent.id));
   // The system prompt of a session is fixed when it starts: `--append-system-prompt` is ignored on `--resume`. So a

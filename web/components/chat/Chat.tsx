@@ -151,7 +151,8 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
   const toast = useToast();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [pending, setPending] = useState<string | null>(null);
+  // Messages sent from this tab that are not in the transcript yet: the next turn's, or ones waiting behind the running turn.
+  const [outbox, setOutbox] = useState<string[]>([]);
   const [toolsOpen, setToolsOpen] = useState<boolean | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
@@ -169,7 +170,14 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
   useEffect(() => { setLoaded(false); void load(); }, [load]);
   // A finished turn is now in the CLI's own transcript: re-read it, then drop the optimistic echo.
   const fin = finished[agent.id] ?? 0;
-  useEffect(() => { if (fin) void load().then(() => setPending(null)); }, [fin]); // eslint-disable-line react-hooks/exhaustive-deps
+  const idle = useRef(true);
+  idle.current = !turn && agent.status !== 'running' && !(agent.queued ?? 0);
+  // When a turn ends and nothing is left behind it, whatever is still in the outbox was sent (its text just differs in the transcript).
+  useEffect(() => { if (fin) void load().then(() => { if (idle.current) setOutbox((o) => (o.length ? [] : o)); }); }, [fin]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Whatever the transcript already holds is no longer "sent but pending".
+  useEffect(() => {
+    setOutbox((o) => { const left = o.filter((p) => !msgs.some((m) => m.role === 'user' && m.blocks.some((b) => b.type === 'text' && b.text.trim() === p.trim()))); return left.length === o.length ? o : left; });
+  }, [msgs]);
 
   // Keep the view pinned to the newest content while the user hasn't scrolled away,
   // including when markdown/tool blocks grow after the first paint.
@@ -182,15 +190,16 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
 
   const send = useCallback(async (prompt: string) => {
     if (readOnly) return false;
-    setPending(prompt); stick.current = true;
+    setOutbox((o) => [...o, prompt]); stick.current = true;
     try { await api.post(`/agents/${agent.id}/messages`, { prompt }); return true; }
-    catch (e) { setPending(null); toast(e instanceof Error ? e.message : t('chat.sendFailed'), 'err'); return false; }
+    catch (e) { setOutbox((o) => { const i = o.lastIndexOf(prompt); return i < 0 ? o : o.filter((_, j) => j !== i); }); toast(e instanceof Error ? e.message : t('chat.sendFailed'), 'err'); return false; }
   }, [agent.id, readOnly, toast, t]);
   const stop = useCallback(() => { void api.post(`/agents/${agent.id}/stop`).catch(() => undefined); }, [agent.id]);
   const toggleTools = useCallback(() => setToolsOpen((o) => (o ? false : true)), []);
 
-  const showPending = pending && !msgs.some((m) => m.role === 'user' && m.blocks.some((b) => b.type === 'text' && b.text.trim() === pending));
-  const isEmpty = loaded && !msgs.length && !turn && !pending;
+  // The running turn already shows its own prompt; the rest of the outbox waits its turn and is shown as queued.
+  const waiting = outbox.filter((p, i) => !(turn && i === outbox.findIndex((x) => x.trim() === turn.prompt.trim())));
+  const isEmpty = loaded && !msgs.length && !turn && !outbox.length;
 
   return (
     <>
@@ -204,7 +213,6 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
             </div>
           )}
           <History msgs={msgs} agent={agent} />
-          {showPending && !turn?.prompt && <UserBubble text={pending ?? ''} />}
           {turn && (
             <>
               {turn.source === 'dispatch' ? (
@@ -227,6 +235,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
               </div>
             </>
           )}
+          {waiting.map((p, i) => <UserBubble key={`${i}:${p}`} text={p} badge={turn ? t('chat.queuedBadge') : undefined} />)}
         </div>
       </div>
       </ToolsOpen.Provider>

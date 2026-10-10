@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Minimal MCP stdio server for hive-am agents. Tool groups come from HIVE_CAPS:
 //   dispatch → list_agents, dispatch (orchestrators with a team)
-//   channel  → channel_reply (agents linked to Telegram/Slack)
+//   channel  → channel_reply, channel_send_file, channel_mute (agents linked to Telegram/Slack)
+//   wake     → wake_me, wake_when_done, schedule_create, schedule_list, schedule_cancel (agents with the Wake-ups skill: to be woken later in the same place)
 // It only talks to the hive-am HTTP API; all rules (assignments, queueing) live there.
 import { createInterface } from 'node:readline';
 
@@ -111,6 +112,65 @@ const allTools = [
       additionalProperties: false,
     },
   },
+  {
+    cap: 'wake',
+    name: 'wake_me',
+    description: 'Schedule yourself to be woken up after some minutes, in the same place where you were asked (the same chat thread, or the same web conversation). You can only write while you are handling a message, so this is the ONLY way to tell the person something later (for example when a long deploy or job should be finished). When the time comes you receive a message with your note, check what you were waiting for and answer. Never promise "I will let you know" without calling this first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        minutes: { type: 'number', description: 'Minutes from now, between 1 and 240.' },
+        note: { type: 'string', description: 'What to check when you wake up and what to tell the person (for example: check ~/job.log, report if it finished or failed). Up to 400 characters.' },
+      },
+      required: ['minutes', 'note'],
+      additionalProperties: false,
+    },
+  },
+  {
+    cap: 'wake',
+    name: 'wake_when_done',
+    description: 'Be woken up THE MOMENT a command you started in the background finishes, in the same place where you were asked (the same chat thread, or the same web conversation), to read the result and tell the person. Start the command yourself in the background with its output in a log (for example `nohup ./deploy.sh > ~/deploy.log 2>&1 & echo $!`; for a job on another machine run the ssh itself in the background: `nohup ssh host \'./job.sh\' > ~/job.log 2>&1 & echo $!`, because the local ssh lives as long as the remote command), then call this with that pid. hive-am only watches the process; it never runs anything. If the process is already gone, check the result now instead. You can also give a marker file that the job creates when it ends. If it is still running after max_minutes you are woken anyway. Never promise "I will tell you when it finishes" without calling this first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pid: { type: 'number', description: 'Process id of the background command (the output of `echo $!` right after starting it).' },
+        log: { type: 'string', description: 'Path of the file where its output goes; you will be told it when you wake up.' },
+        file: { type: 'string', description: 'Optional: a marker file that the job creates when it ends; waking up also happens when it appears (must be in your working folder, home or temp).' },
+        note: { type: 'string', description: 'What to check and report when it finishes (up to 400 characters).' },
+        max_minutes: { type: 'number', description: 'How long to wait at most, 1 to 240 (default 120).' },
+      },
+      required: ['pid', 'note'],
+      additionalProperties: false,
+    },
+  },
+  {
+    cap: 'wake',
+    name: 'schedule_create',
+    description: 'Create a RECURRING schedule: at each run you are woken up in the same place where you were asked (the same chat thread, or the same web conversation), with your note, and you do what it says and tell the person. Use "cron" (5 fields: minute hour day-of-month month day-of-week, e.g. "0 9 * * MON-FRI") or "every_minutes". The minimum gap between runs is 15 minutes. For something that happens once, use wake_me instead. The answer gives the next run times: tell them to the person.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        cron: { type: 'string', description: 'Cron expression, e.g. "30 8 * * MON-FRI" (weekdays 08:30) or "0 */6 * * *" (every 6 hours).' },
+        every_minutes: { type: 'number', description: 'Alternative to cron: a fixed interval in minutes (15 or more).' },
+        timezone: { type: 'string', description: 'IANA time zone for cron, e.g. "America/Mexico_City". Defaults to the server time zone.' },
+        note: { type: 'string', description: 'What to do at each run and what to report (up to 400 characters).' },
+      },
+      required: ['note'],
+      additionalProperties: false,
+    },
+  },
+  {
+    cap: 'wake',
+    name: 'schedule_list',
+    description: 'List your recurring schedules (id, when, note, next run, last result).',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    cap: 'wake',
+    name: 'schedule_cancel',
+    description: 'Cancel one of your recurring schedules by id (see schedule_list).',
+    inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'The schedule id.' } }, required: ['id'], additionalProperties: false },
+  },
 ];
 const tools = allTools.filter((t) => CAPS.has(t.cap)).map(({ cap, ...t }) => t);
 
@@ -177,6 +237,45 @@ async function call(name, args) {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? `channel_mute failed (${r.status})`);
     return j.muted ? `Muted in this thread (${j.place}). You will only be woken when someone mentions you or replies to you.` : `Unmuted in this thread (${j.place}).`;
+  }
+  if (name === 'wake_me') {
+    const r = await fetch(`${API}/api/wake`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: FROM, minutes: args.minutes, note: args.note }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `wake_me failed (${r.status})`);
+    return `Wake-up scheduled for ${j.at} (in ${j.minutes} min), ${j.where === 'thread' ? 'in this same thread' : 'in this same conversation'}. Tell the person that exact time.`;
+  }
+  if (name === 'wake_when_done') {
+    const r = await fetch(`${API}/api/wake-when-done`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: FROM, pid: args.pid, log: args.log, file: args.file, note: args.note, max_minutes: args.max_minutes }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `wake_when_done failed (${r.status})`);
+    return `${j.reused ? 'Already watching this process. ' : ''}Watching the process: you will be woken ${j.where === 'thread' ? 'in this same thread' : 'in this same conversation'} when it finishes (or at ${j.until} at the latest). Tell the person that, and that you will report the result then.`;
+  }
+  if (name === 'schedule_create') {
+    const r = await fetch(`${API}/api/schedules/create`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: FROM, cron: args.cron, every_minutes: args.every_minutes, timezone: args.timezone, note: args.note }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `schedule_create failed (${r.status})`);
+    return `Schedule created (id ${j.id}): ${j.schedule}, ${j.where === 'thread' ? 'in this same thread' : 'in this same conversation'}. Next runs: ${j.next.join(' · ')}. Tell the person.`;
+  }
+  if (name === 'schedule_list') {
+    const r = await fetch(`${API}/api/schedules/list`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ from: FROM }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `schedule_list failed (${r.status})`);
+    return j.schedules.length ? j.schedules.map((s) => `- ${s.id}: ${s.schedule}${s.enabled ? '' : ' [paused]'} · next ${s.next ?? '-'} · last ${s.last ?? 'never'} · ${s.note}`).join('\n') : 'You have no recurring schedules.';
+  }
+  if (name === 'schedule_cancel') {
+    const r = await fetch(`${API}/api/schedules/cancel`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ from: FROM, id: args.id }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `schedule_cancel failed (${r.status})`);
+    return 'Schedule cancelled.';
   }
   throw new Error(`Unknown tool ${name}`);
 }

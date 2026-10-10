@@ -1,6 +1,8 @@
 'use client';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, ChevronUp, File, FileCode, FileImage, FileText, Folder, FolderOpen, GitBranch, ListChecks, RefreshCw, Search, Undo2, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { fmtBytes, fmtDateTime, fmtNum } from '@/lib/format';
@@ -27,6 +29,7 @@ import { ActionButtons, BranchMenu, CommitDialog, DiscardConfirm, type DiscardFi
 import type { GitBlame, GitCommitDetail, GitListing, StashItem, SwitchPlan } from '@/lib/types';
 
 const TREE_MAX_ROWS = 2000;   // the file tree is a list of buttons, not windowed: it shows this many and asks for a narrower filter
+const MARKDOWN = /\.(md|markdown|mdx)$/i;
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|ico|bmp|avif)$/i;
 
 function FileIcon({ name }: { name: string }) {
@@ -146,7 +149,10 @@ function Preview({ agent, path, ignored = false, change, stamp, onOpenCommit, on
   const [blameOn, setBlameOn] = useState(false);
   // Text changes open on their diff; images (and unchanged files) open on the file itself.
   const wantDiff = !!change && !IMAGE.test(path);
-  const [view, setView] = useState<'diff' | 'file'>(wantDiff ? 'diff' : 'file');
+  const isMd = MARKDOWN.test(path);
+  // Markdown opens rendered unless it has changes (then the diff comes first); the File tab shows the source.
+  const firstView = wantDiff ? 'diff' : isMd ? 'preview' : 'file';
+  const [view, setView] = useState<'diff' | 'file' | 'preview'>(firstView);
   const [layout, setLayout] = useState<'unified' | 'split'>('unified');
   const [diff, setDiff] = useState<GitDiffResult | null>(null);
   const [file, setFile] = useState<GitFileResult | null>(null);
@@ -156,7 +162,7 @@ function Preview({ agent, path, ignored = false, change, stamp, onOpenCommit, on
   const isImage = IMAGE.test(path);
 
   // A different file: pick the most useful tab for it. A file that stops/starts being changed: adjust too.
-  useEffect(() => { setView(wantDiff ? 'diff' : 'file'); setImgFailed(false); }, [path, wantDiff]);
+  useEffect(() => { setView(firstView); setImgFailed(false); }, [path, wantDiff]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let dead = false; setErr(null);
@@ -200,7 +206,7 @@ function Preview({ agent, path, ignored = false, change, stamp, onOpenCommit, on
           {file && !change && <span className="muted small">{fmtBytes(file.size)}</span>}
         </div>
         <div className="gx-ptools">
-          {change && <Segmented value={view} onChange={setView} options={[{ id: 'diff', label: t('git.view.diff') }, { id: 'file', label: t('git.view.file') }]} />}
+          {(change || isMd) && <Segmented value={view} onChange={setView} options={[...(change ? [{ id: 'diff' as const, label: t('git.view.diff') }] : []), ...(isMd ? [{ id: 'preview' as const, label: t('git.view.preview') }] : []), { id: 'file' as const, label: t(isMd ? 'git.view.source' : 'git.view.file') }]} />}
           {view === 'diff' && change && <Segmented value={layout} onChange={setLayout} options={[{ id: 'unified', label: t('git.layout.unified') }, { id: 'split', label: t('git.layout.split') }]} />}
           {!isImage && !ignored && change?.status !== 'deleted' && change?.status !== 'untracked' && change?.status !== 'conflict' && (() => {
             const on = blameOn && view === 'file';
@@ -220,6 +226,8 @@ function Preview({ agent, path, ignored = false, change, stamp, onOpenCommit, on
           ) : null
         ) : isImage && !imgFailed && change?.status !== 'deleted' ? (
           <div className="gx-image"><img src={`/api/agents/${agent.id}/git/raw?path=${encodeURIComponent(path)}&v=${stamp}`} alt={name} onError={() => setImgFailed(true)} /></div>
+        ) : view === 'preview' && file && file.path === path ? (
+          <div className="gx-md md">{file.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: (p) => <a {...p} target="_blank" rel="noreferrer" /> }}>{file.content}</ReactMarkdown></div>
         ) : file && file.path === path ? <FileView f={file} agent={agent} blame={blameOn} onOpenCommit={onOpenCommit} marks={marks} allNew={wholeNew} /> : isImage && imgFailed ? <p className="gx-note">{t('git.file.binary')}</p> : null}
       </div>
     </section>

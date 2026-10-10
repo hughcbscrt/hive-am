@@ -31,6 +31,7 @@ export const liveTurn = (id: string) => states.get(id)?.live ?? null;
 export const queueDepth = (id: string) => states.get(id)?.queued ?? 0;
 /** The channel message the agent is answering right now, if the running turn came from one. */
 export const liveOrigin = (id: string) => states.get(id)?.live?.origin;
+export const liveSource = (id: string) => states.get(id)?.live?.source;
 /** Whether the turn running now is the agent's own conversation (not work delegated to it by an orchestrator). */
 export const liveIsDirect = (id: string) => states.get(id)?.live?.source === 'user';
 
@@ -87,7 +88,7 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
     const stream = runners[agent.provider]({
       agent, prompt, signal: controller.signal,
       instructions, refreshInstructions,
-      mcpCaps: mcpCaps(agent),
+      mcpCaps: mcpCaps(agent), effort: origin?.effort,
     });
     for await (const ev of stream) {
       if (ev.t === 'session') {

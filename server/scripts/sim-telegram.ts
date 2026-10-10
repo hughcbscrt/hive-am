@@ -136,6 +136,12 @@ say({ text: 'Please reply with channel_reply: say hello and include the word BAN
 await until(() => real().length >= 1);
 check(sent.some((s) => s.chat_id === '42' && /banana/i.test(s.text) && s.parse_mode === 'HTML' && !s.message_thread_id), 'private chat: agent replies through channel_reply (HTML, no topic)');
 check(actions.some((a) => a.chat_id === '42' && a.action === 'typing'), 'typing indicator was shown');
+// ...and it stops by itself once the turn is over (nothing pulses for a finished turn).
+await until(() => agents.get(agent.id)!.status !== 'running');
+await sleep(1500);
+const pulses = actions.length;
+await sleep(5500);
+check(actions.length === pulses, 'typing stops when the turn ends');
 sent.length = 0;
 
 say({ chat: { id: -100, type: 'supergroup', title: 'Team' }, text: 'no mention, should be ignored' });
@@ -156,10 +162,10 @@ check(sent.length === 1 && String(sent[0].text).includes('tgbot'), '/status@hive
 await until(() => agents.get(agent.id)!.status !== 'running', 180_000); await sleep(2000);
 const files = (await import('node:fs')).readdirSync;
 const inbox = join(process.env.HIVE_AM_HOME!, 'inbox', agent.id);
-blobs.set('docs/vault.txt', Buffer.from('Vault notes.\nThe vault code is 7391-ALPHA.\nPlease keep it secret.\n'));
+blobs.set('docs/vault.txt', Buffer.from('Meeting notes.\nThe meeting room is 7391-ALPHA.\nPlease be on time.\n'));
 blobs.set('photos/p1.jpg', Buffer.from('JPEGDATA-1')); blobs.set('photos/p2.jpg', Buffer.from('JPEGDATA-2'));
 sent.length = 0; const turns0 = prompts.length;
-say({ caption: 'Read the attached file and tell me the vault code with channel_reply. Only the code.', media: { document: { file_id: 'docs/vault.txt', file_name: 'vault.txt', mime_type: 'text/plain', file_size: 60 } } });
+say({ caption: 'Read the attached file and tell me the meeting room with channel_reply. Only the room.', media: { document: { file_id: 'docs/vault.txt', file_name: 'vault.txt', mime_type: 'text/plain', file_size: 60 } } });
 await until(() => real().length >= 1);
 console.log('   file reply was:', JSON.stringify(real().map((s) => s.text)));
 check(prompts.length === turns0 + 1 && /\[hive:files\]/.test(prompts[prompts.length - 1]) && /vault\.txt/.test(prompts[prompts.length - 1]), 'a document becomes ONE turn whose message lists the saved file');
@@ -198,8 +204,8 @@ if (typeof crc32 === 'function') {
   say({ caption: 'What color is this picture? Answer with channel_reply, one word.', media: { photo: [{ file_id: 'photos/red.png', file_size: 600 }] } });
   await until(() => real().length >= 1);
   const last = prompts[prompts.length - 1];
-  console.log('   description line:', (/Description of the picture[^\n]*/.exec(last) ?? [''])[0].slice(0, 160));
-  check(prompts.length === turns2 + 1 && /Description of the picture/.test(last) && /red/i.test(last), 'the picture arrives with a description made by the image model');
+  console.log('   description line:', (/What the picture shows[^\n]*/.exec(last) ?? [''])[0].slice(0, 160));
+  check(prompts.length === turns2 + 1 && /What the picture shows/.test(last) && /red/i.test(last), 'the picture arrives with a description made by the image model');
   r = await api('PATCH', `/api/connections/${connId}`, { config: { vision: { provider: 'claude' } } });
   check(r.status === 400, 'a malformed image model is rejected');
   await api('PATCH', `/api/connections/${connId}`, { config: { vision: null } });

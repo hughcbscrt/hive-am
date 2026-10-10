@@ -6,6 +6,7 @@ import type { AdapterStatus, Attachment, ChannelAdapter, Connection, Inbound, Ta
 
 const MAX_PART = 3500;          // Telegram allows 4096; leave room for the HTML tags added after splitting
 const TYPING_EVERY_MS = 4500;   // «typing…» lasts ~5 s
+const TYPING_MAX_MS = 20 * 60_000;   // safety net: never pulse for longer than this, whatever happens to the turn
 const MIN_GAP_MS = 350;         // stay well under Telegram's ~1 message/second per chat
 const ALBUM_WAIT_MS = 1200;     // the photos of an album arrive as separate messages: wait for the rest
 
@@ -44,7 +45,8 @@ export class TelegramAdapter implements ChannelAdapter {
   private me: { id: number; username: string; can_read_all_group_messages?: boolean } | null = null;
   private stopped = false;
   private abort = new AbortController();
-  private typing = new Map<string, ReturnType<typeof setInterval>>();
+  private typing = new Map<string, { timer: ReturnType<typeof setInterval>; refs: Set<string> }>();
+  private typingWarned = 0;
   private lastSend = new Map<string, number>();
   private albums = new Map<string, { parts: Inbound[]; timer: ReturnType<typeof setTimeout> }>();
 
@@ -75,12 +77,15 @@ export class TelegramAdapter implements ChannelAdapter {
   async stop(): Promise<void> {
     this.stopped = true;
     this.abort.abort();
-    for (const t of this.typing.values()) clearInterval(t);
+    for (const t of this.typing.values()) clearInterval(t.timer);
     this.typing.clear();
     for (const a of this.albums.values()) clearTimeout(a.timer);
     this.albums.clear();
     this.state = { state: 'stopped' };
   }
+
+  /** A link to the person's account: it notifies them in a group even without a @username. */
+  mention(u: { id: string; name: string }): string { return `[${u.name.replace(/[\[\]]/g, '')}](tg://user?id=${u.id})`; }
 
   status() { return this.state; }
 
@@ -136,9 +141,21 @@ export class TelegramAdapter implements ChannelAdapter {
     const cmd = /^\/(\w+)(?:@(\w+))?(?:\s+([\s\S]*))?$/.exec(text);
     if (cmd && cmd[2] && cmd[2].toLowerCase() !== this.me.username.toLowerCase()) return null;   // a command for another bot
     const mention = new RegExp(`@${this.me.username}\\b`, 'i');
-    const addressed = isPrivate || !!cmd || mention.test(text) || msg.reply_to_message?.from?.id === this.me.id;
+    // In a forum topic every message carries a `reply_to_message` that is just the topic's first message (not a real reply to someone).
+    const realReply = msg.reply_to_message && !msg.reply_to_message.forum_topic_created && !(msg.is_topic_message && msg.reply_to_message.message_id === msg.message_thread_id) ? msg.reply_to_message : undefined;
+    const addressed = isPrivate || !!cmd || mention.test(text) || realReply?.from?.id === this.me.id;
     text = text.replace(mention, '').trim();
     if (!text && !attachments.length) return null;
+    // Meant for another person of the chat: a reply to their message, or an @mention / text mention of them.
+    const raw: string = msg.text ?? msg.caption ?? '';
+    let directedAt: string | undefined;
+    const to = realReply?.from;
+    if (!isPrivate && to && !to.is_bot && to.id !== this.me.id && to.id !== msg.from?.id) directedAt = to.username ?? to.first_name ?? String(to.id);
+    for (const e of (msg.entities ?? msg.caption_entities ?? []) as any[]) {
+      if (directedAt || isPrivate) break;
+      if (e.type === 'text_mention' && e.user && !e.user.is_bot && e.user.id !== this.me.id) directedAt = e.user.first_name ?? String(e.user.id);
+      else if (e.type === 'mention') { const u = raw.slice(e.offset + 1, e.offset + e.length); if (u && u.toLowerCase() !== this.me.username.toLowerCase()) directedAt = u; }
+    }
 
     const topic = msg.is_topic_message && msg.message_thread_id !== undefined ? String(msg.message_thread_id) : undefined;
     const from = msg.from ?? {};
@@ -153,6 +170,7 @@ export class TelegramAdapter implements ChannelAdapter {
       command: cmd ? { name: cmd[1].toLowerCase(), args: (cmd[3] ?? '').trim() } : undefined,
       group: !isPrivate,
       addressed,
+      ...(directedAt ? { directedAt } : {}),
       ...(attachments.length ? { attachments } : {}),
     };
   }
@@ -211,6 +229,7 @@ export class TelegramAdapter implements ChannelAdapter {
         }));
       last = String(sent.message_id);
     }
+    if (this.typing.has(`${to.chat}:${to.thread ?? ''}`)) this.ping(to);   // a sent message cancels «typing…»; the agent is still working
     return { externalId: last };
   }
 
@@ -228,13 +247,30 @@ export class TelegramAdapter implements ChannelAdapter {
     }
   }
 
-  async busy(to: Target, state: 'working' | 'done' | 'failed'): Promise<void> {
+  /** One «typing…» pulse. A failure is logged (once a minute) instead of being swallowed, so a silent problem is visible. */
+  private ping(to: Target): void {
+    void this.call('sendChatAction', { chat_id: to.chat, action: 'typing', ...(to.thread ? { message_thread_id: Number(to.thread) } : {}) }).catch((e) => {
+      if (Date.now() - this.typingWarned > 60_000) { this.typingWarned = Date.now(); console.warn(`[connections] ${this.conn.name}: «typing…» failed: ${(e as Error).message}`); }
+    });
+  }
+
+  async busy(to: Target, state: 'working' | 'done' | 'failed', ref = ''): Promise<void> {
     const key = `${to.chat}:${to.thread ?? ''}`;
-    const old = this.typing.get(key); if (old) { clearInterval(old); this.typing.delete(key); }
-    if (state !== 'working') return;
-    const ping = () => void this.call('sendChatAction', { chat_id: to.chat, action: 'typing', ...(to.thread ? { message_thread_id: Number(to.thread) } : {}) }).catch(() => undefined);
-    ping();
-    this.typing.set(key, setInterval(ping, TYPING_EVERY_MS));
+    const cur = this.typing.get(key);
+    if (state === 'working') {
+      if (cur) { cur.refs.add(ref); return; }
+      this.ping(to);
+      const since = Date.now();
+      const timer = setInterval(() => {
+        if (Date.now() - since > TYPING_MAX_MS) { clearInterval(timer); this.typing.delete(key); return; }
+        this.ping(to);
+      }, TYPING_EVERY_MS);
+      this.typing.set(key, { timer, refs: new Set([ref]) });
+      return;
+    }
+    if (!cur) return;
+    cur.refs.delete(ref);
+    if (!cur.refs.size) { clearInterval(cur.timer); this.typing.delete(key); }
   }
 
   async test(userIds: string[]): Promise<string> {
