@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import type { HttpFile, VarInfo } from '@/lib/types';
 import { useToast } from '@/components/ui';
+import { SourceEditor } from './SourceEditor';
 import { sourceLabel, SOURCE_TONE } from './VarsTable';
 
 /**
@@ -61,7 +62,7 @@ export function HttpSource({ objectId, file, vars, onRun, status, onSaved }: {
       </div>
       {err && <div className="gx-banner err">{err}</div>}
       {draft !== null ? (
-        <textarea className="hs-edit mono" value={draft} spellCheck={false} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); void save(); } }} />
+        <SourceEditor value={draft} onChange={setDraft} onSave={() => void save()} vars={vars} named={file.requests.map((r) => r.named).filter((n): n is string => !!n)} />
       ) : (
         <div className="hs-view mono">
           {lines.map((l, i) => {

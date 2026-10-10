@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- Suggestions while editing a `.http` file: variables inside `{{ }}` (with their value), answers of named requests and generated values, methods at the start of a request, header names and the values of Content-Type / Accept, and `# @name`. Ctrl+Space opens them, arrows and Enter or Tab accept.
 - New HTTP requests from the screen: a **+** next to the environment opens a form (file, name, method, URL, headers, body) or takes a pasted **cURL** command, and adds the request to an existing `.http` file or to a new one (`POST /api/objects/:id/http/file` creates files, never over an existing one). `Authorization: Basic user password` is sent encoded.
 - HTTP requests can be copied as cURL, wget, HTTPie, PowerShell, JavaScript (fetch), Node (axios), Python, Go, PHP, Java, C#, Ruby, Rust or a raw HTTP message, with the values in effect now (what has no value stays as `{{name}}`; credential headers can be hidden). API: `GET /api/objects/:id/http/export`.
 - HTTP **History** tab (replaces the Session panel): every run since the screen was opened (request, status, time, tests, answer as a tree), plus the values and remembered answers the session keeps, with the option to set or forget them.
