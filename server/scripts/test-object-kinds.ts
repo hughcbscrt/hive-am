@@ -1,6 +1,6 @@
-// HTTP-requests objects and boss objects, without a model: the .http format (names, variables, environments, private env, file variables,
+// HTTP-requests objects and cluster objects, without a model: the .http format (names, variables, environments, private env, file variables,
 // dynamic values, body from a file, response handlers), running a request against a local server, what is refused (a path outside the folder,
-// a missing variable, a bad URL), and bosses (grouping, start order, stop order, state, logs with the member's name, rules). Usage:
+// a missing variable, a bad URL), and clusters (grouping, start order, stop order, state, logs with the member's name, rules). Usage:
 //   HIVE_AM_OBJECT_POLL_MS=60000 HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-object-kinds.ts
 import { createServer } from 'node:http';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -127,59 +127,60 @@ check((await objectLogs(web.id, {})).text === '', 'and has no logs');
 check(await rejects(() => createObject({ name: 'bad-http', kind: 'http', config: { folder: 'x' } }), /absolute/), 'its folder must be absolute');
 check((await stateOf(createObject({ name: 'gone-http', kind: 'http', config: { folder: join(dir, 'nope') } }))).status === 'error', 'a folder that is not there makes it an error');
 
-// ---------------------------------------------------------------- bosses
-const colony = colonies.create({ name: 'boss-colony', color: '#2f8f5b', cwd: dir, permission: 'acceptEdits', system_prompt: '', skill_ids: [] } as any);
+// ---------------------------------------------------------------- clusters
+const colony = colonies.create({ name: 'cluster-colony', color: '#2f8f5b', cwd: dir, permission: 'acceptEdits', system_prompt: '', skill_ids: [] } as any);
 const other = colonies.create({ name: 'other-colony', color: '#d4663f', cwd: dir, permission: 'acceptEdits', system_prompt: '', skill_ids: [] } as any);
 const order = join(dir, 'order.txt');
 const mk = (name: string, extra = '') => createObject({ name, kind: 'server', colony_id: colony.id, config: { cwd: dir, start: `echo "${name} started" >> ${order}; ${extra} while true; do echo "${name} says hi"; sleep 1; done`, stop: `echo "${name} stopped" >> ${order}` } });
 const db = mk('db'), api = mk('api'), web2 = mk('web');
-const boss = createObject({ name: 'stack', kind: 'boss', colony_id: colony.id, config: { members: [db.id, api.id, web2.id] } });
-check((await stateOf(objectsStore.get(boss.id)!)).status === 'stopped', 'a boss with all members stopped is stopped');
+const cluster = createObject({ name: 'stack', kind: 'cluster', colony_id: colony.id, config: { members: [db.id, api.id, web2.id] } });
+check((await stateOf(objectsStore.get(cluster.id)!)).status === 'stopped', 'a cluster with all members stopped is stopped');
 
-await objectAction(boss.id, 'start'); await sleep(1500); await refreshStates();
-check((await stateOf(objectsStore.get(boss.id)!)).status === 'running' && viewOf(objectsStore.get(boss.id)!).state.detail === '3/3 running', 'starting a boss starts all members and it reports 3/3 running');
+await objectAction(cluster.id, 'start'); await sleep(1500); await refreshStates();
+check((await stateOf(objectsStore.get(cluster.id)!)).status === 'running' && viewOf(objectsStore.get(cluster.id)!).state.detail === '3/3 running', 'starting a cluster starts all members and it reports 3/3 running');
 const lines = readFileSync(order, 'utf8').trim().split('\n');
 check(lines.join() === 'db started,api started,web started', 'they start in the order they are listed');
-await objectAction(boss.id, 'start');
-check(readFileSync(order, 'utf8').trim().split('\n').length === 3, 'starting a boss that is up does not start anything twice');
+await objectAction(cluster.id, 'start');
+check(readFileSync(order, 'utf8').trim().split('\n').length === 3, 'starting a cluster that is up does not start anything twice');
 
 await sleep(1200);
-const l1 = await objectLogs(boss.id, { tail: 50 });
-check(/\[db\] db says hi/.test(l1.text) && /\[api\] api says hi/.test(l1.text) && /\[web\] web says hi/.test(l1.text), 'the logs of a boss carry the name of each member');
+const l1 = await objectLogs(cluster.id, { tail: 50 });
+check(/\[db\] db says hi/.test(l1.text) && /\[api\] api says hi/.test(l1.text) && /\[web\] web says hi/.test(l1.text), 'the logs of a cluster carry the name of each member');
 await sleep(1500);
-const l2 = await objectLogs(boss.id, { after: l1.cursor });
+const l2 = await objectLogs(cluster.id, { after: l1.cursor });
 check(/says hi/.test(l2.text) && !/▶/.test(l2.text), 'following with the cursor returns only what is new');
 
 await objectAction(updated(api.id, 'stop'), 'stop').catch(() => undefined);
 function updated(id: string, _w: string) { return id; }
 await refreshStates();
-const partial = await stateOf(objectsStore.get(boss.id)!);
-check(partial.status === 'error' && /2\/3/.test(partial.detail ?? '') && /api/.test(partial.detail ?? ''), 'a boss with one member down says which, and counts them');
+const partial = await stateOf(objectsStore.get(cluster.id)!);
+check(partial.status === 'error' && /2\/3/.test(partial.detail ?? '') && /api/.test(partial.detail ?? ''), 'a cluster with one member down says which, and counts them');
 
-await objectAction(boss.id, 'stop'); await sleep(300); await refreshStates();
-check((await stateOf(objectsStore.get(boss.id)!)).status === 'stopped', 'stopping a boss stops all members');
+await objectAction(cluster.id, 'stop'); await sleep(300); await refreshStates();
+check((await stateOf(objectsStore.get(cluster.id)!)).status === 'stopped', 'stopping a cluster stops all members');
 const lines2 = readFileSync(order, 'utf8').trim().split('\n').filter((l) => /stopped/.test(l));
 check(lines2.slice(-3).join() === 'web stopped,api stopped,db stopped', 'and they stop in the opposite order');
 
 const bad = createObject({ name: 'broken', kind: 'server', colony_id: colony.id, config: { cwd: dir, start: 'exit 4' } });
-const b2 = createObject({ name: 'boss-2', kind: 'boss', colony_id: colony.id, config: { members: [bad.id, db.id] } });
+const b2 = createObject({ name: 'cluster-2', kind: 'cluster', colony_id: colony.id, config: { members: [bad.id, db.id] } });
 await objectAction(b2.id, 'start');
 await sleep(800); await refreshStates();
 check((await stateOf(objectsStore.get(db.id)!)).status === 'running', 'a member that crashes does not keep the other from starting');
-check((await stateOf(objectsStore.get(b2.id)!)).status === 'error' && /broken/.test((await stateOf(objectsStore.get(b2.id)!)).detail ?? ''), 'and the boss says which one failed');
+check((await stateOf(objectsStore.get(b2.id)!)).status === 'error' && /broken/.test((await stateOf(objectsStore.get(b2.id)!)).detail ?? ''), 'and the cluster says which one failed');
 await objectAction(db.id, 'stop');
 
 // rules
 const foreign = createObject({ name: 'elsewhere', kind: 'server', colony_id: other.id, config: { cwd: dir, start: 'sleep 1' } });
-check(await rejects(() => createObject({ name: 'boss-x', kind: 'boss', colony_id: colony.id, config: { members: [foreign.id] } }), /same colony/), 'a boss cannot group an object of another colony');
-check(await rejects(() => createObject({ name: 'boss-y', kind: 'boss', colony_id: colony.id, config: { members: [boss.id] } }), /only servers and Docker/), 'nor another boss');
-check(await rejects(() => createObject({ name: 'boss-z', kind: 'boss', colony_id: colony.id, config: { members: [web.id] } }), /only servers and Docker/), 'nor an HTTP object');
-check(await rejects(() => createObject({ name: 'boss-w', kind: 'boss', colony_id: colony.id, config: { members: ['nope'] } }), /does not exist/), 'nor something that does not exist');
+check(await rejects(() => createObject({ name: 'cluster-x', kind: 'cluster', colony_id: colony.id, config: { members: [foreign.id] } }), /same colony/), 'a cluster cannot group an object of another colony');
+check(await rejects(() => createObject({ name: 'cluster-y', kind: 'cluster', colony_id: colony.id, config: { members: [cluster.id] } }), /only servers and Docker/), 'nor another cluster');
+check(await rejects(() => createObject({ name: 'cluster-z', kind: 'cluster', colony_id: colony.id, config: { members: [web.id] } }), /only servers and Docker/), 'nor an HTTP object');
+check(createObject({ name: 'old-name', kind: 'boss' as any, colony_id: colony.id, config: { members: [] } }).kind === 'cluster', "the old name 'boss' still creates a cluster");
+check(await rejects(() => createObject({ name: 'cluster-w', kind: 'cluster', colony_id: colony.id, config: { members: ['nope'] } }), /does not exist/), 'nor something that does not exist');
 await removeObject(web2.id);
-check(!(objectsStore.get(boss.id)!.config as any).members.includes(web2.id), 'deleting a member takes it out of its boss');
+check(!(objectsStore.get(cluster.id)!.config as any).members.includes(web2.id), 'deleting a member takes it out of its cluster');
 updateObject(api.id, { colony_id: other.id });
-check(!(objectsStore.get(boss.id)!.config as any).members.includes(api.id), 'moving a member to another colony takes it out too');
-check(await rejects(() => updateObject(boss.id, { config: { members: [foreign.id] } }), /same colony/), 'and editing a boss follows the same rules');
+check(!(objectsStore.get(cluster.id)!.config as any).members.includes(api.id), 'moving a member to another colony takes it out too');
+check(await rejects(() => updateObject(cluster.id, { config: { members: [foreign.id] } }), /same colony/), 'and editing a cluster follows the same rules');
 
 for (const o of objectsStore.list()) await removeObject(o.id);
 target.close();

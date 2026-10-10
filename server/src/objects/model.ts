@@ -4,7 +4,7 @@
  */
 export class ObjectError extends Error {}
 
-export type ObjectKind = 'server' | 'docker' | 'http' | 'boss';
+export type ObjectKind = 'server' | 'docker' | 'http' | 'cluster';
 /** `ready` is for objects that are not run but used (HTTP requests): their files are there and can be used. */
 export type ObjectStatus = 'running' | 'starting' | 'stopped' | 'error' | 'unknown' | 'ready';
 
@@ -30,9 +30,9 @@ export interface DockerConfig {
 /** A folder of `.http` / `.rest` files whose requests can be run (the IntelliJ / VS Code REST client format). */
 export interface HttpConfig { folder: string; /** The environment selected by default (from the http-client.env.json files). */ env?: string }
 /** Groups other objects (servers and containers of the same colony) to start, stop and read them together. */
-export interface BossConfig { members: string[] }
+export interface ClusterConfig { members: string[] }
 
-export interface ObjectRow { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig | HttpConfig | BossConfig; created_at: number; updated_at: number }
+export interface ObjectRow { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig | HttpConfig | ClusterConfig; created_at: number; updated_at: number }
 export interface ObjectState { status: ObjectStatus; /** Why, in a few words (an exit code, "unhealthy", "docker is not available"…). */ detail?: string; pid?: number; since?: number }
 export type ObjectView = ObjectRow & { state: ObjectState };
 
@@ -113,22 +113,24 @@ export function parseHttp(c: any): HttpConfig {
   return { folder, env };
 }
 
-export function parseBoss(c: any): BossConfig {
+export function parseCluster(c: any): ClusterConfig {
   if (!Array.isArray(c?.members)) throw new ObjectError('Choose the objects it groups');
   const members = [...new Set(c.members.map((x: unknown) => str(x, 'A member')))] as string[];
-  if (members.length > 30) throw new ObjectError('A boss groups at most 30 objects');
+  if (members.length > 30) throw new ObjectError('A cluster groups at most 30 objects');
   return { members };
 }
 
-export function parseConfig(kind: ObjectKind, c: unknown): ServerConfig | DockerConfig | HttpConfig | BossConfig {
-  return kind === 'server' ? parseServer(c) : kind === 'docker' ? parseDocker(c) : kind === 'http' ? parseHttp(c) : parseBoss(c);
+export function parseConfig(kind: ObjectKind, c: unknown): ServerConfig | DockerConfig | HttpConfig | ClusterConfig {
+  return kind === 'server' ? parseServer(c) : kind === 'docker' ? parseDocker(c) : kind === 'http' ? parseHttp(c) : parseCluster(c);
 }
 export function parseName(v: unknown): string {
   const name = str(v, 'The name', NAME_MAX);
   if (!name) throw new ObjectError('Give it a name');
   return name;
 }
-export const isKind = (k: unknown): k is ObjectKind => k === 'server' || k === 'docker' || k === 'http' || k === 'boss';
+export const isKind = (k: unknown): k is ObjectKind => k === 'server' || k === 'docker' || k === 'http' || k === 'cluster';
+/** `boss` was the first name of a cluster: the API still accepts it. */
+export const kindOf = (k: unknown): unknown => (k === 'boss' ? 'cluster' : k);
 
 /** Splits a command line the way a shell would for quotes (no expansion): `sh -c "echo hi"` → ["sh", "-c", "echo hi"]. */
 export function splitArgs(line: string): string[] {

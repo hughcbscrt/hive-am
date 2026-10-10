@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { colonies, db } from '../db.js';
-import { ObjectError, parseConfig, parseName, isKind, type BossConfig, type ObjectKind, type ObjectRow } from './model.js';
+import { ObjectError, kindOf, parseConfig, parseName, isKind, type ClusterConfig, type ObjectKind, type ObjectRow } from './model.js';
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS colony_objects (
@@ -9,16 +9,19 @@ CREATE TABLE IF NOT EXISTS colony_objects (
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
 );`);
 
+// The first name of a cluster was `boss`.
+db.exec("UPDATE colony_objects SET kind='cluster' WHERE kind='boss'");
+
 const row = (r: any): ObjectRow => ({ ...r, config: JSON.parse(r.config) });
 
-/** A boss groups servers and containers of its own colony; nothing else, and not itself. */
+/** A cluster groups servers and containers of its own colony; nothing else, and not itself. */
 function checkMembers(kind: string, colony: string | null, config: unknown, selfId?: string) {
-  if (kind !== 'boss') return;
-  for (const id of (config as BossConfig).members) {
+  if (kind !== 'cluster') return;
+  for (const id of (config as ClusterConfig).members) {
     const m = objectsStore.get(id);
     if (!m || m.id === selfId) throw new ObjectError('One of the objects it groups does not exist');
     if (m.kind !== 'server' && m.kind !== 'docker') throw new ObjectError(`"${m.name}" cannot be grouped: only servers and Docker containers can`);
-    if ((m.colony_id ?? null) !== (colony ?? null)) throw new ObjectError(`"${m.name}" is not in the same colony as the boss`);
+    if ((m.colony_id ?? null) !== (colony ?? null)) throw new ObjectError(`"${m.name}" is not in the same colony as the cluster`);
   }
 }
 
@@ -26,7 +29,8 @@ export const objectsStore = {
   list: () => (db.prepare('SELECT * FROM colony_objects ORDER BY name').all() as any[]).map(row),
   get(id: string) { const r = db.prepare('SELECT * FROM colony_objects WHERE id=?').get(id); return r ? row(r) : undefined; },
   byName(name: string) { const r = db.prepare('SELECT * FROM colony_objects WHERE name=?').get(name); return r ? row(r) : undefined; },
-  create(p: { name: unknown; kind: unknown; colony_id?: unknown; config: unknown }): ObjectRow {
+  create(input: { name: unknown; kind: unknown; colony_id?: unknown; config: unknown }): ObjectRow {
+    const p = { ...input, kind: kindOf(input.kind) };
     if (!isKind(p.kind)) throw new ObjectError('Unknown kind of object');
     const name = parseName(p.name), config = parseConfig(p.kind, p.config);
     if (objectsStore.byName(name)) throw new ObjectError(`There is already an object named "${name}"`);
@@ -46,15 +50,15 @@ export const objectsStore = {
     const colony = p.colony_id === undefined ? cur.colony_id : p.colony_id ? String(p.colony_id) : null;
     if (colony && !colonies.get(colony)) throw new ObjectError('That colony no longer exists');
     checkMembers(cur.kind, colony, config, id);
-    // Moving an object to another colony takes it out of the bosses it was grouped by.
+    // Moving an object to another colony takes it out of the clusters it was grouped by.
     if (colony !== cur.colony_id) objectsStore.ungroup(id);
     db.prepare('UPDATE colony_objects SET name=?, colony_id=?, config=?, updated_at=? WHERE id=?').run(name, colony, JSON.stringify(config), Date.now(), id);
     return objectsStore.get(id)!;
   },
-  /** Takes an object out of every boss that groups it. */
+  /** Takes an object out of every cluster that groups it. */
   ungroup(id: string) {
-    for (const b of objectsStore.list().filter((x) => x.kind === 'boss' && (x.config as BossConfig).members.includes(id))) {
-      db.prepare('UPDATE colony_objects SET config=?, updated_at=? WHERE id=?').run(JSON.stringify({ members: (b.config as BossConfig).members.filter((m) => m !== id) }), Date.now(), b.id);
+    for (const b of objectsStore.list().filter((x) => x.kind === 'cluster' && (x.config as ClusterConfig).members.includes(id))) {
+      db.prepare('UPDATE colony_objects SET config=?, updated_at=? WHERE id=?').run(JSON.stringify({ members: (b.config as ClusterConfig).members.filter((m) => m !== id) }), Date.now(), b.id);
     }
   },
   remove(id: string) { objectsStore.ungroup(id); return db.prepare('DELETE FROM colony_objects WHERE id=?').run(id).changes > 0; },

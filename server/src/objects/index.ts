@@ -1,7 +1,7 @@
 import { bus } from '../runtime.js';
 import { dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
 import { describeHttp, httpCount, runHttp, scanHttp } from './http.js';
-import { ObjectError, type BossConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
+import { ObjectError, type ClusterConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
 import { forgetServer, serverLogs, serverState, startServer, stopServer } from './runner.js';
 import { objectsStore } from './store.js';
 
@@ -26,9 +26,9 @@ function httpState(o: ObjectRow): ObjectState {
   return { status: r.ok ? 'ready' : 'error', detail: r.text };
 }
 
-/** A boss is what its members are: running when all are, starting while any is, an error when one failed or only some are up. */
-function bossState(o: ObjectRow): ObjectState {
-  const members = (o.config as BossConfig).members.map((id) => ({ row: objectsStore.get(id), state: states.get(id) })).filter((m) => m.row);
+/** A cluster is what its members are: running when all are, starting while any is, an error when one failed or only some are up. */
+function clusterState(o: ObjectRow): ObjectState {
+  const members = (o.config as ClusterConfig).members.map((id) => ({ row: objectsStore.get(id), state: states.get(id) })).filter((m) => m.row);
   if (!members.length) return { status: 'stopped', detail: 'no members' };
   const by = (s: string) => members.filter((m) => m.state?.status === s);
   const up = by('running').length, total = members.length;
@@ -43,7 +43,7 @@ function bossState(o: ObjectRow): ObjectState {
 export async function stateOf(o: ObjectRow): Promise<ObjectState> {
   const s = o.kind === 'server' ? await serverState(o.id, o.config as ServerConfig)
     : o.kind === 'docker' ? await dockerState(o.id, o.config as DockerConfig)
-    : o.kind === 'http' ? httpState(o) : bossState(o);
+    : o.kind === 'http' ? httpState(o) : clusterState(o);
   states.set(o.id, s);
   return s;
 }
@@ -52,10 +52,10 @@ export async function refreshStates(): Promise<boolean> {
   const all = objectsStore.list();
   let diff = false;
   for (const id of [...states.keys()]) if (!all.some((o) => o.id === id)) { states.delete(id); diff = true; }
-  // Bosses last: they are made of what the others just reported.
+  // Clusters last: they are made of what the others just reported.
   const one = async (o: ObjectRow) => { const before = states.get(o.id); const now = await stateOf(o).catch((e): ObjectState => ({ status: 'unknown', detail: e instanceof Error ? e.message : 'failed' })); states.set(o.id, now); if (!same(before, now)) diff = true; };
-  await Promise.all(all.filter((o) => o.kind !== 'boss').map(one));
-  for (const o of all.filter((x) => x.kind === 'boss')) await one(o);
+  await Promise.all(all.filter((o) => o.kind !== 'cluster').map(one));
+  for (const o of all.filter((x) => x.kind === 'cluster')) await one(o);
   return diff;
 }
 
@@ -87,11 +87,11 @@ async function act(o: ObjectRow, action: 'start' | 'stop' | 'restart'): Promise<
 }
 
 /**
- * Members of a boss one after another: start in the order they are listed, stop in the opposite order (what depends on the others goes
+ * Members of a cluster one after another: start in the order they are listed, stop in the opposite order (what depends on the others goes
  * first and last). One failing does not keep the rest from being tried; the failures are reported together.
  */
-async function actOnBoss(o: ObjectRow, action: 'start' | 'stop' | 'restart'): Promise<void> {
-  const members = (o.config as BossConfig).members.map((id) => objectsStore.get(id)).filter((m): m is ObjectRow => !!m);
+async function actOnCluster(o: ObjectRow, action: 'start' | 'stop' | 'restart'): Promise<void> {
+  const members = (o.config as ClusterConfig).members.map((id) => objectsStore.get(id)).filter((m): m is ObjectRow => !!m);
   const errors: string[] = [];
   const each = async (list: ObjectRow[], what: 'start' | 'stop') => {
     for (const m of list) {
@@ -112,20 +112,20 @@ export async function objectAction(id: string, action: unknown): Promise<ObjectV
   const o = get(id);
   if (action !== 'start' && action !== 'stop' && action !== 'restart') throw new ObjectError('Unknown action');
   if (o.kind === 'http') throw new ObjectError('HTTP requests are not started or stopped: open them and run a request.');
-  try { if (o.kind === 'boss') await actOnBoss(o, action); else await act(o, action); }
+  try { if (o.kind === 'cluster') await actOnCluster(o, action); else await act(o, action); }
   finally { await refreshStates().catch(() => undefined); changed(); }
   return viewOf(o);
 }
 
 /**
- * The latest output. A boss reads all its members and puts `[name]` in front of each line; its cursor is the cursors of the members
+ * The latest output. A cluster reads all its members and puts `[name]` in front of each line; its cursor is the cursors of the members
  * together (a JSON text), so a following call returns only what each of them printed since.
  */
 export async function objectLogs(id: string, q: { tail?: number; after?: string }): Promise<{ text: string; cursor: string; reset?: boolean }> {
   const o = get(id);
   if (o.kind === 'http') return { text: '', cursor: '' };
-  if (o.kind === 'boss') {
-    const members = (o.config as BossConfig).members.map((m) => objectsStore.get(m)).filter((m): m is ObjectRow => !!m);
+  if (o.kind === 'cluster') {
+    const members = (o.config as ClusterConfig).members.map((m) => objectsStore.get(m)).filter((m): m is ObjectRow => !!m);
     let before: Record<string, string> = {}; try { before = q.after ? JSON.parse(q.after) : {}; } catch { /* a fresh start */ }
     const per = Math.max(15, Math.ceil((q.tail ?? 300) / Math.max(1, members.length)));
     const parts = await Promise.all(members.map(async (m) => {
