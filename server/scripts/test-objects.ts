@@ -9,7 +9,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { colonies } from '../src/db.js';
-import { ObjectError, createObject, objectAction, objectLogs, removeObject, stateOf, updateObject } from '../src/objects/index.js';
+import { ObjectError, createObject, objectAction, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
 import { objectsStore } from '../src/objects/store.js';
 
 let fail = 0;
@@ -54,6 +54,8 @@ await objectAction(srv.id, 'restart');
 check(await until(async () => (await st(srv.id)) === 'running'), 'restart brings it back');
 const pid2 = (await stateOf(objectsStore.get(srv.id)!)).pid!;
 check(pid2 !== pid, 'with a new process');
+const sst = await statsOf(srv.id);
+check(typeof sst.cpu === 'number' && (sst.memBytes ?? 0) > 1_000_000 && (sst.pids ?? 0) >= 1 && sst.info.pid === pid2, 'a running server reports the CPU, memory and processes of its group');
 
 // a stubborn one is killed after the grace time, with its children
 const stub = createObject({ name: 'stubborn', kind: 'server', config: { cwd: dir, start: `sh -c 'trap "" TERM; while true; do sleep 1; done'` } });
@@ -113,6 +115,8 @@ else {
   check((await st(cont.id)) === 'stopped', 'a container that does not exist yet is "stopped"');
   await objectAction(cont.id, 'start');
   check(await until(async () => (await st(cont.id)) === 'running'), 'starting creates and runs the container');
+  const cst = await statsOf(cont.id);
+  check(cst.info.image === image && (cst.memBytes ?? 0) > 0 && /18|80/.test(String(cst.info.ports ?? '')) && cst.info.restartPolicy === 'no', 'a container reports its usage, image, ports and restart policy');
   const resp = await fetch(`http://127.0.0.1:${hp}/`).then((r) => r.status).catch(() => 0);
   check(resp === 200, 'the port mapping works');
   check(execFileSync('docker', ['inspect', '-f', '{{index .Config.Labels "hive-am.object"}}', cname], { encoding: 'utf8' }).trim() === cont.id, 'it carries a label that says hive-am made it');
@@ -147,6 +151,8 @@ else {
   check(await until(async () => (await st(comp.id)) === 'running'), 'a compose project can be started');
   check((await fetch(`http://127.0.0.1:${cport}/`).then((r) => r.status).catch(() => 0)) === 200, 'and serves');
   check((await objectLogs(comp.id, { tail: 20 })).text.length >= 0, 'its logs can be read');
+  const kst = await statsOf(comp.id);
+  check(kst.services?.length === 1 && kst.services[0].name === 'web' && kst.services[0].state === 'running', 'a compose project lists its services');
   await objectAction(comp.id, 'stop');
   check((await st(comp.id)) === 'stopped', 'and stopped');
   const proj = (objectsStore.get(comp.id)!.config as any).project;

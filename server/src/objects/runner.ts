@@ -16,9 +16,10 @@ const LOG_MAX = 5 * 1024 * 1024;       // a bigger log is set aside when the obj
 const STOP_GRACE_MS = Number(process.env.HIVE_AM_OBJECT_STOP_MS) || 8000;
 const STARTING_MS = 120_000;           // with a port: how long "starting" is believed before it counts as stopped working
 
-interface Saved { pid: number; stamp: string | null; startedAt: number; /** the user asked for it to stop */ stopped?: boolean; exit?: { code: number | null; signal: string | null; at: number } }
+export interface Saved { pid: number; stamp: string | null; startedAt: number; /** the user asked for it to stop */ stopped?: boolean; exit?: { code: number | null; signal: string | null; at: number } }
 
 const files = (id: string) => ({ log: join(DIR, `${id}.log`), state: join(DIR, `${id}.json`) });
+export const readSaved = (id: string): Saved | null => read(id);
 const read = (id: string): Saved | null => { try { return JSON.parse(readFileSync(files(id).state, 'utf8')); } catch { return null; } };
 const write = (id: string, s: Saved) => { mkdirSync(DIR, { recursive: true }); writeFileSync(files(id).state, JSON.stringify(s)); };
 /** A line in the object's log, marked as coming from hive-am (who asked for what, how it ended). */

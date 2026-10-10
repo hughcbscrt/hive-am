@@ -139,6 +139,8 @@ export async function objectLogs(id: string, q: { tail?: number; after?: string 
   return dockerLogs(o.id, o.config as DockerConfig, q);
 }
 
+export const statsOf = async (id: string) => { const { objectStats } = await import('./stats.js'); return objectStats(get(id)); };
+
 /** The requests of an HTTP object, and running one of them. */
 export const httpScan = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return scanHttp((o.config as HttpConfig).folder); };
 export const httpDescribe = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return describeHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env); };
