@@ -333,7 +333,7 @@ export function writeHttpFile(folder: string, relFile: string, content: string):
   writeFileSync(abs, content, 'utf8');
 }
 
-export const EXPORT_FORMATS = ['curl', 'fetch', 'python', 'httpie', 'http'] as const;
+export const EXPORT_FORMATS = ['curl', 'wget', 'httpie', 'powershell', 'fetch', 'axios', 'python', 'go', 'php', 'java', 'csharp', 'ruby', 'rust', 'http'] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 const sq = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
 const js = (v: string) => JSON.stringify(v);
@@ -368,6 +368,31 @@ export function exportHttp(folder: string, relFile: string, index: number, forma
     text = `const res = await fetch(${js(url)}, {\n${opts.join(',\n')}\n});\nconsole.log(res.status, await res.text());`;
   } else if (format === 'python') {
     text = `import requests\n\nres = requests.request(\n    ${js(m)},\n    ${js(url)},\n` + (headers.length ? `    headers={\n${headers.map((h) => `        ${js(h.name)}: ${js(h.value)},`).join('\n')}\n    },\n` : '') + (hasBody ? `    data=${js(body!)}.encode(),\n` : '') + `)\nprint(res.status_code, res.text)`;
+  } else if (format === 'wget') {
+    text = `wget --quiet --method ${m} ${sq(url)}` + headers.map((h) => ` \\\n  --header ${sq(`${h.name}: ${h.value}`)}`).join('') + (hasBody ? ` \\\n  --body-data ${sq(body!)}` : '') + ' \\\n  -O -';
+  } else if (format === 'powershell') {
+    const ps = (v: string) => `'${v.replace(/'/g, "''")}'`;
+    text = (headers.length ? `$headers = @{\n${headers.map((h) => `  ${ps(h.name)} = ${ps(h.value)}`).join('\n')}\n}\n` : '') + `Invoke-RestMethod -Method ${m} -Uri ${ps(url)}` + (headers.length ? ' -Headers $headers' : '') + (hasBody ? ` -Body ${ps(body!)}` : '');
+  } else if (format === 'axios') {
+    const opts = [`  method: ${js(m.toLowerCase())}`, `  url: ${js(url)}`, ...(headers.length ? [`  headers: {\n${headers.map((h) => `    ${js(h.name)}: ${js(h.value)}`).join(',\n')}\n  }`] : []), ...(hasBody ? [`  data: ${js(body!)}`] : [])];
+    text = `import axios from 'axios';\n\nconst res = await axios.request({\n${opts.join(',\n')}\n});\nconsole.log(res.status, res.data);`;
+  } else if (format === 'go') {
+    const gs = (v: string) => '`' + v.replace(/`/g, '` + "`" + `') + '`';
+    text = `package main\n\nimport (\n\t"fmt"\n\t"io"\n\t"net/http"\n${hasBody ? '\t"strings"\n' : ''})\n\nfunc main() {\n\treq, _ := http.NewRequest(${js(m)}, ${js(url)}, ${hasBody ? `strings.NewReader(${gs(body!)})` : 'nil'})\n` + headers.map((h) => `\treq.Header.Set(${js(h.name)}, ${js(h.value)})\n`).join('') + `\tres, err := http.DefaultClient.Do(req)\n\tif err != nil {\n\t\tpanic(err)\n\t}\n\tdefer res.Body.Close()\n\tout, _ := io.ReadAll(res.Body)\n\tfmt.Println(res.StatusCode, string(out))\n}`;
+  } else if (format === 'php') {
+    const ph = (v: string) => `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+    text = `<?php\n$ch = curl_init(${ph(url)});\ncurl_setopt_array($ch, [\n  CURLOPT_CUSTOMREQUEST => ${ph(m)},\n  CURLOPT_RETURNTRANSFER => true,\n` + (headers.length ? `  CURLOPT_HTTPHEADER => [\n${headers.map((h) => `    ${ph(`${h.name}: ${h.value}`)},`).join('\n')}\n  ],\n` : '') + (hasBody ? `  CURLOPT_POSTFIELDS => ${ph(body!)},\n` : '') + `]);\n$out = curl_exec($ch);\necho curl_getinfo($ch, CURLINFO_HTTP_CODE), " ", $out;`;
+  } else if (format === 'java') {
+    text = `import java.net.URI;\nimport java.net.http.*;\n\nvar request = HttpRequest.newBuilder(URI.create(${js(url)}))\n` + headers.filter((h) => !/^(host|content-length|connection)$/i.test(h.name)).map((h) => `    .header(${js(h.name)}, ${js(h.value)})\n`).join('') + `    .method(${js(m)}, ${hasBody ? `HttpRequest.BodyPublishers.ofString(${js(body!)})` : 'HttpRequest.BodyPublishers.noBody()'})\n    .build();\nvar response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());\nSystem.out.println(response.statusCode() + " " + response.body());`;
+  } else if (format === 'csharp') {
+    const cs = (v: string) => '@"' + v.replace(/"/g, '""') + '"';
+    const ct = headers.find((h) => h.name.toLowerCase() === 'content-type')?.value.split(';')[0].trim();
+    text = `using var client = new HttpClient();\nvar request = new HttpRequestMessage(new HttpMethod(${js(m)}), ${cs(url)});\n` + headers.filter((h) => h.name.toLowerCase() !== 'content-type').map((h) => `request.Headers.TryAddWithoutValidation(${js(h.name)}, ${cs(h.value)});\n`).join('') + (hasBody ? `request.Content = new StringContent(${cs(body!)}, System.Text.Encoding.UTF8${ct ? `, ${js(ct)}` : ''});\n` : '') + `var response = await client.SendAsync(request);\nConsole.WriteLine($"{(int)response.StatusCode} {await response.Content.ReadAsStringAsync()}");`;
+  } else if (format === 'ruby') {
+    const rb = (v: string) => `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+    text = `require 'net/http'\nrequire 'uri'\n\nuri = URI(${rb(url)})\nrequest = Net::HTTP::${m[0] + m.slice(1).toLowerCase()}.new(uri)\n` + headers.map((h) => `request[${rb(h.name)}] = ${rb(h.value)}\n`).join('') + (hasBody ? `request.body = ${rb(body!)}\n` : '') + `response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') { |http| http.request(request) }\nputs "#{response.code} #{response.body}"`;
+  } else if (format === 'rust') {
+    text = `let client = reqwest::Client::new();\nlet res = client\n    .request(reqwest::Method::from_bytes(b${js(m)}).unwrap(), ${js(url)})\n` + headers.map((h) => `    .header(${js(h.name)}, ${js(h.value)})\n`).join('') + (hasBody ? `    .body(${js(body!)})\n` : '') + `    .send()\n    .await?;\nprintln!("{} {}", res.status(), res.text().await?);`;
   } else if (format === 'httpie') {
     text = `http${hasBody ? ` --raw ${sq(body!)}` : ''} ${m} ${sq(url)}` + headers.map((h) => ` ${sq(`${h.name}:${h.value}`)}`).join('');
   } else {

@@ -157,4 +157,4 @@ El ejecutor muestra cuánto vale cada variable ahora mismo, no solo su nombre:
 - **Pestaña Historial**: las ejecuciones desde que abriste la pantalla (la más reciente primero) con su respuesta; ahí viven también los valores de sesión, y un valor agregado ahí va al entorno `default`.
 
 API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/objects/:id/http/file`.
-- **Copiar como…**: junto a Ejecutar, copia la petición como cURL, JavaScript (fetch), Python (requests), HTTPie o un mensaje HTTP crudo, con los valores vigentes; lo que no tiene valor queda como `{{nombre}}` y las cabeceras de credenciales se pueden ocultar. API: `GET /api/objects/:id/http/export?file=&index=&format=&env=&redact=1`.
+- **Copiar como…**: junto a Ejecutar, copia la petición como cURL, wget, HTTPie, PowerShell, fetch, axios, Python, Go, PHP, Java, C#, Ruby, Rust o un mensaje HTTP crudo, con los valores vigentes; lo que no tiene valor queda como `{{nombre}}` y las cabeceras de credenciales se pueden ocultar. API: `GET /api/objects/:id/http/export?file=&index=&format=&env=&redact=1`.

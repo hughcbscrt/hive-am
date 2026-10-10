@@ -157,4 +157,4 @@ The runner shows what each variable is worth right now, not only its name:
 - **History tab**: the runs since you opened the screen (newest first) with their answer; the session values live there too, and a value added there goes to the `default` environment.
 
 API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/objects/:id/http/file`.
-- **Copy as…**: next to Run, copies the request as cURL, JavaScript (fetch), Python (requests), HTTPie or a raw HTTP message, with the values in effect now; what has no value stays as `{{name}}` and credential headers can be hidden. API: `GET /api/objects/:id/http/export?file=&index=&format=&env=&redact=1`.
+- **Copy as…**: next to Run, copies the request as cURL, wget, HTTPie, PowerShell, fetch, axios, Python, Go, PHP, Java, C#, Ruby, Rust or a raw HTTP message, with the values in effect now; what has no value stays as `{{name}}` and credential headers can be hidden. API: `GET /api/objects/:id/http/export?file=&index=&format=&env=&redact=1`.

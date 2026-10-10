@@ -249,6 +249,7 @@ const cu = ex('curl');
 check(cu.text.startsWith(`curl 'http://127.0.0.1:${port}/probe/from-env/PRIVATE-TOKEN-1/HIVE-SECRET-KEY/eu?id={{login.response.body.id}}`) && cu.text.includes("-H 'X-Key: HIVE-SECRET-KEY'") && cu.unresolved.includes('nowhere'), 'copying as cURL uses the values in effect and leaves the missing ones as {{name}}');
 check(!ex('curl', true).text.includes('Bearer PRIVATE') && ex('curl', true).text.includes('••••'), 'credential headers can be masked');
 check(ex('fetch').text.includes('method: "GET"') && ex('python').text.includes('requests.request') && ex('httpie').text.startsWith('http GET') && ex('http').text.startsWith('GET http://127.0.0.1') && ex('http').text.includes('Host: 127.0.0.1'), 'and as fetch, Python, HTTPie and a raw HTTP message');
+for (const f of ['wget', 'powershell', 'axios', 'go', 'php', 'java', 'csharp', 'ruby', 'rust']) check(ex(f).text.includes('/probe/from-env/') && ex(f).text.includes('X-Key'), `copying as ${f} carries the url and the headers`);
 check(await rejects(async () => ex('nope'), /Unknown format/), 'an unknown format is refused');
 await runForObject(io.id, 'i.http', 0, 'dev').catch(() => undefined);
 const fileScope = byName(httpInspect(io.id, 'i.http', undefined, 'dev').vars);

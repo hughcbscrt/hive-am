@@ -4,9 +4,9 @@ import { Check, ChevronDown, Copy } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 
-const FORMATS = [['curl', 'cURL'], ['fetch', 'JavaScript (fetch)'], ['python', 'Python (requests)'], ['httpie', 'HTTPie'], ['http', 'HTTP']] as const;
+const FORMATS = [['curl', 'cURL'], ['wget', 'wget'], ['httpie', 'HTTPie'], ['powershell', 'PowerShell'], ['fetch', 'JavaScript (fetch)'], ['axios', 'Node (axios)'], ['python', 'Python (requests)'], ['go', 'Go'], ['php', 'PHP (cURL)'], ['java', 'Java (HttpClient)'], ['csharp', 'C# (HttpClient)'], ['ruby', 'Ruby (net/http)'], ['rust', 'Rust (reqwest)'], ['http', 'HTTP']] as const;
 
-/** "Copy as…": the request, with the values in effect now, as cURL, fetch, Python, HTTPie or a raw HTTP message. */
+/** "Copy as…": the request, with the values in effect now, as cURL, fetch, Python, Go, Java…. */
 export function CopyAs({ objectId, file, index, env }: { objectId: string; file: string; index: number; env: string }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -36,7 +36,7 @@ export function CopyAs({ objectId, file, index, env }: { objectId: string; file:
       <button className="btn sm" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu"><Copy size={14} />{t('hw2.copyAs')}<ChevronDown size={13} /></button>
       {open && (
         <div className="copyas-menu" role="menu">
-          {FORMATS.map(([id, label]) => <button key={id} role="menuitem" className="copyas-item" onClick={() => void copy(id)}>{label}{done === id && <Check size={14} />}</button>)}
+          <div className="copyas-list">{FORMATS.map(([id, label]) => <button key={id} role="menuitem" className="copyas-item" onClick={() => void copy(id)}>{label}{done === id && <Check size={14} />}</button>)}</div>
           <label className="copyas-opt small"><input type="checkbox" checked={redact} onChange={(e) => setRedact(e.target.checked)} />{t('hw2.copyAs.redact')}</label>
           {note && <p className="muted small copyas-note">{note}</p>}
         </div>)}
