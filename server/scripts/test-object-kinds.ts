@@ -132,7 +132,7 @@ const bare = mkdtempSync(join(tmpdir(), 'http-bare-'));
 writeFileSync(join(bare, 'one.http'), `GET {{host}}/vars/{{who}}\nAuthorization: Bearer {{token}}\n`);
 const vobj = createObject({ name: 'own-vars', kind: 'http', config: { folder: bare, env: 'local', variables: { $shared: { who: { value: 'everyone' } }, local: { host: { value: `http://127.0.0.1:${port}` }, token: { value: 'HIDDEN-TOKEN-777', secret: true } }, other: { host: { value: `http://127.0.0.1:${port}/other` } } } } });
 check(httpScan(vobj.id).environments.join() === 'local,other', 'the environments of hive-am are listed when there is no env file');
-check(await rejects(() => httpRun(bare, 'one.http', 0, 'local'), /Variables of this object/), 'without them the request is refused and says where to define them');
+check(await rejects(() => httpRun(bare, 'one.http', 0), /Variables of this object/), 'without them the request is refused and says where to define them');
 const hv = { local: { host: { value: `http://127.0.0.1:${port}` }, token: { value: 'HIDDEN-TOKEN-777' } }, $shared: { who: { value: 'everyone' } } };
 const vr = await httpRun(bare, 'one.http', 0, 'local', hv);
 check(vr.status === 200 && seen.at(-1)!.url === '/vars/everyone' && seen.at(-1)!.headers.authorization === 'Bearer HIDDEN-TOKEN-777', 'with them it runs: environment values and the shared ones are filled in');
