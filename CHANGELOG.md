@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+- Long conversations no longer freeze the browser: the chat loads the newest 60 messages with a "Show earlier" button, the history endpoint accepts `limit`, and parsed Claude transcripts are cached while the file is unchanged.
 - Telegram forum topics: the implicit reply to the topic's first message is no longer read as a message aimed at someone else, so the agent is not left thinking people talk to another person.
 - A long turn on group chatter that ends without `channel_reply` now gets one reminder, so a finished job is not lost as plain text nobody sees.
 - The Telegram typing indicator is refreshed after the agent's own messages, no longer stops early when two turns overlap, logs failures and has a safety cap.
