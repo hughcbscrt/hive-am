@@ -24,6 +24,7 @@ Esta carpeta describe el proyecto completo: cómo está organizado, cómo se eje
 | 12 | [Operación y solución de problemas](12-operacion-y-problemas.md) | Seguridad, límites conocidos, diagnóstico, cómo probar |
 | 13 | [Explorador de cambios (git)](13-explorador-de-cambios-git.md) | Pestaña **Cambios**: árbol de archivos con resaltado y visor de diferencias, historial y acciones de git (commit, pull, push, ramas) |
 | 14 | [Conexiones externas](14-conexiones-externas.md) | Vincular un agente a Telegram: sesión única, herramienta `channel_reply`, permisos, API y pantalla **Conexiones** |
+| 15 | [Objetos de la colonia](15-objetos-de-la-colonia.md) | Servidores y contenedores Docker como hexágonos de la colonia: iniciar / detener / reiniciar, logs, cómo corren y la API |
 
 ## Lectura recomendada
 
