@@ -154,7 +154,7 @@ El ejecutor muestra cuánto vale cada variable ahora mismo, no solo su nombre:
 - **Pestaña Petición**: la petición tal como se enviará, con lo que falta marcado; tras ejecutar, lo que realmente se envió.
 - **Pestaña Archivo**: el texto del `.http` con un ▶ por petición, `{{variables}}` coloreadas por origen (el valor al pasar el mouse) y un editor (Ctrl+S) que guarda el archivo en disco (solo `.http` / `.rest` existentes, hasta 1 MB).
 - **Respuestas** como árbol JSON plegable; cada valor copia su referencia (`{{nombre.response.body.$.ruta}}`) si la petición tiene nombre. El panel Sesión lista las respuestas recordadas con sus datos.
-- **Pestaña Historial**: las ejecuciones desde que abriste la pantalla (la más reciente primero) con su respuesta; ahí viven también los valores de sesión, y un valor agregado ahí va al entorno `default`.
+- **Pestaña Historial**: las últimas 100 ejecuciones (la más reciente primero, guardadas en disco: sobreviven a un reinicio) con su respuesta; **Comparar con…** muestra las diferencias con la ejecución anterior de la petición o con cualquier otra: estado, tiempo, tamaño, cabeceras y un diff por líneas de la respuesta; ahí viven también los valores de sesión, y un valor agregado ahí va al entorno `default`.
 
 API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/objects/:id/http/file`.
 - **Copiar como…**: junto a Ejecutar, copia la petición como cURL, wget, HTTPie, PowerShell, fetch, axios, Python, Go, PHP, Java, C#, Ruby, Rust o un mensaje HTTP crudo, con los valores vigentes; lo que no tiene valor queda como `{{nombre}}` y las cabeceras de credenciales se pueden ocultar. API: `GET /api/objects/:id/http/export?file=&index=&format=&env=&redact=1`.

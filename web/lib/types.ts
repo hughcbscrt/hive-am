@@ -145,6 +145,7 @@ export interface ObjectStats {
   info: Record<string, string | number | null>; services?: { name: string; state: string; health: string; ports: string }[];
 }
 export interface HttpTest { name: string; passed: boolean; message?: string }
+export interface HttpHistoryEntry { n: number; at: number; file: string; index: number; name: string; method: string; env: string; run?: HttpRun; error?: string }
 export interface HttpSessionView { globals: Record<string, string>; responses: { name: string; status: number; at: number; headers: Record<string, string>; body: string }[] }
 export type VarSource = 'session' | 'file' | 'envfile' | 'hive' | 'response' | 'dynamic' | 'missing';
 export interface VarInfo { name: string; value: string | null; source: VarSource; from: string; secret: boolean; hidden: boolean; overridden: { source: VarSource; from: string; value: string | null }[]; usedBy: number; hint?: string }

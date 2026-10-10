@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
 import { fmtBytes } from '@/lib/format';
-import type { HttpConfig, HttpFile, HttpInspection, HttpRequestItem, HttpRun, HttpScan, HttpSessionView, ObjectView } from '@/lib/types';
+import type { HttpConfig, HttpFile, HttpHistoryEntry, HttpInspection, HttpRequestItem, HttpRun, HttpScan, HttpSessionView, ObjectView } from '@/lib/types';
 import { Segmented } from '@/components/ui';
 import { CopyBtn } from '@/components/chat/ToolCall';
 import { JsonTree } from './JsonTree';
@@ -13,12 +13,11 @@ import { VarsTable } from './VarsTable';
 import { HttpSource } from './HttpSource';
 import { CopyAs } from './CopyAs';
 import { NewRequest } from './NewRequest';
+import { RunDiff } from './RunDiff';
 
 const parseJson = (s: string): unknown | undefined => { try { return JSON.parse(s); } catch { return undefined; } };
 
 interface Result { run?: HttpRun; error?: string; at: number }
-interface HistEntry { n: number; file: string; req: HttpRequestItem; env: string; result: Result }
-let histN = 0;
 /** The environment where the values added from the runner go (created the first time). */
 const DEFAULT_ENV = 'default';
 const methodTone = (m: string) => (m === 'GET' ? 'get' : m === 'POST' ? 'post' : m === 'DELETE' ? 'del' : m === 'PUT' || m === 'PATCH' ? 'put' : 'other');
@@ -60,8 +59,11 @@ export function HttpWorkspace({ object: o, onOpenVars, pane = 'requests', onGoRe
   const [fileInsp, setFileInsp] = useState<HttpInspection | null>(null);
   const [openAns, setOpenAns] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [hist, setHist] = useState<HistEntry[]>([]);
+  const [hist, setHist] = useState<HttpHistoryEntry[]>([]);
   const [histSel, setHistSel] = useState<number | null>(null);
+  const [cmp, setCmp] = useState<number | 'prev' | null>(null);
+  const loadHistory = useCallback(() => api.get<HttpHistoryEntry[]>(`/objects/${o.id}/http/history`).then(setHist).catch(() => undefined), [o.id]);
+  useEffect(() => { void loadHistory(); }, [loadHistory]);
   const [session, setSession] = useState<HttpSessionView>({ globals: {}, responses: [] });
   const [stopOnFail, setStopOnFail] = useState(false);
   const [note, setNote] = useState('');
@@ -103,9 +105,9 @@ export function HttpWorkspace({ object: o, onOpenVars, pane = 'requests', onGoRe
     let out: Result;
     try { out = { run: await api.post<HttpRun>(`/objects/${o.id}/http/run`, { file: f, index: r.index, env: env || undefined }), at: Date.now() }; }
     catch (e) { out = { error: e instanceof Error ? e.message : 'error', at: Date.now() }; }
-    setResults((x) => ({ ...x, [r.id]: out })); setHist((h) => [{ n: ++histN, file: f, req: r, env, result: out }, ...h].slice(0, 100)); setBusy(null); void loadSession();
+    setResults((x) => ({ ...x, [r.id]: out })); setBusy(null); void loadHistory(); void loadSession();
     return out;
-  }, [o.id, env, loadSession]);
+  }, [o.id, env, loadSession, loadHistory]);
   const runFile = async (f: HttpFile) => {
     setNote('');
     for (const r of f.requests) {
@@ -162,30 +164,41 @@ const sessionBlock = (
   if (!scan) return <p className="gx-note">{t('git.loading')}</p>;
   if (pane === 'history') {
     const cur = hist.find((h) => h.n === histSel) ?? null;
-    const cr = cur?.result, cj = cr?.run ? parseJson(cr.run.body) : undefined;
+    const cj = cur?.run ? parseJson(cur.run.body) : undefined;
+    const reqOf = (h: HttpHistoryEntry) => scan.files.find((f) => f.relFile === h.file)?.requests[h.index];
+    const prev = cur ? hist.find((h) => h.n < cur.n && h.file === cur.file && h.index === cur.index && h.run) : undefined;
+    const other = cmp === 'prev' ? prev : typeof cmp === 'number' ? hist.find((h) => h.n === cmp) : undefined;
+    const toneOf = (h: HttpHistoryEntry) => (!h.run ? 'err' : h.run.tests.some((x) => !x.passed) || h.run.scriptError ? 'err' : statusTone(h.run.status));
     return (
       <div className="hw">
         <aside className="hw-list">
-          <div className="hw-env"><b className="grow">{t('hw2.history')}</b>{hist.length > 0 && <button className="btn ghost sm" onClick={() => { setHist([]); setHistSel(null); }}><Trash2 size={13} />{t('hw2.history.clear')}</button>}</div>
+          <div className="hw-env"><b className="grow">{t('hw2.history')}</b>{hist.length > 0 && <button className="btn ghost sm" onClick={() => { void api.del(`/objects/${o.id}/http/history`).then(() => { setHist([]); setHistSel(null); }); }}><Trash2 size={13} />{t('hw2.history.clear')}</button>}</div>
           <div className="hr-reqs">
             {hist.length === 0 && <p className="gx-note">{t('hw2.history.empty')}</p>}
-            {hist.map((h) => { const tn = tone(h.result); return (
-              <button key={h.n} className={`hr-req ${histSel === h.n ? 'sel' : ''}`} onClick={() => setHistSel(h.n)}>
-                <span className={`hr-m ${methodTone(h.req.method)}`}>{h.req.method}</span><span className="nm">{h.req.name}</span>
-                <span className="muted small">{new Date(h.result.at).toLocaleTimeString()}</span>
-                {tn && <i className={`hr-dot ${tn}`} title={h.result.run ? String(h.result.run.status) : h.result.error} />}
-              </button>); })}
+            {hist.map((h) => (
+              <button key={h.n} className={`hr-req ${histSel === h.n ? 'sel' : ''}`} onClick={() => { setHistSel(h.n); setCmp(null); }}>
+                <span className={`hr-m ${methodTone(h.method || 'GET')}`}>{h.method || '?'}</span><span className="nm">{h.name}</span>
+                <span className="muted small">{new Date(h.at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
+                <i className={`hr-dot ${toneOf(h)}`} title={h.run ? String(h.run.status) : h.error} />
+              </button>))}
           </div>
         </aside>
         <section className="hr-detail" style={{ overflow: 'auto' }}>
-          {cur && cr && (<div className="hr-pre">
-            <div className="row gap-s wrap" style={{ marginBottom: 8 }}><span className={`hr-m ${methodTone(cur.req.method)}`}>{cur.req.method}</span><code className="mono grow" style={{ overflowWrap: 'anywhere' }}>{cr.run?.request.url ?? cur.req.url}</code>
-              {cr.run && <><b className={`hr-st ${statusTone(cr.run.status)}`}>{cr.run.status} {cr.run.statusText}</b><span className="muted small">{t('http.time', { ms: cr.run.durationMs })} · {fmtBytes(cr.run.size)}</span></>}
-              <button className="btn sm" onClick={() => { setFile(cur.file); setSel(cur.req); setTab('body'); onGoRequests?.(); }}>{t('hw2.history.open')}</button></div>
-            <p className="muted small" style={{ margin: '0 0 8px' }}>{cur.file}{cur.env ? ` · ${cur.env}` : ''}</p>
-            {cr.error && <div className="gx-banner err" style={{ whiteSpace: 'pre-wrap' }}>{cr.error}</div>}
-            {cr.run && cr.run.tests.map((x, i) => <div key={i} className={`hw-test ${x.passed ? 'ok' : 'err'}`}>{x.passed ? <Check size={14} /> : <X size={14} />}<b>{x.name}</b>{x.message && <span className="muted"> — {x.message}</span>}</div>)}
-            {cr.run && !cr.run.binary && cr.run.body && (cj !== undefined ? <JsonTree value={cj} refBase={cur.req.named ? `${cur.req.named}.response.body` : undefined} /> : <pre>{prettyBody(cr.run)}</pre>)}
+          {cur && (<div className="hr-pre">
+            <div className="row gap-s wrap" style={{ marginBottom: 8 }}><span className={`hr-m ${methodTone(cur.method || 'GET')}`}>{cur.method}</span><code className="mono grow" style={{ overflowWrap: 'anywhere' }}>{cur.run?.request.url ?? cur.name}</code>
+              {cur.run && <><b className={`hr-st ${statusTone(cur.run.status)}`}>{cur.run.status} {cur.run.statusText}</b><span className="muted small">{t('http.time', { ms: cur.run.durationMs })} · {fmtBytes(cur.run.size)}</span></>}
+              {reqOf(cur) && <button className="btn sm" onClick={() => { setFile(cur.file); setSel(reqOf(cur)!); setTab('body'); onGoRequests?.(); }}>{t('hw2.history.open')}</button>}</div>
+            <div className="row gap-s wrap small" style={{ marginBottom: 8 }}><span className="muted">{cur.file}{cur.env ? ` · ${cur.env}` : ''}</span><span className="grow" />
+              <select className="select" style={{ width: 'auto', padding: '3px 8px' }} value={String(cmp ?? '')} onChange={(e) => setCmp(e.target.value === '' ? null : e.target.value === 'prev' ? 'prev' : Number(e.target.value))} aria-label={t('hw2.diff.with')}>
+                <option value="">{t('hw2.diff.with')}</option>
+                <option value="prev" disabled={!prev}>{t('hw2.diff.prev')}</option>
+                {hist.filter((h) => h.n !== cur.n && h.run).map((h) => <option key={h.n} value={h.n}>{h.name} · {new Date(h.at).toLocaleTimeString()} · {h.run!.status}</option>)}
+              </select></div>
+            {cmp === 'prev' && !prev && <p className="muted small">{t('hw2.diff.noPrev')}</p>}
+            {other && cur.run && other.run ? (other.at <= cur.at ? <RunDiff before={other} after={cur} /> : <RunDiff before={cur} after={other} />) : (<>
+              {cur.error && <div className="gx-banner err" style={{ whiteSpace: 'pre-wrap' }}>{cur.error}</div>}
+              {cur.run && cur.run.tests.map((x, i) => <div key={i} className={`hw-test ${x.passed ? 'ok' : 'err'}`}>{x.passed ? <Check size={14} /> : <X size={14} />}<b>{x.name}</b>{x.message && <span className="muted"> — {x.message}</span>}</div>)}
+              {cur.run && !cur.run.binary && cur.run.body && (cj !== undefined ? <JsonTree value={cj} refBase={reqOf(cur)?.named ? `${reqOf(cur)!.named}.response.body` : undefined} /> : <pre>{prettyBody(cur.run)}</pre>)}</>)}
           </div>)}
           {sessionBlock}
         </section>

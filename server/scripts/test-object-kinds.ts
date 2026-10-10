@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { colonies } from '../src/db.js';
-import { ObjectError, createObject, httpExport, httpFileCreate, httpDescribe, httpFileRead, httpFileWrite, httpInspect, httpRun as runForObject, httpScan, httpSession, httpSessionClear, httpSessionSet, objectAction, objectLogs, refreshStates, removeObject, stateOf, updateObject, viewOf } from '../src/objects/index.js';
+import { ObjectError, createObject, httpExport, httpHistory, httpHistoryClear, httpFileCreate, httpDescribe, httpFileRead, httpFileWrite, httpInspect, httpRun as runForObject, httpScan, httpSession, httpSessionClear, httpSessionSet, objectAction, objectLogs, refreshStates, removeObject, stateOf, updateObject, viewOf } from '../src/objects/index.js';
 import { parseHttpFile, runHttp as httpRun } from '../src/objects/http.js';
 import { objectsStore } from '../src/objects/store.js';
 
@@ -266,6 +266,10 @@ httpSessionClear(io.id);
 
 writeFileSync(join(insp, 'basic.http'), '### b\nGET http://h/\nAuthorization: Basic ana s3cret\n');
 check(httpExport(io.id, 'basic.http', 0, 'curl', 'dev').text.includes(`Authorization: Basic ${Buffer.from('ana:s3cret').toString('base64')}`), 'Authorization: Basic user password is sent encoded');
+const hh = httpHistory(io.id);
+check(hh.length >= 1 && hh[0].file === 'i.http' && hh[0].name === 'login' && hh[0].method === 'POST' && (hh[0].run || hh[0].error), 'a run is kept in the history of the object (newest first), with its request name');
+const hn = hh.length; httpHistoryClear(io.id);
+check(httpHistory(io.id).length === 0 && hn >= 1, 'and the history can be cleared');
 // files: create
 check(httpFileCreate(io.id, 'new/made.http', '### x\nGET http://h/\n').file === 'new/made.http' && httpFileRead(io.id, 'new/made.http').content.includes('GET http://h/'), 'a new .http file can be created (folders included)');
 check(await rejects(async () => httpFileCreate(io.id, 'new/made.http', ''), /already exists/) && await rejects(async () => httpFileCreate(io.id, '../out.http', ''), /Use a name/) && await rejects(async () => httpFileCreate(io.id, 'notes.txt', ''), /Use a name/), 'but never over an existing one, outside the folder or with another extension');

@@ -1,6 +1,7 @@
 import { bus } from '../runtime.js';
 import { dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
-import { createHttpFile, exportHttp, type ExportFormat, describeHttp, dropSession, inspectHttp, readHttpFile, runHttp, scanHttp, writeHttpFile, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
+import { recordRun, listHistory, clearHistory } from './http-history.js';
+import { parseHttpFile, createHttpFile, exportHttp, type ExportFormat, describeHttp, dropSession, inspectHttp, readHttpFile, runHttp, scanHttp, writeHttpFile, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
 import { ObjectError, type ClusterConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
 import { forgetServer, serverLogs, serverState, startServer, stopServer } from './runner.js';
 import { forgetSupervision, resetSupervision, supervise } from './supervisor.js';
@@ -153,7 +154,19 @@ export const statsOf = async (id: string) => { const { objectStats } = await imp
 /** The requests of an HTTP object, and running one of them. */
 export const httpScan = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return scanHttp((o.config as HttpConfig).folder, (o.config as HttpConfig).variables); };
 export const httpDescribe = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return describeHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id)); };
-export const httpRun = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return runHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id)); };
+export const httpRun = async (id: string, file: string, index: number, env?: string) => {
+  const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object');
+  const cfg = o.config as HttpConfig, useEnv = env ?? cfg.env ?? '';
+  let name = `#${index}`, method = '';
+  try { const it = parseHttpFile(readHttpFile(cfg.folder, file), file).requests[index]; if (it) { name = it.name; method = it.method; } } catch { /* the run reports it */ }
+  try {
+    const run = await runHttp(cfg.folder, file, index, useEnv || undefined, cfg.variables, sessionOf(o.id));
+    recordRun(id, { file, index, name, method, env: useEnv, run });
+    return run;
+  } catch (e) { recordRun(id, { file, index, name, method, env: useEnv, error: e instanceof Error ? e.message : String(e) }); throw e; }
+};
+export const httpHistory = (id: string) => { httpObjectOf(id); return listHistory(id); };
+export const httpHistoryClear = (id: string) => { httpObjectOf(id); clearHistory(id); return []; };
 
 export const httpInspect = (id: string, file: string | undefined, index: number | undefined, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return inspectHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id)); };
 export const httpExport = (id: string, file: string, index: number, format: ExportFormat, env?: string, redact = false) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return exportHttp((o.config as HttpConfig).folder, file, index, format, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id), redact); };
@@ -162,6 +175,7 @@ export const httpFileCreate = (id: string, file: string, content: string) => { c
 export const httpFileWrite = (id: string, file: string, content: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); writeHttpFile((o.config as HttpConfig).folder, file, content); return { ok: true }; };
 
 /** The values kept while an HTTP object is used (see http.ts): look at them, set one, forget one or all. */
+const httpObjectOf = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return o; };
 const httpObject = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return o; };
 export const httpSession = (id: string) => sessionView(httpObject(id).id);
 export const httpSessionSet = (id: string, name: string, value: string) => { sessionSet(httpObject(id).id, name, value); return sessionView(id); };
@@ -172,7 +186,7 @@ export async function removeObject(id: string): Promise<boolean> {
   const o = objectsStore.get(id); if (!o) return false;
   if (o.kind === 'server') { await stopServer(o.id, o.config as ServerConfig).catch(() => undefined); forgetServer(o.id); }
   else if (o.kind === 'docker') await removeDocker(o.id, o.config as DockerConfig);
-  states.delete(id); counts.delete(id); forgetSupervision(id); dropSession(id);
+  states.delete(id); counts.delete(id); forgetSupervision(id); dropSession(id); clearHistory(id);
   const ok = objectsStore.remove(id); changed();
   return ok;
 }

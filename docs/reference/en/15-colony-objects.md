@@ -154,7 +154,7 @@ The runner shows what each variable is worth right now, not only its name:
 - **Request tab**: the request as it will be sent, with missing values marked; after a run, what was actually sent.
 - **File tab**: the `.http` source with a ▶ per request, `{{variables}}` coloured by origin (hover for the value) and an editor (Ctrl+S) that saves the file on disk (existing `.http` / `.rest` files only, up to 1 MB).
 - **Answers** as a foldable JSON tree; each value copies its reference (`{{name.response.body.$.path}}`) when the request has a name. The Session panel lists remembered answers with their data.
-- **History tab**: the runs since you opened the screen (newest first) with their answer; the session values live there too, and a value added there goes to the `default` environment.
+- **History tab**: the last 100 runs (newest first, kept on disk, so they survive a restart) with their answer; **Compare with…** shows the differences with the previous run of the request or any other: status, time, size, headers and a line diff of the answer; the session values live there too, and a value added there goes to the `default` environment.
 
 API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/objects/:id/http/file`.
 - **Copy as…**: next to Run, copies the request as cURL, wget, HTTPie, PowerShell, fetch, axios, Python, Go, PHP, Java, C#, Ruby, Rust or a raw HTTP message, with the values in effect now; what has no value stays as `{{name}}` and credential headers can be hidden. API: `GET /api/objects/:id/http/export?file=&index=&format=&env=&redact=1`.
