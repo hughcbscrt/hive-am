@@ -62,12 +62,12 @@ export function ActionButtons({ a, ahead, behind, detached, changeCount, onCommi
   const off = !!a.busy;
   return (
     <div className="gx-acts" role="group" aria-label={t('git.act.group')}>
-      <button className="btn sm" disabled={off} title={t('git.act.fetch.hint')} onClick={() => void a.run('fetch', t('git.done.fetch'), 'fetch')}>
-        {a.busy === 'fetch' ? <Loader2 size={14} className="spin" /> : <CloudDownload size={14} />}{t('git.act.fetch')}</button>
-      <button className="btn sm" disabled={off} title={t('git.act.pull.hint')} onClick={() => void a.run('pull', t('git.done.pull'), 'pull')}>
-        {a.busy === 'pull' ? <Loader2 size={14} className="spin" /> : <ArrowDown size={14} />}{t('git.act.pull')}{behind > 0 && <span className="ct">{behind}</span>}</button>
-      <button className="btn sm" disabled={off || detached} title={t('git.act.push.hint')} onClick={() => void a.run('push', t('git.done.push'), 'push')}>
-        {a.busy === 'push' ? <Loader2 size={14} className="spin" /> : <ArrowUp size={14} />}{t('git.act.push')}{ahead > 0 && <span className="ct">{ahead}</span>}</button>
+      <button className="btn sm" disabled={off} title={`${t('git.act.fetch')} — ${t('git.act.fetch.hint')}`} aria-label={t('git.act.fetch')} onClick={() => void a.run('fetch', t('git.done.fetch'), 'fetch')}>
+        {a.busy === 'fetch' ? <Loader2 size={14} className="spin" /> : <CloudDownload size={14} />}</button>
+      <button className="btn sm" disabled={off} title={`${t('git.act.pull')} — ${t('git.act.pull.hint')}`} aria-label={t('git.act.pull')} onClick={() => void a.run('pull', t('git.done.pull'), 'pull')}>
+        {a.busy === 'pull' ? <Loader2 size={14} className="spin" /> : <ArrowDown size={14} />}{behind > 0 && <span className="ct">{behind}</span>}</button>
+      <button className="btn sm" disabled={off || detached} title={`${t('git.act.push')} — ${t('git.act.push.hint')}`} aria-label={t('git.act.push')} onClick={() => void a.run('push', t('git.done.push'), 'push')}>
+        {a.busy === 'push' ? <Loader2 size={14} className="spin" /> : <ArrowUp size={14} />}{ahead > 0 && <span className="ct">{ahead}</span>}</button>
       <button className="btn sm primary" disabled={off || changeCount === 0} title={changeCount === 0 ? t('git.commit.nothing') : undefined} onClick={onCommit}>
         {a.busy === 'commit' ? <Loader2 size={14} className="spin" /> : <GitCommitHorizontal size={14} />}{t('git.act.commit')}{changeCount > 0 && <span className="ct">{changeCount}</span>}</button>
     </div>

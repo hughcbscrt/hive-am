@@ -85,7 +85,7 @@ export function TagView({ agent, tag, onChanged }: { agent: Agent; tag: GitTagIn
       <header className="gx-chead">
         <h3><Tag size={16} style={{ verticalAlign: '-2px', marginRight: 6 }} />{tag.name}</h3>
         {tag.subject && <div>{tag.subject}</div>}
-        <div className="muted small row gap-s wrap"><span className="gx-chip soft">{tag.annotated ? t('git.tags.annotated') : t('git.tags.lightweight')}</span><span className="mono">{tag.sha.slice(0, 10)}</span><CopyBtn text={tag.sha} label={t('git.info.copySha')} /><span>· {fmtDateTime(tag.date)}</span>{files && <span>· {t('git.tags.nfiles', { count: files.length })}</span>}</div>
+        <div className="muted small row gap-s wrap"><span className="gx-chip soft">{tag.annotated ? t('git.tags.annotated') : t('git.tags.lightweight')}</span><span className="mono">{tag.sha.slice(0, 10)}</span><CopyBtn text={tag.sha} label={t('git.info.copySha')} compact /><span>· {fmtDateTime(tag.date)}</span>{files && <span>· {t('git.tags.nfiles', { count: files.length })}</span>}</div>
         <div className="row gap-s wrap" style={{ marginTop: 8 }}>
           {newBr === null ? <button className="btn sm" onClick={() => setNewBr('')}><GitBranch size={14} />{t('git.tags.newBranch')}</button> : (<>
             <input className="input mono" style={{ maxWidth: 240 }} autoFocus placeholder={t('git.tags.branchName')} value={newBr} onChange={(e) => { setNewBr(e.target.value.trim()); setBrErr(''); }} aria-label={t('git.tags.branchName')} onKeyDown={(e) => { if (e.key === 'Enter') void createBranch(); if (e.key === 'Escape') setNewBr(null); }} />

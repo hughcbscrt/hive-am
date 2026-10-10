@@ -830,6 +830,7 @@ export const es: Record<DictKey, string> = {
   "git.cmp.more": "Se muestran los {count} más recientes.",
   "git.cmp.nofiles": "Sin diferencias en los archivos.",
   "git.search.name": "Nombre",
+  "git.files.short": "archivos",
   "git.search.content": "Contenido",
   "git.search.placeholder": "Buscar dentro de los archivos",
   "git.search.min": "Escribe al menos 2 caracteres.",

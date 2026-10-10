@@ -101,7 +101,7 @@ export function CommitPreview({ agent, sha, embedded = false, focus }: { agent: 
         return (<>
           <h3>{subject}</h3>
           {body && <pre className="gx-cbody">{body}</pre>}
-          <div className="muted small row gap-s wrap"><span className="mono">{d.sha.slice(0, 10)}</span><CopyBtn text={d.sha} label={t('git.info.copySha')} /><span>· {d.author} · {fmtDateTime(d.date)}</span>
+          <div className="muted small row gap-s wrap"><span className="mono">{d.sha.slice(0, 10)}</span><CopyBtn text={d.sha} label={t('git.info.copySha')} compact /><span>· {d.author} · {fmtDateTime(d.date)}</span>
             <span>· {t('git.hist.files', { count: d.files.length })}</span></div>
         </>);
       }} />

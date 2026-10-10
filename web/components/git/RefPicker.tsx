@@ -22,8 +22,10 @@ export function useRefs(agent: Agent, stamp?: unknown): GitRefs | null {
  * A button that opens a list of branches, tags and remote branches, with a search box. Anything that looks like a commit
  * (7+ hex characters) or `HEAD~2` can be typed and used as it is. `extra` adds fixed entries on top (e.g. "All branches").
  */
-export function RefPicker({ refs, value, onChange, label, extra, icon = true }: {
+export function RefPicker({ refs, value, onChange, label, extra, icon = true, compact = false }: {
   refs: GitRefs | null; value: string; onChange: (ref: string) => void; label?: string; icon?: boolean;
+  /** A small icon button (the chosen name appears next to it when there is one). */
+  compact?: boolean;
   extra?: { value: string; label: string }[];
 }) {
   const { t } = useI18n();
@@ -49,9 +51,15 @@ export function RefPicker({ refs, value, onChange, label, extra, icon = true }: 
   );
   return (
     <div className="gx-brmenu gx-refpick" ref={box}>
-      <button type="button" className="btn sm gx-refbtn" aria-expanded={open} aria-haspopup="listbox" title={label} onClick={() => setOpen((o) => !o)}>
-        {icon && <GitBranch size={14} />}<span className="nm mono">{extra?.find((x) => x.value === value)?.label ?? (value || t('git.ref.pick'))}</span><ChevronDown size={13} />
-      </button>
+      {compact ? (
+        <button type="button" className={`btn sm ${value ? 'primary gx-refbtn' : 'ghost icon'}`} aria-expanded={open} aria-haspopup="listbox" aria-label={label} title={label} onClick={() => setOpen((o) => !o)}>
+          <GitBranch size={14} />{value && <span className="nm mono">{value}</span>}
+        </button>
+      ) : (
+        <button type="button" className="btn sm gx-refbtn" aria-expanded={open} aria-haspopup="listbox" title={label} onClick={() => setOpen((o) => !o)}>
+          {icon && <GitBranch size={14} />}<span className="nm mono">{extra?.find((x) => x.value === value)?.label ?? (value || t('git.ref.pick'))}</span><ChevronDown size={13} />
+        </button>
+      )}
       {open && (
         <div className="gx-pop" role="listbox">
           <div className="search"><Search size={14} /><input className="input" autoFocus placeholder={t('git.ref.search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('git.ref.search')}

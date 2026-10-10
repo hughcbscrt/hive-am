@@ -15,14 +15,14 @@ export const ToolsOpen = createContext<boolean | null>(null);
 
 const tilde = (p: string) => p.replace(/^\/home\/[^/]+/, '~');
 
-export function CopyBtn({ text, label }: { text: string; label?: string }) {
+export function CopyBtn({ text, label, compact = false }: { text: string; label?: string; /** icon only (the label stays as tooltip) */ compact?: boolean }) {
   const { t } = useI18n();
   label ??= t('common.copy');
   const [ok, setOk] = useState(false);
   return (
-    <button type="button" className="copybtn" aria-label={label} title={label}
+    <button type="button" className={`copybtn ${compact ? 'compact' : ''}`} aria-label={label} title={label}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard?.writeText(text).then(() => { setOk(true); setTimeout(() => setOk(false), 1200); }).catch(() => undefined); }}>
-      {ok ? <Check size={13} /> : <Copy size={13} />}{ok ? t('common.copied') : label}
+      {ok ? <Check size={13} /> : <Copy size={13} />}{compact ? null : ok ? t('common.copied') : label}
     </button>
   );
 }

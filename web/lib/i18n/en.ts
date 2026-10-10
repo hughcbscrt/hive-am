@@ -832,6 +832,7 @@ export const en = {
   "git.cmp.more": "Showing the newest {count}.",
   "git.cmp.nofiles": "No differences in files.",
   "git.search.name": "Name",
+  "git.files.short": "files",
   "git.search.content": "Content",
   "git.search.placeholder": "Search inside the files",
   "git.search.min": "Type at least 2 characters.",

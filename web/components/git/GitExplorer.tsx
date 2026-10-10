@@ -1,6 +1,6 @@
 'use client';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, ChevronUp, File, FileCode, FileImage, FileText, Folder, FolderOpen, GitBranch, History, ListChecks, RefreshCw, Search, Undo2, X } from 'lucide-react';
+import { Archive, ChevronDown, ChevronRight, ChevronUp, File, FileCode, FileImage, FileText, Folder, FolderOpen, FolderTree, GitBranch, GitCompareArrows, History, ListChecks, ListFilter, RefreshCw, Search, Tag, TextSearch, Undo2, UserSearch, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api } from '@/lib/api';
@@ -213,17 +213,21 @@ function Preview({ agent, path, ignored = false, change, stamp, refs, focusLine,
           {change && (change.additions !== null || change.deletions !== null) && <span className="gx-counts"><i className="add">+{change.additions ?? 0}</i><i className="del">−{change.deletions ?? 0}</i></span>}
           {file && !change && <span className="muted small">{fmtBytes(file.size)}</span>}
         </div>
+        <div className="gx-ptr">
+            {change?.status !== 'untracked' && !ignored && <button type="button" className="btn ghost icon sm" title={t('git.file.history')} aria-label={t('git.file.history')} onClick={() => onHistory(path)}><History size={15} /></button>}
+            {change?.status !== 'untracked' && !ignored && <RefPicker refs={refs} value={atRef ?? ''} onChange={setAtRef} compact label={t('git.file.viewAt')} extra={[{ value: '', label: t('git.file.viewAt') }]} />}
+            {!isImage && !ignored && !atRef && change?.status !== 'deleted' && change?.status !== 'untracked' && change?.status !== 'conflict' && (() => {
+              const on = blameOn && view === 'file';
+              return <button type="button" className={`btn ghost icon sm ${on ? 'on' : ''}`} aria-pressed={on} aria-label={t('git.blame')} title={`${t('git.blame')} — ${t('git.blame.hint')}`} onClick={() => { if (view !== 'file') { setView('file'); setBlameOn(true); } else setBlameOn((x) => !x); }}><UserSearch size={15} /></button>;
+            })()}
+            <CopyBtn text={path} label={t('git.copyPath')} compact />
+            {change && change.status !== 'conflict' && <button type="button" className="btn sm" title={t('git.discard.hint')} onClick={() => onDiscard(change)}><Undo2 size={14} />{t('git.discard')}</button>}
+          </div>
         <div className="gx-ptools">
-          {(change || isMd) && <Segmented value={view} onChange={setView} options={[...(change ? [{ id: 'diff' as const, label: t('git.view.diff') }] : []), ...(isMd ? [{ id: 'preview' as const, label: t('git.view.preview') }] : []), { id: 'file' as const, label: t(isMd ? 'git.view.source' : 'git.view.file') }]} />}
-          {view === 'diff' && change && <Segmented value={layout} onChange={setLayout} options={[{ id: 'unified', label: t('git.layout.unified') }, { id: 'split', label: t('git.layout.split') }]} />}
-          {change?.status !== 'untracked' && !ignored && <button type="button" className="btn sm" title={t('git.file.history')} onClick={() => onHistory(path)}><History size={14} />{t('git.file.history')}</button>}
-          {change?.status !== 'untracked' && !ignored && <RefPicker refs={refs} value={atRef ?? ''} onChange={setAtRef} icon={false} label={t('git.file.viewAt')} extra={[{ value: '', label: t('git.file.viewAt') }]} />}
-          {!isImage && !ignored && !atRef && change?.status !== 'deleted' && change?.status !== 'untracked' && change?.status !== 'conflict' && (() => {
-            const on = blameOn && view === 'file';
-            return <button type="button" className={`btn sm ${on ? 'primary' : ''}`} aria-pressed={on} title={t('git.blame.hint')} onClick={() => { if (view !== 'file') { setView('file'); setBlameOn(true); } else setBlameOn((x) => !x); }}>{t('git.blame')}</button>;
-          })()}
-          {change && change.status !== 'conflict' && <button type="button" className="btn sm" title={t('git.discard.hint')} onClick={() => onDiscard(change)}><Undo2 size={14} />{t('git.discard')}</button>}
-          <CopyBtn text={path} label={t('git.copyPath')} />
+          <div className="gx-ptl">
+            {(change || isMd) && <Segmented value={view} onChange={setView} options={[...(change ? [{ id: 'diff' as const, label: t('git.view.diff') }] : []), ...(isMd ? [{ id: 'preview' as const, label: t('git.view.preview') }] : []), { id: 'file' as const, label: t(isMd ? 'git.view.source' : 'git.view.file') }]} />}
+            {view === 'diff' && change && <Segmented value={layout} onChange={setLayout} options={[{ id: 'unified', label: t('git.layout.unified') }, { id: 'split', label: t('git.layout.split') }]} />}
+          </div>
         </div>
       </header>
       {change?.oldPath && <div className="gx-banner">{t('git.renamedFrom', { path: change.oldPath })}</div>}
@@ -415,7 +419,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
           {infoOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
         <span className="grow" />
-        <span className="gx-sum">{status.changes.length === 0 ? <span className="muted">{t('git.clean')}</span> : <><b>{t('git.summary', { count: status.changes.length })}</b> <i className="add">+{fmtNum(totals.add)}</i> <i className="del">−{fmtNum(totals.del)}</i></>}</span>
+        <span className="gx-sum">{status.changes.length === 0 ? <span className="muted">{t('git.clean')}</span> : <><span title={t('git.summary', { count: status.changes.length })} aria-label={t('git.summary', { count: status.changes.length })}><b>{status.changes.length}</b> <span className="muted">{t('git.files.short')}</span> <i className="add">+{fmtNum(totals.add)}</i> <i className="del">−{fmtNum(totals.del)}</i></span></>}</span>
         <BranchMenu agent={agent} a={actions} current={status.branch} onSwitch={(b) => void requestSwitch(b)} />
         <ActionButtons a={actions} ahead={status.upstream?.ahead ?? 0} behind={status.upstream?.behind ?? 0} detached={!status.branch} changeCount={status.changes.length} onCommit={() => setCommitOpen(true)} />
         <button className="btn ghost icon sm" disabled={!!actions.busy || status.changes.length === 0 || !!status.state} onClick={discardAll} aria-label={t('git.discard.all')} title={status.state ? t('git.discard.all.blocked') : t('git.discard.all')}><Undo2 size={15} /></button>
@@ -458,15 +462,22 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
 
       <div className="gx-main">
         <aside className="gx-tree" aria-label={t('git.filesLabel')}>
-          <div className="gx-tabs"><Segmented value={mode} onChange={setMode} options={[{ id: 'files', label: t('git.tab.files') }, { id: 'history', label: t('git.tab.history') }, { id: 'tags', label: t('git.tab.tags') }, { id: 'compare', label: t('git.tab.compare') }, { id: 'stashes', label: `${t('git.tab.stashes')}${stashes?.length ? ` · ${stashes.length}` : ''}` }]} /></div>
+          <div className="gx-tabs" role="tablist" aria-label={t('git.filesLabel')}>
+            {([['files', t('git.tab.files'), FolderTree], ['history', t('git.tab.history'), History], ['tags', t('git.tab.tags'), Tag], ['compare', t('git.tab.compare'), GitCompareArrows], ['stashes', `${t('git.tab.stashes')}${stashes?.length ? ` · ${stashes.length}` : ''}`, Archive]] as const).map(([id, label, Icon], n) => (
+              <button key={id} type="button" role="tab" aria-selected={mode === id} aria-label={label} title={`${label} (Alt+${n + 1})`} className={`gx-tab ${mode === id ? 'on' : ''}`} onClick={() => setMode(id)}><Icon size={15} />{mode === id && <span>{label}</span>}</button>
+            ))}
+          </div>
           {mode === 'stashes' ? <StashList stashes={stashes} sel={stashSel} onSelect={setStashSel} onSave={() => setSaveStash(true)} canSave={status.changes.length > 0 && !status.state} />
             : mode === 'tags' ? <TagList agent={agent} sel={tagSel?.name ?? null} onSelect={setTagSel} />
             : mode === 'compare' ? <CompareList refs={refs} sel={cmp} onChange={setCmp} />
             : mode === 'history' ? <HistoryList agent={agent} head={status.head?.sha} sel={commitSel} onSelect={setCommitSel} refs={refs} path={histPath} onClearPath={() => setHistPath(null)} /> : (<>
           <div className="gx-filter">
             <div className="search"><Search size={14} /><input ref={filterRef} className="input" placeholder={byContent ? t('git.search.placeholder') : t('git.filterPlaceholder')} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={t('git.filterPlaceholder')} /></div>
-            <Segmented value={byContent ? 'content' : 'name'} onChange={(v) => setByContent(v === 'content')} options={[{ id: 'name', label: t('git.search.name') }, { id: 'content', label: t('git.search.content') }]} />
-            {!byContent && <Segmented value={onlyChanged ? 'changed' : 'all'} onChange={(v) => setOnlyChanged(v === 'changed')} options={[{ id: 'all', label: t('git.filter.all') }, { id: 'changed', label: `${t('git.filter.changed')}${status.changes.length ? ` · ${status.changes.length}` : ''}` }]} />}
+            <div className="seg icons" role="group" aria-label={t('git.search.name')}>
+              <button type="button" aria-pressed={!byContent} title={t('git.search.name')} aria-label={t('git.search.name')} onClick={() => setByContent(false)}><File size={14} /></button>
+              <button type="button" aria-pressed={byContent} title={t('git.search.content')} aria-label={t('git.search.content')} onClick={() => setByContent(true)}><TextSearch size={14} /></button>
+            </div>
+            {!byContent && <button type="button" className={`btn sm gx-onlych ${onlyChanged ? 'primary' : ''}`} aria-pressed={onlyChanged} title={t('git.filter.changed')} onClick={() => setOnlyChanged((x) => !x)}><ListFilter size={14} />{status.changes.length > 0 && <span className="ct">{status.changes.length}</span>}</button>}
           </div>
           {byContent ? (
             <div className="gx-list gx-hits">
