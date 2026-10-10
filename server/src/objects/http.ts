@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { randomInt, randomUUID } from 'node:crypto';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { runScript, type ScriptResponse, type ScriptTest } from './http-script.js';
@@ -18,7 +18,7 @@ type Hive = Record<string, Record<string, HttpVariable>> | undefined;
  * inserts a file); `> {% … %}` response handlers are ignored.
  */
 const MAX_DEPTH = 4, MAX_FILES = 300, MAX_REQUESTS = 2000;
-const MAX_RESPONSE = 2 * 1024 * 1024, TIMEOUT_MS = 60_000, MAX_INCLUDE = 1024 * 1024;
+const MAX_RESPONSE = 2 * 1024 * 1024, TIMEOUT_MS = 60_000, MAX_INCLUDE = 1024 * 1024, MAX_FILE_EDIT = 1024 * 1024;
 const SKIP = new Set(['node_modules', '.git', 'target', 'dist', 'build', '.idea', '.vscode']);
 const METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', 'TRACE', 'CONNECT']);
 const ENV_FILES = ['http-client.env.json', 'http-client.private.env.json'];
@@ -121,21 +121,33 @@ const readJson = (file: string): Record<string, Record<string, unknown>> | null 
 };
 
 /** Environment variables for a file: the env files from the folder of the file up to the root (the nearest wins), the private one over the public one. */
-function envVars(root: string, fileAbs: string, env: string | undefined, hive?: Hive): { vars: Record<string, string>; names: string[]; files: string[] } {
+/** One level of values (the variables of an environment, from a file or from hive-am), in the order they are applied: the later ones win. */
+interface Layer { source: 'hive' | 'envfile'; from: string; vars: Record<string, { value: string; secret: boolean; hidden: boolean }> }
+const SECRET_NAME = /(pass(word|wd)?|secret|token|api[-_]?key|auth|credential|private)/i;
+export const looksSecret = (name: string) => SECRET_NAME.test(name);
+
+function envVars(root: string, fileAbs: string, env: string | undefined, hive?: Hive): { vars: Record<string, string>; names: string[]; files: string[]; layers: Layer[] } {
   const dirs: string[] = []; for (let d = dirname(fileAbs); ; d = dirname(d)) { dirs.push(d); if (d === root || !d.startsWith(root)) break; }
-  const merged: Record<string, Record<string, unknown>> = {}; const files: string[] = [];
+  const merged: Record<string, Record<string, unknown>> = {}; const priv: Record<string, Set<string>> = {}; const files: string[] = [];
   for (const d of dirs.reverse()) for (const f of ENV_FILES) {
     const p = join(d, f); if (!existsSync(p)) continue;
     const j = readJson(p); if (!j) continue;
     files.push(relative(root, p));
-    for (const [k, v] of Object.entries(j)) if (v && typeof v === 'object') merged[k] = { ...(merged[k] ?? {}), ...(v as Record<string, unknown>) };
+    for (const [k, v] of Object.entries(j)) if (v && typeof v === 'object') {
+      merged[k] = { ...(merged[k] ?? {}), ...(v as Record<string, unknown>) };
+      if (f.includes('private')) { const s = (priv[k] ??= new Set()); for (const n of Object.keys(v as object)) s.add(n); }
+    }
   }
   const names = [...new Set([...Object.keys(merged), ...Object.keys(hive ?? {})])].filter((k) => k !== '$shared').sort();
+  // The levels, from the weakest to the strongest: hive-am's shared values, hive-am's values of the environment, then the same two from the env files.
+  const layers: Layer[] = [];
+  const fromHive = (scope: string): Layer => ({ source: 'hive', from: scope, vars: Object.fromEntries(Object.entries(hive?.[scope] ?? {}).map(([k, v]) => [k, { value: v.value, secret: !!v.secret, hidden: !!v.secret }])) });
+  const fromFiles = (scope: string): Layer => ({ source: 'envfile', from: scope, vars: Object.fromEntries(Object.entries(merged[scope] ?? {}).map(([k, v]) => [k, { value: typeof v === 'string' ? v : JSON.stringify(v), secret: !!priv[scope]?.has(k), hidden: false }])) });
+  layers.push(fromHive('$shared')); if (env) layers.push(fromHive(env));
+  layers.push(fromFiles('$shared')); if (env) layers.push(fromFiles(env));
   const vars: Record<string, string> = {};
-  // hive-am's own variables fill in first; whatever an env file defines wins over them.
-  for (const [k, v] of Object.entries({ ...(hive?.$shared ?? {}), ...(env ? hive?.[env] ?? {} : {}) })) vars[k] = v.value;
-  for (const [k, v] of Object.entries({ ...(merged.$shared ?? {}), ...(env ? merged[env] ?? {} : {}) })) vars[k] = typeof v === 'string' ? v : JSON.stringify(v);
-  return { vars, names, files };
+  for (const l of layers) for (const [k, v] of Object.entries(l.vars)) vars[k] = v.value;
+  return { vars, names, files, layers };
 }
 
 export function scanHttp(folder: string, hive?: Hive): HttpScan {
@@ -186,7 +198,7 @@ export const sessionOf = (objectId: string): HttpSession => { let s = sessions.g
 export const dropSession = (objectId: string) => { sessions.delete(objectId); };
 export function sessionView(objectId: string) {
   const s = sessionOf(objectId);
-  return { globals: { ...s.globals }, responses: [...s.responses].map(([name, r]) => ({ name, status: r.status, at: r.at })) };
+  return { globals: { ...s.globals }, responses: [...s.responses].map(([name, r]) => ({ name, status: r.status, at: r.at, headers: r.headers, body: r.text.slice(0, 200_000) })) };
 }
 export function sessionSet(objectId: string, name: string, value: string) {
   if (!/^[A-Za-z_][\w.-]{0,80}$/.test(name)) throw new ObjectError(`"${name}" is not a valid variable name`);
@@ -235,6 +247,90 @@ export function describeHttp(folder: string, relFile: string, index: number, env
   const refMissing = [...(item.url + (item.body ?? '') + item.headers.map((x) => x.value).join('\n')).matchAll(VAR)].map((m) => m[1]).filter((k) => REF.test(k) && fromResponse(session, k) === undefined);
   const missing = [...item.variables.filter((v) => dynamic(v) === undefined && !(v in vars)), ...new Set(refMissing)];
   return { item, missing, needsRun: [...new Set(refMissing.map((k) => REF.exec(k)![1]))], environments: e.names };
+}
+
+/**
+ * Every variable in play, with its value and where it comes from, so the interface can show real information instead of making you guess:
+ * for one request, for a whole file, or for everything. The winner is the strongest source (the session, then the file's own `@name`, then
+ * the env files, then hive-am's variables); the others that also define it are listed as overridden. Values hive-am stores as secrets are
+ * never returned (`hidden`); values from a private env file or with a name like a password are flagged `secret` so the interface masks them.
+ */
+export type VarSource = 'session' | 'file' | 'envfile' | 'hive' | 'response' | 'dynamic' | 'missing';
+export interface VarInfo { name: string; value: string | null; source: VarSource; from: string; secret: boolean; hidden: boolean; overridden: { source: VarSource; from: string }[]; usedBy: number; hint?: string }
+export interface HttpInspection {
+  env: string | null; environments: string[];
+  vars: VarInfo[];
+  /** The request as it would be sent now (one request only). Generated values stay as {{$…}}; what is missing stays as {{name}}. */
+  preview?: { method: string; url: string; headers: { name: string; value: string }[]; body?: string; unresolved: string[] };
+}
+
+export function inspectHttp(folder: string, relFile: string | undefined, index: number | undefined, env: string | undefined, hive?: Hive, session?: HttpSession): HttpInspection {
+  const root = realFolder(folder);
+  const abs = relFile ? inside(root, relFile) : join(root, '_.http');
+  const files: HttpFile[] = [];
+  if (relFile) files.push(parseHttpFile(readFileSync(abs, 'utf8'), relFile));
+  else for (const f of scanHttp(folder, hive).files) files.push(f);
+  const item = relFile && index !== undefined ? files[0].requests[index] : undefined;
+  if (relFile && index !== undefined && !item) throw new ObjectError(`Request #${index} is not in ${relFile}`);
+  const e = envVars(root, abs, env, hive);
+
+  // The names to show, and how many requests use each.
+  const used = new Map<string, number>(); const bump = (n: string) => used.set(n, (used.get(n) ?? 0) + 1);
+  const reqs = item ? [item] : files.flatMap((f) => f.requests);
+  for (const r of reqs) {
+    for (const v of r.variables) bump(v);
+    for (const m of (r.url + (r.body ?? '') + r.headers.map((x) => x.value).join('\n')).matchAll(VAR)) if (REF.test(m[1])) bump(m[1]);
+  }
+  const names = new Set(used.keys());
+  if (!item) {
+    for (const f of files) for (const k of Object.keys(f.fileVariables)) names.add(k);
+    for (const l of e.layers) for (const k of Object.keys(l.vars)) names.add(k);
+    for (const k of Object.keys(session?.globals ?? {})) names.add(k);
+  }
+
+  const infoOf = (name: string): VarInfo => {
+    const usedBy = used.get(name) ?? 0;
+    if (REF.test(name)) {
+      const v = fromResponse(session, name), ref = REF.exec(name)!;
+      return v === undefined
+        ? { name, value: null, source: 'missing', from: ref[1], secret: false, hidden: false, overridden: [], usedBy, hint: `run:${ref[1]}` }
+        : { name, value: v, source: 'response', from: ref[1], secret: looksSecret(name), hidden: false, overridden: [], usedBy };
+    }
+    if (dynamic(name) !== undefined) return { name, value: null, source: 'dynamic', from: name, secret: false, hidden: false, overridden: [], usedBy };
+    // every source that defines it, strongest first
+    const found: { source: VarSource; from: string; value: string; secret: boolean; hidden: boolean }[] = [];
+    if (session && name in session.globals) found.push({ source: 'session', from: '', value: session.globals[name], secret: looksSecret(name), hidden: false });
+    for (const f of files) if (name in f.fileVariables) found.push({ source: 'file', from: f.relFile, value: f.fileVariables[name], secret: looksSecret(name), hidden: false });
+    for (const l of [...e.layers].reverse()) if (name in l.vars) found.push({ source: l.source, from: l.from === '$shared' ? '$shared' : l.from, value: l.vars[name].value, secret: l.vars[name].secret || looksSecret(name), hidden: l.vars[name].hidden });
+    if (!found.length) return { name, value: null, source: 'missing', from: '', secret: looksSecret(name), hidden: false, overridden: [], usedBy };
+    const [w, ...rest] = found;
+    return { name, value: w.hidden ? null : w.value, source: w.source, from: w.from, secret: w.secret, hidden: w.hidden, overridden: rest.map((x) => ({ source: x.source, from: x.from })), usedBy };
+  };
+  const vars = [...names].map(infoOf).sort((a, b) => (a.source === 'missing' ? 0 : 1) - (b.source === 'missing' ? 0 : 1) || a.name.localeCompare(b.name));
+
+  let preview: HttpInspection['preview'];
+  if (item) {
+    const unresolved = new Set<string>(); const byName = new Map(vars.map((v) => [v.name, v]));
+    const fill = (text: string) => text.replace(VAR, (whole, k: string) => { const v = byName.get(k); if (!v) return whole; if (v.source === 'missing') { unresolved.add(k); return whole; } if (v.source === 'dynamic') return whole; return v.hidden ? '••••' : v.value ?? whole; });
+    preview = { method: item.method, url: fill(item.url), headers: item.headers.map((x) => ({ name: x.name, value: mask(x.name, fill(x.value)) })), body: item.body === undefined ? undefined : fill(item.body), unresolved: [...unresolved] };
+  }
+  return { env: env ?? null, environments: e.names, vars, preview };
+}
+
+/** The text of a .http file (to show and edit it). */
+export function readHttpFile(folder: string, relFile: string): string {
+  const root = realFolder(folder); const abs = inside(root, relFile);
+  if (!/\.(http|rest)$/i.test(abs)) throw new ObjectError('That is not a .http file');
+  const st = statSync(abs); if (!st.isFile()) throw new ObjectError('That is not a file');
+  if (st.size > MAX_FILE_EDIT) throw new ObjectError('The file is too large to open here');
+  return readFileSync(abs, 'utf8');
+}
+export function writeHttpFile(folder: string, relFile: string, content: string): void {
+  const root = realFolder(folder); const abs = inside(root, relFile);
+  if (!/\.(http|rest)$/i.test(abs)) throw new ObjectError('Only .http and .rest files can be saved here');
+  if (!existsSync(abs) || !statSync(abs).isFile()) throw new ObjectError('The file does not exist: this saves changes to a file, it does not create one');
+  if (Buffer.byteLength(content) > MAX_FILE_EDIT) throw new ObjectError('The file is too large');
+  writeFileSync(abs, content, 'utf8');
 }
 
 export async function runHttp(folder: string, relFile: string, index: number, env?: string, hive?: Hive, session: HttpSession = { globals: {}, responses: new Map() }): Promise<HttpRun> {

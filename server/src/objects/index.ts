@@ -1,6 +1,6 @@
 import { bus } from '../runtime.js';
 import { dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
-import { describeHttp, dropSession, runHttp, scanHttp, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
+import { describeHttp, dropSession, inspectHttp, readHttpFile, runHttp, scanHttp, writeHttpFile, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
 import { ObjectError, type ClusterConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
 import { forgetServer, serverLogs, serverState, startServer, stopServer } from './runner.js';
 import { forgetSupervision, resetSupervision, supervise } from './supervisor.js';
@@ -154,6 +154,10 @@ export const statsOf = async (id: string) => { const { objectStats } = await imp
 export const httpScan = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return scanHttp((o.config as HttpConfig).folder, (o.config as HttpConfig).variables); };
 export const httpDescribe = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return describeHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id)); };
 export const httpRun = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return runHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id)); };
+
+export const httpInspect = (id: string, file: string | undefined, index: number | undefined, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return inspectHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id)); };
+export const httpFileRead = (id: string, file: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return { file, content: readHttpFile((o.config as HttpConfig).folder, file) }; };
+export const httpFileWrite = (id: string, file: string, content: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); writeHttpFile((o.config as HttpConfig).folder, file, content); return { ok: true }; };
 
 /** The values kept while an HTTP object is used (see http.ts): look at them, set one, forget one or all. */
 const httpObject = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return o; };

@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { colonies } from '../src/db.js';
-import { ObjectError, createObject, httpDescribe, httpRun as runForObject, httpScan, httpSession, httpSessionClear, httpSessionSet, objectAction, objectLogs, refreshStates, removeObject, stateOf, updateObject, viewOf } from '../src/objects/index.js';
+import { ObjectError, createObject, httpDescribe, httpFileRead, httpFileWrite, httpInspect, httpRun as runForObject, httpScan, httpSession, httpSessionClear, httpSessionSet, objectAction, objectLogs, refreshStates, removeObject, stateOf, updateObject, viewOf } from '../src/objects/index.js';
 import { parseHttpFile, runHttp as httpRun } from '../src/objects/http.js';
 import { objectsStore } from '../src/objects/store.js';
 
@@ -210,6 +210,59 @@ const otherObj = createObject({ name: 'chain2', kind: 'http', config: { folder: 
 await runForObject(otherObj.id, 'flow.http', 0);
 check(httpSession(chainObj.id).globals.token === undefined && httpSession(otherObj.id).globals.token !== undefined, 'each HTTP object has its own session');
 await removeObject(otherObj.id); await removeObject(chainObj.id);
+
+// ---------------------------------------------------------------- inspecting: every variable with its value and where it comes from
+const insp = mkdtempSync(join(tmpdir(), 'http-insp-'));
+writeFileSync(join(insp, 'http-client.env.json'), JSON.stringify({ $shared: { region: 'eu' }, dev: { host: `http://127.0.0.1:${port}`, who: 'from-env', token: 'public-token' } }));
+writeFileSync(join(insp, 'http-client.private.env.json'), JSON.stringify({ dev: { token: 'PRIVATE-TOKEN-1' } }));
+writeFileSync(join(insp, 'i.http'), `@who = from-file
+@unusedInFile = nobody-uses-me
+
+### Login
+# @name login
+POST {{host}}/login
+
+### Probe
+GET {{host}}/probe/{{who}}/{{token}}/{{apiKey}}/{{region}}?id={{login.response.body.id}}&n={{$uuid}}&gone={{nowhere}}
+X-Key: {{apiKey}}
+Authorization: Bearer {{token}}
+`);
+const io = createObject({ name: 'inspected', kind: 'http', config: { folder: insp, variables: { dev: { who: { value: 'from-hive' }, apiKey: { value: 'HIVE-SECRET-KEY', secret: true }, host: { value: 'http://hive-host' } }, $shared: { region: { value: 'us' }, extra: { value: 'only-hive' } } } } });
+const hv2 = (objectsStore.get(io.id)!.config as any).variables;
+const byName = (vs: { name: string }[]) => Object.fromEntries(vs.map((v) => [v.name, v])) as Record<string, any>;
+const one = byName(httpInspect(io.id, 'i.http', 1, 'dev').vars);
+check(one.who.value === 'from-file' && one.who.source === 'file' && one.who.overridden.map((o: any) => o.source).join() === 'envfile,hive', 'a variable shows its winning source (the @ of the file) and the weaker ones it hides');
+check(one.host.source === 'envfile' && one.host.from === 'dev' && one.host.overridden[0].source === 'hive', 'an env file wins over hive-am’s own value, and says so');
+check(one.region.source === 'envfile' && one.region.from === '$shared' && one.region.value === 'eu' && one.region.overridden[0].source === 'hive', 'shared values of the env file are told apart from the environment’s');
+check(one.token.value === 'PRIVATE-TOKEN-1' && one.token.secret === true && one.token.source === 'envfile', 'a value from a private env file is flagged secret (the interface masks it)');
+check(one.apiKey.source === 'hive' && one.apiKey.value === null && one.apiKey.hidden === true && one.apiKey.secret === true, 'a secret stored in hive-am is never returned: hidden');
+check(JSON.stringify(httpInspect(io.id, undefined, undefined, 'dev')).includes('HIVE-SECRET-KEY') === false, 'in no inspection, whatever the scope');
+check(one['$uuid'].source === 'dynamic' && one['$uuid'].value === null, 'a generated value is described, not shown');
+check(one.nowhere.source === 'missing' && one['login.response.body.id'].source === 'missing' && one['login.response.body.id'].hint === 'run:login', 'what has no value is missing; a reference to an unrun request says which one to run');
+const pv = httpInspect(io.id, 'i.http', 1, 'dev').preview!;
+check(pv.url.includes('/probe/from-file/PRIVATE-TOKEN-1/••••/eu?id={{login.response.body.id}}&n={{$uuid}}&gone={{nowhere}}'), 'the preview fills in what is known, hides hive’s secrets, and keeps generated and missing ones as they are');
+check(pv.headers.find((h) => h.name === 'Authorization')!.value.includes('••••') && !pv.headers.find((h) => h.name === 'Authorization')!.value.includes('PRIVATE'), 'and masks credentials in the headers');
+check(pv.unresolved.sort().join() === 'login.response.body.id,nowhere', 'and lists what is unresolved');
+await runForObject(io.id, 'i.http', 0, 'dev').catch(() => undefined);
+const fileScope = byName(httpInspect(io.id, 'i.http', undefined, 'dev').vars);
+check(fileScope.unusedInFile && fileScope.unusedInFile.usedBy === 0 && fileScope.unusedInFile.source === 'file', 'for a whole file, the @ variables nobody uses are listed too');
+check(fileScope.host.usedBy === 2 && fileScope.who.usedBy === 1, 'with how many requests use each');
+const all = byName(httpInspect(io.id, undefined, undefined, 'dev').vars);
+check(all.extra.source === 'hive' && all.extra.value === 'only-hive' && all.region.value === 'eu', 'for everything: also what only hive-am defines, with the same priorities');
+const noEnv = byName(httpInspect(io.id, undefined, undefined, undefined).vars);
+check(noEnv.host.source === 'missing' && noEnv.region.value === 'eu', 'without an environment only the shared values apply (what an environment defines is missing)');
+httpSessionSet(io.id, 'who', 'from-session');
+const ses = byName(httpInspect(io.id, 'i.http', 1, 'dev').vars);
+check(ses.who.value === 'from-session' && ses.who.source === 'session' && ses.who.overridden.length === 3, 'a value of the session beats everything, and the rest is listed under it');
+httpSessionClear(io.id);
+
+// files: read and save
+check(httpFileRead(io.id, 'i.http').content.startsWith('@who = from-file'), 'a .http file can be read');
+httpFileWrite(io.id, 'i.http', httpFileRead(io.id, 'i.http').content.replace('from-file', 'edited'));
+check(byName(httpInspect(io.id, 'i.http', 1, 'dev').vars).who.value === 'edited', 'and saved: the next inspection sees the change');
+check(await rejects(() => httpFileWrite(io.id, '../outside.http', 'x'), /outside the folder/) && await rejects(() => httpFileWrite(io.id, 'http-client.env.json', '{}'), /\.http and \.rest/) && await rejects(() => httpFileWrite(io.id, 'new-file.http', 'x'), /does not exist/), 'saving refuses a path outside the folder, other kinds of file, and creating files');
+check(await rejects(() => httpFileWrite(io.id, 'i.http', 'x'.repeat(1_100_000)), /too large/) && await rejects(() => httpFileRead(io.id, '../x.http'), /outside the folder/), 'and a file that is too large');
+await removeObject(io.id);
 
 // ---------------------------------------------------------------- variables of hive-am (no env file needed)
 const bare = mkdtempSync(join(tmpdir(), 'http-bare-'));
