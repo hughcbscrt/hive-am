@@ -1,12 +1,17 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Check, ChevronDown, ChevronRight, File, KeyRound, ListChecks, Play, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Eye, File, KeyRound, ListChecks, Play, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { fmtBytes } from '@/lib/format';
-import type { HttpConfig, HttpFile, HttpRequestItem, HttpRun, HttpScan, HttpSessionView, ObjectView } from '@/lib/types';
+import type { HttpConfig, HttpFile, HttpInspection, HttpRequestItem, HttpRun, HttpScan, HttpSessionView, ObjectView } from '@/lib/types';
 import { Segmented } from '@/components/ui';
 import { CopyBtn } from '@/components/chat/ToolCall';
+import { JsonTree } from './JsonTree';
+import { VarsTable } from './VarsTable';
+import { HttpSource } from './HttpSource';
+
+const parseJson = (s: string): unknown | undefined => { try { return JSON.parse(s); } catch { return undefined; } };
 
 interface Result { run?: HttpRun; error?: string; at: number }
 const methodTone = (m: string) => (m === 'GET' ? 'get' : m === 'POST' ? 'post' : m === 'DELETE' ? 'del' : m === 'PUT' || m === 'PATCH' ? 'put' : 'other');
@@ -40,7 +45,14 @@ export function HttpWorkspace({ object: o, onOpenVars }: { object: ObjectView; o
   const [busy, setBusy] = useState<string | null>(null);
   const [missing, setMissing] = useState<string[]>([]);
   const [needsRun, setNeedsRun] = useState<string[]>([]);
-  const [tab, setTab] = useState<'body' | 'headers' | 'tests' | 'request'>('body');
+  const [tab, setTab] = useState<'body' | 'headers' | 'tests' | 'request' | 'vars'>('body');
+  const [fileTab, setFileTab] = useState<'requests' | 'vars' | 'source'>('requests');
+  const [bodyView, setBodyView] = useState<'tree' | 'text'>('tree');
+  const [insp, setInsp] = useState<HttpInspection | null>(null);
+  const [fileInsp, setFileInsp] = useState<HttpInspection | null>(null);
+  const [allInsp, setAllInsp] = useState<HttpInspection | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [openAns, setOpenAns] = useState<string | null>(null);
   const [session, setSession] = useState<HttpSessionView>({ globals: {}, responses: [] });
   const [stopOnFail, setStopOnFail] = useState(false);
   const [note, setNote] = useState('');
@@ -67,6 +79,15 @@ export function HttpWorkspace({ object: o, onOpenVars }: { object: ObjectView; o
     api.get<{ missing: string[]; needsRun: string[] }>(`/objects/${o.id}/http/describe?file=${encodeURIComponent(fileOf.current.get(sel.id) ?? '')}&index=${sel.index}${env ? `&env=${encodeURIComponent(env)}` : ''}`).then((r) => { setMissing(r.missing); setNeedsRun(r.needsRun ?? []); }).catch(() => { setMissing([]); setNeedsRun([]); });
   }, [o.id, o.updated_at, sel?.id, env]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { describe(); }, [describe, session]);
+
+  const inspect = useCallback((f?: string, index?: number): Promise<HttpInspection> =>
+    api.get<HttpInspection>(`/objects/${o.id}/http/variables?${[f ? `file=${encodeURIComponent(f)}` : '', index !== undefined ? `index=${index}` : '', env ? `env=${encodeURIComponent(env)}` : ''].filter(Boolean).join('&')}`), [o.id, env]);
+  const refreshInsp = useCallback(() => {
+    if (sel) void inspect(fileOf.current.get(sel.id), sel.index).then(setInsp).catch(() => setInsp(null)); else setInsp(null);
+    if (file) void inspect(file).then(setFileInsp).catch(() => setFileInsp(null));
+    if (showAll) void inspect().then(setAllInsp).catch(() => setAllInsp(null));
+  }, [inspect, sel?.id, file, showAll]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { refreshInsp(); }, [refreshInsp, session, o.updated_at]);
 
   const run = useCallback(async (r: HttpRequestItem): Promise<Result> => {
     const f = fileOf.current.get(r.id); if (!f) return { error: '', at: Date.now() };
@@ -101,6 +122,9 @@ export function HttpWorkspace({ object: o, onOpenVars }: { object: ObjectView; o
   const setValue = () => { if (!newName.trim()) return; api.post<HttpSessionView>(`/objects/${o.id}/http/session`, { name: newName.trim(), value: newValue }).then((s) => { setSession(s); setNewName(''); setNewValue(''); setAdding(false); }).catch(() => undefined); };
   const [showSession, setShowSession] = useState(true);
   const kept = Object.entries(session.globals);
+  const setVar = (name: string, value: string) => api.post<HttpSessionView>(`/objects/${o.id}/http/session`, { name, value }).then(setSession).catch(() => undefined);
+  const runNamed = (n: string) => { const r = byName.current.get(n); if (r) { setFile(fileOf.current.get(r.id) ?? file); setSel(r); setTab('body'); void run(r); } };
+  const statusByIndex = (f: HttpFile) => Object.fromEntries(f.requests.map((r) => [r.index, tone(results[r.id])])) as Record<number, 'ok' | 'warn' | 'err' | ''>;
 
   if (err) return <p className="gx-note err" style={{ padding: 20 }}>{err}</p>;
   if (!scan) return <p className="gx-note">{t('git.loading')}</p>;
@@ -111,8 +135,13 @@ export function HttpWorkspace({ object: o, onOpenVars }: { object: ObjectView; o
           <label className="row gap-s small grow"><span className="muted">{t('http.env')}</span>
             <select className="select" style={{ width: 'auto', padding: '4px 10px', flex: 1 }} value={env} onChange={(e) => setEnv(e.target.value)}>
               <option value="">{t('http.noEnv')}</option>{scan.environments.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+          <button className={`btn ghost icon sm ${showAll ? 'on' : ''}`} onClick={() => setShowAll((s) => !s)} aria-expanded={showAll} aria-label={t('hw2.envEye')} title={t('hw2.envEye')}><Eye size={15} /></button>
           <button className="btn ghost icon sm" onClick={() => { load(); void loadSession(); }} aria-label={t('http.rescan')} title={t('http.rescan')}><RefreshCw size={15} /></button>
         </div>
+        {showAll && (
+          <div className="hw-pop"><div className="row gap-s"><b className="grow">{t('iv.env.title')}</b><button className="btn ghost icon sm" onClick={() => setShowAll(false)} aria-label={t('hw2.cancel')}><X size={14} /></button></div>
+            <p className="muted small" style={{ margin: '2px 0 8px' }}>{t('iv.env.hint')}</p>
+            {allInsp ? <VarsTable vars={allInsp.vars} onSet={setVar} onForget={(n) => void forget(n)} onRun={runNamed} compact /> : <p className="muted small">{t('git.loading')}</p>}</div>)}
         {scan.envFiles.length === 0 && scan.environments.length === 0 && <p className="muted small hw-hint">{t('hw.noEnvFile')} <button className="btn sm" onClick={onOpenVars}>{t('hw.editVars')}</button></p>}
         <div className="gx-filter"><div className="search"><Search size={14} /><input className="input" placeholder={t('http.search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('http.search')} /></div></div>
         <div className="hr-reqs">
@@ -146,11 +175,15 @@ export function HttpWorkspace({ object: o, onOpenVars }: { object: ObjectView; o
           <button className="hw-session-head" onClick={() => setShowSession((s) => !s)} aria-expanded={showSession}>
             {showSession ? <ChevronDown size={14} /> : <ChevronRight size={14} />}<b>{t('hw.session')}</b><span className="muted small">{kept.length || ''}</span></button>
           {showSession && (<div className="hw-session-body">
-            {kept.length === 0 && !adding && <p className="muted small" style={{ margin: 0 }}>{t('hw.session.empty')}</p>}
+            {kept.length === 0 && session.responses.length === 0 && !adding && <p className="muted small" style={{ margin: 0 }}>{t('hw.session.empty')}</p>}
             {kept.map(([k, v]) => (
               <div key={k} className="hw-kv"><code className="mono" title={k}>{k}</code><span className="mono val" title={v}>{v}</span>
                 <button className="btn ghost icon sm" onClick={() => void forget(k)} aria-label={t('hw.session.forget')} title={t('hw.session.forget')}><X size={13} /></button></div>))}
-            {session.responses.length > 0 && <p className="muted small" style={{ margin: '6px 0 0' }}>{t('hw.session.answers')}: {session.responses.map((r) => `${r.name} (${r.status})`).join(', ')}</p>}
+            {session.responses.length > 0 && (<div className="hw-ans"><div className="eyebrow">{t('hw2.remembered')}</div>
+              {session.responses.map((r) => { const j = parseJson(r.body); const op = openAns === r.name; return (
+                <div key={r.name}><button className="hw-ans-head" onClick={() => setOpenAns(op ? null : r.name)} aria-expanded={op}>{op ? <ChevronDown size={13} /> : <ChevronRight size={13} />}<code className="mono">{r.name}</code><b className={`hr-st ${statusTone(r.status)}`}>{r.status}</b><span className="muted small">{new Date(r.at).toLocaleTimeString()}</span></button>
+                  {op && <div className="hw-ans-body">{j !== undefined ? <JsonTree value={j} refBase={`${r.name}.response.body`} /> : <pre className="mono small" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{r.body.slice(0, 2000)}</pre>}</div>}</div>); })}
+              <p className="muted small" style={{ margin: '4px 0 0' }}>{t('hw2.remembered.hint')}</p></div>)}
             {adding ? (
               <div className="hw-kv-add"><input className="input mono" placeholder={t('hw.session.name')} value={newName} onChange={(e) => setNewName(e.target.value)} aria-label={t('hw.session.name')} />
                 <input className="input mono" placeholder={t('hw.session.value')} value={newValue} onChange={(e) => setNewValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') setValue(); }} aria-label={t('hw.session.value')} />
@@ -180,17 +213,28 @@ export function HttpWorkspace({ object: o, onOpenVars }: { object: ObjectView; o
           )}
           {note && <div className="gx-banner">{note}</div>}
           <div className="row gap-s" style={{ padding: '8px 16px' }}>
-            <Segmented value={tab} onChange={setTab} options={[{ id: 'body', label: t('http.body') }, { id: 'headers', label: `${t('http.headers')}${res?.run ? ` · ${res.run.headers.length}` : ''}` }, { id: 'tests', label: `${t('hw.tests')}${testsOf(res).length ? ` · ${testsOf(res).filter((x) => x.passed).length}/${testsOf(res).length}` : ''}` }, { id: 'request', label: t('http.request') }]} />
+            <Segmented value={tab} onChange={setTab} options={[{ id: 'body', label: t('http.body') }, { id: 'headers', label: `${t('http.headers')}${res?.run ? ` · ${res.run.headers.length}` : ''}` }, { id: 'tests', label: `${t('hw.tests')}${testsOf(res).length ? ` · ${testsOf(res).filter((x) => x.passed).length}/${testsOf(res).length}` : ''}` }, { id: 'request', label: t('http.request') }, { id: 'vars', label: `${t('hw2.tab.vars')}${insp?.vars.length ? ` · ${insp.vars.length}` : ''}` }]} />
             <span className="grow" />
             {res?.run && <span className="row gap-s small">{res.run.set.length > 0 && <span className="chip" title={res.run.set.join(', ')}>{t('hw.kept', { names: res.run.set.join(', ') })}</span>}<b className={`hr-st ${statusTone(res.run.status)}`}>{res.run.status} {res.run.statusText}</b><span className="muted">{t('http.time', { ms: res.run.durationMs })} · {fmtBytes(res.run.size)}</span></span>}
           </div>
           {res?.run?.scriptError && <div className="gx-banner err">{t('hw.script.error', { error: res.run.scriptError })}</div>}
           {res?.run?.scriptFile && <div className="gx-banner">{t('hw.script.file', { file: res.run.scriptFile })}</div>}
           <div className="hr-out">
-            {tab === 'request' ? (
+            {tab === 'vars' ? (
+              <div className="hr-pre">{insp ? <VarsTable vars={insp.vars} onSet={setVar} onForget={(n) => void forget(n)} onRun={runNamed} /> : <p className="muted">{t('git.loading')}</p>}</div>
+            ) : tab === 'request' ? (
               <div className="hr-pre">
-                {(res?.run?.request.headers ?? sel.headers).map((h, i) => <div key={i}><b>{h.name}</b>: {res?.run ? h.value : <WithVars text={h.value} />}</div>)}
-                {(res?.run?.request.body ?? sel.body) !== undefined && <><div className="eyebrow" style={{ margin: '12px 0 4px' }}>{t('http.requestBody')}</div><pre><WithVars text={res?.run?.request.body ?? sel.body ?? ''} /></pre></>}
+                {!res?.run && insp?.preview ? (<>
+                  <div className="row gap-s small" style={{ marginBottom: 8 }}><b>{t('hw2.resolved')}</b>{insp.preview.unresolved.length > 0 && <span className="chip warn">{t('hw2.unresolved', { count: insp.preview.unresolved.length })}</span>}</div>
+                  <div className="mono"><b>{insp.preview.method}</b> <WithVars text={insp.preview.url} /></div>
+                  {insp.preview.headers.map((h, i) => <div key={i}><b>{h.name}</b>: <WithVars text={h.value} /></div>)}
+                  {insp.preview.body !== undefined && <><div className="eyebrow" style={{ margin: '12px 0 4px' }}>{t('http.requestBody')}</div><pre><WithVars text={insp.preview.body} /></pre></>}
+                </>) : null}
+                {res?.run && <div className="muted small" style={{ marginBottom: 8 }}>{t('hw2.resolved')}</div>}
+                {res?.run && <div className="mono"><b>{res.run.request.method}</b> {res.run.request.url}</div>}
+                {res?.run && (res.run.request.headers).map((h, i) => <div key={i}><b>{h.name}</b>: {h.value}</div>)}
+                {res?.run ? null : !insp?.preview && (sel.headers).map((h, i) => <div key={i}><b>{h.name}</b>: {res?.run ? h.value : <WithVars text={h.value} />}</div>)}
+                {res?.run && res.run.request.body !== undefined && <><div className="eyebrow" style={{ margin: '12px 0 4px' }}>{t('http.requestBody')}</div><pre><WithVars text={res?.run?.request.body ?? sel.body ?? ''} /></pre></>}
                 {sel.script && <><div className="eyebrow" style={{ margin: '12px 0 4px' }}>{t('hw.script')}</div><p className="muted small" style={{ margin: '0 0 6px' }}>{t('hw.script.hint')}</p><pre>{sel.script.trim()}</pre></>}
               </div>
             ) : tab === 'tests' ? (
@@ -205,7 +249,9 @@ export function HttpWorkspace({ object: o, onOpenVars }: { object: ObjectView; o
               <div className="hr-pre">
                 {res.run!.truncated && <div className="gx-banner">{t('http.truncated')}</div>}
                 {res.run!.binary ? <p className="muted">{t('http.binary', { type: res.run!.contentType || '?', size: fmtBytes(res.run!.size) })}</p>
-                  : res.run!.body ? <><div style={{ textAlign: 'right' }}><CopyBtn text={res.run!.body} /></div><pre>{prettyBody(res.run!)}</pre></> : <p className="muted">{t('http.emptyBody')}</p>}
+                  : res.run!.body ? (() => { const j = parseJson(res.run!.body); return (<>
+                    <div className="row gap-s" style={{ justifyContent: 'flex-end' }}>{j !== undefined && <Segmented value={bodyView} onChange={setBodyView} options={[{ id: 'tree', label: t('hw2.tree') }, { id: 'text', label: t('hw2.text') }]} />}<CopyBtn text={res.run!.body} /></div>
+                    {j !== undefined && bodyView === 'tree' ? <>{!sel.named && <p className="muted small">{t('hw2.copyRef.need')}</p>}<JsonTree value={j} refBase={sel.named ? `${sel.named}.response.body` : undefined} /></> : <pre>{prettyBody(res.run!)}</pre>}</>); })() : <p className="muted">{t('http.emptyBody')}</p>}
               </div>
             )}
           </div>
@@ -214,15 +260,17 @@ export function HttpWorkspace({ object: o, onOpenVars }: { object: ObjectView; o
             <div className="row gap-s"><File size={18} className="muted" /><h3 className="mono grow" style={{ fontSize: 15, overflowWrap: 'anywhere' }}>{picked.relFile}</h3>
               <label className="row gap-s small"><input type="checkbox" checked={stopOnFail} onChange={(e) => setStopOnFail(e.target.checked)} />{t('hw.stopOnFail')}</label>
               <button className="btn primary sm" disabled={!!busy} onClick={() => void runFile(picked)}><ListChecks size={14} />{t('http.runFile')}</button></div>
-            <p className="muted small" style={{ margin: 0 }}>{t('hw.fileInfo', { count: picked.requests.length })}{Object.keys(picked.fileVariables).length ? ` · @${Object.keys(picked.fileVariables).join(', @')}` : ''}</p>
+            <Segmented value={fileTab} onChange={setFileTab} options={[{ id: 'requests', label: `${t('hw2.tab.requests')} · ${picked.requests.length}` }, { id: 'vars', label: `${t('hw2.tab.vars')}${fileInsp?.vars.length ? ` · ${fileInsp.vars.length}` : ''}` }, { id: 'source', label: t('hw2.tab.source') }]} />
             {note && <div className="gx-banner">{note}</div>}
-            <table className="cm-table"><thead><tr><th /><th>{t('obj.f.name')}</th><th>{t('hw.fileTests')}</th><th>{t('hw.lastRun')}</th></tr></thead><tbody>
+            {fileTab === 'vars' ? (fileInsp ? <VarsTable vars={fileInsp.vars} onSet={setVar} onForget={(n) => void forget(n)} onRun={runNamed} /> : <p className="muted">{t('git.loading')}</p>)
+            : fileTab === 'source' ? <div className="hw-src"><HttpSource objectId={o.id} file={picked} vars={fileInsp?.vars ?? []} status={statusByIndex(picked)} onSaved={() => { load(); refreshInsp(); }} onRun={(i) => { const r = picked.requests.find((x) => x.index === i); if (r) { setSel(r); setTab('body'); void run(r); } }} /></div>
+            : (<table className="cm-table"><thead><tr><th /><th>{t('obj.f.name')}</th><th>{t('hw.fileTests')}</th><th>{t('hw.lastRun')}</th></tr></thead><tbody>
               {picked.requests.map((r) => { const x = results[r.id]; const ts = testsOf(x); return (
                 <tr key={r.id} className="hw-trow" onClick={() => { setSel(r); setTab('body'); }}>
                   <td><span className={`hr-m ${methodTone(r.method)}`}>{r.method}</span></td><td><b>{r.name}</b><div className="muted small mono hw-url"><WithVars text={r.url} /></div></td>
                   <td>{ts.length ? <span className={`hr-st ${ts.every((y) => y.passed) ? 'ok' : 'err'}`}>{ts.filter((y) => y.passed).length}/{ts.length}</span> : <span className="muted small">—</span>}</td>
                   <td>{x ? (x.run ? <span className={`hr-st ${tone(x)}`}><b>{x.run.status}</b> <span className="muted">{x.run.durationMs} ms</span></span> : <span className="hr-st err" title={x.error}>error</span>) : <span className="muted small">{t('hw.notRun')}</span>}</td></tr>); })}
-            </tbody></table>
+            </tbody></table>)}
           </div>
         ) : <div className="gx-empty"><p>{t('hw.pickFile')}</p></div>}
       </section>

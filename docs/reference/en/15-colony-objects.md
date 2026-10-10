@@ -145,3 +145,15 @@ Every field that holds a path uses the same picker (`PathPicker` in `web/compone
 ## 15.8 Not there yet
 
 Terminals (a bottom panel) are the next step. Docker objects cannot be created on a remote Docker host, and PM2 is not integrated (a server object keeps its own process).
+
+## 15.9 Seeing the values
+
+The runner shows what each variable is worth right now, not only its name:
+
+- **Variables tab of a file or request**: each variable with its current value, where it comes from (session, `@` in the file, env file, hive-am, answer of another request, generated on each run, or missing), what it hides when something weaker defines it too, and how often it is used. A missing one that comes from a named request offers to run it. The pencil sets a value for the session (it wins over everything until forgotten); secrets are masked and the ones stored in hive-am are never sent to the browser.
+- **Eye next to the environment**: every variable in effect for the chosen environment.
+- **Request tab**: the request as it will be sent, with missing values marked; after a run, what was actually sent.
+- **File tab**: the `.http` source with a ▶ per request, `{{variables}}` coloured by origin (hover for the value) and an editor (Ctrl+S) that saves the file on disk (existing `.http` / `.rest` files only, up to 1 MB).
+- **Answers** as a foldable JSON tree; each value copies its reference (`{{name.response.body.$.path}}`) when the request has a name. The Session panel lists remembered answers with their data.
+
+API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/objects/:id/http/file`.
