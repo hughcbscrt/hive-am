@@ -149,6 +149,54 @@ export async function gitBranches(cwd: string): Promise<GitBranches> {
   return res;
 }
 
+/* ------------------------------------------------------------------ tags (read-only) */
+
+export interface GitTag { name: string; sha: string; date: string; subject: string; annotated: boolean }
+const MAX_TAGS = 1000;
+
+export async function gitTags(cwd: string): Promise<{ tags: GitTag[]; truncated: boolean }> {
+  const { root } = await repoOf(cwd);
+  // %(*objectname) is the commit an annotated tag points to; a lightweight tag has none and %(objectname) is already the commit.
+  const { out } = await run(root, ['for-each-ref', '--sort=-creatordate', `--count=${MAX_TAGS + 1}`, '--format=%(refname:strip=2)%1f%(objecttype)%1f%(*objectname)%1f%(objectname)%1f%(creatordate:iso-strict)%1f%(contents:subject)', 'refs/tags']);
+  const all = out.split('\n').filter(Boolean).map((line) => {
+    const [name, type, peeled, direct, date, subject] = line.split('\x1f');
+    return { name, sha: peeled || direct, date, subject: subject ?? '', annotated: type === 'tag' };
+  });
+  return { tags: all.slice(0, MAX_TAGS), truncated: all.length > MAX_TAGS };
+}
+
+/** A tag name from the browser, resolved to the commit it points to. Only names that really are tags get through. */
+async function tagCommit(root: string, tag: string): Promise<string> {
+  if (!tag || tag.length > 200 || tag.startsWith('-') || /[\s\0~^:?*[\\]/.test(tag)) throw new PathError('Invalid tag');
+  const r = await run(root, ['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`], { okCodes: [1] });
+  const sha = r.out.trim();
+  if (!SHA.test(sha)) throw new PathError(`Tag "${tag}" not found`);
+  return sha;
+}
+
+export async function gitTagTree(cwd: string, tag: string): Promise<{ tag: string; sha: string; files: string[]; truncated: boolean }> {
+  const { root, scope } = await repoOf(cwd);
+  const sha = await tagCommit(root, tag);
+  const { out } = await run(root, ['ls-tree', '-r', '--name-only', '-z', sha, '--', scope || '.'], { raw: true });
+  const files = out.split('\0').filter(Boolean);
+  const MAX = 30_000;
+  return { tag, sha, files: files.slice(0, MAX), truncated: files.length > MAX };
+}
+
+const MAX_TAG_FILE = 1_000_000;
+export async function gitTagFile(cwd: string, tag: string, rel: string): Promise<{ path: string; size: number; binary: boolean; truncated: boolean; content: string; source: 'tag' }> {
+  const { root } = await repoOf(cwd);
+  const sha = await tagCommit(root, tag);
+  if (!rel || rel.includes('\0') || rel.startsWith('/') || rel.split('/').includes('..')) throw new PathError('Invalid path');
+  // The path must be a file of that commit (not a folder, not a submodule).
+  const kind = (await run(root, ['ls-tree', '-z', sha, '--', rel], { raw: true })).out.split('\0')[0] ?? '';
+  if (!/^100\d{3} blob /.test(kind) && !/^120000 blob /.test(kind)) throw new PathError('File not found in this tag');
+  const size = Number((await run(root, ['cat-file', '-s', `${sha}:${rel}`])).out) || 0;
+  const { out } = await run(root, ['show', `${sha}:${rel}`], { raw: true });
+  const binary = out.slice(0, 8000).includes('\0');
+  return { path: rel, size, binary, truncated: !binary && out.length > MAX_TAG_FILE, content: binary ? '' : out.slice(0, MAX_TAG_FILE), source: 'tag' };
+}
+
 /* ------------------------------------------------------------------ writes */
 
 export interface GitResult { ok: true; output: string }
