@@ -6,6 +6,7 @@ import { Boxes, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, 
 import { HiveProvider, useHive } from '@/lib/store';
 import { I18nProvider, LOCALES, useI18n } from '@/lib/i18n';
 import { Toaster } from './ui';
+import { Tooltips } from './Tooltips';
 
 function HiveMark() {
   return <img src="/icon.png" width={34} height={34} alt="" aria-hidden className="brand-mark" />;
@@ -70,6 +71,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <I18nProvider>
       <HiveProvider>
         <Toaster>
+          <Tooltips />
           <div className="shell"><Nav /><main className="main">{children}</main></div>
         </Toaster>
       </HiveProvider>

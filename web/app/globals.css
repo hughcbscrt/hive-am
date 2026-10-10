@@ -904,3 +904,9 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .gx-ptr .btn.on { background: var(--honey-soft); color: var(--ink); box-shadow: inset 0 0 0 1px var(--honey); }
 .gx-ptr .gx-refbtn .nm { max-width: 120px; }
 .copybtn.compact { padding: 6px; border-radius: 8px; } .copybtn.compact:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+
+/* Tooltips (see components/Tooltips.tsx): inverted colours so they read on both themes. */
+.tooltip { position: fixed; z-index: 3000; max-width: min(340px, calc(100vw - 16px)); padding: 6px 10px; border-radius: 8px; background: var(--ink); color: var(--bg); font-size: 12px; line-height: 1.45; font-weight: 500; white-space: pre-line; overflow-wrap: anywhere; pointer-events: none; box-shadow: 0 8px 24px -8px rgba(0, 0, 0, .45); animation: tip-in .12s ease-out; }
+@keyframes tip-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+.tooltip[data-below='1'] { animation-name: tip-in-below; } @keyframes tip-in-below { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .tooltip { animation: none; } }
