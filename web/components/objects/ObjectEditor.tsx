@@ -4,7 +4,7 @@ import { Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
-import type { DockerConfig, ObjectKind, ObjectView, ServerConfig } from '@/lib/types';
+import type { BossConfig, DockerConfig, HttpConfig, ObjectKind, ObjectView, ServerConfig } from '@/lib/types';
 import { Drawer, Field, FolderPicker, Modal, PathPicker, Segmented, useToast } from '@/components/ui';
 import { KIND, envToText, lines, textToEnv } from './meta';
 
@@ -12,21 +12,27 @@ type Mode = NonNullable<DockerConfig['mode']>;
 interface Draft {
   name: string; colony_id: string; kind: ObjectKind;
   cwd: string; start: string; stop: string; port: string; env: string;
+  folder: string; defEnv: string; members: string[];
   mode: Mode; image: string; ports: string; volumes: string; restart: string; command: string; file: string; project: string; services: string; container: string;
 }
 
 const fromObject = (o?: ObjectView, colony?: string): Draft => {
   const s = (o?.kind === 'server' ? o.config : {}) as Partial<ServerConfig>;
   const d = (o?.kind === 'docker' ? o.config : {}) as Partial<DockerConfig>;
+  const h = (o?.kind === 'http' ? o.config : {}) as Partial<HttpConfig>;
+  const bo = (o?.kind === 'boss' ? o.config : {}) as Partial<BossConfig>;
   return {
     name: o?.name ?? '', colony_id: o?.colony_id ?? colony ?? '', kind: o?.kind ?? 'server',
     cwd: s.cwd ?? '', start: s.start ?? '', stop: s.stop ?? '', port: s.port ? String(s.port) : '', env: envToText(o?.kind === 'server' ? s.env : d.env),
+    folder: h.folder ?? '', defEnv: h.env ?? '', members: bo.members ?? [],
     mode: d.mode ?? 'container', image: d.image ?? '', ports: (d.ports ?? []).join('\n'), volumes: (d.volumes ?? []).join('\n'), restart: d.restart ?? 'no', command: d.command ?? '',
     file: d.file ?? '', project: d.project ?? '', services: (d.services ?? []).join(', '), container: d.container ?? '',
   };
 };
 
-function toConfig(d: Draft): ServerConfig | DockerConfig {
+function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | BossConfig {
+  if (d.kind === 'http') return { folder: d.folder.trim(), env: d.defEnv.trim() || undefined };
+  if (d.kind === 'boss') return { members: d.members };
   if (d.kind === 'server') return { cwd: d.cwd.trim(), start: d.start.trim(), stop: d.stop.trim() || undefined, port: d.port.trim() ? Number(d.port) : undefined, env: textToEnv(d.env) };
   if (d.mode === 'existing') return { mode: 'existing', container: d.container.trim() };
   if (d.mode === 'compose') return { mode: 'compose', file: d.file.trim(), project: d.project.trim() || undefined, services: d.services.split(',').map((x) => x.trim()).filter(Boolean) };
@@ -35,7 +41,7 @@ function toConfig(d: Draft): ServerConfig | DockerConfig {
 
 export function ObjectEditor({ object, presetColonyId, onClose, onSaved }: { object?: ObjectView; presetColonyId?: string; onClose: () => void; onSaved?: (id: string) => void }) {
   const { t } = useI18n();
-  const { colonies, refresh } = useHive();
+  const { colonies, objects, refresh } = useHive();
   const toast = useToast();
   const [d, setD] = useState<Draft>(() => fromObject(object, presetColonyId));
   const [err, setErr] = useState('');
@@ -71,7 +77,7 @@ export function ObjectEditor({ object, presetColonyId, onClose, onSaved }: { obj
         {!object && (
           <Field label={t('obj.kind.pick')}>
             <div className="okinds">
-              {(['server', 'docker'] as ObjectKind[]).map((k) => { const { icon: Icon, color } = KIND[k]; return (
+              {(['server', 'docker', 'http', 'boss'] as ObjectKind[]).map((k) => { const { icon: Icon, color } = KIND[k]; return (
                 <button key={k} type="button" className="okind" aria-pressed={d.kind === k} style={{ ['--c' as never]: color }} onClick={() => set('kind', k)}>
                   <Icon size={20} /><b>{t(`obj.kind.${k}`)}</b><small>{t(`obj.kind.${k}.hint`)}</small>
                 </button>); })}
@@ -80,12 +86,25 @@ export function ObjectEditor({ object, presetColonyId, onClose, onSaved }: { obj
         )}
         <Field label={t('obj.f.name')} error={err}>{text('name')}</Field>
         <Field label={t('obj.colony')}>
-          <select className="select" value={d.colony_id} onChange={(e) => set('colony_id', e.target.value)}>
+          <select className="select" value={d.colony_id} onChange={(e) => setD((x) => ({ ...x, colony_id: e.target.value, members: [] }))}>
             <option value="">{t('obj.noColony')}</option>{colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </Field>
 
-        {d.kind === 'server' ? (<>
+        {d.kind === 'http' ? (<>
+          <FolderPicker value={d.folder} onChange={(v) => set('folder', v)} label={t('obj.f.httpFolder')} hint={t('obj.f.httpFolder.hint')} />
+          <Field label={t('obj.f.defaultEnv')} hint={t('obj.f.defaultEnv.hint')}>{text('defEnv', { placeholder: 'dev', mono: true })}</Field>
+        </>) : d.kind === 'boss' ? (<>
+          <Field label={t('obj.f.members')} hint={t('obj.f.members.hint')}>
+            {(() => {
+              const pool = objects.filter((o) => (o.kind === 'server' || o.kind === 'docker') && (o.colony_id ?? '') === d.colony_id);
+              if (!pool.length) return <p className="muted small" style={{ margin: 0 }}>{t('obj.f.members.none')}</p>;
+              const toggle = (id: string) => set('members', d.members.includes(id) ? d.members.filter((x) => x !== id) : [...d.members, id]);
+              return (<div className="omembers">{pool.map((o) => { const { icon: Icon, color } = KIND[o.kind]; const at = d.members.indexOf(o.id); return (
+                <label key={o.id} className="omember"><input type="checkbox" checked={at >= 0} onChange={() => toggle(o.id)} /><Icon size={15} style={{ color }} /><span className="nm">{o.name}</span>{at >= 0 && <span className="ord">{at + 1}</span>}</label>); })}</div>);
+            })()}
+          </Field>
+        </>) : d.kind === 'server' ? (<>
           <FolderPicker value={d.cwd} onChange={(v) => set('cwd', v)} label={t('obj.f.folder')} hint={t('obj.f.folder.hint')} />
           <Field label={t('obj.f.start')} hint={t('obj.f.start.hint')}>{text('start', { placeholder: 'npm run dev', mono: true })}</Field>
           <Field label={t('obj.f.stop')} hint={t('obj.f.stop.hint')}>{text('stop', { mono: true })}</Field>

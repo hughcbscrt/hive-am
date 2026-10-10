@@ -1,6 +1,6 @@
 # 15. Objetos de la colonia
 
-Además de agentes, una colonia puede tener **objetos**: cosas que hive-am mantiene corriendo o vigila junto a ellos. Hoy hay dos tipos: **servidores** y **Docker**. Aparecen en el mapa de la Colonia como hexágonos (con el color del tipo y un punto de estado), dentro de la colonia a la que pertenecen o sueltos. Al pulsar uno ves su estado, lo inicias, detienes o reinicias y lees sus logs; el lápiz lo edita.
+Además de agentes, una colonia puede tener **objetos**: cosas que hive-am mantiene corriendo o vigila junto a ellos. Hay cuatro tipos: **servidores**, **Docker**, **peticiones HTTP** y **jefe**. Aparecen en el mapa de la Colonia como hexágonos (con el color del tipo y un punto de estado), dentro de la colonia a la que pertenecen o sueltos. Al pulsar uno ves su estado, lo inicias, detienes o reinicias y lees sus logs; el lápiz lo edita.
 
 Se crea con **Nuevo objeto** (arriba a la derecha en la pantalla Colonia): eliges el tipo, un nombre, la colonia y los ajustes de abajo.
 
@@ -34,6 +34,19 @@ Necesita el comando `docker`. Cada valor se pasa como un argumento aparte (sin s
 | **Contenedor existente** (nombre o id) | Solo `start` / `stop` / `restart` y leer sus logs | Se deja como está. **Nunca se elimina.** |
 
 El estado sale de `docker inspect` (corriendo, reiniciando, terminado con un código, no saludable / health check pendiente) o, en compose, de `docker compose ps`. Un contenedor que no existe es **Detenido** (los creados por hive-am) o **Desconocido** (los existentes).
+
+## 15.2b Peticiones HTTP
+
+Una carpeta de archivos `.http` / `.rest` en el formato de los clientes REST de IntelliJ y VS Code. Pulsa **Abrir el ejecutor** en su panel: a la izquierda están las peticiones de cada archivo (hasta 300 archivos, 4 niveles de profundidad) y a la derecha la elegida y su respuesta. Estado: **Listo** (la carpeta está; el detalle dice cuántas peticiones tiene) o **Error**.
+
+- **Formato:** `###` separa peticiones (el texto que sigue es el nombre, o `# @name x`); `@nombre = valor` define una variable; la línea de petición es `MÉTODO URL [HTTP/1.1]`; las líneas que empiezan con `?` o `&` continúan la URL; las cabeceras siguen hasta la primera línea en blanco; el resto es el cuerpo (`< ./archivo.json` inserta un archivo junto al `.http`, dentro de la carpeta); los manejadores `> {% … %}` se ignoran.
+- **Variables:** `{{nombre}}` toma su valor de las variables del archivo y luego del entorno elegido, y `{{$uuid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}` y `{{$randomInt}}` se generan. Los entornos salen de `http-client.env.json` (y de `http-client.private.env.json` encima, para secretos) en la carpeta del archivo o en cualquiera por encima; `$shared` aplica a todos. El objeto puede tener un entorno por defecto.
+- **Ejecución:** el servidor envía la petición con `fetch` (60 s de límite, sigue redirecciones, las respuestas de más de 2 MB se cortan, las binarias se describen y no se imprimen). Una petición con un valor que no se puede resolver **no se envía**: el ejecutor nombra los `{{variables}}` que faltan antes de que pulses Ejecutar. **Ctrl+Enter** ejecuta la petición elegida; el icono de lista de un archivo ejecuta todas sus peticiones en orden, cada una conserva su última respuesta y un punto indica cómo salió. La respuesta se ve como Respuesta (JSON con formato), Cabeceras y Petición; la petición mostrada oculta los valores de `Authorization`, `Cookie` y cabeceras de API key.
+- **Límites:** solo URLs `http` / `https`; no se lee nada fuera de la carpeta (se rechaza una ruta que salga de ella, incluso por un enlace); ejecutar una petición solo se acepta desde la app local. Los objetos HTTP no tienen logs y no se inician ni se detienen.
+
+## 15.2c Jefe
+
+Agrupa servidores y contenedores Docker **de la misma colonia** (no otros jefes ni objetos HTTP). **Iniciar todo** inicia los miembros en el orden en que están listados, saltando los que ya están arriba; **Detener todo** los detiene en el orden contrario; **Reiniciar todo** hace ambas cosas. Que uno falle no impide intentar los demás: los fallos se informan juntos. Su estado sale de sus miembros: **Corriendo** cuando todos lo están, **Iniciando** mientras uno inicia, **Error** cuando uno falló o solo algunos están arriba (el detalle dice cuáles), **Detenido** cuando ninguno lo está. Sus logs son los de los miembros con `[nombre]` delante de cada línea (el cursor son los cursores de los miembros juntos, así que seguirlo devuelve solo lo nuevo). En el mapa se une a sus miembros con líneas punteadas. Eliminar un jefe deja a sus miembros como están; eliminar un miembro, o moverlo a otra colonia, lo saca de los jefes.
 
 ## 15.3 Estado, logs y actualización en vivo
 
@@ -73,8 +86,8 @@ Todo campo que guarda una ruta usa el mismo selector (`PathPicker` en `web/compo
 
 ## 15.7 Pruebas
 
-`server/scripts/test-objects.ts` y `test-object-tools.ts` (sin modelo; el segundo pasa por el script MCP y la API HTTP reales): corre procesos reales (estado, espera del puerto, logs por cursor, detener con gracia y kill, reinicio, códigos de salida, comando de parada propio, un servidor iniciado por otro proceso y vuelto a encontrar) y contenedores Docker reales llamados `hive-am-*` desde una imagen local (crear, mapeo de puertos, etiqueta, logs sin marcas de tiempo, reinicio, adoptar uno existente, compose), más la validación de entradas. Omite la parte de Docker si falta Docker o la imagen y nunca toca un contenedor que no creó.
+`server/scripts/test-objects.ts`, `test-object-kinds.ts` (archivos HTTP, entornos, ejecución contra un servidor local, jefes) y `test-object-tools.ts` (sin modelo; el último pasa por el script MCP y la API HTTP reales): corre procesos reales (estado, espera del puerto, logs por cursor, detener con gracia y kill, reinicio, códigos de salida, comando de parada propio, un servidor iniciado por otro proceso y vuelto a encontrar) y contenedores Docker reales llamados `hive-am-*` desde una imagen local (crear, mapeo de puertos, etiqueta, logs sin marcas de tiempo, reinicio, adoptar uno existente, compose), más la validación de entradas. Omite la parte de Docker si falta Docker o la imagen y nunca toca un contenedor que no creó.
 
 ## 15.8 Lo que falta
 
-Las terminales (un panel inferior), el objeto de peticiones HTTP y el objeto *jefe* que agrupa otros son los siguientes pasos. Los objetos Docker no se pueden crear en un host Docker remoto y PM2 no está integrado (un objeto servidor mantiene su propio proceso).
+Las terminales (un panel inferior). Los objetos Docker no se pueden crear en un host Docker remoto y PM2 no está integrado (un objeto servidor mantiene su propio proceso).

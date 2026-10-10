@@ -117,13 +117,24 @@ export interface StashDetail { sha: string; untrackedSha: string | null; untrack
 export interface GitListing { path: string; entries: { name: string; dir: boolean }[]; truncated: boolean }
 
 // ---- colony objects (servers and Docker containers) ----
-export type ObjectKind = 'server' | 'docker';
-export type ObjectStatus = 'running' | 'starting' | 'stopped' | 'error' | 'unknown';
+export type ObjectKind = 'server' | 'docker' | 'http' | 'boss';
+export type ObjectStatus = 'running' | 'starting' | 'stopped' | 'error' | 'unknown' | 'ready';
 export interface ServerConfig { cwd: string; start: string; stop?: string; env?: Record<string, string>; port?: number }
 export interface DockerConfig {
   mode: 'container' | 'compose' | 'existing';
   image?: string; ports?: string[]; volumes?: string[]; env?: Record<string, string>; restart?: 'no' | 'always' | 'unless-stopped' | 'on-failure'; command?: string;
   file?: string; project?: string; services?: string[]; container?: string;
 }
+export interface HttpConfig { folder: string; env?: string }
+export interface BossConfig { members: string[] }
 export interface ObjectState { status: ObjectStatus; detail?: string; pid?: number; since?: number }
-export interface ObjectView { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig; state: ObjectState; created_at: number; updated_at: number }
+export interface ObjectView { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig | HttpConfig | BossConfig; state: ObjectState; created_at: number; updated_at: number }
+
+// ---- HTTP-requests objects ----
+export interface HttpRequestItem { id: string; index: number; name: string; method: string; url: string; headers: { name: string; value: string }[]; body?: string; line: number; variables: string[] }
+export interface HttpFile { relFile: string; requests: HttpRequestItem[]; fileVariables: Record<string, string> }
+export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; truncated: boolean }
+export interface HttpRun {
+  request: { method: string; url: string; headers: { name: string; value: string }[]; body?: string };
+  status: number; statusText: string; durationMs: number; size: number; headers: { name: string; value: string }[]; body: string; truncated: boolean; binary: boolean; contentType: string;
+}

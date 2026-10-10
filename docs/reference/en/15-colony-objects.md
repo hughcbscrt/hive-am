@@ -1,6 +1,6 @@
 # 15. Colony objects
 
-Besides agents, a colony can hold **objects**: things hive-am keeps running or watches next to them. Two kinds exist today: **servers** and **Docker**. They appear on the Colony map as hexagons (with the kind's colour and a state dot), inside the colony they belong to or free. Click one to see its state, start / stop / restart it and read its logs; the pencil edits it.
+Besides agents, a colony can hold **objects**: things hive-am keeps running or watches next to them. Four kinds exist: **servers**, **Docker**, **HTTP requests** and **boss**. They appear on the Colony map as hexagons (with the kind's colour and a state dot), inside the colony they belong to or free. Click one to see its state, start / stop / restart it and read its logs; the pencil edits it.
 
 Create one with **New object** (top right of the Colony screen): choose the kind, a name, the colony, and the settings below.
 
@@ -34,6 +34,19 @@ Needs the `docker` command. Every value is passed as a separate argument (no she
 | **Existing container** (name or id) | Only `start` / `stop` / `restart` and reading its logs | Left as it is. **Never removed.** |
 
 State comes from `docker inspect` (running, restarting, exited with a code, unhealthy / health check pending) or, for compose, from `docker compose ps`. A container that is not there is **Stopped** (created ones) or **Unknown** (existing ones).
+
+## 15.2b HTTP requests
+
+A folder of `.http` / `.rest` files in the format of the IntelliJ and VS Code REST clients. Press **Open the runner** in its panel: the requests of every file are on the left (up to 300 files, 4 levels deep), the selected one and its answer on the right. State: **Ready** (the folder is there; the detail says how many requests) or **Error**.
+
+- **Format:** `###` separates requests (the text after it is the name, or `# @name x`); `@name = value` defines a variable; the request line is `METHOD URL [HTTP/1.1]`; lines that start with `?` or `&` continue the URL; headers follow until the first blank line; the rest is the body (`< ./file.json` inserts a file next to the `.http`, inside the folder); `> {% … %}` response handlers are ignored.
+- **Variables:** `{{name}}` takes its value from the file variables, then from the selected environment, and `{{$uuid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}` and `{{$randomInt}}` are generated. Environments come from `http-client.env.json` (and `http-client.private.env.json` over it, for secrets) in the folder of the file or any folder above it; `$shared` applies to all. The object can have a default environment.
+- **Running:** the server sends the request with `fetch` (60 s timeout, redirects followed, answers over 2 MB are cut, binary answers are described and not printed). A request with a value that cannot be resolved is **not sent**: the runner names the missing `{{variables}}` before you press Run. **Ctrl+Enter** runs the selected request; the list icon of a file runs all of its requests in order, each keeps its last answer, and a dot shows how it went. The answer is shown as Response (JSON formatted), Headers and Request; the echoed request hides the values of `Authorization`, `Cookie`, API-key headers.
+- **Limits:** only `http` / `https` URLs; nothing outside the folder is read (a path that leaves it, even through a link, is refused); running a request is only accepted from the local app. HTTP objects have no logs and cannot be started or stopped.
+
+## 15.2c Boss
+
+Groups servers and Docker containers **of the same colony** (not other bosses, not HTTP objects). **Start all** starts the members in the order they are listed, skipping the ones already up; **Stop all** stops them in the opposite order; **Restart all** does both. One failing does not keep the others from being tried: the failures are reported together. Its state comes from its members: **Running** when all are, **Starting** while one is, **Error** when one failed or only some are up (the detail says which), **Stopped** when none is. Its logs are the logs of the members with `[name]` in front of each line (the cursor is the members' cursors together, so following returns only what is new). On the map it is joined to its members by dashed lines. Deleting a boss leaves its members as they are; deleting a member, or moving it to another colony, takes it out of the bosses.
 
 ## 15.3 State, logs and live updates
 
@@ -73,8 +86,8 @@ Every field that holds a path uses the same picker (`PathPicker` in `web/compone
 
 ## 15.7 Tests
 
-`server/scripts/test-objects.ts` and `test-object-tools.ts` (no model; the second goes through the real MCP script and HTTP API): runs real processes (state, port wait, logs by cursor, stop with grace and kill, restart, exit codes, custom stop command, a server started by another process and found again) and real Docker containers named `hive-am-*` from a local image (create, port mapping, label, logs without timestamps, restart, adopt an existing one, compose), plus the input validation. It skips the Docker part if Docker or the image is missing and never touches a container it did not create.
+`server/scripts/test-objects.ts`, `test-object-kinds.ts` (HTTP files, environments, running against a local server, bosses) and `test-object-tools.ts` (no model; the last goes through the real MCP script and HTTP API): runs real processes (state, port wait, logs by cursor, stop with grace and kill, restart, exit codes, custom stop command, a server started by another process and found again) and real Docker containers named `hive-am-*` from a local image (create, port mapping, label, logs without timestamps, restart, adopt an existing one, compose), plus the input validation. It skips the Docker part if Docker or the image is missing and never touches a container it did not create.
 
 ## 15.8 Not there yet
 
-Terminals (a bottom panel), the HTTP-requests object and the *boss* object that groups others are the next steps. Docker objects cannot be created on a remote Docker host, and PM2 is not integrated (a server object keeps its own process).
+Terminals (a bottom panel) are the next step. Docker objects cannot be created on a remote Docker host, and PM2 is not integrated (a server object keeps its own process).

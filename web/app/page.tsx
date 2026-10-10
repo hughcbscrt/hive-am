@@ -99,7 +99,9 @@ export default function Colony() {
   const fullW = width + margin * 2, fullH = height + margin * 2;
   const k = avail ? Math.min(1, (avail - 24) / fullW) : 1;
   const pos = new Map<string, { x: number; y: number }>();
-  for (const c of clusters) for (const cell of c.cells) if (cell.agent) pos.set(cell.agent.id, { x: cell.x + margin, y: cell.y + margin });
+  for (const c of clusters) for (const cell of c.cells) { if (cell.agent) pos.set(cell.agent.id, { x: cell.x + margin, y: cell.y + margin }); if (cell.object) pos.set(cell.object.id, { x: cell.x + margin, y: cell.y + margin }); }
+  // A boss is joined to the objects it groups.
+  const bossLinks = objects.filter((o) => o.kind === 'boss').flatMap((b) => (b.config as { members: string[] }).members.map((m) => ({ from: b.id, to: m })));
   const [deleting, setDeleting] = useState<string | null>(null);
   const selected = agents.find((a) => a.id === sel) ?? null;
   const selectedObject = objects.find((o) => o.id === sel) ?? null;
@@ -231,6 +233,18 @@ export default function Colony() {
                         {live && <animate attributeName="stroke-dashoffset" from="26" to="0" dur="0.8s" repeatCount="indefinite" />}
                       </line>
                       <circle cx={x2} cy={y2} r={emph ? 5.5 : 4} fill="var(--honey)" stroke="var(--surface)" strokeWidth={2} />
+                    </g>
+                  );
+                })}
+                {bossLinks.map((l) => {
+                  const a = pos.get(l.from), b = pos.get(l.to); if (!a || !b) return null;
+                  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, r = S * 0.62;
+                  const sel2 = sel === l.from || sel === l.to;
+                  return (
+                    <g key={l.from + l.to} opacity={sel && !sel2 ? 0.25 : 1}>
+                      <line x1={a.x + ux * r} y1={a.y + uy * r} x2={b.x - ux * r} y2={b.y - uy * r} stroke="var(--surface)" strokeWidth={sel2 ? 7 : 5} strokeLinecap="round" opacity={0.85} />
+                      <line x1={a.x + ux * r} y1={a.y + uy * r} x2={b.x - ux * r} y2={b.y - uy * r} stroke="#c0399a" strokeWidth={sel2 ? 3 : 2} strokeDasharray="3 5" strokeLinecap="round" />
+                      <circle cx={b.x - ux * r} cy={b.y - uy * r} r={sel2 ? 4.5 : 3.5} fill="#c0399a" stroke="var(--surface)" strokeWidth={2} />
                     </g>
                   );
                 })}

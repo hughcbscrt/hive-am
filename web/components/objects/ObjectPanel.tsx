@@ -1,16 +1,17 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Pencil, Play, RotateCw, Square, UserPlus } from 'lucide-react';
+import { Globe, Pencil, Play, RotateCw, Square, UserPlus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { ago, shortPath } from '@/lib/meta';
-import type { DockerConfig, ObjectView, ServerConfig } from '@/lib/types';
+import type { BossConfig, DockerConfig, HttpConfig, ObjectView, ServerConfig } from '@/lib/types';
 import { useToast } from '@/components/ui';
 import { useHive } from '@/lib/store';
 import { OBJECTS_SKILL_ID } from '@/components/agents/NewAgentDrawer';
 import { KIND, STATUS_TONE } from './meta';
 import { LogView } from './LogView';
+import { HttpRunner } from './HttpRunner';
 
 export function StatusDot({ status, className = '' }: { status: ObjectView['state']['status']; className?: string }) {
   return <i className={`odot ${STATUS_TONE[status]} ${className}`} aria-hidden />;
@@ -19,6 +20,8 @@ export function StatusDot({ status, className = '' }: { status: ObjectView['stat
 /** One-line summary of how an object is run. */
 export function objectSummary(o: ObjectView): string {
   if (o.kind === 'server') { const c = o.config as ServerConfig; return c.start; }
+  if (o.kind === 'http') return shortPath((o.config as HttpConfig).folder);
+  if (o.kind === 'boss') return `${(o.config as BossConfig).members.length}`;
   const c = o.config as DockerConfig;
   return c.mode === 'container' ? c.image ?? '' : c.mode === 'compose' ? shortPath(c.file ?? '') : c.container ?? '';
 }
@@ -26,7 +29,8 @@ export function objectSummary(o: ObjectView): string {
 /** The panel shown when an object of the colony map is selected: its state, start/stop/restart, and its logs. */
 export function ObjectPanel({ object: o, onEdit, onCreateManager }: { object: ObjectView; onEdit: () => void; onCreateManager: () => void }) {
   const { t } = useI18n();
-  const { agents } = useHive();
+  const { agents, objects } = useHive();
+  const [runner, setRunner] = useState(false);
   // The agents that can act on it: the ones with the Colony objects skill in the same colony (or, with no colony, among the objects that have none).
   const managers = agents.filter((a) => a.skill_ids.includes(OBJECTS_SKILL_ID) && (a.colony_id ?? null) === (o.colony_id ?? null));
   const toast = useToast();
@@ -40,6 +44,7 @@ export function ObjectPanel({ object: o, onEdit, onCreateManager }: { object: Ob
     finally { setBusy(null); }
   };
   const live = st === 'running' || st === 'starting';
+  const members = o.kind === 'boss' ? (o.config as BossConfig).members.map((id) => objects.find((x) => x.id === id)).filter((x): x is ObjectView => !!x) : [];
   return (
     <aside className="side-float card card-pad col obj-panel" style={{ gap: 12 }} aria-label={o.name}>
       <div className="card-corner row gap-s"><button className="btn ghost icon sm" onClick={onEdit} aria-label={t('obj.act.edit')} title={t('obj.act.edit')}><Pencil size={15} /></button></div>
@@ -56,19 +61,32 @@ export function ObjectPanel({ object: o, onEdit, onCreateManager }: { object: Ob
       {(o.state.detail || o.state.since) && (
         <p className="muted small" style={{ margin: 0 }}>{[o.state.detail, o.state.since && live ? t('obj.since', { time: ago(o.state.since) }) : '', o.state.pid ? t('obj.pid', { pid: o.state.pid }) : ''].filter(Boolean).join(' · ')}</p>
       )}
-      <div className="mono small obj-cmd" title={objectSummary(o)}>{objectSummary(o)}</div>
-      <div className="row gap-s">
-        <button className="btn primary sm" disabled={!!busy || live} onClick={() => void act('start')}><Play size={14} />{t('obj.act.start')}</button>
-        <button className="btn sm" disabled={!!busy || (!live && st !== 'error')} onClick={() => void act('stop')}><Square size={14} />{t('obj.act.stop')}</button>
-        <button className="btn sm" disabled={!!busy} onClick={() => void act('restart')}><RotateCw size={14} />{t('obj.act.restart')}</button>
-      </div>
-      <div><div className="eyebrow" style={{ marginBottom: 6 }}>{t('obj.logs')}</div><LogView id={o.id} /></div>
-      <div className="obj-managers">
+      {o.kind !== 'boss' && <div className="mono small obj-cmd" title={objectSummary(o)}>{objectSummary(o)}</div>}
+      {o.kind === 'http' ? (
+        <button className="btn primary" onClick={() => setRunner(true)}><Globe size={15} />{t('http.open')}</button>
+      ) : (<>
+        <div className="row gap-s wrap">
+          <button className="btn primary sm" disabled={!!busy || (o.kind === 'boss' ? st === 'running' : live)} onClick={() => void act('start')}><Play size={14} />{t(o.kind === 'boss' ? 'obj.act.startAll' : 'obj.act.start')}</button>
+          <button className="btn sm" disabled={!!busy || (!live && st !== 'error' && !(o.kind === 'boss' && members.some((m) => m.state.status === 'running')))} onClick={() => void act('stop')}><Square size={14} />{t(o.kind === 'boss' ? 'obj.act.stopAll' : 'obj.act.stop')}</button>
+          <button className="btn sm" disabled={!!busy} onClick={() => void act('restart')}><RotateCw size={14} />{t(o.kind === 'boss' ? 'obj.act.restartAll' : 'obj.act.restart')}</button>
+        </div>
+        {o.kind === 'boss' && (
+          <div>
+            <div className="eyebrow" style={{ marginBottom: 6 }}>{t('obj.members')}</div>
+            {members.length ? <div className="col" style={{ gap: 4 }}>{members.map((m, i) => (
+              <div key={m.id} className="row gap-s small"><span className="ord">{i + 1}</span><StatusDot status={m.state.status} /><b className="grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</b><span className="muted">{t(`obj.status.${m.state.status}`)}</span></div>))}</div>
+              : <p className="muted small" style={{ margin: 0 }}>{t('obj.members.empty')}</p>}
+          </div>
+        )}
+        <div><div className="eyebrow" style={{ marginBottom: 6 }}>{t('obj.logs')}</div><LogView id={o.id} /></div>
+      </>)}
+      {runner && <HttpRunner object={o} onClose={() => setRunner(false)} />}
+      {o.kind !== 'http' && <div className="obj-managers">
         <div className="eyebrow" style={{ marginBottom: 6 }}>{t('obj.managers')}</div>
         {managers.length ? <div className="row gap-s wrap">{managers.map((a) => <Link key={a.id} href={`/agents/${a.id}`} className="chip" title={a.permission === 'plan' ? t('obj.managers.readonly') : undefined}>{a.name}{a.permission === 'plan' ? ` · ${t('obj.managers.ro')}` : ''}</Link>)}</div>
           : <p className="muted small" style={{ margin: 0 }}>{t('obj.managers.none')}</p>}
         <button className="btn sm" style={{ marginTop: 8 }} onClick={onCreateManager}><UserPlus size={14} />{t('obj.managers.create')}</button>
-      </div>
+      </div>}
     </aside>
   );
 }
