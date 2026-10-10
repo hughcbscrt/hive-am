@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- Sessions screen: a sidebar like the Skills one, a transcript that opens on its latest 100 messages (with a button for earlier ones) and long messages folded behind "show all".
+- The sessions list no longer reads every conversation to answer: sizes and costs are cached by conversation fingerprint and filled in the background, so the list appears at once even with very long sessions.
 - OpenCode agents answering an external chat use a long-lived opencode serve per agent (at most 2 alive, stopped after 5 idle minutes, cleaned up on exit): replies went from 6-9 s to 2-4 s and the first hive tool call no longer fails.
 - Group chats: a name counts as a call only when it speaks to the agent (not as a noun inside a sentence), messages for another person are marked To: and only a verified correction or a danger is worth a reply, and unaddressed chatter wakes the agent at most 10 times per minute per thread (chatter_per_minute).
 - Channel messages carry the current time (Now:), so agents no longer run date; pictures described by an image model are talked about naturally.
