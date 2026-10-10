@@ -17,8 +17,8 @@ import { LogPane } from './LogPane';
 import { HttpWorkspace } from './HttpWorkspace';
 import { HttpVars } from './HttpVars';
 
-type Tab = 'summary' | 'logs' | 'config' | 'requests' | 'vars';
-const tabsOf = (o: ObjectView): Tab[] => (o.kind === 'http' ? ['requests', 'vars', 'config'] : ['summary', 'logs', 'config']);
+type Tab = 'summary' | 'logs' | 'config' | 'requests' | 'history' | 'vars';
+const tabsOf = (o: ObjectView): Tab[] => (o.kind === 'http' ? ['requests', 'history', 'vars', 'config'] : ['summary', 'logs', 'config']);
 
 /** One object on a whole screen, like an agent: the list at the left, and its tabs (summary, logs, settings — or requests and variables). */
 export function ObjectWorkspace({ id }: { id?: string }) {
@@ -86,11 +86,11 @@ function Screen({ object: o }: { object: ObjectView }) {
       <div className="tabs ow-tabs" role="tablist">
         {tabs.map((x) => <button key={x} className="tab" role="tab" aria-selected={tab === x} onClick={() => setTab(x)}>{t(`ow.tab.${x}`)}</button>)}
       </div>
-      <div className={`ow-body ${tab === 'logs' || tab === 'requests' ? 'full' : ''}`}>
+      <div className={`ow-body ${tab === 'logs' || tab === 'requests' || tab === 'history' ? 'full' : ''}`}>
         {tab === 'summary' && <ObjectSummary object={o} onSeeLogs={() => setTab('logs')} />}
         {tab === 'logs' && <LogPane id={o.id} members={cluster ? memberNames : undefined} />}
         {tab === 'config' && <ObjectConfig object={o} />}
-        {tab === 'requests' && <HttpWorkspace object={o} onOpenVars={() => setTab('vars')} />}
+        {(tab === 'requests' || tab === 'history') && <HttpWorkspace object={o} pane={tab} onOpenVars={() => setTab('vars')} onGoRequests={() => setTab('requests')} />}
         {tab === 'vars' && <HttpVars object={o} />}
       </div>
     </section>

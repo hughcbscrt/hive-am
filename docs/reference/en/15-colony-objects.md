@@ -155,5 +155,6 @@ The runner shows what each variable is worth right now, not only its name:
 - **Request tab**: the request as it will be sent, with missing values marked; after a run, what was actually sent.
 - **File tab**: the `.http` source with a ▶ per request, `{{variables}}` coloured by origin (hover for the value) and an editor (Ctrl+S) that saves the file on disk (existing `.http` / `.rest` files only, up to 1 MB).
 - **Answers** as a foldable JSON tree; each value copies its reference (`{{name.response.body.$.path}}`) when the request has a name. The Session panel lists remembered answers with their data.
+- **History tab**: the runs since you opened the screen (newest first) with their answer; the session values and remembered answers live there too.
 
 API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/objects/:id/http/file`.
