@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-10
+
 ### Added
 
 - Markdown preview in the file explorer: `.md` files open rendered, with a Preview tab next to the source (File) and the diff.
@@ -50,5 +52,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/hughcbscrt/hive-am/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/hughcbscrt/hive-am/releases/tag/v1.0.0
