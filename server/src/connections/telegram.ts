@@ -141,13 +141,15 @@ export class TelegramAdapter implements ChannelAdapter {
     const cmd = /^\/(\w+)(?:@(\w+))?(?:\s+([\s\S]*))?$/.exec(text);
     if (cmd && cmd[2] && cmd[2].toLowerCase() !== this.me.username.toLowerCase()) return null;   // a command for another bot
     const mention = new RegExp(`@${this.me.username}\\b`, 'i');
-    const addressed = isPrivate || !!cmd || mention.test(text) || msg.reply_to_message?.from?.id === this.me.id;
+    // In a forum topic every message carries a `reply_to_message` that is just the topic's first message (not a real reply to someone).
+    const realReply = msg.reply_to_message && !msg.reply_to_message.forum_topic_created && !(msg.is_topic_message && msg.reply_to_message.message_id === msg.message_thread_id) ? msg.reply_to_message : undefined;
+    const addressed = isPrivate || !!cmd || mention.test(text) || realReply?.from?.id === this.me.id;
     text = text.replace(mention, '').trim();
     if (!text && !attachments.length) return null;
     // Meant for another person of the chat: a reply to their message, or an @mention / text mention of them.
     const raw: string = msg.text ?? msg.caption ?? '';
     let directedAt: string | undefined;
-    const to = msg.reply_to_message?.from;
+    const to = realReply?.from;
     if (!isPrivate && to && !to.is_bot && to.id !== this.me.id && to.id !== msg.from?.id) directedAt = to.username ?? to.first_name ?? String(to.id);
     for (const e of (msg.entities ?? msg.caption_entities ?? []) as any[]) {
       if (directedAt || isPrivate) break;
