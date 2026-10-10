@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- Terminals: a bottom panel (Ctrl+`) with real shells (a pty each, kept by the server, replayed when a page attaches) and the logs of objects in tabs; from an agent, a server object or a container. Only this machine can reach them (loopback host and origin), `HIVE_AM_TERMINALS=0` turns them off, `node-pty` is an optional dependency.
 - HTTP-requests objects: a folder of `.http` / `.rest` files with environments (`http-client.env.json` and the private one), file and generated variables, bodies from a file and a runner to send the requests and read the answers; nothing is sent while a variable is missing, and credentials are hidden in the echoed request.
 - Boss objects: group servers and containers of a colony to start them in order, stop them in reverse, see one state and read their logs together with the name of each member.
 - Agents that look after colony objects: a "Colony objects" skill gives an agent `object_list`, `object_logs` and `object_action` (start, stop, restart) for the objects of its own colony; read-only agents cannot act, nothing can be created or changed by an agent, and the log says who asked. A "Create a manager agent" button in the object panel sets one up.

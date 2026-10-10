@@ -3,7 +3,7 @@ import { useAgentSettings } from '@/components/agents/useAgentSettings';
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, History, Maximize2, Minimize2, RotateCcw, SlidersHorizontal, Waypoints } from 'lucide-react';
+import { ArrowLeft, History, Maximize2, Minimize2, RotateCcw, SlidersHorizontal, SquareTerminal, Waypoints } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
 import { ago, shortPath } from '@/lib/meta';
@@ -16,6 +16,7 @@ import { AgentForm } from '@/components/agents/AgentForm';
 import { NotebookPanel } from '@/components/agents/NotebookPanel';
 import { Hex, Modal, ProviderBadge, RoleChip, StatusChip, useToast } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
+import { useDock } from '@/lib/dock';
 
 interface Sess { session_id: string; first_seen: number; last_seen: number; kind: 'direct' | 'delegation'; from_name: string | null; task: string | null }
 
@@ -34,6 +35,7 @@ function Workspace({ id }: { id: string }) {
   const agent = find(id);
   const router = useRouter();
   const toast = useToast();
+  const dock = useDock();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'config' | 'notebook' | 'sessions'>('config');
   const [sessions, setSessions] = useState<Sess[]>([]);
@@ -90,6 +92,7 @@ function Workspace({ id }: { id: string }) {
           </div>
           {viewing && <button className="btn primary sm" onClick={() => resume(viewing)} disabled={sessions.find((s) => s.session_id === viewing)?.kind === 'delegation'}>{t('agent.makeCurrent')}</button>}
           {viewing && <button className="btn sm" onClick={() => setViewing(undefined)}>{t('agent.backToCurrent')}</button>}
+          <button className="btn sm" onClick={() => void dock.openTerminal({ agentId: id })} aria-label={t('dock.agent')} title={t('dock.agent')}><SquareTerminal size={14} /></button>
           <button className="btn sm" onClick={() => setConfirm('new')} disabled={!agent.session_id || agent.status === 'running'}><RotateCcw size={14} />{t('agent.newConversation')}</button>
           <button className={`btn sm ${open ? 'primary' : ''}`} onClick={() => toggle(!open)} aria-expanded={open} aria-label={t('colony.agentSettings')}><SlidersHorizontal size={14} />{t('agent.settings')}{dirty && <i className="dot run" title={t('agent.unsaved')} />}</button>
         </header>

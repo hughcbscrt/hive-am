@@ -1,13 +1,14 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Globe, Pencil, Play, RotateCw, Square, UserPlus } from 'lucide-react';
+import { FileText, Globe, Pencil, Play, RotateCw, Square, SquareTerminal, UserPlus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { ago, shortPath } from '@/lib/meta';
 import type { BossConfig, DockerConfig, HttpConfig, ObjectView, ServerConfig } from '@/lib/types';
 import { useToast } from '@/components/ui';
 import { useHive } from '@/lib/store';
+import { useDock } from '@/lib/dock';
 import { OBJECTS_SKILL_ID } from '@/components/agents/NewAgentDrawer';
 import { KIND, STATUS_TONE } from './meta';
 import { LogView } from './LogView';
@@ -31,6 +32,9 @@ export function ObjectPanel({ object: o, onEdit, onCreateManager }: { object: Ob
   const { t } = useI18n();
   const { agents, objects } = useHive();
   const [runner, setRunner] = useState(false);
+  const dock = useDock();
+  // A terminal where the server runs, or inside the container (a compose project has several, so it only has logs).
+  const canShell = o.kind === 'server' || (o.kind === 'docker' && (o.config as DockerConfig).mode !== 'compose');
   // The agents that can act on it: the ones with the Colony objects skill in the same colony (or, with no colony, among the objects that have none).
   const managers = agents.filter((a) => a.skill_ids.includes(OBJECTS_SKILL_ID) && (a.colony_id ?? null) === (o.colony_id ?? null));
   const toast = useToast();
@@ -78,6 +82,10 @@ export function ObjectPanel({ object: o, onEdit, onCreateManager }: { object: Ob
               : <p className="muted small" style={{ margin: 0 }}>{t('obj.members.empty')}</p>}
           </div>
         )}
+        <div className="row gap-s wrap">
+          {canShell && <button className="btn sm" onClick={() => void dock.openTerminal({ objectId: o.id })}><SquareTerminal size={14} />{o.kind === 'server' ? t('dock.here') : t('dock.shell')}</button>}
+          <button className="btn sm" onClick={() => dock.openLogs(o.id, o.name)}><FileText size={14} />{t('dock.logs')}</button>
+        </div>
         <div><div className="eyebrow" style={{ marginBottom: 6 }}>{t('obj.logs')}</div><LogView id={o.id} /></div>
       </>)}
       {runner && <HttpRunner object={o} onClose={() => setRunner(false)} />}

@@ -2,11 +2,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Boxes, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, Sun, Users, Plug } from 'lucide-react';
+import { Boxes, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, SquareTerminal, Sun, Users, Plug } from 'lucide-react';
 import { HiveProvider, useHive } from '@/lib/store';
 import { I18nProvider, LOCALES, useI18n } from '@/lib/i18n';
 import { Toaster } from './ui';
 import { Tooltips } from './Tooltips';
+import { DockProvider, useDock } from '@/lib/dock';
+import { TerminalDock } from './dock/TerminalDock';
 
 function HiveMark() {
   return <img src="/icon.png" width={34} height={34} alt="" aria-hidden className="brand-mark" />;
@@ -31,6 +33,7 @@ function Nav() {
   const path = usePathname();
   const { t } = useI18n();
   const { agents, types, skills, connections, connected } = useHive();
+  const dock = useDock();
   const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
   useEffect(() => { try { const saved = localStorage.getItem('hive-theme') as 'light' | 'dark' | null; if (saved) { setTheme(saved); document.documentElement.dataset.theme = saved; } } catch { /* ignore */ } }, []);
   const flip = () => {
@@ -59,6 +62,7 @@ function Nav() {
       <div className="nav-label">{t('nav.history')}</div>
       {item('/sessions', t('nav.sessions'), <History size={18} />)}
       <div className="rail-foot">
+        <button className="btn ghost sm" onClick={dock.toggle} aria-pressed={dock.open} title={`${t('dock.nav')} (Ctrl+\`)`} style={{ justifyContent: 'flex-start' }}><SquareTerminal size={15} /> {t('dock.nav')}{dock.tabs.length > 0 && <span className="count" style={{ marginLeft: 'auto' }}>{dock.tabs.length}</span>}</button>
         <div className="conn"><i className={`dot ${connected ? 'ok' : 'err'}`} />{connected ? t('nav.connected') : t('nav.offline')}</div>
         <button className="btn ghost sm" onClick={flip} style={{ justifyContent: 'flex-start' }}>{theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />} {t('nav.switchTheme')}</button>
       </div>
@@ -70,10 +74,13 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <I18nProvider>
       <HiveProvider>
-        <Toaster>
-          <Tooltips />
-          <div className="shell"><Nav /><main className="main">{children}</main></div>
-        </Toaster>
+        <DockProvider>
+          <Toaster>
+            <Tooltips />
+            <div className="shell"><Nav /><main className="main">{children}</main></div>
+            <TerminalDock />
+          </Toaster>
+        </DockProvider>
       </HiveProvider>
     </I18nProvider>
   );

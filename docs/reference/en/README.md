@@ -25,6 +25,7 @@ This folder describes the whole project: how it is organized, how it runs, where
 | 13 | [Changes explorer (git)](13-changes-explorer-git.md) | The **Changes** tab: file tree with highlighting and diff viewer, history and git actions (commit, pull, push, branches) |
 | 14 | [External connections](14-external-connections.md) | Linking an agent to Telegram: single session, `channel_reply` tool, permissions, API and the **Connections** screen |
 | 15 | [Colony objects](15-colony-objects.md) | Servers and Docker containers as hexagons of the colony: start / stop / restart, logs, how they run and the API |
+| 16 | [Terminals](16-terminals.md) | The bottom panel: terminals and object logs, how they work and why only this machine can reach them |
 
 ## Suggested reading
 
