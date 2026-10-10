@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- Tags in the git explorer: a Tags tab lists the repository's tags; each one can be browsed read-only (its files as they were at that tag, with Markdown preview, and the changes of its commit). The working folder is never touched.
+
 ### Changed
 
 - Sessions screen: a sidebar like the Skills one, a transcript that opens on its latest 100 messages (with a button for earlier ones) and long messages folded behind "show all".
