@@ -28,7 +28,7 @@ import { createReadStream } from 'node:fs';
 import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git/repo.js';
 import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './git/switch.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from './objects/agent.js';
-import { ObjectError, createObject, listObjects, objectAction, objectLogs, removeObject, updateObject } from './objects/index.js';
+import { ObjectError, createObject, httpDescribe, httpRun, httpScan, listObjects, objectAction, objectLogs, removeObject, updateObject } from './objects/index.js';
 import { gitCompare, gitCompareDiff, gitGrep, gitImageAt, gitRefs } from './git/browse.js';
 import { GitOpError, gitBlame, gitBranchCreate, gitBranchDelete, gitRefFile, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitTagFile, gitTagTree, gitTags, gitUnresolve, type PullMode } from './git/ops.js';
 
@@ -280,6 +280,9 @@ route('POST', '/api/objects', async ({ req }) => { objectGuard(req); const p = a
 route('PATCH', '/api/objects/:id', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => updateObject(params[0], p)); });
 route('DELETE', '/api/objects/:id', async ({ req, params }) => { objectGuard(req); return objectSafe(async () => { if (!(await removeObject(params[0]))) throw notFound('Object not found'); return { ok: true }; }); });
 route('POST', '/api/objects/:id/action', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => objectAction(params[0], p.action)); });
+route('GET', '/api/objects/:id/http', ({ params }) => objectSafe(() => httpScan(params[0])));
+route('GET', '/api/objects/:id/http/describe', ({ params, url }) => objectSafe(() => httpDescribe(params[0], url.searchParams.get('file') ?? '', Number(url.searchParams.get('index') ?? 0), url.searchParams.get('env') ?? undefined)));
+route('POST', '/api/objects/:id/http/run', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => httpRun(params[0], String(p.file ?? ''), Number(p.index ?? 0), p.env ? String(p.env) : undefined)); });
 route('GET', '/api/objects/:id/logs', ({ params, url }) => objectSafe(() => objectLogs(params[0], { tail: url.searchParams.get('tail') ? Number(url.searchParams.get('tail')) : undefined, after: url.searchParams.get('after') ?? undefined })));
 
 // ---- skills ----
