@@ -843,3 +843,13 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .chip.warn { border-color: var(--honey); color: var(--honey); }
 
 .chat-earlier { display: block; margin: 4px auto 14px; }
+
+/* Scrollbars: thin, no track, a thumb tinted with the ink colour that darkens while the area is hovered (both themes). */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent; }
+*:hover { scrollbar-color: color-mix(in srgb, var(--ink) 38%, transparent) transparent; }
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink) 24%, transparent); border-radius: 10px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--ink) 42%, transparent); background-clip: content-box; }
+}
