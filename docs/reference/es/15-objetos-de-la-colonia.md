@@ -145,3 +145,15 @@ Todo campo que guarda una ruta usa el mismo selector (`PathPicker` en `web/compo
 ## 15.8 Lo que falta
 
 Las terminales (un panel inferior). Los objetos Docker no se pueden crear en un host Docker remoto y PM2 no está integrado (un objeto servidor mantiene su propio proceso).
+
+## 15.9 Ver los valores
+
+El ejecutor muestra cuánto vale cada variable ahora mismo, no solo su nombre:
+
+- **Pestaña Variables de un archivo o petición**: cada variable con su valor actual, de dónde sale (sesión, `@` del archivo, archivo env, hive-am, respuesta de otra petición, generada en cada ejecución o falta), qué oculta cuando algo más débil también la define y cuántas veces se usa. Si falta y viene de una petición con nombre, ofrece ejecutarla. El lápiz pone un valor para la sesión (gana sobre todo hasta que se olvide); los secretos se enmascaran y los guardados en hive-am nunca llegan al navegador.
+- **Ojo junto al entorno**: todas las variables vigentes con el entorno elegido.
+- **Pestaña Petición**: la petición tal como se enviará, con lo que falta marcado; tras ejecutar, lo que realmente se envió.
+- **Pestaña Archivo**: el texto del `.http` con un ▶ por petición, `{{variables}}` coloreadas por origen (el valor al pasar el mouse) y un editor (Ctrl+S) que guarda el archivo en disco (solo `.http` / `.rest` existentes, hasta 1 MB).
+- **Respuestas** como árbol JSON plegable; cada valor copia su referencia (`{{nombre.response.body.$.ruta}}`) si la petición tiene nombre. El panel Sesión lista las respuestas recordadas con sus datos.
+
+API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/objects/:id/http/file`.
