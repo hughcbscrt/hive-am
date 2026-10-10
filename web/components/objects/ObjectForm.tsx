@@ -1,9 +1,12 @@
 'use client';
 import { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { Field, FolderPicker, PathPicker, Segmented } from '@/components/ui';
+import { useComposeServices, useDockerLists } from '@/lib/useDocker';
+import { Suggest } from './Suggest';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
-import type { ClusterConfig, DockerConfig, HttpConfig, ObjectKind, ObjectView, ServerConfig } from '@/lib/types';
+import type { ClusterConfig, DockerConfig, HttpConfig, HttpScan, ObjectKind, ObjectView, ServerConfig } from '@/lib/types';
 import { KIND, envToText, lines, textToEnv } from './meta';
 import { VarsEditor, type Vars } from './VarsEditor';
 
@@ -56,41 +59,83 @@ export function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | C
   };
 }
 
-/** The settings of an object, as fields. Used to create one (in a drawer) and to change it (in its own screen). */
-export function ObjectFields({ d, set, setD, fileEnvs, fileVars, showKind = false, error }: {
+const Card = ({ title, hint, wide = false, children }: { title: string; hint?: string; wide?: boolean; children: React.ReactNode }) => (
+  <section className={`of-card ${wide ? 'wide' : ''}`}><header><h4>{title}</h4>{hint && <p className="muted small">{hint}</p>}</header>{children}</section>
+);
+
+/** The services of a compose file, to pick (none picked = all of them). */
+function ServicePicker({ file, project, services, onServices, onProject }: { file: string; project: string; services: string; onServices: (v: string) => void; onProject: (v: string) => void }) {
+  const { t } = useI18n();
+  const { info, err, loading } = useComposeServices(file);
+  const picked = new Set(services.split(',').map((x) => x.trim()).filter(Boolean));
+  const toggle = (s: string) => { const n = new Set(picked); if (n.has(s)) n.delete(s); else n.add(s); onServices([...n].join(', ')); };
+  return (
+    <>
+      <Field label={t('obj.f.services')} hint={t('dk.services.hint')}>
+        {!file ? <p className="muted small" style={{ margin: 0 }}>{t('dk.services.pickFile')}</p>
+          : loading ? <p className="muted small" style={{ margin: 0 }}>{t('dk.services.loading')}</p>
+          : err ? <p className="gx-note err" style={{ margin: 0 }}>{err}</p>
+          : info && info.services.length === 0 ? <p className="muted small" style={{ margin: 0 }}>{t('dk.services.none')}</p>
+          : info ? (<>
+            <div className="chips">{info.services.map((sv) => <button key={sv} type="button" className={`chip-pick ${picked.has(sv) ? 'on' : ''}`} aria-pressed={picked.has(sv)} onClick={() => toggle(sv)}>{sv}</button>)}</div>
+            {info.source === 'file' && <p className="muted small" style={{ margin: '6px 0 0' }}>{t('dk.services.file')}</p>}
+          </>) : null}
+      </Field>
+      <Field label={t('obj.f.project')} hint={t('dk.project.hint')}>
+        <div className="row gap-s"><input className="input mono" value={project} onChange={(e) => onProject(e.target.value)} placeholder={info?.project} />
+          {info && !project && <button type="button" className="btn sm" onClick={() => onProject(info.project)}>{t('dk.project.use', { name: info.project })}</button>}</div>
+      </Field>
+    </>
+  );
+}
+
+/** The settings of an object, as fields in cards (one column in a drawer, several on a wide screen). Used to create one and to change it. */
+export function ObjectFields({ d, set, setD, scan, showKind = false, error }: {
   d: Draft; set: <K extends keyof Draft>(k: K, v: Draft[K]) => void; setD: (f: (x: Draft) => Draft) => void;
-  fileEnvs?: string[]; fileVars?: Record<string, string[]>; showKind?: boolean; error?: string;
+  scan?: HttpScan | null; showKind?: boolean; error?: string;
 }) {
   const { t } = useI18n();
   const { colonies, objects } = useHive();
+  const needsDocker = d.kind === 'docker' && (d.mode === 'existing' || d.mode === 'container');
+  const docker = useDockerLists(needsDocker);
   const text = (k: keyof Draft, props: { placeholder?: string; mono?: boolean; type?: string } = {}) => (
     <input className={`input ${props.mono ? 'mono' : ''}`} type={props.type} value={d[k] as string} placeholder={props.placeholder} onChange={(e) => set(k, e.target.value as never)} />
   );
+  const dockerNote = docker.error ? <p className="muted small" style={{ margin: '4px 0 0' }}>{t('dk.unavailable', { error: docker.error })}</p> : null;
+  const refresh = <button type="button" className="btn ghost icon sm" onClick={docker.reload} aria-label={t('dk.refresh')} title={t('dk.refresh')}><RefreshCw size={14} /></button>;
+  const fileEnvs = scan ? Object.keys(scan.fileVars).filter((e) => e !== '$shared') : undefined;
+
   return (
-    <>
+    <div className="of">
       {showKind && (
-        <Field label={t('obj.kind.pick')}>
+        <Card title={t('obj.kind.pick')} wide>
           <div className="okinds">
             {(['server', 'docker', 'http', 'cluster'] as ObjectKind[]).map((k) => { const { icon: Icon, color } = KIND[k]; return (
               <button key={k} type="button" className="okind" aria-pressed={d.kind === k} style={{ ['--c' as never]: color }} onClick={() => set('kind', k)}>
                 <Icon size={20} /><b>{t(`obj.kind.${k}`)}</b><small>{t(`obj.kind.${k}.hint`)}</small>
               </button>); })}
           </div>
-        </Field>
+        </Card>
       )}
-      <Field label={t('obj.f.name')} error={error}>{text('name')}</Field>
-      <Field label={t('obj.colony')}>
-        <select className="select" value={d.colony_id} onChange={(e) => setD((x) => ({ ...x, colony_id: e.target.value, members: [] }))}>
-          <option value="">{t('obj.noColony')}</option>{colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-      </Field>
+      <Card title={t('of.general')}>
+        <Field label={t('obj.f.name')} error={error}>{text('name')}</Field>
+        <Field label={t('obj.colony')}>
+          <select className="select" value={d.colony_id} onChange={(e) => setD((x) => ({ ...x, colony_id: e.target.value, members: [] }))}>
+            <option value="">{t('obj.noColony')}</option>{colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </Field>
+      </Card>
 
       {d.kind === 'http' ? (<>
-        <FolderPicker value={d.folder} onChange={(v) => set('folder', v)} label={t('obj.f.httpFolder')} hint={t('obj.f.httpFolder.hint')} />
-        <Field label={t('obj.f.defaultEnv')} hint={t('obj.f.defaultEnv.hint')}>{text('defEnv', { placeholder: 'dev', mono: true })}</Field>
-        <Field label={t('vars.title')} hint={t('vars.hint')}><VarsEditor value={d.variables} onChange={(v) => set('variables', v)} fileEnvs={fileEnvs} fileVars={fileVars} /></Field>
-      </>) : d.kind === 'cluster' ? (<>
-        <Field label={t('obj.f.members')} hint={t('obj.f.members.hint')}>
+        <Card title={t('of.files')}>
+          <FolderPicker value={d.folder} onChange={(v) => set('folder', v)} label={t('obj.f.httpFolder')} hint={t('obj.f.httpFolder.hint')} />
+          <Field label={t('obj.f.defaultEnv')} hint={t('obj.f.defaultEnv.hint')}>
+            <Suggest value={d.defEnv} onChange={(v) => set('defEnv', v)} mono placeholder="dev" options={[...new Set([...(scan?.environments ?? []), ...Object.keys(d.variables).filter((k) => k !== '$shared')])].map((v) => ({ value: v }))} />
+          </Field>
+        </Card>
+        <Card title={t('of.vars')} wide><VarsEditor value={d.variables} onChange={(v) => set('variables', v)} fileEnvs={fileEnvs} fileVars={scan?.fileVars} used={scan?.used} fileDefined={scan?.fileDefined} /></Card>
+      </>) : d.kind === 'cluster' ? (
+        <Card title={t('of.members')} hint={t('obj.f.members.hint')}>
           {(() => {
             const pool = objects.filter((o) => (o.kind === 'server' || o.kind === 'docker') && (o.colony_id ?? '') === d.colony_id);
             if (!pool.length) return <p className="muted small" style={{ margin: 0 }}>{t('obj.f.members.none')}</p>;
@@ -98,15 +143,16 @@ export function ObjectFields({ d, set, setD, fileEnvs, fileVars, showKind = fals
             return (<div className="omembers">{pool.map((o) => { const { icon: Icon, color } = KIND[o.kind]; const at = d.members.indexOf(o.id); return (
               <label key={o.id} className="omember"><input type="checkbox" checked={at >= 0} onChange={() => toggle(o.id)} /><Icon size={15} style={{ color }} /><span className="nm">{o.name}</span>{at >= 0 && <span className="ord">{at + 1}</span>}</label>); })}</div>);
           })()}
-        </Field>
-      </>) : d.kind === 'server' ? (<>
-        <FolderPicker value={d.cwd} onChange={(v) => set('cwd', v)} label={t('obj.f.folder')} hint={t('obj.f.folder.hint')} />
-        <Field label={t('obj.f.start')} hint={t('obj.f.start.hint')}>{text('start', { placeholder: 'npm run dev', mono: true })}</Field>
-        <Field label={t('obj.f.stop')} hint={t('obj.f.stop.hint')}>{text('stop', { mono: true })}</Field>
-        <Field label={t('obj.f.port')} hint={t('obj.f.port.hint')}>{text('port', { placeholder: '3000' })}</Field>
-        <Field label={t('obj.f.env')} hint={t('obj.f.env.hint')}><textarea className="textarea mono" rows={3} value={d.env} onChange={(e) => set('env', e.target.value)} /></Field>
-        <details className="ofold" open={d.restart !== 'no' || !!d.healthKind}>
-          <summary>{t('obj.sup.title')}</summary>
+        </Card>
+      ) : d.kind === 'server' ? (<>
+        <Card title={t('of.run')}>
+          <FolderPicker value={d.cwd} onChange={(v) => set('cwd', v)} label={t('obj.f.folder')} hint={t('obj.f.folder.hint')} />
+          <Field label={t('obj.f.start')} hint={t('obj.f.start.hint')}>{text('start', { placeholder: 'npm run dev', mono: true })}</Field>
+          <Field label={t('obj.f.stop')} hint={t('obj.f.stop.hint')}>{text('stop', { mono: true })}</Field>
+          <Field label={t('obj.f.port')} hint={t('obj.f.port.hint')}>{text('port', { placeholder: '3000' })}</Field>
+        </Card>
+        <Card title={t('of.env')}><Field label={t('obj.f.env')} hint={t('obj.f.env.hint')}><textarea className="textarea mono" rows={5} value={d.env} onChange={(e) => set('env', e.target.value)} /></Field></Card>
+        <Card title={t('obj.sup.title')}>
           <Field label={t('obj.sup.restart')} hint={t('obj.sup.restart.hint')}>
             <div className="row gap-s"><select className="select" value={d.restart} onChange={(e) => set('restart', e.target.value)}>
               <option value="no">{t('obj.sup.restart.no')}</option><option value="on-failure">{t('obj.sup.restart.fail')}</option><option value="always">{t('obj.sup.restart.always')}</option></select>
@@ -121,51 +167,64 @@ export function ObjectFields({ d, set, setD, fileEnvs, fileVars, showKind = fals
               <input className="input" style={{ maxWidth: 130 }} value={d.healthRetries} onChange={(e) => set('healthRetries', e.target.value)} placeholder={t('obj.sup.retries')} aria-label={t('obj.sup.retries')} />
               <label className="row gap-s small"><input type="checkbox" checked={d.healthRestart} onChange={(e) => set('healthRestart', e.target.checked)} />{t('obj.sup.healthRestart')}</label></div>)}
           </Field>
-          <div className="row gap-s wrap">
+          <div className="of-grid2">
             <Field label={t('obj.sup.stopTimeout')} hint={t('obj.sup.stopTimeout.hint')}>{text('stopTimeout', { placeholder: '8' })}</Field>
             <Field label={t('obj.sup.logMax')} hint={t('obj.sup.logMax.hint')}>{text('logMax', { placeholder: '5' })}</Field>
           </div>
-        </details>
+        </Card>
       </>) : (<>
-        <Field label={t('obj.f.mode')}>
+        <Card title={t('obj.f.mode')}>
           <Segmented value={d.mode} onChange={(v) => set('mode', v)} options={[{ id: 'container', label: t('obj.mode.container') }, { id: 'compose', label: t('obj.mode.compose') }, { id: 'existing', label: t('obj.mode.existing') }]} />
-        </Field>
+        </Card>
         {d.mode === 'container' && (<>
-          <Field label={t('obj.f.image')}>{text('image', { placeholder: 'nginx:alpine', mono: true })}</Field>
-          <Field label={t('obj.f.ports')} hint={t('obj.f.ports.hint')}><textarea className="textarea mono" rows={2} value={d.ports} onChange={(e) => set('ports', e.target.value)} placeholder="8080:80" /></Field>
-          <Field label={t('obj.f.volumes')} hint={t('obj.f.volumes.hint')}>
-            <textarea className="textarea mono" rows={2} value={d.volumes} onChange={(e) => set('volumes', e.target.value)} />
-            <PathPicker bare value="" buttonLabel={t('obj.f.volumes.add')} onChange={(v) => set('volumes', `${d.volumes.trimEnd()}${d.volumes.trim() ? '\n' : ''}${v}:/data`)} />
-          </Field>
-          <Field label={t('obj.f.env')} hint={t('obj.f.env.hint')}><textarea className="textarea mono" rows={3} value={d.env} onChange={(e) => set('env', e.target.value)} /></Field>
-          <Field label={t('obj.f.restart')}>
-            <select className="select" value={d.dockerRestart} onChange={(e) => set('dockerRestart', e.target.value)}>{['no', 'always', 'unless-stopped', 'on-failure'].map((r) => <option key={r} value={r}>{r}</option>)}</select>
-          </Field>
-          <Field label={t('obj.f.command')}>{text('command', { mono: true })}</Field>
-          <details className="ofold" open={!!(d.memory || d.cpus || d.network || d.logMax || d.stopTimeout)}>
-            <summary>{t('obj.dk.limits')}</summary>
-            <p className="muted small" style={{ margin: '0 0 8px' }}>{t('obj.dk.limits.hint')}</p>
-            <div className="row gap-s wrap">
+          <Card title={t('of.image')}>
+            <Field label={t('obj.f.image')}>
+              <div className="row gap-s"><div className="grow"><Suggest value={d.image} onChange={(v) => set('image', v)} mono placeholder={t('dk.pickImage')} ariaLabel={t('obj.f.image')}
+                options={(docker.images ?? []).map((i) => ({ value: i.ref, hint: `${i.size}${i.created ? ` · ${i.created}` : ''}` }))} /></div>{refresh}</div>
+              {dockerNote}
+            </Field>
+            <Field label={t('obj.f.ports')} hint={t('obj.f.ports.hint')}><textarea className="textarea mono" rows={2} value={d.ports} onChange={(e) => set('ports', e.target.value)} placeholder="8080:80" /></Field>
+            <Field label={t('obj.f.volumes')} hint={t('obj.f.volumes.hint')}>
+              <textarea className="textarea mono" rows={2} value={d.volumes} onChange={(e) => set('volumes', e.target.value)} />
+              <PathPicker bare value="" buttonLabel={t('obj.f.volumes.add')} onChange={(v) => set('volumes', `${d.volumes.trimEnd()}${d.volumes.trim() ? '\n' : ''}${v}:/data`)} />
+            </Field>
+          </Card>
+          <Card title={t('of.env')}>
+            <Field label={t('obj.f.env')} hint={t('obj.f.env.hint')}><textarea className="textarea mono" rows={4} value={d.env} onChange={(e) => set('env', e.target.value)} /></Field>
+            <Field label={t('obj.f.restart')}>
+              <select className="select" value={d.dockerRestart} onChange={(e) => set('dockerRestart', e.target.value)}>{['no', 'always', 'unless-stopped', 'on-failure'].map((r) => <option key={r} value={r}>{r}</option>)}</select>
+            </Field>
+            <Field label={t('obj.f.command')}>{text('command', { mono: true })}</Field>
+          </Card>
+          <Card title={t('of.limits')} hint={t('obj.dk.limits.hint')}>
+            <div className="of-grid2">
               <Field label={t('obj.dk.memory')}>{text('memory', { placeholder: '512m' })}</Field>
               <Field label={t('obj.dk.cpus')}>{text('cpus', { placeholder: '1.5' })}</Field>
               <Field label={t('obj.dk.network')}>{text('network', { placeholder: 'bridge' })}</Field>
               <Field label={t('obj.sup.stopTimeout')}>{text('stopTimeout', { placeholder: '10' })}</Field>
               <Field label={t('obj.sup.logMax')}>{text('logMax', { placeholder: '10' })}</Field>
             </div>
-          </details>
+          </Card>
         </>)}
-        {d.mode === 'compose' && (<>
-          <PathPicker mode="file" exts={['yml', 'yaml']} value={d.file} onChange={(v) => set('file', v)} label={t('obj.f.file')} hint={t('obj.f.file.hint')} placeholder="/home/you/app/docker-compose.yml" />
-          <Field label={t('obj.f.project')}>{text('project', { mono: true })}</Field>
-          <Field label={t('obj.f.services')} hint={t('obj.f.services.hint')}>{text('services', { mono: true })}</Field>
-          <Field label={t('obj.sup.stopTimeout')} hint={t('obj.sup.stopTimeout.hint')}>{text('stopTimeout', { placeholder: '10' })}</Field>
-        </>)}
-        {d.mode === 'existing' && (<>
-          <Field label={t('obj.f.container')} hint={t('obj.f.container.hint')}>{text('container', { mono: true })}</Field>
-          <Field label={t('obj.sup.stopTimeout')} hint={t('obj.sup.stopTimeout.hint')}>{text('stopTimeout', { placeholder: '10' })}</Field>
-        </>)}
+        {d.mode === 'compose' && (
+          <Card title={t('obj.mode.compose')}>
+            <PathPicker mode="file" exts={['yml', 'yaml']} value={d.file} onChange={(v) => set('file', v)} label={t('obj.f.file')} hint={t('obj.f.file.hint')} placeholder="/home/you/app/docker-compose.yml" />
+            <ServicePicker file={d.file} project={d.project} services={d.services} onServices={(v) => set('services', v)} onProject={(v) => set('project', v)} />
+            <Field label={t('obj.sup.stopTimeout')} hint={t('obj.sup.stopTimeout.hint')}>{text('stopTimeout', { placeholder: '10' })}</Field>
+          </Card>
+        )}
+        {d.mode === 'existing' && (
+          <Card title={t('obj.mode.existing')}>
+            <Field label={t('obj.f.container')} hint={t('obj.f.container.hint')}>
+              <div className="row gap-s"><div className="grow"><Suggest value={d.container} onChange={(v) => set('container', v)} mono placeholder={t('dk.pickContainer')} ariaLabel={t('obj.f.container')}
+                options={(docker.containers ?? []).map((c) => ({ value: c.name, hint: `${c.image} · ${c.state}${c.managed ? ` · ${t('dk.managed')}` : ''}` }))} /></div>{refresh}</div>
+              {dockerNote}
+            </Field>
+            <Field label={t('obj.sup.stopTimeout')} hint={t('obj.sup.stopTimeout.hint')}>{text('stopTimeout', { placeholder: '10' })}</Field>
+          </Card>
+        )}
       </>)}
-    </>
+    </div>
   );
 }
 

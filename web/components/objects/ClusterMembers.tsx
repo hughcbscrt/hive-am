@@ -8,7 +8,7 @@ import { useHive } from '@/lib/store';
 import { ago } from '@/lib/meta';
 import type { ClusterConfig, ObjectView } from '@/lib/types';
 import { useToast } from '@/components/ui';
-import { KIND } from './meta';
+import { KIND, detailText } from './meta';
 import { StatusDot } from './ObjectPanel';
 
 /** The members of a cluster: their state, one by one actions, and the order they start in. */
@@ -45,7 +45,7 @@ export function ClusterMembers({ cluster }: { cluster: ObjectView }) {
                   <button className="btn ghost icon sm" disabled={i === members.length - 1 || !!busy} onClick={() => move(i, 1)} aria-label={t('cl.down')} title={t('cl.down')}><ArrowDown size={14} /></button></td>
                 <td><Link href={`/objects/${m.id}`} className="cm-name"><Icon size={15} style={{ color }} /><b>{m.name}</b></Link></td>
                 <td><span className="row gap-s small"><StatusDot status={m.state.status} />{t(`obj.status.${m.state.status}`)}</span>
-                  <span className="muted small">{[m.state.detail, m.state.since && live ? t('obj.since', { time: ago(m.state.since) }) : ''].filter(Boolean).join(' · ')}</span></td>
+                  <span className="muted small">{[detailText(t, m.state.detail), m.state.since && live ? t('obj.since', { time: ago(m.state.since) }) : ''].filter(Boolean).join(' · ')}</span></td>
                 <td className="cm-act">
                   <button className="btn ghost icon sm" disabled={!!busy || live} onClick={() => void act(m, 'start')} aria-label={t('obj.act.start')} title={t('obj.act.start')}><Play size={14} /></button>
                   <button className="btn ghost icon sm" disabled={!!busy || (!live && m.state.status !== 'error')} onClick={() => void act(m, 'stop')} aria-label={t('obj.act.stop')} title={t('obj.act.stop')}><Square size={14} /></button>

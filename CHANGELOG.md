@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- Suggestions in the object forms: images and containers from Docker (read-only), the services of a compose file as chips to pick (and a project name from the folder), and, for HTTP variables, the names the requests use (with a panel that shows which ones still have no value).
 - Objects screen: **Objects** in the rail opens a screen like an agent's, with a collapsible list at the left and, for each object, tabs: Summary (state, uptime, CPU and memory with history, Docker network and disk, details, latest output), Logs on a whole screen (search, only matches, follow, wrap, text size, pause, copy, download, error and warning colours, per-member colours for clusters) and Settings in place (unsaved-changes bar, save and restart, delete). The Colony map links to it.
 - HTTP requests as a screen: pick the `.http` file you want, see its requests, run one or the whole file; and **Variables** of its own per environment (for when there is no env file; env files win), with **secrets** that are hidden once saved and never returned by the API (stored unencrypted on this machine).
 - Keeping servers healthy: restart after a failure or always, with a growing wait and a limit (then it says it gave up); health checks (HTTP, port, command) that mark it unhealthy and can restart it; stop timeout; log rotation while it runs. Docker containers: memory, CPU, network, log size and stop timeout (the container is created again when one of them changes).
@@ -21,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- Objects screens use the whole screen: the latest output of the Summary fills the height that is left, and Settings are cards that flow into several columns. States the server writes in English are shown in the interface's language.
+- HTTP variables: *Shared* is now **All environments**, with a short explanation of how variables work and which scope each tab is.
 - *Boss* objects are now called **clusters** (existing ones are converted; the API still accepts `boss`).
 - One path picker for every folder or file field (agent, colony and server folders, the compose file, Docker volumes), including a file mode.
 - Your messages in the web chat (and in Sessions) are no longer inverted bubbles: light with a thin border in the light theme and dark in the dark theme.

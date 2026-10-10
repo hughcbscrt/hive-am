@@ -10,6 +10,7 @@
 | Cluster | **Summary** (members) · **Logs** · **Settings** |
 | HTTP requests | **Requests** · **Variables** · **Settings** |
 
+- **Layout:** each tab uses the whole width and height of the screen: the latest output of the Summary grows to fill what is left, Logs fill the screen, and Settings flow into as many columns of cards as fit (*General*, *How it runs*, *Environment*, *Keeping it healthy*… one column in the creation drawer). State details the server writes in English ("2/3 running", "exited with code 3") are shown in the language of the interface.
 - **Summary:** the state (and for how long it has been running), what it uses (CPU and memory with a short history, processes, network and disk for Docker), its details (command, folder, port, restart policy, health check; or image, ports, network, restart count, limits) and its latest output. A compose project lists its services; a cluster lists its members (15.2c).
 - **Logs:** the whole screen. Search with highlighting (or *only matches*), error and warning lines coloured, follow the end (it stops following when you scroll up), wrap lines, text size, pause, clear the view, copy and download. It keeps the last 800 000 characters and draws the last 4 000 lines. For a cluster, each member has its colour and a chip to hide it.
 - **Settings:** the same fields as when creating, in place, with a bar that says whether something is unsaved (*Save*, *Discard*, and *Save and restart* when it is running) and *Delete*. Changes to a running object apply when it is restarted.
@@ -72,11 +73,22 @@ A folder of `.http` / `.rest` files in the format of the IntelliJ and VS Code RE
 - **Running:** the server sends the request with `fetch` (60 s timeout, redirects followed, answers over 2 MB are cut, binary answers are described and not printed). A request with a value that cannot be resolved is **not sent**: the runner names the missing `{{variables}}` before you press Run. **Ctrl+Enter** runs the selected request; the list icon of a file runs all of its requests in order, each keeps its last answer, and a dot shows how it went. The answer is shown as Response (JSON formatted), Headers and Request; the echoed request hides the values of `Authorization`, `Cookie`, API-key headers.
 - **Limits:** only `http` / `https` URLs; nothing outside the folder is read (a path that leaves it, even through a link, is refused); running a request is only accepted from the local app. HTTP objects have no logs and cannot be started or stopped.
 
-**Variables of the object.** Besides the env files, an HTTP object has its own **Variables** (its tab, and a section of the creation form): environments (`Shared` applies to all) with name / value rows. They are for when there is no `http-client.env.json`, or it lacks something; **an env file wins** when it defines the same variable (the row says so). A variable can be marked **secret**: it is hidden once saved (it shows as *saved*), the API never returns its value, and saving it empty keeps the stored one; type a new value to replace it. Secrets are stored in hive-am's database on this machine, **without encryption**, like the Telegram bot token.
+**Variables of the object.** Besides the env files, an HTTP object has its own **Variables** (its tab, and a section of the creation form): a page that explains how they work, **All environments** (values that apply whichever environment you pick) and one tab per environment (`dev`, `qa`…, which only apply when that environment is picked; when a value is missing there, the one from *All environments* is used), each with name / value rows. A panel lists **the variables your files use** (read from the `{{…}}` of every request) and, for each, whether it is defined here, in *All environments*, by an env file, by an `@name` line, or **missing**: click a missing one to add it. The name field suggests those names while you type. They are for when there is no `http-client.env.json`, or it lacks something; **an env file wins** when it defines the same variable (the row says so). A variable can be marked **secret**: it is hidden once saved (it shows as *saved*), the API never returns its value, and saving it empty keeps the stored one; type a new value to replace it. Secrets are stored in hive-am's database on this machine, **without encryption**, like the Telegram bot token.
 
 ## 15.2c Cluster
 
 Groups servers and Docker containers **of the same colony** (not other clusters, not HTTP objects). **Start all** starts the members in the order they are listed, skipping the ones already up; **Stop all** stops them in the opposite order; **Restart all** does both. One failing does not keep the others from being tried: the failures are reported together. Its state comes from its members: **Running** when all are, **Starting** while one is, **Error** when one failed or only some are up (the detail says which), **Stopped** when none is. Its logs are the logs of the members with `[name]` in front of each line (the cursor is the members' cursors together, so following returns only what is new). On the map it is joined to its members by dashed lines. Deleting a boss leaves its members as they are; deleting a member, or moving it to another colony, takes it out of the bosses.
+
+## 15.2d Suggestions from Docker and from the files
+
+The forms ask Docker (read-only) so you do not have to type what already exists:
+
+- **Image** (create a container): the images on this machine, with their size and age; anything else can still be typed (it will be pulled).
+- **Existing container:** the containers on this machine, with their image and state; the ones hive-am created are marked. A refresh button reloads the list.
+- **Compose project:** once the file is chosen, its **services** appear as chips to pick (none picked = all of them) and the project name is suggested from the folder. They come from `docker compose config --services`; when Docker cannot read the file (a variable without a value, for instance) they are read from the file itself and it says so.
+- If Docker is not available the lists are empty and the form says why; you can always type.
+
+API: `GET /api/docker/containers`, `GET /api/docker/images`, `GET /api/docker/compose-services?file=`.
 
 ## 15.3 State, logs and live updates
 

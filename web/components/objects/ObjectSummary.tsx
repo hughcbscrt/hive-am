@@ -8,6 +8,7 @@ import { ago, shortPath } from '@/lib/meta';
 import { fmtBytes } from '@/lib/format';
 import type { ClusterConfig, DockerConfig, ObjectStats, ObjectView, ServerConfig } from '@/lib/types';
 import { StatusDot } from './ObjectPanel';
+import { detailText } from './meta';
 import { Spark } from './Spark';
 import { ClusterMembers } from './ClusterMembers';
 
@@ -86,9 +87,8 @@ export function ObjectSummary({ object: o, onSeeLogs }: { object: ObjectView; on
         <section className="ov-card">
           <div className="eyebrow">{t('ow.state')}</div>
           <div className="ov-big"><StatusDot status={st.status} className="lg" />{t(`obj.status.${st.status}`)}</div>
-          {st.detail && <p className="muted small" style={{ margin: 0 }}>{st.detail}</p>}
+          {st.detail && <p className="muted small" style={{ margin: 0 }}>{detailText(t, st.detail)}</p>}
           {st.since && live && <p className="small" style={{ margin: 0 }}>{t('ow.uptime')} <b>{dur(Date.now() - st.since)}</b></p>}
-          {o.kind === 'cluster' && <p className="small" style={{ margin: 0 }}>{t('cl.summary', { up: (o.config as ClusterConfig).members.length ? st.detail?.match(/(\d+)\/\d+/)?.[1] ?? '0' : '0', total: (o.config as ClusterConfig).members.length })}</p>}
         </section>
         {(o.kind === 'server' || o.kind === 'docker') && (
           <section className="ov-card">
@@ -114,7 +114,7 @@ export function ObjectSummary({ object: o, onSeeLogs }: { object: ObjectView; on
           <table className="cm-table"><tbody>{stats.services.map((s) => <tr key={s.name}><td><b>{s.name}</b></td><td><span className="row gap-s small"><StatusDot status={s.state === 'running' ? 'running' : s.state === 'exited' ? 'error' : 'stopped'} />{s.state}{s.health ? ` · ${s.health}` : ''}</span></td><td className="muted small">{s.ports}</td></tr>)}</tbody></table></section>
       )}
       {o.kind === 'cluster' && <section className="ov-card wide"><div className="eyebrow">{t('cl.members')}</div><ClusterMembers cluster={o} /></section>}
-      <section className="ov-card wide">
+      <section className="ov-card wide grow">
         <div className="row"><div className="eyebrow grow">{t('ow.recent')}</div><button className="btn ghost sm" onClick={onSeeLogs}>{t('ow.seeLogs')}</button></div>
         <pre className="ov-log mono">{text === null ? t('git.loading') : lastLines || t('obj.logs.empty')}</pre>
       </section>

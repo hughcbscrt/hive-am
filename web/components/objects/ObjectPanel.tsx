@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui';
 import { useHive } from '@/lib/store';
 import { useDock } from '@/lib/dock';
 import { OBJECTS_SKILL_ID } from '@/components/agents/NewAgentDrawer';
-import { KIND, STATUS_TONE } from './meta';
+import { KIND, STATUS_TONE, detailText } from './meta';
 import { LogView } from './LogView';
 
 export function StatusDot({ status, className = '' }: { status: ObjectView['state']['status']; className?: string }) {
@@ -61,7 +61,7 @@ export function ObjectPanel({ object: o, onCreateManager }: { object: ObjectView
         </div>
       </div>
       {(o.state.detail || o.state.since) && (
-        <p className="muted small" style={{ margin: 0 }}>{[o.state.detail, o.state.since && live ? t('obj.since', { time: ago(o.state.since) }) : '', o.state.pid ? t('obj.pid', { pid: o.state.pid }) : ''].filter(Boolean).join(' · ')}</p>
+        <p className="muted small" style={{ margin: 0 }}>{[detailText(t, o.state.detail), o.state.since && live ? t('obj.since', { time: ago(o.state.since) }) : '', o.state.pid ? t('obj.pid', { pid: o.state.pid }) : ''].filter(Boolean).join(' · ')}</p>
       )}
       <Link className="btn primary" href={`/objects/${o.id}`}><ExternalLink size={15} />{t('obj.open')}</Link>
       {o.kind !== 'cluster' && <div className="mono small obj-cmd" title={objectSummary(o)}>{objectSummary(o)}</div>}

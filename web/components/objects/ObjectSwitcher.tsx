@@ -5,7 +5,7 @@ import { PanelLeftClose, PanelLeftOpen, Plus, Search } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { useI18n } from '@/lib/i18n/index';
 import type { ObjectView } from '@/lib/types';
-import { KIND } from './meta';
+import { KIND, detailText } from './meta';
 import { StatusDot } from './ObjectPanel';
 import { ObjectEditor } from './ObjectEditor';
 
@@ -65,7 +65,7 @@ export function ObjectSwitcher({ activeId, collapsed = false, onToggle }: { acti
                 <span className="sw-av"><span className="obj-ico sm" style={{ ['--c' as never]: color }}><Icon size={17} /></span></span>
                 <span className="sw-body">
                   <span className="sw-top"><b>{o.name}</b></span>
-                  <span className="sw-sub"><StatusDot status={o.state.status} /> {t(`obj.status.${o.state.status}`)}{o.state.detail ? ` · ${o.state.detail}` : ''}</span>
+                  <span className="sw-sub"><StatusDot status={o.state.status} /> {t(`obj.status.${o.state.status}`)}{o.state.detail ? ` · ${detailText(t, o.state.detail)}` : ''}</span>
                   <span className="sw-meta">{t(`obj.kind.${o.kind}`)}</span>
                 </span>
               </Link>); })}

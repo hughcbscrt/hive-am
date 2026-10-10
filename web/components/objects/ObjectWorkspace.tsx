@@ -8,7 +8,7 @@ import { useHive } from '@/lib/store';
 import { useDock } from '@/lib/dock';
 import type { ClusterConfig, DockerConfig, ObjectView } from '@/lib/types';
 import { useToast } from '@/components/ui';
-import { KIND, STATUS_TONE } from './meta';
+import { KIND, STATUS_TONE, detailText } from './meta';
 import { StatusDot } from './ObjectPanel';
 import { ObjectSwitcher } from './ObjectSwitcher';
 import { ObjectSummary } from './ObjectSummary';
@@ -73,7 +73,7 @@ function Screen({ object: o }: { object: ObjectView }) {
           <div className="row gap-s wrap" style={{ marginTop: 3 }}>
             <span className={`ostatus ${STATUS_TONE[st]}`}><StatusDot status={st} />{t(`obj.status.${st}`)}</span>
             <span className="muted small">{t(`obj.kind.${o.kind}`)}</span>
-            {o.state.detail && <span className="muted small">· {o.state.detail}</span>}
+            {o.state.detail && <span className="muted small">· {detailText(t, o.state.detail)}</span>}
           </div>
         </div>
         {o.kind !== 'http' && (<>

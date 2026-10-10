@@ -139,7 +139,7 @@ export interface ObjectView { id: string; colony_id: string | null; kind: Object
 // ---- HTTP-requests objects ----
 export interface HttpRequestItem { id: string; index: number; name: string; method: string; url: string; headers: { name: string; value: string }[]; body?: string; line: number; variables: string[] }
 export interface HttpFile { relFile: string; requests: HttpRequestItem[]; fileVariables: Record<string, string> }
-export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; fileVars: Record<string, string[]>; truncated: boolean }
+export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; fileVars: Record<string, string[]>; used: { name: string; count: number }[]; fileDefined: string[]; truncated: boolean }
 export interface ObjectStats {
   cpu: number | null; memBytes: number | null; memLimitBytes: number | null; pids: number | null; net?: string | null; block?: string | null;
   info: Record<string, string | number | null>; services?: { name: string; state: string; health: string; ports: string }[];
