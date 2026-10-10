@@ -142,7 +142,9 @@ route('GET', '/api/agents/:id/history', ({ params, url }) => {
   const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');
   const sid = url.searchParams.get('session') ?? a.session_id;
   if (sid && sid !== a.session_id && !agents.sessions(a.id).some((s) => s.session_id === sid)) throw bad('That session does not belong to this agent');
-  return { session_id: sid, messages: readHistory(resolved(a), sid) };
+  // A long conversation is sent in pieces: `limit` keeps only the newest messages (the browser would freeze rendering thousands).
+  const all = readHistory(resolved(a), sid), limit = Number(url.searchParams.get('limit'));
+  return { session_id: sid, total: all.length, messages: limit > 0 && all.length > limit ? all.slice(-limit) : all };
 });
 route('GET', '/api/agents/:id/stats', ({ params, url }) => {
   const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');

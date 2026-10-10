@@ -524,6 +524,7 @@ export const en = {
   "chat.readOnly": "You’re reading an older session. Make it current to continue it.",
   "chat.queuePlaceholder": "Queue a follow-up…",
   "chat.queuedBadge": "Queued: it will be sent when the current reply ends",
+  "chat.earlier": "Show earlier messages ({n} more)",
   "chat.placeholder": "Message {name}",
   "chat.messageLabel": "Message",
   "chat.stop": "Stop",

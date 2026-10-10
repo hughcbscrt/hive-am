@@ -522,6 +522,7 @@ export const es: Record<DictKey, string> = {
   "chat.readOnly": "Estás leyendo una sesión anterior. Hazla la actual para continuarla.",
   "chat.queuePlaceholder": "Encola un mensaje de seguimiento…",
   "chat.queuedBadge": "En cola: se enviará cuando termine la respuesta actual",
+  "chat.earlier": "Mostrar mensajes anteriores ({n} más)",
   "chat.placeholder": "Escribe a {name}",
   "chat.messageLabel": "Mensaje",
   "chat.stop": "Detener",

@@ -1,5 +1,5 @@
 'use client';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ArrowUp, Brain, ChevronRight, Square, AlertTriangle, Waypoints, Coins, Layers, Timer, Hammer } from 'lucide-react';
@@ -69,6 +69,7 @@ function LiveMeta({ turn }: { turn: NonNullable<ReturnType<typeof useHive>['live
     </div>
   );
 }
+const PAGE = 60; // messages loaded at first, and the step of "Show earlier" is twice this
 const pretty = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v, null, 2));
 
 /** Parsing markdown is the expensive part of rendering a chat, so each text block is parsed only when its text changes. */
@@ -151,6 +152,10 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
   const toast = useToast();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // Only the newest messages are loaded: thousands of rendered messages freeze the browser. "Show earlier" asks for more.
+  const [limit, setLimit] = useState(PAGE);
+  const [total, setTotal] = useState(0);
+  const anchor = useRef<number | null>(null);
   // Messages sent from this tab that are not in the transcript yet: the next turn's, or ones waiting behind the running turn.
   const [outbox, setOutbox] = useState<string[]>([]);
   const [toolsOpen, setToolsOpen] = useState<boolean | null>(null);
@@ -163,11 +168,18 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
   const load = useCallback(() => {
     const sid = readOnly ? sessionOverride : agent.session_id;
     if (!sid) { setMsgs([]); setLoaded(true); return Promise.resolve(); }
-    return api.get<{ messages: ChatMessage[] }>(`/agents/${agent.id}/history?session=${encodeURIComponent(sid)}`)
-      .then((r) => { setMsgs(r.messages); setLoaded(true); }).catch((e) => { toast(e.message, 'err'); setLoaded(true); });
-  }, [agent.id, agent.session_id, readOnly, sessionOverride, toast]);
+    return api.get<{ messages: ChatMessage[]; total?: number }>(`/agents/${agent.id}/history?session=${encodeURIComponent(sid)}&limit=${limit}`)
+      .then((r) => { setMsgs(r.messages); setTotal(r.total ?? r.messages.length); setLoaded(true); }).catch((e) => { toast(e.message, 'err'); setLoaded(true); });
+  }, [agent.id, agent.session_id, readOnly, sessionOverride, toast, limit]);
 
-  useEffect(() => { setLoaded(false); void load(); }, [load]);
+  useEffect(() => { setLoaded(false); setLimit(PAGE); }, [agent.id, agent.session_id, sessionOverride]);
+  useEffect(() => { void load(); }, [load]);
+  // Earlier messages are added above: keep what the person was reading where it was.
+  useLayoutEffect(() => {
+    const el = threadRef.current;
+    if (el && anchor.current !== null) { el.scrollTop += el.scrollHeight - anchor.current; anchor.current = null; }
+  }, [msgs]);
+  const earlier = useCallback(() => { anchor.current = threadRef.current?.scrollHeight ?? null; stick.current = false; setLimit((l) => l + PAGE * 2); }, []);
   // A finished turn is now in the CLI's own transcript: re-read it, then drop the optimistic echo.
   const fin = finished[agent.id] ?? 0;
   const idle = useRef(true);
@@ -212,6 +224,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
               <p>{agent.role === 'orchestrator' ? t('chat.empty.orchestrator') : t('chat.empty.worker')}</p>
             </div>
           )}
+          {total > msgs.length && <button type="button" className="btn sm chat-earlier" onClick={earlier}>{t('chat.earlier', { n: total - msgs.length })}</button>}
           <History msgs={msgs} agent={agent} />
           {turn && (
             <>

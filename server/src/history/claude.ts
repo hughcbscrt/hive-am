@@ -24,9 +24,21 @@ export function claudeFile(cwd: string, sessionId: string): string | null {
   return null;
 }
 
+// Parsing a long transcript (tens of MB) takes about a second and the UI asks for it often: keep the last results while the file is unchanged.
+const cache = new Map<string, { sig: string; msgs: ChatMessage[] }>();
+
 export function readClaude(cwd: string, sessionId: string): ChatMessage[] {
   const file = claudeFile(cwd, sessionId);
   if (!file) return [];
+  const st = statSync(file), sig = `${st.mtimeMs}:${st.size}`, hit = cache.get(file);
+  if (hit && hit.sig === sig) return hit.msgs;
+  const msgs = parseClaude(file);
+  cache.delete(file); cache.set(file, { sig, msgs });
+  if (cache.size > 4) cache.delete(cache.keys().next().value as string);
+  return msgs;
+}
+
+function parseClaude(file: string): ChatMessage[] {
   const out: ChatMessage[] = [];
   const byMsgId = new Map<string, ChatMessage>();
   const toolBlocks = new Map<string, Extract<Block, { type: 'tool' }>>();

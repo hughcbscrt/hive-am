@@ -835,3 +835,5 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .sched-runs { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 8px; }
 .sched-runs .r { display: flex; gap: 10px; flex-wrap: wrap; }
 .chip.warn { border-color: var(--honey); color: var(--honey); }
+
+.chat-earlier { display: block; margin: 4px auto 14px; }
