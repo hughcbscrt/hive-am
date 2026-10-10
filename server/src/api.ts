@@ -27,6 +27,7 @@ import { emptyUsage } from './pricing.js';
 import { createReadStream } from 'node:fs';
 import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git/repo.js';
 import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './git/switch.js';
+import { agentObjectAction, agentObjectLogs, agentObjects } from './objects/agent.js';
 import { ObjectError, createObject, listObjects, objectAction, objectLogs, removeObject, updateObject } from './objects/index.js';
 import { gitCompare, gitCompareDiff, gitGrep, gitImageAt, gitRefs } from './git/browse.js';
 import { GitOpError, gitBlame, gitBranchCreate, gitBranchDelete, gitRefFile, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitTagFile, gitTagTree, gitTags, gitUnresolve, type PullMode } from './git/ops.js';
@@ -270,6 +271,10 @@ route('GET', '/api/sessions', () => {
 /** They run commands, so, like the git actions, they only accept requests from the local app. */
 const objectGuard = (req: IncomingMessage) => { try { localOnly(req); } catch { throw new HttpError(403, 'Objects can only be changed from the local app'); } };
 const objectSafe = async <T,>(fn: () => Promise<T> | T): Promise<T> => { try { return await fn(); } catch (e) { if (e instanceof ObjectError) throw bad(e.message); throw e; } };
+// The agents' side (tools `object_list`, `object_action`, `object_logs`): `from` is the agent; scope and permission are checked in objects/agent.ts.
+route('POST', '/api/agent-objects/list', async ({ req }) => { const b = await body(req); return objectSafe(() => ({ objects: agentObjects(b.from) })); });
+route('POST', '/api/agent-objects/action', async ({ req }) => { const b = await body(req); return objectSafe(() => agentObjectAction(b.from, b.name, b.action)); });
+route('POST', '/api/agent-objects/logs', async ({ req }) => { const b = await body(req); return objectSafe(() => agentObjectLogs(b.from, b.name, b.tail)); });
 route('GET', '/api/objects', () => listObjects());
 route('POST', '/api/objects', async ({ req }) => { objectGuard(req); const p = await body(req); return objectSafe(() => createObject(p)); });
 route('PATCH', '/api/objects/:id', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => updateObject(params[0], p)); });

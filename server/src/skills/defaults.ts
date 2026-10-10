@@ -11,6 +11,9 @@ export const CHANNELS_SKILL_ID = 'default-channels';
 /** Waking the agent later. Its tool (`wake_me`) exists only for agents that have this skill; agents with a connection get it by themselves. */
 export const WAKEUPS_SKILL_ID = 'default-wakeups';
 
+/** Running the servers and containers of the colony. Its tools (`object_list`, `object_action`, `object_logs`) exist only for agents that have this skill. */
+export const OBJECTS_SKILL_ID = 'default-objects';
+
 export const DEFAULT_SKILLS: DefaultSkill[] = [
   {
     slug: 'notebook',
@@ -122,6 +125,28 @@ Secrets are: passwords, API keys, access tokens, bot tokens, private keys and ce
 - Tell the person when the next runs are (the tool returns them), and that they can ask you to stop it. \`schedule_list\` shows your schedules and \`schedule_cancel\` stops one. You can have 10 at most.
 - A run is skipped, not replayed, if the server was down or you were already busy. Report something at each run only when it is useful: if nothing changed, say so in one short line.
 - Do not create a schedule for something the person did not ask for.`,
+  },
+  {
+    slug: 'objects',
+    load: 'always',
+    name: 'Colony objects',
+    description: 'Look after the servers and Docker containers of the colony: see their state, read their logs, start, stop and restart them.',
+    content: `The colony you belong to can have **objects**: servers (a command that hive-am keeps running) and Docker containers or compose projects. A person created them and configured how they run. You look after them: you can see their state, read their logs and start, stop or restart them. You cannot create, edit or delete them, and you cannot change the command they run.
+
+## Which objects are yours
+The objects of your own colony, or the ones that belong to no colony if you are in none. Another colony's objects are not visible to you. Names are unique: use the exact name that \`object_list\` shows.
+
+## How to work
+- Start with \`object_list\`: it gives each object's name, kind, state (running, starting, stopped, error, unknown) and the reason when there is one.
+- To find out why something is failing, read its logs with \`object_logs\` (the last lines; ask for more with \`tail\` if you need to) before you touch it. Quote the lines that show the problem.
+- \`object_action\` takes \`name\` and \`action\` (start, stop or restart). After you use it, call \`object_list\` again and tell the person what happened: the state it ended in, not what you expected. A server with a port can stay "starting" for a while: wait and check again, do not restart it again right away.
+- Restart is the right answer to a crash only after you read why it crashed. If it crashes again right after, stop and report what the logs say instead of looping.
+- Read-only agents can look but cannot start or stop anything.
+
+## Care
+- Stopping or restarting a server or a container interrupts whoever is using it. If the person did not ask for it and the object is running fine, ask first.
+- Logs can contain secrets (tokens, passwords, connection strings). Never repeat them in a chat; replace them with \`***\`.
+- Do not run the object's command yourself from a terminal as a way around \`object_action\`: use the tool, so hive-am knows what is running.`,
   },
   {
     slug: 'git-workflow',

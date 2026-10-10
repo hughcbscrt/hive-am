@@ -3,6 +3,7 @@
 //   dispatch → list_agents, dispatch (orchestrators with a team)
 //   channel  → channel_reply, channel_send_file, channel_mute (agents linked to Telegram/Slack)
 //   wake     → wake_me, wake_when_done, schedule_create, schedule_list, schedule_cancel (agents with the Wake-ups skill: to be woken later in the same place)
+//   objects  → object_list, object_logs, object_action (agents with the Colony objects skill: the servers and containers of their colony)
 // It only talks to the hive-am HTTP API; all rules (assignments, queueing) live there.
 import { createInterface } from 'node:readline';
 
@@ -109,6 +110,40 @@ const allTools = [
       type: 'object',
       properties: { muted: { type: 'boolean', description: 'true to stay quiet in this thread, false to take part again.' } },
       required: ['muted'],
+      additionalProperties: false,
+    },
+  },
+  {
+    cap: 'objects',
+    name: 'object_list',
+    description: 'List the objects of your colony (servers and Docker containers that hive-am keeps running): name, kind, state (running, starting, stopped, error, unknown) and the reason when there is one. Use the exact names in the other object tools.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    cap: 'objects',
+    name: 'object_logs',
+    description: 'Read the latest output of an object of your colony (a server or a container). Read it before restarting something that fails. Logs can contain secrets: never repeat them in a chat.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'The exact name of the object, as object_list shows it.' },
+        tail: { type: 'number', description: 'How many of the last lines to read (default 80, at most 500).' },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    cap: 'objects',
+    name: 'object_action',
+    description: 'Start, stop or restart an object of your colony. Not available in read-only mode. It answers with the state it ended in: check it with object_list a moment later, since a server can take a while to come up. Starting, stopping and restarting interrupt whoever uses it: do not do it for something that runs fine unless you were asked.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'The exact name of the object.' },
+        action: { type: 'string', enum: ['start', 'stop', 'restart'] },
+      },
+      required: ['name', 'action'],
       additionalProperties: false,
     },
   },
@@ -237,6 +272,20 @@ async function call(name, args) {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? `channel_mute failed (${r.status})`);
     return j.muted ? `Muted in this thread (${j.place}). You will only be woken when someone mentions you or replies to you.` : `Unmuted in this thread (${j.place}).`;
+  }
+  if (name === 'object_list' || name === 'object_logs' || name === 'object_action') {
+    const r = await fetch(`${API}/api/agent-objects/${name.slice('object_'.length)}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: FROM, ...args }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `${name} failed (${r.status})`);
+    if (name === 'object_list') {
+      if (!j.objects.length) return 'Your colony has no objects.';
+      return j.objects.map((o) => `${o.name} · ${o.kind} · ${o.status}${o.detail ? ` (${o.detail})` : ''}`).join('\n');
+    }
+    if (name === 'object_logs') return j.text.trim() ? `Last lines of ${j.name}:\n${j.text}` : `${j.name} has not printed anything.`;
+    return `${j.name}: ${j.status}${j.detail ? ` (${j.detail})` : ''}. Check again with object_list in a moment.`;
   }
   if (name === 'wake_me') {
     const r = await fetch(`${API}/api/wake`, {

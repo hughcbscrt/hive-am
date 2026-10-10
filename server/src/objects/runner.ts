@@ -21,7 +21,9 @@ interface Saved { pid: number; stamp: string | null; startedAt: number; /** the 
 const files = (id: string) => ({ log: join(DIR, `${id}.log`), state: join(DIR, `${id}.json`) });
 const read = (id: string): Saved | null => { try { return JSON.parse(readFileSync(files(id).state, 'utf8')); } catch { return null; } };
 const write = (id: string, s: Saved) => { mkdirSync(DIR, { recursive: true }); writeFileSync(files(id).state, JSON.stringify(s)); };
-const note = (id: string, text: string) => { try { appendFileSync(files(id).log, `\n[hive-am] ${text}\n`); } catch { /* the log is a convenience */ } };
+/** A line in the object's log, marked as coming from hive-am (who asked for what, how it ended). */
+export const noteServer = (id: string, text: string) => note(id, text);
+const note = (id: string, text: string) => { try { mkdirSync(DIR, { recursive: true }); appendFileSync(files(id).log, `\n[hive-am] ${text}\n`); } catch { /* the log is a convenience */ } };
 
 const listening = (port: number) => new Promise<boolean>((resolve) => {
   const s = connect({ port, host: '127.0.0.1' }, () => { s.destroy(); resolve(true); });
