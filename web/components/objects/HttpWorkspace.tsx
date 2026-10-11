@@ -14,6 +14,8 @@ import { HttpSource } from './HttpSource';
 import { CopyAs } from './CopyAs';
 import { NewRequest } from './NewRequest';
 import { RunDiff } from './RunDiff';
+import { ExportMenu } from './ExportMenu';
+import { jsonPath } from '@/lib/jsonPath';
 import { AssertEditor } from './AssertEditor';
 import { AuthForm } from './AuthForm';
 
@@ -57,6 +59,7 @@ export function HttpWorkspace({ object: o, onOpenVars, pane = 'requests', onGoRe
   const [tab, setTab] = useState<'body' | 'headers' | 'tests' | 'request' | 'vars' | 'auth'>('body');
   const [fileTab, setFileTab] = useState<'requests' | 'vars' | 'source'>('requests');
   const [bodyView, setBodyView] = useState<'tree' | 'text'>('tree');
+  const [bodyFilter, setBodyFilter] = useState('');
   const [insp, setInsp] = useState<HttpInspection | null>(null);
   const [fileInsp, setFileInsp] = useState<HttpInspection | null>(null);
   const [openAns, setOpenAns] = useState<string | null>(null);
@@ -306,9 +309,21 @@ const sessionBlock = (
               <div className="hr-pre">
                 {res.run!.truncated && <div className="gx-banner">{t('http.truncated')}</div>}
                 {res.run!.binary ? <p className="muted">{t('http.binary', { type: res.run!.contentType || '?', size: fmtBytes(res.run!.size) })}</p>
-                  : res.run!.body ? (() => { const j = parseJson(res.run!.body); return (<>
-                    <div className="row gap-s" style={{ justifyContent: 'flex-end' }}>{j !== undefined && <Segmented value={bodyView} onChange={setBodyView} options={[{ id: 'tree', label: t('hw2.tree') }, { id: 'text', label: t('hw2.text') }]} />}<CopyBtn text={res.run!.body} /></div>
-                    {j !== undefined && bodyView === 'tree' ? <>{!sel.named && <p className="muted small">{t('hw2.copyRef.need')}</p>}<JsonTree value={j} refBase={sel.named ? `${sel.named}.response.body` : undefined} /></> : <pre>{prettyBody(res.run!)}</pre>}</>); })() : <p className="muted">{t('http.emptyBody')}</p>}
+                  : res.run!.body ? (() => {
+                    const j = parseJson(res.run!.body), q = bodyFilter.trim(), isPath = q.startsWith('$');
+                    let found: unknown[] | null = null, perr = '';
+                    if (isPath && j !== undefined) { try { found = jsonPath(j, q); } catch (e) { perr = e instanceof Error ? e.message : 'error'; } }
+                    const text = prettyBody(res.run!);
+                    const lines = q && !isPath ? text.split('\n').map((l, n) => ({ l, n: n + 1 })).filter((x) => x.l.toLowerCase().includes(q.toLowerCase())) : null;
+                    return (<>
+                      <div className="row gap-s">
+                        <div className="search grow"><Search size={14} /><input className="input mono" value={bodyFilter} onChange={(e) => setBodyFilter(e.target.value)} placeholder={t('hw2.filter.placeholder')} aria-label={t('hw2.filter')} spellCheck={false} /></div>
+                        {j !== undefined && <Segmented value={bodyView} onChange={setBodyView} options={[{ id: 'tree', label: t('hw2.tree') }, { id: 'text', label: t('hw2.text') }]} />}<CopyBtn text={found ? JSON.stringify(found.length === 1 ? found[0] : found, null, 2) : res.run!.body} /></div>
+                      {perr && <p className="gx-note err" style={{ margin: '6px 0' }}>{perr}</p>}
+                      {isPath && j === undefined && <p className="muted small">{t('hw2.noJson')}</p>}
+                      {found ? (found.length === 0 ? <p className="muted small">{t('hw2.filter.none')}</p> : (<><p className="muted small" style={{ margin: '6px 0' }}>{t('hw2.filter.count', { count: found.length })}</p>{bodyView === 'tree' ? <JsonTree value={found.length === 1 ? found[0] : found} /> : <pre>{JSON.stringify(found.length === 1 ? found[0] : found, null, 2)}</pre>}</>))
+                        : lines ? (lines.length === 0 ? <p className="muted small">{t('hw2.filter.none')}</p> : <pre>{lines.map((x) => `${String(x.n).padStart(4)}  ${x.l}`).join('\n')}</pre>)
+                        : j !== undefined && bodyView === 'tree' ? <>{!sel.named && <p className="muted small">{t('hw2.copyRef.need')}</p>}<JsonTree value={j} refBase={sel.named ? `${sel.named}.response.body` : undefined} /></> : <pre>{text}</pre>}</>); })() : <p className="muted">{t('http.emptyBody')}</p>}
               </div>
             )}
           </div>
@@ -316,6 +331,7 @@ const sessionBlock = (
           <div className="hw-file-view">
             <div className="row gap-s"><File size={18} className="muted" /><h3 className="mono grow" style={{ fontSize: 15, overflowWrap: 'anywhere' }}>{picked.relFile}</h3>
               <label className="row gap-s small"><input type="checkbox" checked={stopOnFail} onChange={(e) => setStopOnFail(e.target.checked)} />{t('hw.stopOnFail')}</label>
+              <ExportMenu objectId={o.id} file={picked.relFile} />
               <button className="btn primary sm" disabled={!!busy} onClick={() => void runFile(picked)}><ListChecks size={14} />{t('http.runFile')}</button></div>
             <Segmented value={fileTab} onChange={setFileTab} options={[{ id: 'requests', label: `${t('hw2.tab.requests')} · ${picked.requests.length}` }, { id: 'vars', label: `${t('hw2.tab.vars')}${fileInsp?.vars.length ? ` · ${fileInsp.vars.length}` : ''}` }, { id: 'source', label: t('hw2.tab.source') }]} />
             {note && <div className="gx-banner">{note}</div>}

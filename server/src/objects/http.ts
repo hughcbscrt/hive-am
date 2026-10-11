@@ -424,6 +424,38 @@ export function exportHttp(folder: string, relFile: string, index: number, forma
   return { text, unresolved: [...unresolved] };
 }
 
+/** The requests of a file (or of all the files) as documentation (Markdown) or as a Postman collection (v2.1). Values stay as {{variables}}. */
+export function exportCollection(folder: string, name: string, format: 'markdown' | 'postman', relFile?: string, lastRuns?: (file: string, index: number) => { status: number; contentType: string; body: string } | undefined): { filename: string; mime: string; content: string } {
+  const sc = scanHttp(folder, undefined);
+  const files = sc.files.filter((f) => !relFile || f.relFile === relFile);
+  if (relFile && !files.length) throw new ObjectError(`${relFile} is not one of the .http files`);
+  const slug = (relFile ? relFile.replace(/\.(http|rest)$/i, '') : name).replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'requests';
+  if (format === 'postman') {
+    const vars = [...new Map(files.flatMap((f) => Object.entries(f.fileVariables)).map(([key, value]) => [key, { key, value }])).values()];
+    const item = (f: HttpFile) => f.requests.map((r) => {
+      const hasBody = r.body !== undefined && !['GET', 'HEAD'].includes(r.method);
+      const ct = r.headers.find((h) => h.name.toLowerCase() === 'content-type')?.value ?? '';
+      return { name: r.name, request: { method: r.method, header: r.headers.map((h) => ({ key: h.name, value: h.value })), url: { raw: r.url }, ...(hasBody ? { body: { mode: 'raw', raw: r.body, options: { raw: { language: /json/i.test(ct) ? 'json' : /xml/i.test(ct) ? 'xml' : 'text' } } } } : {}) } };
+    });
+    const items = files.length === 1 ? item(files[0]) : files.map((f) => ({ name: f.relFile, item: item(f) }));
+    return { filename: `${slug}.postman_collection.json`, mime: 'application/json', content: JSON.stringify({ info: { name: relFile ?? name, schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' }, item: items, variable: vars }, null, 2) };
+  }
+  const out: string[] = [`# ${relFile ?? name}`, ''];
+  for (const f of files) {
+    if (!relFile) out.push(`## ${f.relFile}`, '');
+    const vs = Object.entries(f.fileVariables);
+    if (vs.length) out.push('Variables of the file:', '', ...vs.map(([k, v]) => `- \`${k}\` = \`${v}\``), '');
+    for (const r of f.requests) {
+      out.push(`${relFile ? '##' : '###'} ${r.name}`, '', '```http', `${r.method} ${r.url}`, ...r.headers.map((h) => `${h.name}: ${h.value}`), '```', '');
+      if (r.body) out.push('Body:', '', '```' + (/^\s*[[{]/.test(r.body) ? 'json' : ''), r.body, '```', '');
+      if (r.refs.length) out.push(`Uses the answer of: ${r.refs.map((n) => `\`${n}\``).join(', ')}.`, '');
+      const last = lastRuns?.(f.relFile, r.index);
+      if (last) { let b = last.body; try { b = JSON.stringify(JSON.parse(b), null, 2); } catch { /* as it came */ } out.push(`Example answer (${last.status}):`, '', '```' + (/json/i.test(last.contentType) ? 'json' : ''), b.length > 4000 ? `${b.slice(0, 4000)}\n…` : b, '```', ''); }
+    }
+  }
+  return { filename: `${slug}.md`, mime: 'text/markdown', content: out.join('\n') };
+}
+
 export async function runHttp(folder: string, relFile: string, index: number, env?: string, hive?: Hive, session: HttpSession = { globals: {}, responses: new Map() }): Promise<HttpRun> {
   const root = realFolder(folder);
   const abs = inside(root, relFile);

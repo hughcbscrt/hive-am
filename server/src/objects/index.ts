@@ -1,7 +1,7 @@
 import { bus } from '../runtime.js';
 import { dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
 import { recordRun, listHistory, clearHistory } from './http-history.js';
-import { parseHttpFile, createHttpFile, exportHttp, type ExportFormat, describeHttp, dropSession, inspectHttp, readHttpFile, runHttp, scanHttp, writeHttpFile, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
+import { exportCollection, parseHttpFile, createHttpFile, exportHttp, type ExportFormat, describeHttp, dropSession, inspectHttp, readHttpFile, runHttp, scanHttp, writeHttpFile, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
 import { ObjectError, type ClusterConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
 import { forgetServer, serverLogs, serverState, startServer, stopServer } from './runner.js';
 import { forgetSupervision, resetSupervision, supervise } from './supervisor.js';
@@ -164,6 +164,11 @@ export const httpRun = async (id: string, file: string, index: number, env?: str
     recordRun(id, { file, index, name, method, env: useEnv, run });
     return run;
   } catch (e) { recordRun(id, { file, index, name, method, env: useEnv, error: e instanceof Error ? e.message : String(e) }); throw e; }
+};
+export const httpDocs = (id: string, format: 'markdown' | 'postman', file?: string) => {
+  const o = httpObjectOf(id);
+  const hist = listHistory(id);
+  return exportCollection((o.config as HttpConfig).folder, o.name, format, file || undefined, (f, i) => { const h = hist.find((x) => x.file === f && x.index === i && x.run && x.run.status < 400 && !x.run.binary); return h?.run ? { status: h.run.status, contentType: h.run.contentType, body: h.run.body } : undefined; });
 };
 export const httpHistory = (id: string) => { httpObjectOf(id); return listHistory(id); };
 export const httpHistoryClear = (id: string) => { httpObjectOf(id); clearHistory(id); return []; };
