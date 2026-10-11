@@ -1,11 +1,14 @@
 'use client';
 import { useState } from 'react';
-import { FileText, Play, RotateCw, Square } from 'lucide-react';
+import { FileText, Info, MoreHorizontal, Play, RefreshCcw, RotateCw, Square, SquareTerminal, Hammer } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { fmtBytes } from '@/lib/format';
 import type { ServiceStat } from '@/lib/types';
+import { useDock } from '@/lib/dock';
 import { useToast } from '@/components/ui';
+import { Menu, MenuItem } from '@/components/Menu';
+import { ServiceDetail } from './ServiceDetail';
 import { StatusDot } from './ObjectPanel';
 
 const tone = (s: ServiceStat) => (s.state === 'running' ? (/unhealthy/i.test(s.health) ? 'error' : /starting/i.test(s.health) ? 'starting' : 'running') : s.state === 'exited' || s.state === 'dead' ? 'error' : s.state === 'restarting' ? 'starting' : 'stopped');
@@ -24,14 +27,16 @@ function Ports({ ports }: { ports: string }) {
 export function ServicesTable({ objectId, services, onLogs, onChanged }: { objectId: string; services: ServiceStat[]; onLogs?: (service: string) => void; onChanged: () => void }) {
   const { t } = useI18n();
   const toast = useToast();
+  const dock = useDock();
   const [busy, setBusy] = useState<string | null>(null);
-  const act = async (service: string, action: 'start' | 'stop' | 'restart') => {
+  const [detail, setDetail] = useState<string | null>(null);
+  const act = async (service: string, action: 'start' | 'stop' | 'restart' | 'recreate' | 'rebuild') => {
     setBusy(`${service}:${action}`);
     try { await api.post(`/objects/${objectId}/service`, { service, action }); onChanged(); }
     catch (e) { toast(`${t('obj.act.failed', { action: t(`obj.act.${action}`) })}: ${e instanceof Error ? e.message : ''}`, 'err'); }
     finally { setBusy(null); }
   };
-  return (
+  return (<>
     <table className="cm-table svc">
       <thead><tr><th>{t('svc.col.name')}</th><th>{t('svc.col.image')}</th><th>{t('svc.col.status')}</th><th>{t('svc.col.ports')}</th><th className="num">{t('ow.cpu')}</th><th className="num">{t('ow.mem')}</th><th /></tr></thead>
       <tbody>{services.map((s) => {
@@ -49,9 +54,16 @@ export function ServicesTable({ objectId, services, onLogs, onChanged }: { objec
               <button className="btn ghost icon sm" disabled={!!busy || !live} onClick={() => void act(s.name, 'stop')} aria-label={t('obj.act.stop')} title={t('obj.act.stop')}><Square size={14} /></button>
               <button className="btn ghost icon sm" disabled={!!busy} onClick={() => void act(s.name, 'restart')} aria-label={t('obj.act.restart')} title={t('obj.act.restart')}><RotateCw size={14} /></button>
               {onLogs && <button className="btn ghost icon sm" onClick={() => onLogs(s.name)} aria-label={t('svc.logs')} title={t('svc.logs')}><FileText size={14} /></button>}
+              <button className="btn ghost icon sm" disabled={!live} onClick={() => void dock.openTerminal({ objectId, service: s.name })} aria-label={t('svc.shell')} title={t('svc.shell')}><SquareTerminal size={14} /></button>
+              <Menu label={t('svc.more')} icon={<MoreHorizontal size={14} />} iconOnly>{(close) => (<>
+                <MenuItem onClick={() => { close(); setDetail(s.name); }}><span className="row gap-s"><Info size={14} />{t('svc.inspect')}</span></MenuItem>
+                <MenuItem onClick={() => { close(); void act(s.name, 'recreate'); }}><span className="row gap-s" title={t('svc.recreate.hint')}><RefreshCcw size={14} />{t('svc.recreate')}</span></MenuItem>
+                <MenuItem onClick={() => { close(); void act(s.name, 'rebuild'); }}><span className="row gap-s" title={t('svc.rebuild.hint')}><Hammer size={14} />{t('svc.rebuild')}</span></MenuItem>
+              </>)}</Menu>
             </td>
           </tr>);
       })}</tbody>
     </table>
-  );
+    {detail && <ServiceDetail objectId={objectId} service={detail} title={detail} onClose={() => setDetail(null)} />}
+  </>);
 }

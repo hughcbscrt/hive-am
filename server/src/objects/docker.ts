@@ -116,13 +116,74 @@ export async function restartDocker(id: string, c: DockerConfig): Promise<void> 
   const r = await dk(['restart', ...stopArgs(c), name], { timeout: 300_000 }); if (r.code !== 0) throw fail(r, 'could not restart it');
 }
 
-/** One service of a compose project: start (creating it if needed), stop or restart it alone. */
-export async function composeServiceAction(c: DockerConfig, service: string, action: 'start' | 'stop' | 'restart'): Promise<void> {
+export type DockerAction = 'start' | 'stop' | 'restart' | 'recreate' | 'rebuild';
+
+/** One service of a compose project, alone: start (creating it if needed), stop, restart, create it again, or build it again and create it. */
+export async function composeServiceAction(c: DockerConfig, service: string, action: DockerAction): Promise<void> {
   if (c.mode !== 'compose') throw new ObjectError('Only a compose project has services');
   if (!/^[\w][\w.-]{0,80}$/.test(service)) throw new ObjectError('That is not a service name');
   checkCompose(c);
-  const r = await dk(composeArgs(c, action === 'start' ? ['up', '-d', service] : [action, ...stopArgs(c), service]), { cwd: dirname(c.file!), timeout: 300_000 });
+  const rest = action === 'start' ? ['up', '-d', service]
+    : action === 'recreate' ? ['up', '-d', '--force-recreate', service]
+    : action === 'rebuild' ? ['up', '-d', '--build', service]
+    : [action, ...stopArgs(c), service];
+  const r = await dk(composeArgs(c, rest), { cwd: dirname(c.file!), timeout: action === 'rebuild' ? 900_000 : 300_000 });
   if (r.code !== 0) throw fail(r, `compose ${action} failed`);
+}
+
+/** The whole object: create its container(s) again (a compose project with --force-recreate; a container hive-am made is removed and run again), or build them again first. */
+export async function recreateDocker(id: string, c: DockerConfig, build = false): Promise<void> {
+  if (c.mode === 'compose') {
+    checkCompose(c);
+    const r = await dk(composeArgs(c, ['up', '-d', ...(build ? ['--build'] : ['--force-recreate']), ...(c.services ?? [])]), { cwd: dirname(c.file!), timeout: build ? 900_000 : 300_000 });
+    if (r.code !== 0) throw fail(r, `compose ${build ? 'rebuild' : 'recreate'} failed`);
+    return;
+  }
+  if (build) throw new ObjectError('Only a compose project builds images');
+  if (c.mode === 'existing') throw new ObjectError('A container that already existed is never removed: it cannot be created again from here');
+  await dk(['rm', '-f', nameOf(id, c)], { timeout: 120_000 });
+  await startDocker(id, c);
+}
+
+/** The id of the container behind an object (or behind one service of a compose project), or an error when there is none. */
+export async function containerOf(id: string, c: DockerConfig, service?: string): Promise<string> {
+  if (c.mode !== 'compose') return nameOf(id, c);
+  if (!service || !/^[\w][\w.-]{0,80}$/.test(service)) throw new ObjectError('Say which service');
+  checkCompose(c);
+  const r = await dk(composeArgs(c, ['ps', '-a', '-q', service]), { cwd: dirname(c.file!) });
+  const cid = r.out.trim().split('\n')[0];
+  if (r.code !== 0 || !cid) throw new ObjectError(`The service ${service} has no container: start it first`);
+  return cid;
+}
+
+/** What `docker inspect` says about a container, cut down to what is read: command, variables, ports, mounts, networks, health. */
+export interface Inspected {
+  id: string; name: string; image: string; status: string; created: string; started: string; restartPolicy: string; restarts: number;
+  command: string; entrypoint: string; workdir: string; user: string;
+  env: { name: string; value: string }[];
+  ports: { container: string; host: string }[];
+  mounts: { type: string; source: string; destination: string; rw: boolean }[];
+  networks: { name: string; ip: string; gateway: string; aliases: string[] }[];
+  health?: { status: string; log: { at: string; exit: number; output: string }[] };
+  labels: Record<string, string>;
+}
+export async function inspectDocker(id: string, c: DockerConfig, service?: string): Promise<Inspected> {
+  const ref = await containerOf(id, c, service);
+  const r = await dk(['inspect', ref]);
+  if (r.code !== 0) throw new ObjectError(`There is no container ${ref}`);
+  const j = JSON.parse(r.out)[0];
+  const cfg = j.Config ?? {}, st = j.State ?? {}, net = j.NetworkSettings ?? {};
+  return {
+    id: String(j.Id ?? '').slice(0, 12), name: String(j.Name ?? '').replace(/^\//, ''), image: String(cfg.Image ?? ''), status: String(st.Status ?? ''), created: String(j.Created ?? ''), started: String(st.StartedAt ?? ''),
+    restartPolicy: String(j.HostConfig?.RestartPolicy?.Name || 'no'), restarts: Number(j.RestartCount ?? 0),
+    command: Array.isArray(cfg.Cmd) ? cfg.Cmd.join(' ') : '', entrypoint: Array.isArray(cfg.Entrypoint) ? cfg.Entrypoint.join(' ') : String(cfg.Entrypoint ?? ''), workdir: String(cfg.WorkingDir ?? ''), user: String(cfg.User ?? ''),
+    env: ((cfg.Env ?? []) as string[]).map((e) => { const i = e.indexOf('='); return i < 0 ? { name: e, value: '' } : { name: e.slice(0, i), value: e.slice(i + 1) }; }),
+    ports: Object.entries((net.Ports ?? {}) as Record<string, { HostIp: string; HostPort: string }[] | null>).flatMap(([cp, hs]) => (hs && hs.length ? [...new Map(hs.map((h) => [h.HostPort, h])).values()].map((h) => ({ container: cp, host: h.HostPort })) : [{ container: cp, host: '' }])),
+    mounts: ((j.Mounts ?? []) as any[]).map((m) => ({ type: String(m.Type ?? ''), source: String(m.Source ?? m.Name ?? ''), destination: String(m.Destination ?? ''), rw: m.RW !== false })),
+    networks: Object.entries((net.Networks ?? {}) as Record<string, any>).map(([name, n]) => ({ name, ip: String(n.IPAddress ?? ''), gateway: String(n.Gateway ?? ''), aliases: (n.Aliases ?? []) as string[] })),
+    health: st.Health ? { status: String(st.Health.Status ?? ''), log: ((st.Health.Log ?? []) as any[]).slice(-5).map((l) => ({ at: String(l.End ?? l.Start ?? ''), exit: Number(l.ExitCode ?? 0), output: String(l.Output ?? '').slice(0, 300) })) } : undefined,
+    labels: (cfg.Labels ?? {}) as Record<string, string>,
+  };
 }
 
 /** A container hive-am created goes away with its object; a compose project is only stopped; an existing container is left alone. */

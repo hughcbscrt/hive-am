@@ -170,3 +170,5 @@ API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/obje
 ## 15.10 Services and members
 
 A compose object lists its **services** like Docker Desktop: state (with health), image, published ports (they open in the browser), CPU and memory, and start / stop / restart / logs for each one without touching the others. A cluster lists its **members** as a tree: state, what each runs, CPU and memory, and under a compose member its services; the order arrows set the start order. API: `POST /api/objects/:id/service {service, action}` (only from this machine).
+
+Each service has **Inspect** (how it runs, variables — secrets stay hidden until you show them —, ports, mounts, networks, health checks), a **shell** inside its container, **Create again** (removes the container and creates it from its image; what is inside is lost) and **Build again** (builds the image and creates the container). The whole object has **Create again** / **Build again** too, in **More**. An existing container is never removed, so it cannot be created again from here.

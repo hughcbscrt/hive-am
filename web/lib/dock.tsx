@@ -7,7 +7,7 @@ import { useI18n } from './i18n';
 export type DockTab =
   | { key: string; kind: 'term'; id: string; title: string; cwd: string; ended?: number | null }
   | { key: string; kind: 'logs'; objectId: string; title: string };
-export interface TerminalSpec { cwd?: string; title?: string; objectId?: string; agentId?: string }
+export interface TerminalSpec { cwd?: string; title?: string; objectId?: string; agentId?: string; /** A service of a compose object: the shell opens inside its container. */ service?: string }
 
 interface Ctx {
   open: boolean; height: number; tabs: DockTab[]; active: string | null; enabled: boolean; error: string;

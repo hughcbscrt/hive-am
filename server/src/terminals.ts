@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { dirname } from 'node:path';
 import { homedir } from 'node:os';
 import type { IncomingMessage } from 'node:http';
 import type { WebSocket } from 'ws';
@@ -45,7 +47,7 @@ export function isLocalRequest(req: IncomingMessage): boolean {
   return true;
 }
 
-export interface TerminalSpec { cwd?: unknown; title?: unknown; objectId?: unknown; agentId?: unknown }
+export interface TerminalSpec { cwd?: unknown; title?: unknown; objectId?: unknown; agentId?: unknown; /** A service of a compose object: the shell opens inside its container. */ service?: unknown }
 
 /** Where and what to run: the user's shell in a folder, or a shell inside a container of an object. */
 function plan(spec: TerminalSpec): { cwd: string; file: string; args: string[]; title: string } {
@@ -62,9 +64,17 @@ function plan(spec: TerminalSpec): { cwd: string; file: string; args: string[]; 
     if (o.kind === 'server') cwd = (o.config as ServerConfig).cwd;
     else if (o.kind === 'docker') {
       const c = o.config as DockerConfig;
-      if (c.mode === 'compose') throw new TerminalError('A compose project has several containers: use its logs, or open a terminal on one of them as an "existing container" object.');
+      let target: string;
+      if (c.mode === 'compose') {
+        if (typeof spec.service !== 'string' || !/^[\w][\w.-]{0,80}$/.test(spec.service)) throw new TerminalError('A compose project has several containers: pick a service.');
+        if (!existsSync(c.file!)) throw new TerminalError('The compose file is missing');
+        let id = '';
+        try { id = execFileSync('docker', ['compose', '-f', c.file!, ...(c.project ? ['-p', c.project] : []), 'ps', '-q', spec.service], { cwd: dirname(c.file!), encoding: 'utf8', timeout: 10_000 }).trim().split('\n')[0]; } catch { /* reported below */ }
+        if (!id) throw new TerminalError(`The service ${spec.service} has no container: start it first.`);
+        target = id; title = `${o.name}/${spec.service}`;
+      } else target = c.mode === 'existing' ? c.container! : containerName(o.id);
       // A shell inside the container: bash when it has one, sh otherwise.
-      file = 'docker'; args = ['exec', '-it', c.mode === 'existing' ? c.container! : containerName(o.id), 'sh', '-c', 'command -v bash >/dev/null 2>&1 && exec bash || exec sh'];
+      file = 'docker'; args = ['exec', '-it', target, 'sh', '-c', 'command -v bash >/dev/null 2>&1 && exec bash || exec sh'];
     } else throw new TerminalError('This kind of object has no terminal.');
   }
   if (!existsSync(cwd) || !statSync(cwd).isDirectory()) throw new TerminalError(`The folder ${cwd} does not exist`);

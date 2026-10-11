@@ -30,7 +30,7 @@ import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashAp
 import { composeServices, listContainers, listImages } from './objects/docker-info.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from './objects/agent.js';
 import { TerminalError, closeTerminal, createTerminal, isLocalRequest, listTerminals, terminalsEnabled } from './terminals.js';
-import { ObjectError, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, objectAction, objectServiceAction, objectLogs, removeObject, updateObject } from './objects/index.js';
+import { ObjectError, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, objectAction, objectServiceAction, objectInspect, objectLogs, removeObject, updateObject } from './objects/index.js';
 import { gitCompare, gitCompareDiff, gitGrep, gitImageAt, gitRefs } from './git/browse.js';
 import { GitOpError, gitBlame, gitBranchCreate, gitBranchDelete, gitRefFile, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitTagFile, gitTagTree, gitTags, gitUnresolve, type PullMode } from './git/ops.js';
 
@@ -281,6 +281,7 @@ route('GET', '/api/objects', () => listObjects());
 route('POST', '/api/objects', async ({ req }) => { objectGuard(req); const p = await body(req); return objectSafe(() => createObject(p)); });
 route('PATCH', '/api/objects/:id', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => updateObject(params[0], p)); });
 route('DELETE', '/api/objects/:id', async ({ req, params }) => { objectGuard(req); return objectSafe(async () => { if (!(await removeObject(params[0]))) throw notFound('Object not found'); return { ok: true }; }); });
+route('GET', '/api/objects/:id/inspect', ({ params, url }) => objectSafe(() => objectInspect(params[0], url.searchParams.get('service') ?? undefined)));
 route('POST', '/api/objects/:id/service', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => objectServiceAction(params[0], p.service, p.action)); });
 route('POST', '/api/objects/:id/action', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => objectAction(params[0], p.action)); });
 // What Docker knows, to suggest in the forms (containers, images, the services of a compose file).

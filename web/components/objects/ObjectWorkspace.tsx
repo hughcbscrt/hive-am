@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Play, RotateCw, Square } from 'lucide-react';
+import { ArrowLeft, Hammer, Info, MoreHorizontal, Play, RefreshCcw, RotateCw, Square } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
@@ -13,6 +13,8 @@ import { ObjectSwitcher } from './ObjectSwitcher';
 import { ObjectSummary } from './ObjectSummary';
 import { ObjectConfig } from './ObjectConfig';
 import { LogPane } from './LogPane';
+import { Menu, MenuItem } from '@/components/Menu';
+import { ServiceDetail } from './ServiceDetail';
 import { TerminalButton } from '@/components/dock/TerminalButton';
 import { HttpWorkspace } from './HttpWorkspace';
 import { HttpVars } from './HttpVars';
@@ -47,12 +49,13 @@ function Screen({ object: o }: { object: ObjectView }) {
   const tabs = tabsOf(o);
   const [tab, setTab] = useState<Tab>(tabs[0]);
   const [logFilter, setLogFilter] = useState('');
+  const [inspecting, setInspecting] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   // `?tab=config` opens that tab (the colony map links to the settings).
   useEffect(() => { const w = new URLSearchParams(window.location.search).get('tab') as Tab | null; if (w && tabs.includes(w)) setTab(w); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const { icon: Icon, color } = KIND[o.kind];
   const st = o.state.status, live = st === 'running' || st === 'starting';
-  const act = async (action: 'start' | 'stop' | 'restart') => {
+  const act = async (action: 'start' | 'stop' | 'restart' | 'recreate' | 'rebuild') => {
     setBusy(action);
     try { await api.post(`/objects/${o.id}/action`, { action }); }
     catch (e) { toast(`${t('obj.act.failed', { action: t(`obj.act.${action}`) })}: ${e instanceof Error ? e.message : ''}`, 'err'); } finally { setBusy(null); }
@@ -81,6 +84,13 @@ function Screen({ object: o }: { object: ObjectView }) {
           <button className="btn sm" disabled={!!busy || (!live && st !== 'error')} onClick={() => void act('stop')}><Square size={14} />{t(cluster ? 'obj.act.stopAll' : 'obj.act.stop')}</button>
           <button className="btn sm" disabled={!!busy} onClick={() => void act('restart')}><RotateCw size={14} />{t(cluster ? 'obj.act.restartAll' : 'obj.act.restart')}</button>
         </>)}
+        {o.kind === 'docker' && (o.config as DockerConfig).mode !== 'existing' && (
+          <Menu label={t('svc.more')} icon={<MoreHorizontal size={14} />}>{(close) => (<>
+            {(o.config as DockerConfig).mode === 'container' && <MenuItem onClick={() => { close(); setInspecting(true); }}><span className="row gap-s"><Info size={14} />{t('svc.inspect')}</span></MenuItem>}
+            <MenuItem onClick={() => { close(); void act('recreate'); }}><span className="row gap-s" title={t('svc.recreate.hint')}><RefreshCcw size={14} />{t('obj.act.recreate')}</span></MenuItem>
+            {(o.config as DockerConfig).mode === 'compose' && <MenuItem onClick={() => { close(); void act('rebuild'); }}><span className="row gap-s" title={t('svc.rebuild.hint')}><Hammer size={14} />{t('obj.act.rebuild')}</span></MenuItem>}
+          </>)}</Menu>
+        )}
         {canShell && <TerminalButton spec={{ objectId: o.id }} title={o.kind === 'server' ? t('dock.here') : t('dock.shell')} />}
       </header>
       <div className="tabs ow-tabs" role="tablist">
@@ -93,6 +103,7 @@ function Screen({ object: o }: { object: ObjectView }) {
         {(tab === 'requests' || tab === 'history') && <HttpWorkspace object={o} pane={tab} onOpenVars={() => setTab('vars')} onGoRequests={() => setTab('requests')} />}
         {tab === 'vars' && <HttpVars object={o} />}
       </div>
+      {inspecting && <ServiceDetail objectId={o.id} title={o.name} onClose={() => setInspecting(false)} />}
     </section>
   );
 }

@@ -170,3 +170,5 @@ API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/obje
 ## 15.10 Servicios y miembros
 
 Un objeto compose lista sus **servicios** como Docker Desktop: estado (con salud), imagen, puertos publicados (se abren en el navegador), CPU y memoria, y iniciar / detener / reiniciar / logs de cada uno sin tocar los demás. Un clúster lista sus **miembros** como un árbol: estado, qué ejecuta cada uno, CPU y memoria, y bajo un miembro compose sus servicios; las flechas de orden fijan el orden de inicio. API: `POST /api/objects/:id/service {service, action}` (solo desde esta máquina).
+
+Cada servicio tiene **Inspeccionar** (cómo corre, variables —los secretos siguen ocultos hasta que los muestras—, puertos, montajes, redes, chequeos de salud), una **shell** dentro de su contenedor, **Crear de nuevo** (quita el contenedor y lo crea desde su imagen; lo que hay dentro se pierde) y **Reconstruir** (construye la imagen y crea el contenedor). El objeto completo también tiene **Crear de nuevo** / **Reconstruir** en **Más**. Un contenedor que ya existía nunca se elimina, así que no se puede crear de nuevo desde aquí.

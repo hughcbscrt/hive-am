@@ -1140,3 +1140,10 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .of-nav button:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
 .of-nav button.on { color: var(--ink); font-weight: 600; background: var(--surface); border-left-color: var(--honey); }
 @media (max-width: 900px) { .oc-body { grid-template-columns: 1fr; } .of-nav { position: static; flex-direction: row; flex-wrap: wrap; } }
+
+.modal.wide { top: 6vh; width: min(860px, calc(100vw - 32px)); max-height: 88vh; overflow: auto; }
+
+.sd-sec { display: flex; flex-direction: column; gap: 6px; } .sd-sec > .eyebrow { margin-top: 4px; }
+.sd-kv { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 12px; font-size: 13px; margin: 0; } .sd-kv dt { color: var(--muted); } .sd-kv dd { margin: 0; overflow-wrap: anywhere; }
+.sd-table { width: 100%; border-collapse: collapse; font-size: 12.5px; } .sd-table td, .sd-table th { text-align: left; padding: 4px 8px 4px 0; border-top: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; } .sd-table th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-top: 0; }
+.cm-act .menu { display: inline-block; vertical-align: middle; } .cm-act { white-space: nowrap; }
