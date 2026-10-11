@@ -166,3 +166,7 @@ API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/obje
 - **Exportar**: documentación en Markdown (con una respuesta de ejemplo del historial) o una colección de Postman v2.1, de un archivo o de todos. API: `GET /api/objects/:id/http/docs?format=markdown|postman&file=`.
 - **Ejecutar con datos…** (vista del archivo): pega o carga un CSV (nombres en la primera línea) o un arreglo JSON de objetos. El archivo se ejecuta una vez por fila, las columnas son variables de esa fila (ganan sobre todo y se olvidan al terminar) y una tabla muestra cada petición en cada fila. Hasta 200 filas.
 - La pestaña **Archivo** usa el mismo editor y selector de tema que el explorador de código (temas, espacios visibles, ancho de tabulador: una sola configuración para ambos), con resaltado para archivos `.http` / `.rest`.
+
+## 15.10 Servicios y miembros
+
+Un objeto compose lista sus **servicios** como Docker Desktop: estado (con salud), imagen, puertos publicados (se abren en el navegador), CPU y memoria, y iniciar / detener / reiniciar / logs de cada uno sin tocar los demás. Un clúster lista sus **miembros** como un árbol: estado, qué ejecuta cada uno, CPU y memoria, y bajo un miembro compose sus servicios; las flechas de orden fijan el orden de inicio. API: `POST /api/objects/:id/service {service, action}` (solo desde esta máquina).

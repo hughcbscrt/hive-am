@@ -46,6 +46,7 @@ function Screen({ object: o }: { object: ObjectView }) {
   const toast = useToast();
   const tabs = tabsOf(o);
   const [tab, setTab] = useState<Tab>(tabs[0]);
+  const [logFilter, setLogFilter] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   // `?tab=config` opens that tab (the colony map links to the settings).
   useEffect(() => { const w = new URLSearchParams(window.location.search).get('tab') as Tab | null; if (w && tabs.includes(w)) setTab(w); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -83,11 +84,11 @@ function Screen({ object: o }: { object: ObjectView }) {
         {canShell && <TerminalButton spec={{ objectId: o.id }} title={o.kind === 'server' ? t('dock.here') : t('dock.shell')} />}
       </header>
       <div className="tabs ow-tabs" role="tablist">
-        {tabs.map((x) => <button key={x} className="tab" role="tab" aria-selected={tab === x} onClick={() => setTab(x)}>{t(`ow.tab.${x}`)}</button>)}
+        {tabs.map((x) => <button key={x} className="tab" role="tab" aria-selected={tab === x} onClick={() => { if (x === 'logs') setLogFilter(''); setTab(x); }}>{t(`ow.tab.${x}`)}</button>)}
       </div>
       <div className={`ow-body ${tab === 'logs' || tab === 'requests' || tab === 'history' ? 'full' : ''}`}>
-        {tab === 'summary' && <ObjectSummary object={o} onSeeLogs={() => setTab('logs')} />}
-        {tab === 'logs' && <LogPane id={o.id} members={cluster ? memberNames : undefined} />}
+        {tab === 'summary' && <ObjectSummary object={o} onSeeLogs={(filter) => { setLogFilter(filter ?? ''); setTab('logs'); }} />}
+        {tab === 'logs' && <LogPane key={logFilter} id={o.id} members={cluster ? memberNames : undefined} initialFilter={logFilter || undefined} />}
         {tab === 'config' && <ObjectConfig object={o} />}
         {(tab === 'requests' || tab === 'history') && <HttpWorkspace object={o} pane={tab} onOpenVars={() => setTab('vars')} onGoRequests={() => setTab('requests')} />}
         {tab === 'vars' && <HttpVars object={o} />}

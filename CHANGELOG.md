@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- Compose projects and clusters in the style of Docker Desktop: a compose object lists its services with state, image, ports that open in the browser, CPU and memory, and start / stop / restart / logs for each service on its own (`POST /api/objects/:id/service`); a cluster shows its members as a tree (state, what each runs, CPU and memory, the services of a compose member under it) with the same actions and the start order.
 - The `.http` file editor of the HTTP runner is the code explorer’s editor: syntax highlighting for `.http` / `.rest` files (also in the explorer), line numbers, the same themes (Hive, GitLab, Solarized, Monokai, Dracula), visible whitespace and tab width, and the theme picker next to the editor (one setting for both places). The suggestions keep working on top of it.
 - Run an HTTP file with data: a CSV (names in the first line) or a JSON array of objects; the file runs once per row with the columns as variables for that row, and a table shows how each request went in each row (up to 200 rows; the values are forgotten at the end).
 - HTTP answers can be filtered (text, or a JSONPath such as `$.items[*].id`, `$..id`, `$.a[?(@.price > 10)]`), and the requests of a file (or all of them) can be exported as Markdown documentation (with an example answer taken from the history) or as a Postman v2.1 collection. API: `GET /api/objects/:id/http/docs?format=markdown|postman&file=`.
@@ -33,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- The Terminal and theme buttons of the sidebar look like the menu items above them; the settings of an HTTP object are one General card (its variables have their own tab); compose ports are no longer listed twice.
 - Consistency pass on the objects screens: the help of each panel is now a help button (like the Colony screen) instead of text left on the page; the forms of the HTTP runner use the app’s font and spacing; the terminal buttons (agent, server, container) look like the buttons around them, through one shared component; the menus of “Copy as…” and “Export” share one `Menu`; and reading and saving `.http` files goes through one helper.
 - HTTP variables: the selected environment (env files, then hive-am’s) now wins over an `@name` line in the `.http` file; the value of the session still wins over everything.
 

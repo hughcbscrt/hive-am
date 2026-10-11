@@ -11,6 +11,7 @@ import { StatusDot } from './ObjectPanel';
 import { detailText } from './meta';
 import { Spark } from './Spark';
 import { ClusterMembers } from './ClusterMembers';
+import { ServicesTable } from './ServicesTable';
 
 const HISTORY = 60;
 const dur = (ms: number) => { const s = Math.max(0, Math.floor(ms / 1000)); const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : m ? `${m}m ${s % 60}s` : `${s}s`; };
@@ -21,9 +22,11 @@ function useStats(o: ObjectView) {
   const [cpu, setCpu] = useState<number[]>([]);
   const [mem, setMem] = useState<number[]>([]);
   const live = o.state.status === 'running' || o.state.status === 'starting';
+  const [nonce, setNonce] = useState(0);
+  const reload = () => setNonce((n) => n + 1);
   useEffect(() => {
     if (o.kind !== 'server' && o.kind !== 'docker') return;
-    setStats(null); setCpu([]); setMem([]);
+    if (nonce === 0) { setStats(null); setCpu([]); setMem([]); }
     let dead = false, timer: ReturnType<typeof setTimeout>;
     const tick = async () => {
       try {
@@ -37,16 +40,16 @@ function useStats(o: ObjectView) {
     };
     void tick();
     return () => { dead = true; clearTimeout(timer); };
-  }, [o.id, o.kind, live]);
-  return { stats, cpu, mem, live };
+  }, [o.id, o.kind, live, nonce]);
+  return { stats, cpu, mem, live, reload };
 }
 
 const Row = ({ k, v }: { k: string; v: React.ReactNode }) => <div className="ov-row"><dt>{k}</dt><dd>{v}</dd></div>;
 
 /** The first tab of a server, a container or a cluster: its state, what it uses, how it is set up and its latest output. */
-export function ObjectSummary({ object: o, onSeeLogs }: { object: ObjectView; onSeeLogs: () => void }) {
+export function ObjectSummary({ object: o, onSeeLogs }: { object: ObjectView; onSeeLogs: (filter?: string) => void }) {
   const { t } = useI18n();
-  const { stats, cpu, mem, live } = useStats(o);
+  const { stats, cpu, mem, live, reload } = useStats(o);
   const [, tick] = useState(0);
   useEffect(() => { if (!live) return; const id = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(id); }, [live]);
   const { text } = useLogStream(o.id, { max: 40_000, pollMs: 2000 });
@@ -110,12 +113,12 @@ export function ObjectSummary({ object: o, onSeeLogs }: { object: ObjectView; on
       </div>
 
       {o.kind === 'docker' && stats?.services && stats.services.length > 0 && (
-        <section className="ov-card wide"><div className="eyebrow">{t('ow.d.services')}</div>
-          <table className="cm-table"><tbody>{stats.services.map((s) => <tr key={s.name}><td><b>{s.name}</b></td><td><span className="row gap-s small"><StatusDot status={s.state === 'running' ? 'running' : s.state === 'exited' ? 'error' : 'stopped'} />{s.state}{s.health ? ` · ${s.health}` : ''}</span></td><td className="muted small">{s.ports}</td></tr>)}</tbody></table></section>
+        <section className="ov-card wide"><div className="eyebrow">{t('ow.d.services')} · {info.running ?? 0}/{info.services ?? 0}</div>
+          <ServicesTable objectId={o.id} services={stats.services} onLogs={(sv) => onSeeLogs(`${sv}-`)} onChanged={reload} /></section>
       )}
       {o.kind === 'cluster' && <section className="ov-card wide"><div className="eyebrow">{t('cl.members')}</div><ClusterMembers cluster={o} /></section>}
       <section className="ov-card wide grow">
-        <div className="row"><div className="eyebrow grow">{t('ow.recent')}</div><button className="btn ghost sm" onClick={onSeeLogs}>{t('ow.seeLogs')}</button></div>
+        <div className="row"><div className="eyebrow grow">{t('ow.recent')}</div><button className="btn ghost sm" onClick={() => onSeeLogs()}>{t('ow.seeLogs')}</button></div>
         <pre className="ov-log mono">{text === null ? t('git.loading') : lastLines || t('obj.logs.empty')}</pre>
       </section>
     </div>

@@ -1,5 +1,5 @@
 import { bus } from '../runtime.js';
-import { dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
+import { composeServiceAction, dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
 import { recordRun, listHistory, clearHistory } from './http-history.js';
 import { exportCollection, parseHttpFile, createHttpFile, exportHttp, type ExportFormat, describeHttp, dropSession, inspectHttp, readHttpFile, runHttp, scanHttp, writeHttpFile, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
 import { ObjectError, type ClusterConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
@@ -123,6 +123,16 @@ export async function objectAction(id: string, action: unknown): Promise<ObjectV
   if (action !== 'start' && action !== 'stop' && action !== 'restart') throw new ObjectError('Unknown action');
   if (o.kind === 'http') throw new ObjectError('HTTP requests are not started or stopped: open them and run a request.');
   try { if (o.kind === 'cluster') await actOnCluster(o, action); else await act(o, action); }
+  finally { await refreshStates().catch(() => undefined); changed(); }
+  return viewOf(o);
+}
+
+/** One service of a compose project (start, stop, restart), without touching the others. */
+export async function objectServiceAction(id: string, service: unknown, action: unknown): Promise<ObjectView> {
+  const o = get(id);
+  if (o.kind !== 'docker') throw new ObjectError('Only a compose project has services');
+  if (action !== 'start' && action !== 'stop' && action !== 'restart') throw new ObjectError('Unknown action');
+  try { await composeServiceAction(o.config as DockerConfig, String(service ?? ''), action); }
   finally { await refreshStates().catch(() => undefined); changed(); }
   return viewOf(o);
 }

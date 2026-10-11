@@ -104,6 +104,13 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error }: {
   const dockerNote = docker.error ? <p className="muted small" style={{ margin: '4px 0 0' }}>{t('dk.unavailable', { error: docker.error })}</p> : null;
   const refresh = <button type="button" className="btn ghost icon sm" onClick={docker.reload} aria-label={t('dk.refresh')} title={t('dk.refresh')}><RefreshCw size={14} /></button>;
   const fileEnvs = scan ? Object.keys(scan.fileVars).filter((e) => e !== '$shared') : undefined;
+  // In the settings of an existing object these live in the one General card (its variables have their own tab); creating one, in cards of their own.
+  const httpFiles = (<>
+    <FolderPicker value={d.folder} onChange={(v) => set('folder', v)} label={t('obj.f.httpFolder')} hint={t('obj.f.httpFolder.hint')} />
+    <Field label={t('obj.f.defaultEnv')} hint={t('obj.f.defaultEnv.hint')}>
+      <Suggest value={d.defEnv} onChange={(v) => set('defEnv', v)} mono placeholder="dev" options={[...new Set([...(scan?.environments ?? []), ...Object.keys(d.variables).filter((k) => k !== '$shared')])].map((v) => ({ value: v }))} />
+    </Field>
+  </>);
 
   return (
     <div className="of">
@@ -124,16 +131,12 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error }: {
             <option value="">{t('obj.noColony')}</option>{colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </Field>
+        {d.kind === 'http' && !showKind && httpFiles}
       </Card>
 
       {d.kind === 'http' ? (<>
-        <Card title={t('of.files')}>
-          <FolderPicker value={d.folder} onChange={(v) => set('folder', v)} label={t('obj.f.httpFolder')} hint={t('obj.f.httpFolder.hint')} />
-          <Field label={t('obj.f.defaultEnv')} hint={t('obj.f.defaultEnv.hint')}>
-            <Suggest value={d.defEnv} onChange={(v) => set('defEnv', v)} mono placeholder="dev" options={[...new Set([...(scan?.environments ?? []), ...Object.keys(d.variables).filter((k) => k !== '$shared')])].map((v) => ({ value: v }))} />
-          </Field>
-        </Card>
-        <Card title={t('of.vars')} wide><VarsEditor value={d.variables} onChange={(v) => set('variables', v)} fileEnvs={fileEnvs} fileVars={scan?.fileVars} used={scan?.used} fileDefined={scan?.fileDefined} setBy={scan?.setBy} /></Card>
+        {showKind && <Card title={t('of.files')}>{httpFiles}</Card>}
+        {showKind && <Card title={t('of.vars')} wide><VarsEditor value={d.variables} onChange={(v) => set('variables', v)} fileEnvs={fileEnvs} fileVars={scan?.fileVars} used={scan?.used} fileDefined={scan?.fileDefined} setBy={scan?.setBy} /></Card>}
       </>) : d.kind === 'cluster' ? (
         <Card title={t('of.members')} hint={t('obj.f.members.hint')}>
           {(() => {

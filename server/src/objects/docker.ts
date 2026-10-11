@@ -116,6 +116,15 @@ export async function restartDocker(id: string, c: DockerConfig): Promise<void> 
   const r = await dk(['restart', ...stopArgs(c), name], { timeout: 300_000 }); if (r.code !== 0) throw fail(r, 'could not restart it');
 }
 
+/** One service of a compose project: start (creating it if needed), stop or restart it alone. */
+export async function composeServiceAction(c: DockerConfig, service: string, action: 'start' | 'stop' | 'restart'): Promise<void> {
+  if (c.mode !== 'compose') throw new ObjectError('Only a compose project has services');
+  if (!/^[\w][\w.-]{0,80}$/.test(service)) throw new ObjectError('That is not a service name');
+  checkCompose(c);
+  const r = await dk(composeArgs(c, action === 'start' ? ['up', '-d', service] : [action, ...stopArgs(c), service]), { cwd: dirname(c.file!), timeout: 300_000 });
+  if (r.code !== 0) throw fail(r, `compose ${action} failed`);
+}
+
 /** A container hive-am created goes away with its object; a compose project is only stopped; an existing container is left alone. */
 export async function removeDocker(id: string, c: DockerConfig): Promise<void> {
   if (c.mode === 'container') await dk(['rm', '-f', containerName(id)]).catch(() => undefined);

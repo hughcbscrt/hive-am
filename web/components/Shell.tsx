@@ -63,9 +63,9 @@ function Nav() {
       <div className="nav-label">{t('nav.history')}</div>
       {item('/sessions', t('nav.sessions'), <History size={18} />)}
       <div className="rail-foot">
-        <button className="btn ghost sm" onClick={dock.toggle} aria-pressed={dock.open} title={`${t('dock.nav')} (Ctrl+\`)`}><SquareTerminal size={15} /> {t('dock.nav')}{dock.tabs.length > 0 && <span className="count">{dock.tabs.length}</span>}</button>
+        <button type="button" className="nav" onClick={dock.toggle} aria-pressed={dock.open} title={`${t('dock.nav')} (Ctrl+\`)`}><SquareTerminal size={18} /><span className="t">{t('dock.nav')}</span>{dock.tabs.length > 0 && <span className="count">{dock.tabs.length}</span>}</button>
         <div className="conn"><i className={`dot ${connected ? 'ok' : 'err'}`} />{connected ? t('nav.connected') : t('nav.offline')}</div>
-        <button className="btn ghost sm" onClick={flip}>{theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />} {t('nav.switchTheme')}</button>
+        <button type="button" className="nav" onClick={flip}>{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}<span className="t">{t('nav.switchTheme')}</span></button>
       </div>
     </nav>
   );

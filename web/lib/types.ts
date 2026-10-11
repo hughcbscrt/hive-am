@@ -140,9 +140,10 @@ export interface ObjectView { id: string; colony_id: string | null; kind: Object
 export interface HttpRequestItem { id: string; index: number; name: string; method: string; url: string; headers: { name: string; value: string }[]; body?: string; line: number; variables: string[]; refs: string[]; named?: string; script?: string; scriptFile?: string }
 export interface HttpFile { relFile: string; requests: HttpRequestItem[]; fileVariables: Record<string, string> }
 export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; fileVars: Record<string, string[]>; setBy: Record<string, string[]>; used: { name: string; count: number }[]; fileDefined: string[]; truncated: boolean }
+export interface ServiceStat { name: string; container: string; image: string; state: string; health: string; status: string; ports: string; cpu: number | null; memBytes: number | null }
 export interface ObjectStats {
   cpu: number | null; memBytes: number | null; memLimitBytes: number | null; pids: number | null; net?: string | null; block?: string | null;
-  info: Record<string, string | number | null>; services?: { name: string; state: string; health: string; ports: string }[];
+  info: Record<string, string | number | null>; services?: ServiceStat[];
 }
 export interface HttpTest { name: string; passed: boolean; message?: string }
 export interface HttpHistoryEntry { n: number; at: number; file: string; index: number; name: string; method: string; env: string; run?: HttpRun; error?: string }

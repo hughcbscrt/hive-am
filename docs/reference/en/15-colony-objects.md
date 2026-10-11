@@ -166,3 +166,7 @@ API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/obje
 - **Export**: documentation in Markdown (with an example answer from the history) or a Postman v2.1 collection, for one file or all of them. API: `GET /api/objects/:id/http/docs?format=markdown|postman&file=`.
 - **Run with data…** (file view): paste or load a CSV (names in the first line) or a JSON array of objects. The file runs once per row, the columns are variables for that row (they win over everything and are forgotten at the end) and a table shows each request in each row. Up to 200 rows.
 - The **File** tab uses the same editor and theme picker as the code explorer (themes, visible whitespace, tab width — one setting for both), with highlighting for `.http` / `.rest` files.
+
+## 15.10 Services and members
+
+A compose object lists its **services** like Docker Desktop: state (with health), image, published ports (they open in the browser), CPU and memory, and start / stop / restart / logs for each one without touching the others. A cluster lists its **members** as a tree: state, what each runs, CPU and memory, and under a compose member its services; the order arrows set the start order. API: `POST /api/objects/:id/service {service, action}` (only from this machine).

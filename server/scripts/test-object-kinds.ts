@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { colonies } from '../src/db.js';
-import { ObjectError, createObject, httpDocs, httpExport, httpHistory, httpHistoryClear, httpFileCreate, httpDescribe, httpFileRead, httpFileWrite, httpInspect, httpRun as runForObject, httpScan, httpSession, httpSessionClear, httpSessionSet, objectAction, objectLogs, refreshStates, removeObject, stateOf, updateObject, viewOf } from '../src/objects/index.js';
+import { ObjectError, createObject, objectServiceAction, httpDocs, httpExport, httpHistory, httpHistoryClear, httpFileCreate, httpDescribe, httpFileRead, httpFileWrite, httpInspect, httpRun as runForObject, httpScan, httpSession, httpSessionClear, httpSessionSet, objectAction, objectLogs, refreshStates, removeObject, stateOf, updateObject, viewOf } from '../src/objects/index.js';
 import { parseHttpFile, runHttp as httpRun } from '../src/objects/http.js';
 import { objectsStore } from '../src/objects/store.js';
 
@@ -275,6 +275,7 @@ check(md.startsWith('# i.http') && md.includes('## login') && md.includes('POST 
 const pm = JSON.parse(httpDocs(io.id, 'postman').content);
 check(pm.info.schema.includes('v2.1.0') && pm.item.some((f: any) => f.name === 'i.http' && f.item[0].request.method === 'POST') && pm.variable.some((v: any) => v.key === 'who'), 'or as a Postman collection (with the variables of the files)');
 check(httpDocs(io.id, 'postman', 'i.http').filename === 'i.postman_collection.json' && await rejects(async () => httpDocs(io.id, 'markdown', 'nope.http'), /not one of/), 'for one file or all of them; an unknown file is refused');
+check(await rejects(async () => objectServiceAction(io.id, 'web', 'start'), /Only a compose project/), 'a service action is only for a compose project');
 // files: create
 check(httpFileCreate(io.id, 'new/made.http', '### x\nGET http://h/\n').file === 'new/made.http' && httpFileRead(io.id, 'new/made.http').content.includes('GET http://h/'), 'a new .http file can be created (folders included)');
 check(await rejects(async () => httpFileCreate(io.id, 'new/made.http', ''), /already exists/) && await rejects(async () => httpFileCreate(io.id, '../out.http', ''), /Use a name/) && await rejects(async () => httpFileCreate(io.id, 'notes.txt', ''), /Use a name/), 'but never over an existing one, outside the folder or with another extension');

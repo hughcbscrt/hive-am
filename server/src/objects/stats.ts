@@ -9,13 +9,15 @@ import { readSaved } from './runner.js';
  * What an object is using right now, for its panel: the CPU and memory of a server's processes, and what Docker reports for a container
  * (and the services of a compose project). Read on request, not polled.
  */
+/** One service of a compose project, as Docker Desktop lists it: its container, image, state, ports and what it uses. */
+export interface ServiceStat { name: string; container: string; image: string; state: string; health: string; status: string; ports: string; cpu: number | null; memBytes: number | null }
 export interface ObjectStats {
   cpu: number | null;                 // percent of one core
   memBytes: number | null; memLimitBytes: number | null; pids: number | null;
   net?: string | null; block?: string | null;
   info: Record<string, string | number | null>;
   /** Compose: one row per service. */
-  services?: { name: string; state: string; health: string; ports: string }[];
+  services?: ServiceStat[];
 }
 
 const run = (file: string, args: string[], o: { cwd?: string; timeout?: number } = {}) => new Promise<{ out: string; code: number }>((resolve) => {
@@ -64,12 +66,21 @@ async function composeStats(c: DockerConfig): Promise<ObjectStats> {
   const ps = await run('docker', [...args, 'ps', '--all', '--format', 'json', ...(c.services ?? [])], { cwd: dirname(c.file!) });
   const t = ps.out.trim();
   const items: any[] = t.startsWith('[') ? (() => { try { return JSON.parse(t); } catch { return []; } })() : t.split('\n').flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } });
-  const services = items.map((x) => ({ name: String(x.Service ?? x.Name ?? ''), state: String(x.State ?? ''), health: String(x.Health ?? ''), ports: String(x.Publishers ? (x.Publishers as any[]).filter((p) => p.PublishedPort).map((p) => `${p.PublishedPort}→${p.TargetPort}`).join(', ') : x.Ports ?? '') }));
+  // "16379→6379" once, even when Docker lists the same port for IPv4 and IPv6
+  const portsOf = (x: any) => [...new Set(((x.Publishers ?? []) as any[]).filter((p) => p.PublishedPort).map((p) => `${p.PublishedPort}→${p.TargetPort}`))].join(', ') || String(x.Ports ?? '');
+  const services: ServiceStat[] = items.map((x) => ({ name: String(x.Service ?? x.Name ?? ''), container: String(x.Name ?? ''), image: String(x.Image ?? ''), state: String(x.State ?? ''), health: String(x.Health ?? ''), status: String(x.Status ?? ''), ports: portsOf(x), cpu: null, memBytes: null }));
   const ids = items.filter((x) => x.State === 'running').map((x) => String(x.ID ?? x.Name));
   let cpu = 0, mem = 0, pids = 0;
   if (ids.length) {
     const st = await run('docker', ['stats', '--no-stream', '--format', '{{json .}}', ...ids]);
-    for (const l of st.out.trim().split('\n')) { try { const j = JSON.parse(l); cpu += Number.parseFloat(j.CPUPerc) || 0; mem += bytes(String(j.MemUsage).split('/')[0] ?? '') ?? 0; pids += Number(j.PIDs) || 0; } catch { /* a line that is not json */ } }
+    for (const l of st.out.trim().split('\n')) {
+      try {
+        const j = JSON.parse(l); const c1 = Number.parseFloat(j.CPUPerc) || 0, m1 = bytes(String(j.MemUsage).split('/')[0] ?? '') ?? 0;
+        cpu += c1; mem += m1; pids += Number(j.PIDs) || 0;
+        const sv = services.find((x) => x.container === j.Name || (j.ID && String(items.find((i) => i.Name === x.container)?.ID ?? '').startsWith(String(j.ID))));
+        if (sv) { sv.cpu = Math.round(c1 * 10) / 10; sv.memBytes = m1; }
+      } catch { /* a line that is not json */ }
+    }
   }
   return { cpu: ids.length ? Math.round(cpu * 10) / 10 : null, memBytes: ids.length ? mem : null, memLimitBytes: null, pids: ids.length ? pids : null, info: { services: services.length, running: ids.length }, services };
 }

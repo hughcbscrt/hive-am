@@ -12,12 +12,12 @@ const COLORS = ['#0f8f9e', '#c0399a', '#7a4de0', '#d4663f', '#2f8f5b', '#9a7400'
  * The logs of an object on a whole screen: search (highlighting, or only the lines that match), follow the end, wrap, text size, pause,
  * clear, copy and download. For a cluster each line starts with `[member]`: members get a colour and can be hidden.
  */
-export function LogPane({ id, members }: { id: string; members?: string[] }) {
+export function LogPane({ id, members, initialFilter }: { id: string; members?: string[]; /** Opens with this text searched, showing only the matching lines (e.g. the lines of one service). */ initialFilter?: string }) {
   const { t } = useI18n();
   const [paused, setPaused] = useState(false);
   const { text, clear } = useLogStream(id, { paused });
-  const [q, setQ] = useState('');
-  const [only, setOnly] = useState(false);
+  const [q, setQ] = useState(initialFilter ?? '');
+  const [only, setOnly] = useState(!!initialFilter);
   const [follow, setFollow] = useState(true);
   const [wrap, setWrap] = useState(true);
   const [size, setSize] = useState(12.5);
