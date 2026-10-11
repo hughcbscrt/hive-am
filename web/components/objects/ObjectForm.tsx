@@ -60,7 +60,7 @@ export function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | C
 }
 
 const Card = ({ title, hint, wide = false, children }: { title: string; hint?: string; wide?: boolean; children: React.ReactNode }) => (
-  <section className={`of-card ${wide ? 'wide' : ''}`}><header><h4>{title}</h4>{hint && <p className="muted small">{hint}</p>}</header>{children}</section>
+  <section className={`of-card ${wide ? 'wide' : ''}`} id={`of-${title.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-')}`} data-title={title}><header><h4>{title}</h4>{hint && <p className="muted small">{hint}</p>}</header>{children}</section>
 );
 
 /** The services of a compose file, to pick (none picked = all of them). */

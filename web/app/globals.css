@@ -1029,11 +1029,10 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 @media (max-width: 900px) { .hw { grid-template-columns: 1fr; grid-template-rows: 40% 1fr; } .hw-list { border-right: 0; border-bottom: 1px solid var(--line); } .vars-row { grid-template-columns: 1fr 1fr auto auto auto; } }
 
 /* Cards of the object form, suggestions, variables */
-.of { columns: 440px; column-gap: 14px; }
-.of-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; break-inside: avoid; margin: 0 0 14px; } .of-card.wide { column-span: all; }
+.of { display: flex; flex-direction: column; gap: 14px; }
+.of-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; scroll-margin-top: 16px; } .of-card.wide { }
 .of-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
 .of-card > header h4 { font-family: var(--font-display); font-size: 15px; margin: 0; } .of-card > header p { margin: 3px 0 0; }
-.drawer .of, [role=dialog] .of { columns: 1; }
 .sg { position: relative; } .sg-list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; max-height: 280px; overflow-y: auto; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px; box-shadow: 0 14px 34px -12px rgba(0, 0, 0, .35); }
 .sg-opt { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; border: 0; background: none; color: inherit; font: inherit; padding: 6px 9px; border-radius: 7px; cursor: pointer; text-align: left; } .sg-opt.hi { background: color-mix(in srgb, var(--honey) 22%, var(--surface)); }
 .sg-opt .nm { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sg-opt .hint { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; } .sg-empty { padding: 8px 10px; font-size: 12.5px; color: var(--muted); }
@@ -1132,3 +1131,12 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .svc-ports { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 12px; } .svc-ports a { color: var(--p-opencode); text-decoration: none; } .svc-ports a:hover { text-decoration: underline; }
 .cm-table tr.cm-sub > td { padding: 0 0 0 38px; background: color-mix(in srgb, var(--ink) 3%, transparent); } .cm-table tr.cm-sub .cm-table { margin: 0; } .cm-table tr.cm-sub .cm-table th { padding-top: 8px; }
 .cm-chev { border: 0; background: none; padding: 0; width: 20px; height: 20px; display: inline-grid; place-items: center; color: var(--muted); cursor: pointer; border-radius: 5px; } .cm-chev:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+
+/* settings: one column, fixed order, with the list of sections at the left */
+.oc-body { display: grid; grid-template-columns: 190px minmax(0, 780px); gap: 24px; padding: 20px 24px 28px; align-items: start; }
+.oc-body .oc-form { padding: 0; max-width: none; }
+.of-nav { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 2px; }
+.of-nav button { text-align: left; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--muted); padding: 7px 10px; border-radius: 8px; cursor: pointer; border-left: 3px solid transparent; }
+.of-nav button:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
+.of-nav button.on { color: var(--ink); font-weight: 600; background: var(--surface); border-left-color: var(--honey); }
+@media (max-width: 900px) { .oc-body { grid-template-columns: 1fr; } .of-nav { position: static; flex-direction: row; flex-wrap: wrap; } }

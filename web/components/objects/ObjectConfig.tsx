@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -22,6 +22,18 @@ export function ObjectConfig({ object: o }: { object: ObjectView }) {
   const [confirmDel, setConfirmDel] = useState(false);
   const [scan, setScan] = useState<HttpScan | null>(null);
   useEffect(() => { if (o.kind === 'http') api.get<HttpScan>(`/objects/${o.id}/http`).then(setScan).catch(() => undefined); }, [o.id, o.kind]);
+  // The sections are always one column, in a fixed order; the list at the left jumps to one and shows the one being read.
+  const form = useRef<HTMLDivElement>(null);
+  const [secs, setSecs] = useState<{ id: string; title: string }[]>([]);
+  const [active, setActive] = useState('');
+  useEffect(() => {
+    const els = [...(form.current?.querySelectorAll<HTMLElement>('.of-card[id]') ?? [])];
+    setSecs(els.map((e) => ({ id: e.id, title: e.dataset.title ?? '' })));
+    if (!els.length || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((es) => { const hit = es.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]; if (hit) setActive(hit.target.id); }, { rootMargin: '-8% 0px -70% 0px' });
+    els.forEach((e) => io.observe(e));
+    return () => io.disconnect();
+  }, [d.kind, d.mode, scan]);
   const dirty = JSON.stringify(d) !== JSON.stringify(base);
   const live = o.state.status === 'running' || o.state.status === 'starting';
   const restartable = o.kind === 'server' || o.kind === 'docker' || o.kind === 'cluster';
@@ -44,7 +56,10 @@ export function ObjectConfig({ object: o }: { object: ObjectView }) {
 
   return (
     <div className="oc">
-      <div className="oc-form"><ObjectFields d={d} set={set} setD={setD} scan={scan} error={err} /></div>
+      <div className="oc-body">
+        {secs.length > 1 && <nav className="of-nav" aria-label={t('ow.tab.config')}>{secs.map((x) => <button key={x.id} type="button" className={active === x.id || (!active && x === secs[0]) ? 'on' : ''} onClick={() => { document.getElementById(x.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setActive(x.id); }}>{x.title}</button>)}</nav>}
+        <div className="oc-form" ref={form}><ObjectFields d={d} set={set} setD={setD} scan={scan} error={err} /></div>
+      </div>
       <div className="savebar oc-bar">
         <span className="muted small grow">{dirty ? t('ow.cfg.dirty') : t('ow.cfg.saved')}{dirty && restartable ? ` · ${live ? t('ow.cfg.appliesRunning') : t('ow.cfg.applies')}` : ''}</span>
         <button className="btn danger" onClick={() => setConfirmDel(true)}><Trash2 size={15} />{t('common.delete')}</button>

@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- Settings of an object: the sections are always one column in a fixed order (no more cards moving to the side or below when an option changes), with a list of sections at the left that jumps to one and marks the one being read.
 - The Terminal and theme buttons of the sidebar look like the menu items above them; the settings of an HTTP object are one General card (its variables have their own tab); compose ports are no longer listed twice.
 - Consistency pass on the objects screens: the help of each panel is now a help button (like the Colony screen) instead of text left on the page; the forms of the HTTP runner use the app’s font and spacing; the terminal buttons (agent, server, container) look like the buttons around them, through one shared component; the menus of “Copy as…” and “Export” share one `Menu`; and reading and saving `.http` files goes through one helper.
 - HTTP variables: the selected environment (env files, then hive-am’s) now wins over an `@name` line in the `.http` file; the value of the session still wins over everything.
