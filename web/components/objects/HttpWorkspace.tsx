@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Check, ChevronDown, ChevronRight, File, KeyRound, ListChecks, Play, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronRight, File, KeyRound, ListChecks, Table2, Play, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
@@ -15,6 +15,7 @@ import { CopyAs } from './CopyAs';
 import { NewRequest } from './NewRequest';
 import { RunDiff } from './RunDiff';
 import { ExportMenu } from './ExportMenu';
+import { BatchRun } from './BatchRun';
 import { jsonPath } from '@/lib/jsonPath';
 import { AssertEditor } from './AssertEditor';
 import { AuthForm } from './AuthForm';
@@ -64,6 +65,7 @@ export function HttpWorkspace({ object: o, onOpenVars, pane = 'requests', onGoRe
   const [fileInsp, setFileInsp] = useState<HttpInspection | null>(null);
   const [openAns, setOpenAns] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [batch, setBatch] = useState(false);
   const [hist, setHist] = useState<HttpHistoryEntry[]>([]);
   const [histSel, setHistSel] = useState<number | null>(null);
   const [cmp, setCmp] = useState<number | 'prev' | null>(null);
@@ -329,9 +331,10 @@ const sessionBlock = (
           </div>
         </>) : picked ? (
           <div className="hw-file-view">
-            <div className="row gap-s"><File size={18} className="muted" /><h3 className="mono grow" style={{ fontSize: 15, overflowWrap: 'anywhere' }}>{picked.relFile}</h3>
+            <div className="row gap-s wrap"><File size={18} className="muted" /><h3 className="mono grow" style={{ fontSize: 15, overflowWrap: 'anywhere', minWidth: 140 }}>{picked.relFile}</h3>
               <label className="row gap-s small"><input type="checkbox" checked={stopOnFail} onChange={(e) => setStopOnFail(e.target.checked)} />{t('hw.stopOnFail')}</label>
               <ExportMenu objectId={o.id} file={picked.relFile} />
+              <button className="btn sm" disabled={!!busy} onClick={() => setBatch(true)}><Table2 size={14} />{t('hw2.batch.open')}</button>
               <button className="btn primary sm" disabled={!!busy} onClick={() => void runFile(picked)}><ListChecks size={14} />{t('http.runFile')}</button></div>
             <Segmented value={fileTab} onChange={setFileTab} options={[{ id: 'requests', label: `${t('hw2.tab.requests')} · ${picked.requests.length}` }, { id: 'vars', label: `${t('hw2.tab.vars')}${fileInsp?.vars.length ? ` · ${fileInsp.vars.length}` : ''}` }, { id: 'source', label: t('hw2.tab.source') }]} />
             {note && <div className="gx-banner">{note}</div>}
@@ -347,6 +350,7 @@ const sessionBlock = (
           </div>
         ) : <div className="gx-empty"><p>{t('hw.pickFile')}</p></div>}
       </section>
+      {batch && picked && <BatchRun objectId={o.id} file={picked} env={env} onClose={() => setBatch(false)} onDone={() => { void loadSession(); void loadHistory(); }} />}
       {creating && <NewRequest objectId={o.id} files={scan.files} defaultFile={file} onClose={() => setCreating(false)} onCreated={(f) => { setCreating(false); setFile(f); setSel(null); setFileTab('source'); setOpen((x) => new Set(x).add(f)); load(); }} />}
     </div>
   );

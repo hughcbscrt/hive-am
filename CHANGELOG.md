@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
+- Run an HTTP file with data: a CSV (names in the first line) or a JSON array of objects; the file runs once per row with the columns as variables for that row, and a table shows how each request went in each row (up to 200 rows; the values are forgotten at the end).
 - HTTP answers can be filtered (text, or a JSONPath such as `$.items[*].id`, `$..id`, `$.a[?(@.price > 10)]`), and the requests of a file (or all of them) can be exported as Markdown documentation (with an example answer taken from the history) or as a Postman v2.1 collection. API: `GET /api/objects/:id/http/docs?format=markdown|postman&file=`.
 - HTTP requests without code: an **Authentication** tab (Bearer, Basic, API key; for one request or all of a file) writes the header the request needs, and **Checks** in the Tests tab (status, time, header, JSON value, text) are saved in the file as a response handler and reported on each run. Handlers can read `response.time` and `response.text`.
 - HTTP history that lasts: the last 100 runs of each HTTP object are kept on disk (request, answer, tests), so they survive a restart; and **compare** any run with the previous one of the same request, or with another, as status, time, size, changed headers and a line diff of the answer. API: `GET|DELETE /api/objects/:id/http/history`.
