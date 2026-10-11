@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MutableRefObject } from 'react';
 import { useHighlighted } from '@/lib/git/useHighlighted';
 import { useGitPrefs } from '@/lib/git/gitPrefs';
 import { CodeCell } from './Code';
@@ -13,9 +13,14 @@ import { ROW_H } from './VirtualLines';
  * (see useHighlighted), so typing is never blocked by it.
  * Conflict markers (<<<<<<< ======= >>>>>>>) get their own line colour so they are easy to spot and remove.
  */
-export function CodeEditor({ value, onChange, path, id, label }: { value: string; onChange: (v: string) => void; path: string; id?: string; label?: string }) {
+export function CodeEditor({ value, onChange, path, id, label, areaRef, onKeyDown, onClick, onBlur }: {
+  value: string; onChange: (v: string) => void; path: string; id?: string; label?: string;
+  /** For editors built on top of this one (suggestions, shortcuts): the textarea, and its key / click / blur events (a key handler that calls preventDefault skips the Tab handling). */
+  areaRef?: MutableRefObject<HTMLTextAreaElement | null>; onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void; onClick?: () => void; onBlur?: () => void;
+}) {
   const prefs = useGitPrefs();
-  const area = useRef<HTMLTextAreaElement>(null);
+  const own = useRef<HTMLTextAreaElement>(null);
+  const area = (areaRef ?? own) as MutableRefObject<HTMLTextAreaElement | null>;
   const layer = useRef<HTMLDivElement>(null);
   const raf = useRef(0);
   const [view, setView] = useState({ top: 0, h: 600 });
@@ -46,7 +51,8 @@ export function CodeEditor({ value, onChange, path, id, label }: { value: string
   }
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== 'Tab') return;
+    onKeyDown?.(e);
+    if (e.defaultPrevented || e.key !== 'Tab') return;
     e.preventDefault();
     const el = e.currentTarget, s = el.selectionStart, en = el.selectionEnd, ind = ' '.repeat(prefs.tabSize);
     if (s === en && !e.shiftKey) { onChange(value.slice(0, s) + ind + value.slice(en)); requestAnimationFrame(() => el.setSelectionRange(s + ind.length, s + ind.length)); return; }
@@ -63,7 +69,7 @@ export function CodeEditor({ value, onChange, path, id, label }: { value: string
           <div className="ce-win" style={{ top: start * ROW_H }}>{rows}</div>
         </div>
       </div>
-      <textarea ref={area} id={id} aria-label={label} className="ce-area" value={value} spellCheck={false} wrap="off" onChange={(e) => onChange(e.target.value)} onScroll={sync} onKeyDown={onKey} />
+      <textarea ref={area} id={id} aria-label={label} className="ce-area" value={value} spellCheck={false} wrap="off" onChange={(e) => onChange(e.target.value)} onScroll={sync} onKeyDown={onKey} onClick={onClick} onBlur={onBlur} />
     </div>
   );
 }

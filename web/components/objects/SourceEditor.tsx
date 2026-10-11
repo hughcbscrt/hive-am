@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useRef, useState } from 'react';
+import { CodeEditor } from '@/components/git/CodeEditor';
 import type { VarInfo } from '@/lib/types';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
@@ -45,14 +46,14 @@ function suggest(text: string, caret: number, vars: VarInfo[], named: string[]):
 function caretXY(ta: HTMLTextAreaElement, pos: number): { x: number; y: number } {
   const cs = getComputedStyle(ta); const m = document.createElement('div');
   for (const p of ['fontFamily', 'fontSize', 'lineHeight', 'letterSpacing', 'tabSize', 'paddingTop', 'paddingLeft', 'paddingRight', 'paddingBottom', 'borderTopWidth', 'borderLeftWidth', 'borderRightWidth', 'boxSizing'] as const) (m.style as unknown as Record<string, string>)[p] = cs[p];
-  m.style.cssText += ';position:absolute;visibility:hidden;white-space:pre-wrap;overflow-wrap:break-word;top:0;left:0;width:' + ta.clientWidth + 'px';
+  m.style.cssText += ';position:absolute;visibility:hidden;white-space:pre;top:0;left:0;width:' + ta.clientWidth + 'px';
   m.textContent = ta.value.slice(0, pos); const s = document.createElement('span'); s.textContent = '​'; m.appendChild(s);
   document.body.appendChild(m); const x = s.offsetLeft, y = s.offsetTop; document.body.removeChild(m);
   return { x: x - ta.scrollLeft, y: y - ta.scrollTop };
 }
 
 export function SourceEditor({ value, onChange, onSave, vars, named }: { value: string; onChange: (v: string) => void; onSave: () => void; vars: VarInfo[]; named: string[] }) {
-  const ta = useRef<HTMLTextAreaElement>(null);
+  const ta = useRef<HTMLTextAreaElement | null>(null);
   const [sug, setSug] = useState<Sug | null>(null);
   const [sel, setSel] = useState(0);
   const [xy, setXy] = useState({ x: 0, y: 0 });
@@ -72,8 +73,7 @@ export function SourceEditor({ value, onChange, onSave, vars, named }: { value: 
   };
   return (
     <div className="se">
-      <textarea ref={ta} className="hs-edit mono" value={value} spellCheck={false}
-        onChange={(e) => { onChange(e.target.value); refresh(e.target.value, e.target.selectionStart); }}
+      <CodeEditor value={value} path="requests.http" areaRef={ta} onChange={(v) => { onChange(v); const el = ta.current; if (el) requestAnimationFrame(() => refresh(v, el.selectionStart)); }}
         onClick={() => setSug(null)} onBlur={() => setTimeout(() => setSug(null), 120)}
         onKeyDown={(e) => {
           if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); onSave(); return; }

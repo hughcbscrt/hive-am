@@ -6,6 +6,8 @@ import { useI18n } from '@/lib/i18n/index';
 import type { HttpFile, VarInfo } from '@/lib/types';
 import { useToast } from '@/components/ui';
 import { SourceEditor } from './SourceEditor';
+import { GitSettings } from '@/components/git/GitSettings';
+import { useGitPrefs } from '@/lib/git/gitPrefs';
 import { sourceLabel, SOURCE_TONE } from './VarsTable';
 
 /**
@@ -19,6 +21,7 @@ export function HttpSource({ objectId, file, vars, onRun, status, onSaved }: {
 }) {
   const { t } = useI18n();
   const toast = useToast();
+  const prefs = useGitPrefs();
   const [text, setText] = useState<string | null>(null);
   const [draft, setDraft] = useState<string | null>(null);
   const [err, setErr] = useState('');
@@ -40,7 +43,14 @@ export function HttpSource({ objectId, file, vars, onRun, status, onSaved }: {
     return `${name} = ${val}\n${sourceLabel(t, v.source, v.from)}`;
   };
   const renderLine = (line: string) => {
-    if (/^\s*(#|\/\/)/.test(line)) return <span className="hs-comment">{line}</span>;
+    if (/^#{3,}/.test(line.trim())) return <span className="hljs-section">{line}</span>;
+    if (/^\s*(#|\/\/)/.test(line)) return <span className="hljs-comment">{line}</span>;
+    const at = /^(@[\w.-]+)(\s*=.*)$/.exec(line); if (at) return <><span className="hljs-attr">{at[1]}</span>{renderVars(at[2])}</>;
+    const m = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)(\s.*)$/.exec(line); if (m) return <><span className="hljs-keyword">{m[1]}</span>{renderVars(m[2])}</>;
+    const hd = /^([A-Za-z][\w-]*)(:.*)$/.exec(line); if (hd) return <><span className="hljs-attr">{hd[1]}</span>{renderVars(hd[2])}</>;
+    return renderVars(line);
+  };
+  const renderVars = (line: string) => {
     const parts = line.split(/(\{\{[^}]+\}\})/g);
     return <>{parts.map((p, i) => {
       if (!p.startsWith('{{')) return <Fragment key={i}>{p}</Fragment>;
@@ -53,9 +63,10 @@ export function HttpSource({ objectId, file, vars, onRun, status, onSaved }: {
   if (text === null) return <p className="gx-note">{t('git.loading')}</p>;
   const lines = (draft ?? text).split('\n');
   return (
-    <div className="hs">
+    <div className="hs gx" data-gx-theme={prefs.theme} style={{ ['--g-tab' as never]: prefs.tabSize }}>
       <div className="hs-bar">
         <span className="muted small grow">{draft !== null ? t('hw2.dirty') : t('hw2.fileHint')}</span>
+        <GitSettings compact />
         {draft === null ? <button className="btn sm" onClick={() => setDraft(text)}><Pencil size={14} />{t('hw2.edit')}</button> : (<>
           <button className="btn ghost sm" onClick={() => { setDraft(null); setErr(''); }}><X size={14} />{t('hw2.cancel')}</button>
           <button className="btn primary sm" disabled={busy || draft === text} onClick={() => void save()}><Save size={14} />{t('hw2.save')}</button></>)}

@@ -165,3 +165,4 @@ API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/obje
 - **Filter the answer**: a box over the answer takes a text (shows the matching lines) or a JSONPath (`$.items[*].id`, `$..id`, `$.list[?(@.price > 10)]`, `[-1]`).
 - **Export**: documentation in Markdown (with an example answer from the history) or a Postman v2.1 collection, for one file or all of them. API: `GET /api/objects/:id/http/docs?format=markdown|postman&file=`.
 - **Run with data…** (file view): paste or load a CSV (names in the first line) or a JSON array of objects. The file runs once per row, the columns are variables for that row (they win over everything and are forgotten at the end) and a table shows each request in each row. Up to 200 rows.
+- The **File** tab uses the same editor and theme picker as the code explorer (themes, visible whitespace, tab width — one setting for both), with highlighting for `.http` / `.rest` files.

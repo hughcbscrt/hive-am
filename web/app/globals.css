@@ -1103,3 +1103,11 @@ code, pre, .mono { font-family: var(--font-mono); font-size: 0.86em; }
 
 .ae-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; } .ae-row .input { flex: 1; min-width: 120px; } .ae-row .select { width: auto; }
 .hr-detail .seg button { white-space: nowrap; } .hr-detail .seg { flex-wrap: wrap; }
+
+/* the .http source takes the theme of the code explorer */
+.hs.gx { background: var(--g-bg); color: var(--g-fg); } .hs.gx .hs-bar { background: var(--surface); }
+.hs.gx .hs-view { background: var(--g-bg); color: var(--g-fg); } .hs.gx .hs-no { color: var(--g-gfg); background: var(--g-gbg); padding-left: 4px; } .hs.gx .hs-line:hover { background: color-mix(in srgb, var(--g-fg) 6%, transparent); }
+.hs.gx .hs-line.sep { background: color-mix(in srgb, var(--g-keyword) 10%, transparent); font-weight: 400; }
+.hs.gx .hs-var { background: color-mix(in srgb, var(--g-fg) 10%, transparent); } .hs.gx .hs-var.miss { background: color-mix(in srgb, var(--honey) 28%, transparent); }
+.hs.gx .se { padding: 0; } .hs.gx .ce { border: 0; border-radius: 0; flex: 1; } .hs.gx .se .ce { height: 100%; }
+.hs.gx .hs-bar { color: var(--ink); } .se-pop { color: var(--ink); }
