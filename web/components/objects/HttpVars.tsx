@@ -31,7 +31,6 @@ export function HttpVars({ object: o }: { object: ObjectView }) {
   return (
     <div className="oc">
       <div className="oc-form">
-        <p className="muted" style={{ marginTop: 0 }}>{t('vars.hint')}</p>
         <VarsEditor value={vars} onChange={setVars} fileEnvs={scan ? Object.keys(scan.fileVars).filter((e) => e !== '$shared') : []} fileVars={scan?.fileVars} used={scan?.used} fileDefined={scan?.fileDefined} setBy={scan?.setBy} />
         {err && <p className="gx-note err">{err}</p>}
       </div>

@@ -5,7 +5,8 @@ import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { parseRows } from '@/lib/dataRows';
 import type { HttpFile, HttpRun } from '@/lib/types';
-import { Field, Modal } from '@/components/ui';
+import { Modal } from '@/components/ui';
+import { HelpPopover } from '@/components/HelpPopover';
 
 interface Cell { status?: number; ok: boolean; tests: string; error?: string }
 const MAX_ROWS = 200;
@@ -56,11 +57,12 @@ export function BatchRun({ objectId, file, env, onClose, onDone }: { objectId: s
 
   return (
     <Modal title={t('hw2.batch.title', { file: file.relFile })} onClose={() => { stop.current = true; onClose(); }}>
-      <div className="stack" style={{ gap: 12, minWidth: 0 }}>
-        <p className="muted small" style={{ margin: 0 }}>{t('hw2.batch.hint')}</p>
-        <Field label={t('hw2.batch.data')} hint={t('hw2.batch.format')}>
-          <textarea className="input mono" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={'user,passwd\nana,s3cret\nluis,otra'} spellCheck={false} disabled={running} />
-        </Field>
+      <div className="stack">
+        <div className="field">
+          <div className="row gap-s"><label className="label" htmlFor="batch-data">{t('hw2.batch.data')}</label><HelpPopover size="sm" label={t('common.help')} title={t('hw2.help.how')}>{t('hw2.batch.hint')}</HelpPopover></div>
+          <textarea id="batch-data" className="input mono" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={'user,passwd\nana,s3cret\nluis,otra'} spellCheck={false} disabled={running} />
+          <span className="muted small">{t('hw2.batch.format')}</span>
+        </div>
         <div className="row gap-s wrap">
           <label className="btn sm"><Upload size={14} />{t('hw2.batch.file')}<input type="file" accept=".csv,.json,.txt,text/csv,application/json" hidden onChange={(e) => load(e.target.files?.[0])} /></label>
           <label className="row gap-s small"><input type="checkbox" checked={stopOnFail} onChange={(e) => setStopOnFail(e.target.checked)} />{t('hw2.batch.stopRow')}</label>

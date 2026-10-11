@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Plus, Save, X } from 'lucide-react';
-import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { ASSERT_OPS, getAssertions, setAssertions, type Assertion } from '@/lib/httpText';
+import { editHttpSource, readHttpSource } from '@/lib/httpFiles';
 import { useToast } from '@/components/ui';
+import { HelpPopover } from '@/components/HelpPopover';
 
 const KINDS: Assertion['k'][] = ['status', 'time', 'header', 'body', 'text'];
 const NO_VALUE = new Set(['exists', '2xx']);
@@ -22,7 +23,7 @@ export function AssertEditor({ objectId, file, line, onSaved }: { objectId: stri
   const [err, setErr] = useState('');
   useEffect(() => {
     let live = true;
-    api.get<{ content: string }>(`/objects/${objectId}/http/file?file=${encodeURIComponent(file)}`).then((r) => { if (!live) return; const a = getAssertions(r.content, line); setRows(a); setBase(JSON.stringify(a)); }).catch(() => undefined);
+    readHttpSource(objectId, file).then((content) => { if (!live) return; const a = getAssertions(content, line); setRows(a); setBase(JSON.stringify(a)); }).catch(() => undefined);
     return () => { live = false; };
   }, [objectId, file, line]);
   const dirty = JSON.stringify(rows) !== base;
@@ -30,18 +31,17 @@ export function AssertEditor({ objectId, file, line, onSaved }: { objectId: stri
   const save = async () => {
     setBusy(true); setErr('');
     try {
-      const cur = await api.get<{ content: string }>(`/objects/${objectId}/http/file?file=${encodeURIComponent(file)}`);
       const clean = rows.filter((a) => a.k === 'status' || a.k === 'time' || (a.k === 'header' || a.k === 'body' ? !!a.name?.trim() : true));
-      await api.put(`/objects/${objectId}/http/file`, { file, content: setAssertions(cur.content, line, clean) });
+      await editHttpSource(objectId, file, (content) => setAssertions(content, line, clean));
       setRows(clean); setBase(JSON.stringify(clean)); toast(t('hw2.saved')); onSaved();
     } catch (e) { setErr(e instanceof Error ? e.message : 'error'); } finally { setBusy(false); }
   };
   return (
     <div className="ae">
-      <div className="row gap-s"><b className="grow">{t('hw2.assert.title')}</b>
+      <div className="row gap-s"><b>{t('hw2.assert.title')}</b><HelpPopover size="sm" label={t('common.help')} title={t('hw2.help.how')}>{t('hw2.assert.hint')}</HelpPopover><span className="grow" />
         <button className="btn sm" onClick={() => setRows((r) => [...r, { k: 'status', op: '2xx' }])}><Plus size={13} />{t('hw2.assert.add')}</button>
         <button className="btn primary sm" disabled={!dirty || busy} onClick={() => void save()}><Save size={13} />{t('hw2.assert.save')}</button></div>
-      <p className="muted small" style={{ margin: '4px 0 8px' }}>{t('hw2.assert.hint')}</p>
+      <div style={{ height: 8 }} />
       {rows.map((a, i) => (
         <div key={i} className="ae-row">
           <select className="select" value={a.k} onChange={(e) => { const k = e.target.value as Assertion['k']; set(i, { k, op: ASSERT_OPS[k][0], name: undefined, v: '' }); }} aria-label={t('hw2.assert.kind')}>{KINDS.map((k) => <option key={k} value={k}>{t(`hw2.assert.k.${k}`)}</option>)}</select>

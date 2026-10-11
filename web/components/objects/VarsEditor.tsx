@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { Check, Eye, EyeOff, Info, Lock, Plus, Trash2, X } from 'lucide-react';
+import { Check, Eye, EyeOff, Lock, Plus, Trash2, X } from 'lucide-react';
+import { HelpPopover } from '@/components/HelpPopover';
 import { useI18n } from '@/lib/i18n/index';
 import type { HttpVariable } from '@/lib/types';
 import { Suggest } from './Suggest';
@@ -25,7 +26,6 @@ export function VarsEditor({ value, onChange, fileEnvs = [], fileVars = {}, used
   const [env, setEnv] = useState(() => names.find((n) => n !== ALL && Object.keys(value[n] ?? {}).length > 0) ?? names[0]);
   const [adding, setAdding] = useState('');
   const [peek, setPeek] = useState<Record<string, boolean>>({});
-  const [help, setHelp] = useState(true);
   const cur = value[env] ?? {};
   const fromFile = new Set([...(env !== ALL ? fileVars[ALL] ?? [] : []), ...(fileVars[env] ?? [])]);
 
@@ -48,8 +48,8 @@ export function VarsEditor({ value, onChange, fileEnvs = [], fileVars = {}, used
 
   return (
     <div className="vars">
-      <button type="button" className="vars-how-btn" aria-expanded={help} onClick={() => setHelp((h) => !h)}><Info size={14} />{t('vars.how.title')}</button>
-      {help && <div className="vars-how"><p>{t('vars.how.1')}</p><p>{t('vars.how.2')}</p><p className="muted small">{t('vars.note')}</p></div>}
+      <div className="row gap-s"><b>{t('ow.tab.vars')}</b>
+        <HelpPopover size="sm" label={t('common.help')} title={t('vars.how.title')}><p>{t('vars.hint')}</p><p>{t('vars.how.1')}</p><p>{t('vars.how.2')}</p><p>{t('vars.note')}</p></HelpPopover></div>
 
       <div className="vars-envs" role="tablist">
         {names.map((n) => (

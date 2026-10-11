@@ -1,7 +1,8 @@
 'use client';
+import { TerminalButton } from '@/components/dock/TerminalButton';
 import { useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, FileText, Pencil, Play, RotateCw, Square, SquareTerminal, UserPlus } from 'lucide-react';
+import { ExternalLink, FileText, Pencil, Play, RotateCw, Square, UserPlus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { ago, shortPath } from '@/lib/meta';
@@ -80,7 +81,7 @@ export function ObjectPanel({ object: o, onCreateManager }: { object: ObjectView
           </div>
         )}
         <div className="row gap-s wrap">
-          {canShell && <button className="btn sm" onClick={() => void dock.openTerminal({ objectId: o.id })}><SquareTerminal size={14} />{o.kind === 'server' ? t('dock.here') : t('dock.shell')}</button>}
+          {canShell && <TerminalButton spec={{ objectId: o.id }} label={o.kind === 'server' ? t('dock.here') : t('dock.shell')} />}
           <button className="btn sm" onClick={() => dock.openLogs(o.id, o.name)}><FileText size={14} />{t('dock.logs')}</button>
         </div>
         <div><div className="eyebrow" style={{ marginBottom: 6 }}>{t('obj.logs')}</div><LogView id={o.id} /></div>

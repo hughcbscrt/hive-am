@@ -1,11 +1,10 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Play, RotateCw, Square, SquareTerminal } from 'lucide-react';
+import { ArrowLeft, Play, RotateCw, Square } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
-import { useDock } from '@/lib/dock';
 import type { ClusterConfig, DockerConfig, ObjectView } from '@/lib/types';
 import { useToast } from '@/components/ui';
 import { KIND, STATUS_TONE, detailText } from './meta';
@@ -14,6 +13,7 @@ import { ObjectSwitcher } from './ObjectSwitcher';
 import { ObjectSummary } from './ObjectSummary';
 import { ObjectConfig } from './ObjectConfig';
 import { LogPane } from './LogPane';
+import { TerminalButton } from '@/components/dock/TerminalButton';
 import { HttpWorkspace } from './HttpWorkspace';
 import { HttpVars } from './HttpVars';
 
@@ -44,7 +44,6 @@ export function ObjectWorkspace({ id }: { id?: string }) {
 function Screen({ object: o }: { object: ObjectView }) {
   const { t } = useI18n();
   const toast = useToast();
-  const dock = useDock();
   const tabs = tabsOf(o);
   const [tab, setTab] = useState<Tab>(tabs[0]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -81,7 +80,7 @@ function Screen({ object: o }: { object: ObjectView }) {
           <button className="btn sm" disabled={!!busy || (!live && st !== 'error')} onClick={() => void act('stop')}><Square size={14} />{t(cluster ? 'obj.act.stopAll' : 'obj.act.stop')}</button>
           <button className="btn sm" disabled={!!busy} onClick={() => void act('restart')}><RotateCw size={14} />{t(cluster ? 'obj.act.restartAll' : 'obj.act.restart')}</button>
         </>)}
-        {canShell && <button className="btn sm" onClick={() => void dock.openTerminal({ objectId: o.id })} aria-label={o.kind === 'server' ? t('dock.here') : t('dock.shell')} title={o.kind === 'server' ? t('dock.here') : t('dock.shell')}><SquareTerminal size={14} /></button>}
+        {canShell && <TerminalButton spec={{ objectId: o.id }} title={o.kind === 'server' ? t('dock.here') : t('dock.shell')} />}
       </header>
       <div className="tabs ow-tabs" role="tablist">
         {tabs.map((x) => <button key={x} className="tab" role="tab" aria-selected={tab === x} onClick={() => setTab(x)}>{t(`ow.tab.${x}`)}</button>)}

@@ -37,10 +37,10 @@ export function TerminalDock() {
             </div>
           ))}
         </div>
-        {d.enabled && <button className="btn ghost icon sm" onClick={() => void d.openTerminal(lastCwd ? { cwd: lastCwd } : {})} aria-label={t('dock.new')} title={t('dock.new')}><Plus size={16} /></button>}
+        {d.enabled && <button className="btn ghost icon sm" onClick={() => void d.openTerminal(lastCwd ? { cwd: lastCwd } : {})} aria-label={t('dock.new')} title={t('dock.new')}><Plus size={15} /></button>}
         {d.enabled && <button className="btn ghost icon sm" onClick={() => setPicking(lastCwd ?? '')} aria-label={t('dock.inFolder')} title={t('dock.inFolder')}><FolderOpen size={15} /></button>}
         <span className="grow" />
-        <button className="btn ghost icon sm" onClick={() => d.setOpen(false)} aria-label={t('dock.hide')} title={`${t('dock.hide')} (Ctrl+\`)`}><ChevronDown size={16} /></button>
+        <button className="btn ghost icon sm" onClick={() => d.setOpen(false)} aria-label={t('dock.hide')} title={`${t('dock.hide')} (Ctrl+\`)`}><ChevronDown size={15} /></button>
       </div>
       <div className="dock-body">
         {d.error && <p className="gx-note err" style={{ margin: 0, padding: '10px 14px' }}>{d.error}</p>}

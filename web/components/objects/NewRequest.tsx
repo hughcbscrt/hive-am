@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { api } from '@/lib/api';
+import { createHttpSource, editHttpSource } from '@/lib/httpFiles';
 import { useI18n } from '@/lib/i18n/index';
 import { appendRequest, parseCurl, requestBlock, type DraftRequest } from '@/lib/httpText';
 import type { HttpFile } from '@/lib/types';
@@ -31,14 +31,14 @@ export function NewRequest({ objectId, files, defaultFile, onClose, onCreated }:
     setBusy(true); setErr('');
     try {
       const d = draft();
-      if (target === NEW) { const name = newFile.trim(); await api.post(`/objects/${objectId}/http/file`, { file: name, content: `${requestBlock(d)}\n` }); onCreated(name); }
-      else { const cur = await api.get<{ content: string }>(`/objects/${objectId}/http/file?file=${encodeURIComponent(target)}`); await api.put(`/objects/${objectId}/http/file`, { file: target, content: appendRequest(cur.content, d) }); onCreated(target); }
+      if (target === NEW) { const name = newFile.trim(); await createHttpSource(objectId, name, `${requestBlock(d)}\n`); onCreated(name); }
+      else { await editHttpSource(objectId, target, (content) => appendRequest(content, d)); onCreated(target); }
     } catch (e) { setErr(e instanceof Error ? e.message : 'error'); } finally { setBusy(false); }
   };
 
   return (
     <Modal title={t('hw2.new.title')} onClose={onClose}>
-      <div className="stack" style={{ gap: 12 }}>
+      <div className="stack">
         <Segmented value={mode} onChange={setMode} options={[{ id: 'form', label: t('hw2.new.form') }, { id: 'curl', label: t('hw2.new.curl') }]} />
         {mode === 'curl' ? (<>
           <Field label={t('hw2.new.curl')} hint={t('hw2.new.curlHint')}><textarea className="input mono" rows={7} value={curl} onChange={(e) => setCurl(e.target.value)} placeholder={"curl -X POST 'https://…' -H 'Content-Type: application/json' -d '{…}'"} autoFocus /></Field>

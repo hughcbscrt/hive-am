@@ -33,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- Consistency pass on the objects screens: the help of each panel is now a help button (like the Colony screen) instead of text left on the page; the forms of the HTTP runner use the app’s font and spacing; the terminal buttons (agent, server, container) look like the buttons around them, through one shared component; the menus of “Copy as…” and “Export” share one `Menu`; and reading and saving `.http` files goes through one helper.
 - HTTP variables: the selected environment (env files, then hive-am’s) now wins over an `@name` line in the `.http` file; the value of the session still wins over everything.
 
 - Objects screens use the whole screen: the latest output of the Summary fills the height that is left, and Settings are cards that flow into several columns. States the server writes in English are shown in the interface's language.

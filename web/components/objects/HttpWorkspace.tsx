@@ -19,6 +19,7 @@ import { BatchRun } from './BatchRun';
 import { jsonPath } from '@/lib/jsonPath';
 import { AssertEditor } from './AssertEditor';
 import { AuthForm } from './AuthForm';
+import { HelpPopover } from '@/components/HelpPopover';
 
 const parseJson = (s: string): unknown | undefined => { try { return JSON.parse(s); } catch { return undefined; } };
 
@@ -150,7 +151,7 @@ export function HttpWorkspace({ object: o, onOpenVars, pane = 'requests', onGoRe
 
 const sessionBlock = (
           <div className="hw-session-body" style={{ padding: 16 }}>
-          <b>{t('hw.session')}</b>
+          <div className="row gap-s"><b>{t('hw.session')}</b><HelpPopover size="sm" label={t('common.help')} title={t('hw2.help.how')}>{t('hw.session.hint')}</HelpPopover></div>
 
             {kept.length === 0 && !adding && <p className="muted small" style={{ margin: 0 }}>{t('hw.session.empty')}</p>}
             {kept.map(([k, v]) => (
@@ -163,7 +164,6 @@ const sessionBlock = (
             ) : (
               <div className="row gap-s" style={{ marginTop: 6 }}><button className="btn sm" onClick={() => setAdding(true)}><Plus size={13} />{t('hw.session.add')}</button>
                 {kept.length > 0 && <button className="btn ghost sm" onClick={() => void forget()}><Trash2 size={13} />{t('hw.session.clear')}</button>}</div>)}
-            <p className="muted small" style={{ margin: '6px 0 0' }}>{t('hw.session.hint')}</p>
           </div>
   );
 
@@ -298,12 +298,13 @@ const sessionBlock = (
                 {sel.script && <><div className="eyebrow" style={{ margin: '12px 0 4px' }}>{t('hw.script')}</div><p className="muted small" style={{ margin: '0 0 6px' }}>{t('hw.script.hint')}</p><pre>{sel.script.trim()}</pre></>}
               </div>
             ) : tab === 'tests' ? (
-              <div className="hr-pre">
+              <div className="hr-form">
                 <AssertEditor objectId={o.id} file={fileOf.current.get(sel.id) ?? ''} line={sel.line} onSaved={load} />
-                <div className="eyebrow" style={{ margin: '14px 0 6px' }}>{t('hw.tests')}</div>
+                <div className="eyebrow" style={{ margin: '16px 0 6px' }}>{t('hw.tests')}</div><div className="hr-pre" style={{ padding: 0 }}>
                 {!res?.run ? <p className="muted">{t('http.noResponse')}</p> : testsOf(res).length === 0 && res.run.logs.length === 0 ? <p className="muted">{t('hw.tests.none')}</p> : (<>
                   {testsOf(res).map((x, i) => <div key={i} className={`hw-test ${x.passed ? 'ok' : 'err'}`}>{x.passed ? <Check size={14} /> : <X size={14} />}<b>{x.name}</b>{x.message && <span className="muted"> — {x.message}</span>}</div>)}
                   {res.run.logs.length > 0 && <><div className="eyebrow" style={{ margin: '12px 0 4px' }}>{t('hw.console')}</div><pre>{res.run.logs.join('\n')}</pre></>}</>)}
+                </div>
               </div>
             ) : !res ? <p className="gx-note">{t('http.noResponse')}</p> : res.error ? <div className="gx-banner err" style={{ margin: 16, whiteSpace: 'pre-wrap' }}>{res.error}</div> : tab === 'headers' ? (
               <div className="hr-pre">{res.run!.headers.map((h, i) => <div key={i}><b>{h.name}</b>: {h.value}</div>)}</div>
