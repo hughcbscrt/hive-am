@@ -4,18 +4,20 @@ import { RefreshCw } from 'lucide-react';
 import { Field, FolderPicker, PathPicker, Segmented } from '@/components/ui';
 import { useComposeServices, useDockerLists } from '@/lib/useDocker';
 import { Suggest } from './Suggest';
+import { TemplatePicker } from './TemplatePicker';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
 import type { ClusterConfig, DockerConfig, HttpConfig, HttpScan, ObjectKind, ObjectView, ServerConfig } from '@/lib/types';
 import { KIND, envToText, lines, textToEnv } from './meta';
 import { VarsEditor, type Vars } from './VarsEditor';
 
-type Mode = NonNullable<DockerConfig['mode']>;
+type Mode = NonNullable<DockerConfig['mode']> | 'template';
 export interface Draft {
   name: string; colony_id: string; kind: ObjectKind;
   cwd: string; start: string; stop: string; port: string; env: string;
   restart: string; maxRestarts: string; healthKind: string; healthTarget: string; healthInterval: string; healthRetries: string; healthRestart: boolean; stopTimeout: string; logMax: string;
   folder: string; defEnv: string; variables: Vars; members: string[];
+  template: string; tplValues: Record<string, string>;
   mode: Mode; image: string; ports: string; volumes: string; dockerRestart: string; command: string; file: string; project: string; services: string; container: string;
   memory: string; cpus: string; network: string;
 }
@@ -32,7 +34,8 @@ export const draftFrom = (o?: ObjectView, colony?: string, kind?: ObjectKind): D
     restart: s.restart ?? 'no', maxRestarts: n(s.maxRestarts), healthKind: s.health?.kind ?? '', healthTarget: s.health?.target ?? '', healthInterval: n(s.health?.intervalSec), healthRetries: n(s.health?.retries), healthRestart: !!s.health?.restartWhenUnhealthy,
     stopTimeout: n(o?.kind === 'server' ? s.stopTimeoutSec : d.stopTimeoutSec), logMax: n(o?.kind === 'server' ? s.logMaxMb : d.logMaxMb),
     folder: h.folder ?? '', defEnv: h.env ?? '', variables: (h.variables ?? {}) as Vars, members: c.members ?? [],
-    mode: d.mode ?? 'container', image: d.image ?? '', ports: (d.ports ?? []).join('\n'), volumes: (d.volumes ?? []).join('\n'), dockerRestart: d.restart ?? 'no', command: d.command ?? '',
+    template: '', tplValues: {},
+    mode: d.mode ?? (o ? 'container' : 'template'), image: d.image ?? '', ports: (d.ports ?? []).join('\n'), volumes: (d.volumes ?? []).join('\n'), dockerRestart: d.restart ?? 'no', command: d.command ?? '',
     file: d.file ?? '', project: d.project ?? '', services: (d.services ?? []).join(', '), container: d.container ?? '',
     memory: d.memory ?? '', cpus: n(d.cpus), network: d.network ?? '',
   };
@@ -51,6 +54,7 @@ export function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | C
       health: d.healthKind && d.healthTarget.trim() ? { kind: d.healthKind as 'http', target: d.healthTarget.trim(), intervalSec: num(d.healthInterval), retries: num(d.healthRetries), restartWhenUnhealthy: d.healthRestart || undefined } : undefined,
     };
   }
+  if (d.mode === 'template') return { mode: 'compose' };   // creating from a template goes through its own call (see ObjectEditor)
   if (d.mode === 'existing') return { mode: 'existing', container: d.container.trim(), stopTimeoutSec: num(d.stopTimeout) };
   if (d.mode === 'compose') return { mode: 'compose', file: d.file.trim(), project: d.project.trim() || undefined, services: d.services.split(',').map((x) => x.trim()).filter(Boolean), stopTimeoutSec: num(d.stopTimeout) };
   return {
@@ -177,8 +181,15 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error }: {
         </Card>
       </>) : (<>
         <Card title={t('obj.f.mode')}>
-          <Segmented value={d.mode} onChange={(v) => set('mode', v)} options={[{ id: 'container', label: t('obj.mode.container') }, { id: 'compose', label: t('obj.mode.compose') }, { id: 'existing', label: t('obj.mode.existing') }]} />
+          <Segmented value={d.mode} onChange={(v) => set('mode', v)} options={[...(showKind ? [{ id: 'template' as const, label: t('obj.mode.template') }] : []), { id: 'container', label: t('obj.mode.container') }, { id: 'compose', label: t('obj.mode.compose') }, { id: 'existing', label: t('obj.mode.existing') }]} />
         </Card>
+        {d.mode === 'template' && (
+          <Card title={t('obj.mode.template')} hint={t('tpl.hint')}>
+            <TemplatePicker template={d.template} values={d.tplValues}
+              onPick={(x) => setD((p) => ({ ...p, template: x.id, tplValues: Object.fromEntries(x.fields.map((f) => [f.key, f.default])), name: p.name.trim() ? p.name : x.name }))}
+              onValue={(k, v) => setD((p) => ({ ...p, tplValues: { ...p.tplValues, [k]: v } }))} />
+          </Card>
+        )}
         {d.mode === 'container' && (<>
           <Card title={t('of.image')}>
             <Field label={t('obj.f.image')}>

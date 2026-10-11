@@ -1,4 +1,8 @@
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { DATA_DIR } from '../db.js';
 import { bus } from '../runtime.js';
+import { renderTemplate, listTemplates } from './templates.js';
 import { composeServiceAction, inspectDocker, recreateDocker, type DockerAction, dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
 import { recordRun, listHistory, clearHistory } from './http-history.js';
 import { exportCollection, parseHttpFile, createHttpFile, exportHttp, type ExportFormat, describeHttp, dropSession, inspectHttp, readHttpFile, runHttp, scanHttp, writeHttpFile, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
@@ -138,6 +142,23 @@ export async function objectInspect(id: string, service?: string) {
   const o = get(id);
   if (o.kind !== 'docker') throw new ObjectError('Only a Docker object can be inspected');
   return inspectDocker(o.id, o.config as DockerConfig, service);
+}
+
+export { listTemplates };
+
+/** Writes the compose file of a template under the data folder and makes it a Docker object (it is not started: the first run may pull images). */
+export function createFromTemplate(p: { template: unknown; name: unknown; values?: unknown; colony_id?: unknown }): ObjectView {
+  const name = String(p.name ?? '').trim();
+  if (!name) throw new ObjectError('The name is required');
+  const compose = renderTemplate(String(p.template ?? ''), (p.values && typeof p.values === 'object' ? p.values : {}) as Record<string, unknown>);
+  const slug = name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || String(p.template);
+  const dir = join(DATA_DIR, 'stacks', slug);
+  if (existsSync(dir)) throw new ObjectError(`There is already a stack called "${slug}"`);
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, 'docker-compose.yml');
+  writeFileSync(file, compose, { encoding: 'utf8', flag: 'wx' });
+  try { return createObject({ name, kind: 'docker', colony_id: (p.colony_id as string) || null, config: { mode: 'compose', file, project: `hive-${slug}` } }); }
+  catch (e) { rmSync(dir, { recursive: true, force: true }); throw e; }
 }
 
 /** One service of a compose project (start, stop, restart), without touching the others. */
