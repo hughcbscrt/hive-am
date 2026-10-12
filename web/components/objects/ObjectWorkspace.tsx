@@ -35,7 +35,9 @@ export function ObjectWorkspace({ id }: { id?: string }) {
   return (
     <div className={`ws ${collapsed ? 'sw-collapsed' : ''}`}>
       <ObjectSwitcher activeId={id} collapsed={collapsed} onToggle={toggle} />
-      {!id ? (
+      {!id && !ready ? (
+        <section className="ws-chat" />
+      ) : !id ? (
         <section className="ws-chat"><div className="empty" style={{ margin: 40 }}><h3>{all.length ? t('ow.pick') : t('ow.empty.title')}</h3>{!all.length && <p>{t('ow.empty.body')}</p>}</div></section>
       ) : !o ? (
         <section className="ws-chat"><div className="empty" style={{ margin: 40 }}>{ready ? <h3>{t('ow.gone')}</h3> : <p>{t('git.loading')}</p>}</div></section>
