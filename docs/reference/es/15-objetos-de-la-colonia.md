@@ -144,7 +144,7 @@ Todo campo que guarda una ruta usa el mismo selector (`PathPicker` en `web/compo
 
 ## 15.8 Lo que falta
 
-Las terminales (un panel inferior). Los objetos Docker no se pueden crear en un host Docker remoto y PM2 no está integrado (un objeto servidor mantiene su propio proceso).
+Los objetos Docker no se pueden crear en un host Docker remoto y PM2 no está integrado: un objeto servidor ejecuta su comando en su propio grupo de procesos y sobrevive a un reinicio de hive-am (ver 15.2), pero el supervisor de hive-am (reinicios automáticos, chequeos de salud) solo funciona mientras hive-am está corriendo.
 
 ## 15.9 Ver los valores
 
