@@ -14,7 +14,7 @@ import { HttpSource } from './HttpSource';
 import { CopyAs } from './CopyAs';
 import { NewRequest } from './NewRequest';
 import { RunDiff } from './RunDiff';
-import { ExportMenu } from './ExportMenu';
+import { FileMenu } from './FileMenu';
 import { BatchRun } from './BatchRun';
 import { jsonPath } from '@/lib/jsonPath';
 import { AssertEditor } from './AssertEditor';
@@ -332,11 +332,13 @@ const sessionBlock = (
           </div>
         </>) : picked ? (
           <div className="hw-file-view">
-            <div className="row gap-s wrap"><File size={18} className="muted" /><h3 className="mono grow" style={{ fontSize: 15, overflowWrap: 'anywhere', minWidth: 140 }}>{picked.relFile}</h3>
-              <label className="row gap-s small"><input type="checkbox" checked={stopOnFail} onChange={(e) => setStopOnFail(e.target.checked)} />{t('hw.stopOnFail')}</label>
-              <ExportMenu objectId={o.id} file={picked.relFile} />
-              <button className="btn sm" disabled={!!busy} onClick={() => setBatch(true)}><Table2 size={14} />{t('hw2.batch.open')}</button>
-              <button className="btn primary sm" disabled={!!busy} onClick={() => void runFile(picked)}><ListChecks size={14} />{t('http.runFile')}</button></div>
+            <div className="hw-fhead">
+              <File size={20} className="muted" />
+              <div className="grow" style={{ minWidth: 0 }}><h3 className="mono" title={picked.relFile}>{picked.relFile}</h3>
+                <p className="muted small" style={{ margin: 0 }}>{t('hw.fileInfo', { count: picked.requests.length })}{fileInsp ? ` · ${t('hw2.vars.count', { count: fileInsp.vars.length })}` : ''}</p></div>
+              <button className="btn primary" disabled={!!busy} onClick={() => void runFile(picked)}><ListChecks size={15} />{t('http.runFile')}</button>
+              <FileMenu objectId={o.id} file={picked.relFile} onBatch={() => setBatch(true)} stopOnFail={stopOnFail} onStopOnFail={setStopOnFail} />
+            </div>
             <Segmented value={fileTab} onChange={setFileTab} options={[{ id: 'requests', label: `${t('hw2.tab.requests')} · ${picked.requests.length}` }, { id: 'vars', label: `${t('hw2.tab.vars')}${fileInsp?.vars.length ? ` · ${fileInsp.vars.length}` : ''}` }, { id: 'source', label: t('hw2.tab.source') }]} />
             {note && <div className="gx-banner">{note}</div>}
             {fileTab === 'vars' ? (fileInsp ? <VarsTable vars={fileInsp.vars} onSet={setVar} onForget={(n) => void forget(n)} onRun={runNamed} /> : <p className="muted">{t('git.loading')}</p>)

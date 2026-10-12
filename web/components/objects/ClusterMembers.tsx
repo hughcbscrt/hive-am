@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { Fragment, useEffect, useState } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Play, Plus, RotateCw, Square, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, ExternalLink, MoreHorizontal, Play, Plus, RotateCw, Square, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
@@ -9,6 +9,8 @@ import { ago, shortPath } from '@/lib/meta';
 import { fmtBytes } from '@/lib/format';
 import type { ClusterConfig, DockerConfig, ObjectStats, ObjectView, ServerConfig } from '@/lib/types';
 import { useToast } from '@/components/ui';
+import { Menu, MenuItem, MenuSep } from '@/components/Menu';
+import { useRouter } from 'next/navigation';
 import { KIND, detailText } from './meta';
 import { StatusDot } from './ObjectPanel';
 import { ServicesTable } from './ServicesTable';
@@ -46,6 +48,7 @@ export function ClusterMembers({ cluster }: { cluster: ObjectView }) {
   const { t } = useI18n();
   const { objects, refresh } = useHive();
   const toast = useToast();
+  const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const ids = (cluster.config as ClusterConfig).members;
@@ -89,10 +92,15 @@ export function ClusterMembers({ cluster }: { cluster: ObjectView }) {
                     <td className="num mono small">{st?.cpu != null ? `${st.cpu}%` : '—'}</td>
                     <td className="num mono small">{st?.memBytes != null ? fmtBytes(st.memBytes) : '—'}</td>
                     <td className="cm-act">
-                      <button className="btn ghost icon sm" disabled={!!busy || live} onClick={() => void act(m, 'start')} aria-label={t('obj.act.start')} title={t('obj.act.start')}><Play size={14} /></button>
-                      <button className="btn ghost icon sm" disabled={!!busy || (!live && m.state.status !== 'error')} onClick={() => void act(m, 'stop')} aria-label={t('obj.act.stop')} title={t('obj.act.stop')}><Square size={14} /></button>
+                      {live
+                        ? <button className="btn ghost icon sm" disabled={!!busy} onClick={() => void act(m, 'stop')} aria-label={t('obj.act.stop')} title={t('obj.act.stop')}><Square size={14} /></button>
+                        : <button className="btn ghost icon sm" disabled={!!busy} onClick={() => void act(m, 'start')} aria-label={t('obj.act.start')} title={t('obj.act.start')}><Play size={14} /></button>}
                       <button className="btn ghost icon sm" disabled={!!busy} onClick={() => void act(m, 'restart')} aria-label={t('obj.act.restart')} title={t('obj.act.restart')}><RotateCw size={14} /></button>
-                      <button className="btn ghost icon sm" disabled={!!busy} onClick={() => void saveMembers(ids.filter((x) => x !== m.id))} aria-label={t('cl.remove')} title={t('cl.remove')}><X size={14} /></button></td>
+                      <Menu label={t('svc.more')} icon={<MoreHorizontal size={15} />} iconOnly>{(close) => (<>
+                        <MenuItem icon={<ExternalLink size={15} />} onClick={() => { close(); router.push(`/objects/${m.id}`); }}>{t('cl.open')}</MenuItem>
+                        <MenuSep />
+                        <MenuItem icon={<X size={15} />} danger hint={t('cl.remove.hint')} disabled={!!busy} onClick={() => { close(); void saveMembers(ids.filter((x) => x !== m.id)); }}>{t('cl.remove')}</MenuItem>
+                      </>)}</Menu></td>
                   </tr>
                   {expanded && sv && <tr className="cm-sub"><td colSpan={7}><ServicesTable objectId={m.id} services={sv} onChanged={reload} /></td></tr>}
                 </Fragment>);

@@ -13,7 +13,7 @@ import { ObjectSwitcher } from './ObjectSwitcher';
 import { ObjectSummary } from './ObjectSummary';
 import { ObjectConfig } from './ObjectConfig';
 import { LogPane } from './LogPane';
-import { Menu, MenuItem } from '@/components/Menu';
+import { Menu, MenuItem, MenuSep } from '@/components/Menu';
 import { ServiceDetail } from './ServiceDetail';
 import { TerminalButton } from '@/components/dock/TerminalButton';
 import { HttpWorkspace } from './HttpWorkspace';
@@ -86,9 +86,9 @@ function Screen({ object: o }: { object: ObjectView }) {
         </>)}
         {o.kind === 'docker' && (o.config as DockerConfig).mode !== 'existing' && (
           <Menu label={t('svc.more')} icon={<MoreHorizontal size={14} />}>{(close) => (<>
-            {(o.config as DockerConfig).mode === 'container' && <MenuItem onClick={() => { close(); setInspecting(true); }}><span className="row gap-s"><Info size={14} />{t('svc.inspect')}</span></MenuItem>}
-            <MenuItem onClick={() => { close(); void act('recreate'); }}><span className="row gap-s" title={t('svc.recreate.hint')}><RefreshCcw size={14} />{t('obj.act.recreate')}</span></MenuItem>
-            {(o.config as DockerConfig).mode === 'compose' && <MenuItem onClick={() => { close(); void act('rebuild'); }}><span className="row gap-s" title={t('svc.rebuild.hint')}><Hammer size={14} />{t('obj.act.rebuild')}</span></MenuItem>}
+            {(o.config as DockerConfig).mode === 'container' && <><MenuItem icon={<Info size={15} />} onClick={() => { close(); setInspecting(true); }}>{t('svc.inspect')}</MenuItem><MenuSep /></>}
+            <MenuItem icon={<RefreshCcw size={15} />} danger hint={t('svc.recreate.hint')} onClick={() => { close(); void act('recreate'); }}>{t('obj.act.recreate')}</MenuItem>
+            {(o.config as DockerConfig).mode === 'compose' && <MenuItem icon={<Hammer size={15} />} hint={t('svc.rebuild.hint')} onClick={() => { close(); void act('rebuild'); }}>{t('obj.act.rebuild')}</MenuItem>}
           </>)}</Menu>
         )}
         {canShell && <TerminalButton spec={{ objectId: o.id }} title={o.kind === 'server' ? t('dock.here') : t('dock.shell')} />}

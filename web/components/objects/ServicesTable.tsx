@@ -7,7 +7,7 @@ import { fmtBytes } from '@/lib/format';
 import type { ServiceStat } from '@/lib/types';
 import { useDock } from '@/lib/dock';
 import { useToast } from '@/components/ui';
-import { Menu, MenuItem } from '@/components/Menu';
+import { Menu, MenuItem, MenuSep } from '@/components/Menu';
 import { ServiceDetail } from './ServiceDetail';
 import { StatusDot } from './ObjectPanel';
 
@@ -50,15 +50,17 @@ export function ServicesTable({ objectId, services, onLogs, onChanged }: { objec
             <td className="num mono small">{s.cpu !== null ? `${s.cpu}%` : '—'}</td>
             <td className="num mono small">{s.memBytes !== null ? fmtBytes(s.memBytes) : '—'}</td>
             <td className="cm-act">
-              <button className="btn ghost icon sm" disabled={!!busy || live} onClick={() => void act(s.name, 'start')} aria-label={t('obj.act.start')} title={t('obj.act.start')}><Play size={14} /></button>
-              <button className="btn ghost icon sm" disabled={!!busy || !live} onClick={() => void act(s.name, 'stop')} aria-label={t('obj.act.stop')} title={t('obj.act.stop')}><Square size={14} /></button>
+              {live
+                ? <button className="btn ghost icon sm" disabled={!!busy} onClick={() => void act(s.name, 'stop')} aria-label={t('obj.act.stop')} title={t('obj.act.stop')}><Square size={14} /></button>
+                : <button className="btn ghost icon sm" disabled={!!busy} onClick={() => void act(s.name, 'start')} aria-label={t('obj.act.start')} title={t('obj.act.start')}><Play size={14} /></button>}
               <button className="btn ghost icon sm" disabled={!!busy} onClick={() => void act(s.name, 'restart')} aria-label={t('obj.act.restart')} title={t('obj.act.restart')}><RotateCw size={14} /></button>
-              {onLogs && <button className="btn ghost icon sm" onClick={() => onLogs(s.name)} aria-label={t('svc.logs')} title={t('svc.logs')}><FileText size={14} /></button>}
-              <button className="btn ghost icon sm" disabled={!live} onClick={() => void dock.openTerminal({ objectId, service: s.name })} aria-label={t('svc.shell')} title={t('svc.shell')}><SquareTerminal size={14} /></button>
-              <Menu label={t('svc.more')} icon={<MoreHorizontal size={14} />} iconOnly>{(close) => (<>
-                <MenuItem onClick={() => { close(); setDetail(s.name); }}><span className="row gap-s"><Info size={14} />{t('svc.inspect')}</span></MenuItem>
-                <MenuItem onClick={() => { close(); void act(s.name, 'recreate'); }}><span className="row gap-s" title={t('svc.recreate.hint')}><RefreshCcw size={14} />{t('svc.recreate')}</span></MenuItem>
-                <MenuItem onClick={() => { close(); void act(s.name, 'rebuild'); }}><span className="row gap-s" title={t('svc.rebuild.hint')}><Hammer size={14} />{t('svc.rebuild')}</span></MenuItem>
+              <Menu label={t('svc.more')} icon={<MoreHorizontal size={15} />} iconOnly>{(close) => (<>
+                {onLogs && <MenuItem icon={<FileText size={15} />} onClick={() => { close(); onLogs(s.name); }}>{t('svc.logs.short')}</MenuItem>}
+                <MenuItem icon={<SquareTerminal size={15} />} disabled={!live} hint={live ? undefined : t('svc.needsRunning')} onClick={() => { close(); void dock.openTerminal({ objectId, service: s.name }); }}>{t('svc.shell')}</MenuItem>
+                <MenuItem icon={<Info size={15} />} onClick={() => { close(); setDetail(s.name); }}>{t('svc.inspect')}</MenuItem>
+                <MenuSep />
+                <MenuItem icon={<RefreshCcw size={15} />} danger hint={t('svc.recreate.hint')} onClick={() => { close(); void act(s.name, 'recreate'); }}>{t('svc.recreate')}</MenuItem>
+                <MenuItem icon={<Hammer size={15} />} hint={t('svc.rebuild.hint')} onClick={() => { close(); void act(s.name, 'rebuild'); }}>{t('svc.rebuild')}</MenuItem>
               </>)}</Menu>
             </td>
           </tr>);

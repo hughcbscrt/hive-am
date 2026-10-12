@@ -2,10 +2,14 @@
 import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { api } from '@/lib/api';
-import { useI18n } from '@/lib/i18n/index';
-import { Menu, MenuItem } from '@/components/Menu';
+import { useI18n, type MessageKey } from '@/lib/i18n/index';
+import { Menu, MenuCheck, MenuGroup, MenuItem, MenuSep } from '@/components/Menu';
 
-const FORMATS = [['curl', 'cURL'], ['wget', 'wget'], ['httpie', 'HTTPie'], ['powershell', 'PowerShell'], ['fetch', 'JavaScript (fetch)'], ['axios', 'Node (axios)'], ['python', 'Python (requests)'], ['go', 'Go'], ['php', 'PHP (cURL)'], ['java', 'Java (HttpClient)'], ['csharp', 'C# (HttpClient)'], ['ruby', 'Ruby (net/http)'], ['rust', 'Rust (reqwest)'], ['http', 'HTTP']] as const;
+const GROUPS: { key: string; formats: readonly (readonly [string, string])[] }[] = [
+  { key: 'tools', formats: [['curl', 'cURL'], ['wget', 'wget'], ['httpie', 'HTTPie'], ['powershell', 'PowerShell']] },
+  { key: 'langs', formats: [['fetch', 'JavaScript (fetch)'], ['axios', 'Node (axios)'], ['python', 'Python (requests)'], ['go', 'Go'], ['php', 'PHP (cURL)'], ['java', 'Java (HttpClient)'], ['csharp', 'C# (HttpClient)'], ['ruby', 'Ruby (net/http)'], ['rust', 'Rust (reqwest)']] },
+  { key: 'raw', formats: [['http', 'HTTP']] },
+];
 
 /** "Copy as…": the request, with the values in effect now, as cURL, fetch, Python, Go, Java… */
 export function CopyAs({ objectId, file, index, env }: { objectId: string; file: string; index: number; env: string }) {
@@ -25,8 +29,10 @@ export function CopyAs({ objectId, file, index, env }: { objectId: string; file:
   };
   return (
     <Menu label={t('hw2.copyAs')} icon={<Copy size={14} />}>{() => (<>
-      <div className="menu-list">{FORMATS.map(([id, label]) => <MenuItem key={id} onClick={() => void copy(id)}>{label}{done === id && <Check size={14} />}</MenuItem>)}</div>
-      <label className="menu-opt small"><input type="checkbox" checked={redact} onChange={(e) => setRedact(e.target.checked)} />{t('hw2.copyAs.redact')}</label>
+      <MenuCheck checked={redact} onChange={setRedact} hint={t('hw2.copyAs.redact.hint')}>{t('hw2.copyAs.redact')}</MenuCheck>
+      <MenuSep />
+      {GROUPS.map((g) => (
+        <MenuGroup key={g.key} label={t(`hw2.copyAs.g.${g.key}` as MessageKey)}>{g.formats.map(([id, label]) => <MenuItem key={id} icon={done === id ? <Check size={15} /> : undefined} onClick={() => void copy(id)}>{label}</MenuItem>)}</MenuGroup>))}
       {note && <p className="muted small menu-note">{note}</p>}
     </>)}</Menu>
   );
