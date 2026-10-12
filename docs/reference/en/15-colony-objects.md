@@ -1,8 +1,8 @@
-# 15. Colony objects
+# 15. Colony resources
 
-## 15.0 The Objects screen
+## 15.0 The Resources screen
 
-**Objects** in the left rail opens a screen laid out like an agent's: the list of objects at the left (grouped by colony, with a state dot, searchable, collapsible to icons; **+** creates one) and the selected object on the right, with a header (state and Start / Stop / Restart, *Terminal here* where it applies) and tabs. On the Colony map, selecting a hexagon still shows the small card, now with **Open panel** (and the pencil goes to its settings).
+**Resources** in the left rail opens a screen laid out like an agent's: the list of resources at the left (grouped by colony, with a state dot, searchable, collapsible to icons; **+** creates one) and the selected resource on the right, with a header (state and Start / Stop / Restart, *Terminal here* where it applies) and tabs. On the Colony map, selecting a hexagon still shows the small card, now with **Open panel** (and the pencil goes to its settings).
 
 | Kind | Tabs |
 |---|---|
@@ -13,12 +13,12 @@
 - **Layout:** each tab uses the whole width and height of the screen: the latest output of the Summary grows to fill what is left, Logs fill the screen, and Settings flow into as many columns of cards as fit (*General*, *How it runs*, *Environment*, *Keeping it healthy*… one column in the creation drawer). State details the server writes in English ("2/3 running", "exited with code 3") are shown in the language of the interface.
 - **Summary:** the state (and for how long it has been running), what it uses (CPU and memory with a short history, processes, network and disk for Docker), its details (command, folder, port, restart policy, health check; or image, ports, network, restart count, limits) and its latest output. A compose project lists its services; a cluster lists its members (15.2c).
 - **Logs:** the whole screen. Search with highlighting (or *only matches*), error and warning lines coloured, follow the end (it stops following when you scroll up), wrap lines, text size, pause, clear the view, copy and download. It keeps the last 800 000 characters and draws the last 4 000 lines. For a cluster, each member has its colour and a chip to hide it.
-- **Settings:** the same fields as when creating, in place, with a bar that says whether something is unsaved (*Save*, *Discard*, and *Save and restart* when it is running) and *Delete*. Changes to a running object apply when it is restarted.
+- **Settings:** the same fields as when creating, in place, with a bar that says whether something is unsaved (*Save*, *Discard*, and *Save and restart* when it is running) and *Delete*. Changes to a running resource apply when it is restarted.
 
 
-Besides agents, a colony can hold **objects**: things hive-am keeps running or watches next to them. Four kinds exist: **servers**, **Docker**, **HTTP requests** and **clusters** (called *boss* in the first version: the API still accepts that name, and existing ones were converted). They appear on the Colony map as hexagons (with the kind's colour and a state dot), inside the colony they belong to or free. Click one to see its state, start / stop / restart it and read its logs; the pencil edits it.
+Besides agents, a colony can hold **resources**: things hive-am keeps running or watches next to them. Four kinds exist: **servers**, **Docker**, **HTTP requests** and **clusters** (called *boss* in the first version: the API still accepts that name, and existing ones were converted). They appear on the Colony map as hexagons (with the kind's colour and a state dot), inside the colony they belong to or free. Click one to see its state, start / stop / restart it and read its logs; the pencil edits it.
 
-Create one with **New object** (top right of the Colony screen): choose the kind, a name, the colony, and the settings below.
+Create one with **New resource** (top right of the Colony screen): choose the kind, a name, the colony, and the settings below.
 
 ## 15.1 Server
 
@@ -29,7 +29,7 @@ A shell command that hive-am keeps running. Besides the fields below, **Keeping 
 | Folder | Absolute path where the command runs. |
 | Start command | Run through `sh -c` (e.g. `npm run dev`, `java -jar app.jar`). |
 | Stop command (optional) | Run first when stopping (e.g. `docker compose down`). The process is always stopped afterwards. |
-| Port (optional) | The object is **Starting** until something listens on `127.0.0.1:<port>`, then **Running**. A process that is alive for two minutes without opening it is shown as an error. |
+| Port (optional) | The resource is **Starting** until something listens on `127.0.0.1:<port>`, then **Running**. A process that is alive for two minutes without opening it is shown as an error. |
 | Environment variables | `NAME=value`, one per line, added to hive-am's own. |
 
 How it runs: the command starts in its **own process group** with its output going straight to `~/.hive-am/objects/<id>.log`, and the pid and start time are saved in `<id>.json`. So:
@@ -37,7 +37,7 @@ How it runs: the command starts in its **own process group** with its output goi
 - The server **keeps running if hive-am restarts**; afterwards it is found again by that pid and start time (a pid the system reuses for something else is not mistaken for it).
 - **Stop** signals the whole group (`sh`, `npm`, `node`…): `SIGTERM` first, and `SIGKILL` if it has not ended after 8 s (`HIVE_AM_OBJECT_STOP_MS`).
 - States: **Stopped** (never started, stopped by you, or ended with code 0), **Error** (ended with a non-zero code or by a signal; the detail says which), **Starting**, **Running**.
-- A log over 5 MB is set aside as `.log.1` when the object starts.
+- A log over 5 MB is set aside as `.log.1` when the resource starts.
 
 ## 15.1b Keeping a server healthy
 
@@ -54,7 +54,7 @@ The restarts, the health checks and the log trimming happen where the state is c
 
 Needs the `docker` command. Every value is passed as a separate argument (no shell), and names and mappings are validated (an image or volume that looks like an option is refused).
 
-| Mode | What hive-am does | When the object is deleted |
+| Mode | What hive-am does | When the resource is deleted |
 |---|---|---|
 | **Create a container** (image, ports `8080:80`, volumes, variables, restart policy, command) | `docker run -d --name hive-am-<id> --label hive-am.object=<id>`, then `start` / `stop` / `restart` | The container is removed. |
 | **Compose project** (file, project name, services) | `docker compose -f file [-p project] up -d / stop / restart` | The project is stopped, **not** removed. |
@@ -69,11 +69,11 @@ State comes from `docker inspect` (running, restarting, exited with a code, unhe
 A folder of `.http` / `.rest` files in the format of the IntelliJ and VS Code REST clients. Open its screen (see 15.0): the **Requests** tab has the `.http` files on the left (up to 300 files, 4 levels deep) with their requests under each; click a file to see its requests and run it whole, or a request to see it and its answer on the right. State: **Ready** (the folder is there; the detail says how many requests) or **Error**.
 
 - **Format:** `###` separates requests (the text after it is the name, or `# @name x`); `@name = value` defines a variable; the request line is `METHOD URL [HTTP/1.1]`; lines that start with `?` or `&` continue the URL; headers follow until the first blank line; the rest is the body (`< ./file.json` inserts a file next to the `.http`, inside the folder); `> {% … %}` response handlers are ignored.
-- **Variables:** `{{name}}` takes its value from the selected environment (the env files over the object's own), and if the environment has none, from the file variables (`@name = value`), and `{{$uuid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}` and `{{$randomInt}}` are generated. Environments come from `http-client.env.json` (and `http-client.private.env.json` over it, for secrets) in the folder of the file or any folder above it; `$shared` applies to all. The object can have a default environment.
+- **Variables:** `{{name}}` takes its value from the selected environment (the env files over the resource's own), and if the environment has none, from the file variables (`@name = value`), and `{{$uuid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}` and `{{$randomInt}}` are generated. Environments come from `http-client.env.json` (and `http-client.private.env.json` over it, for secrets) in the folder of the file or any folder above it; `$shared` applies to all. The resource can have a default environment.
 - **Running:** the server sends the request with `fetch` (60 s timeout, redirects followed, answers over 2 MB are cut, binary answers are described and not printed). A request with a value that cannot be resolved is **not sent**: the runner names the missing `{{variables}}` before you press Run. **Ctrl+Enter** runs the selected request; the list icon of a file runs all of its requests in order, each keeps its last answer, and a dot shows how it went. The answer is shown as Response (JSON formatted), Headers and Request; the echoed request hides the values of `Authorization`, `Cookie`, API-key headers.
-- **Limits:** only `http` / `https` URLs; nothing outside the folder is read (a path that leaves it, even through a link, is refused); running a request is only accepted from the local app. HTTP objects have no logs and cannot be started or stopped.
+- **Limits:** only `http` / `https` URLs; nothing outside the folder is read (a path that leaves it, even through a link, is refused); running a request is only accepted from the local app. HTTP resources have no logs and cannot be started or stopped.
 
-**Variables of the object.** Besides the env files, an HTTP object has its own **Variables** (its tab, and a section of the creation form): a page that explains how they work, **All environments** (values that apply whichever environment you pick) and one tab per environment (`dev`, `qa`…, which only apply when that environment is picked; when a value is missing there, the one from *All environments* is used), each with name / value rows. A panel lists **the variables your files use** (read from the `{{…}}` of every request) and, for each, whether it is defined here, in *All environments*, by an env file, by an `@name` line, or **missing**: click a missing one to add it. The name field suggests those names while you type. They are for when there is no `http-client.env.json`, or it lacks something; **an env file wins** when it defines the same variable (the row says so). A variable can be marked **secret**: it is hidden once saved (it shows as *saved*), the API never returns its value, and saving it empty keeps the stored one; type a new value to replace it. Secrets are stored in hive-am's database on this machine, **without encryption**, like the Telegram bot token.
+**Variables of the resource.** Besides the env files, an HTTP resource has its own **Variables** (its tab, and a section of the creation form): a page that explains how they work, **All environments** (values that apply whichever environment you pick) and one tab per environment (`dev`, `qa`…, which only apply when that environment is picked; when a value is missing there, the one from *All environments* is used), each with name / value rows. A panel lists **the variables your files use** (read from the `{{…}}` of every request) and, for each, whether it is defined here, in *All environments*, by an env file, by an `@name` line, or **missing**: click a missing one to add it. The name field suggests those names while you type. They are for when there is no `http-client.env.json`, or it lacks something; **an env file wins** when it defines the same variable (the row says so). A variable can be marked **secret**: it is hidden once saved (it shows as *saved*), the API never returns its value, and saving it empty keeps the stored one; type a new value to replace it. Secrets are stored in hive-am's database on this machine, **without encryption**, like the Telegram bot token.
 
 ### Chaining requests: response handlers and the session
 
@@ -82,13 +82,13 @@ A request can keep values from its answer for the next ones, or check the answer
 - **Handlers** (`> {% … %}` after the body, or on one line): run after the answer. `client.global.set("token", response.body.token)` keeps a value (usable as `{{token}}` from then on); `client.global.get`, `clear(name)` and `clearAll()` read and forget; `client.test("name", function () { client.assert(response.status === 200, "message"); })` checks the answer (each test is shown as passed or failed, with its message); `client.log(...)` writes to the Console. `response.status`, `response.body` (the parsed JSON, or the text), `response.headers.valueOf("X-Name")` and `response.contentType.mimeType` are available. The Requests screen shows a key icon on requests that have a handler, a **Tests** tab (`2/3`), a *Kept: token* chip and a coloured dot in the list (red when the status is an error, a test failed or the handler could not run).
 - **References to answers:** a request with a name (`### login` or `# @name login`, one word) can be used by the next ones: `{{login.response.body.$.token}}` (or `.token`, `.items[0].id`), `{{login.response.headers.X-Session}}`, `{{login.response.status}}`, `{{login.response.body.*}}` (the whole text). A request that uses the answer of one that has not been run yet says so and offers to run it first.
 - **Order and sequence:** the list icon of a file runs its requests in order, so each one finds what the one before kept; *Stop at the first failure* ends the run at the first error, error status, failed test or handler that could not run.
-- **The session:** what handlers keep, and the last answer of each named request, live in memory per HTTP object (a **Session** panel at the bottom of the left column): look at the values, set one by hand, forget one or all. They end when hive-am stops. **They win** over environments, the object's variables and `@name` lines, because something set them on purpose and later. The Variables tab shows which variables a request's handler keeps (*kept by the answer of “login”*), so they do not count as missing.
+- **The session:** what handlers keep, and the last answer of each named request, live in memory per HTTP resource (a **Session** panel at the bottom of the left column): look at the values, set one by hand, forget one or all. They end when hive-am stops. **They win** over environments, the resource's variables and `@name` lines, because something set them on purpose and later. The Variables tab shows which variables a request's handler keeps (*kept by the answer of “login”*), so they do not count as missing.
 - **No JavaScript is executed.** The handler is read by a small parser and run by a small interpreter that knows only what such handlers need: values, `response`, `client`, `JSON.parse` / `stringify`, `Math.floor` / `round` / `min` / `max`, `String` / `Number` / `parseInt` / `parseFloat`, `var` / `let` / `const`, `if` / `else`, arrow functions and `function` expressions (for `map`, `filter`, `find`, `some`, `every` and for `client.test`), comparisons, `&&`, `||`, `??`, `? :`, `+` (numbers and text), template strings, and a short list of string methods (`includes`, `startsWith`, `endsWith`, `indexOf`, `toLowerCase`, `toUpperCase`, `trim`, `split`, `slice`, `substring`, `replace`) and array methods (`includes`, `indexOf`, `join`, `slice`, `map`, `filter`, `find`, `some`, `every`). There is no `require`, `process`, `fetch`, `eval`, `new`, loops, `try`, `await` or access to prototypes (`constructor`, `__proto__`…), and a handler may only do a limited amount of work, so a `.http` file from someone else cannot run code on your machine. A handler that uses something outside of that is **not run** and the answer says what is not supported (the request itself was already sent). A handler *file* (`> ./checks.js`) is not run either: write the handler inside the `.http` file.
 - **API:** `GET /api/objects/:id/http/session` (`{ globals, responses }`), `POST …/http/session` (`{ name, value }`), `DELETE …/http/session[?name=]`; the run answer adds `tests`, `logs`, `set`, `scriptError`, `scriptFile`.
 
 ## 15.2c Cluster
 
-Groups servers and Docker containers **of the same colony** (not other clusters, not HTTP objects). **Start all** starts the members in the order they are listed, skipping the ones already up; **Stop all** stops them in the opposite order; **Restart all** does both. One failing does not keep the others from being tried: the failures are reported together. Its state comes from its members: **Running** when all are, **Starting** while one is, **Error** when one failed or only some are up (the detail says which), **Stopped** when none is. Its logs are the logs of the members with `[name]` in front of each line (the cursor is the members' cursors together, so following returns only what is new). On the map it is joined to its members by dashed lines. Deleting a boss leaves its members as they are; deleting a member, or moving it to another colony, takes it out of the bosses.
+Groups servers and Docker containers **of the same colony** (not other clusters, not HTTP resources). **Start all** starts the members in the order they are listed, skipping the ones already up; **Stop all** stops them in the opposite order; **Restart all** does both. One failing does not keep the others from being tried: the failures are reported together. Its state comes from its members: **Running** when all are, **Starting** while one is, **Error** when one failed or only some are up (the detail says which), **Stopped** when none is. Its logs are the logs of the members with `[name]` in front of each line (the cursor is the members' cursors together, so following returns only what is new). On the map it is joined to its members by dashed lines. Deleting a boss leaves its members as they are; deleting a member, or moving it to another colony, takes it out of the bosses.
 
 ## 15.2d Suggestions from Docker and from the files
 
@@ -110,25 +110,25 @@ API: `GET /api/docker/containers`, `GET /api/docker/images`, `GET /api/docker/co
 
 | Route | What it does |
 |---|---|
-| `GET /api/objects` | All objects with their state. |
+| `GET /api/objects` | All resources with their state. |
 | `POST /api/objects` | `{ name, kind, colony_id?, config }` |
 | `PATCH /api/objects/:id` | `{ name?, colony_id?, config? }` (the kind cannot change). |
 | `DELETE /api/objects/:id` | Deletes it (see 15.2 for what happens to the container). |
 | `POST /api/objects/:id/action` | `{ action: "start" \| "stop" \| "restart" }` |
 | `GET /api/objects/:id/logs?tail=&after=` | `{ text, cursor, reset? }` |
-| `GET /api/objects/:id/stats` | What a server or Docker object uses now: `{ cpu, memBytes, memLimitBytes, pids, net, block, info, services? }` |
+| `GET /api/objects/:id/stats` | What a server or Docker resource uses now: `{ cpu, memBytes, memLimitBytes, pids, net, block, info, services? }` |
 
-**Security:** objects run commands, so creating, changing, deleting and acting on them are refused when the request does not come from the local app (same rule as the git actions). Reading is open like the rest of the API, which only listens on `127.0.0.1`.
+**Security:** resources run commands, so creating, changing, deleting and acting on them are refused when the request does not come from the local app (same rule as the git actions). Reading is open like the rest of the API, which only listens on `127.0.0.1`.
 
-## 15.5 Agents that look after objects
+## 15.5 Agents that look after resources
 
-An agent with the **Colony objects** skill (`default-objects`, one of the skills that ship with hive-am) gets three tools: `object_list`, `object_logs` and `object_action` (start, stop, restart). To make one, select an object on the map and press **Create a manager agent** in its panel: it opens the new-agent form with the skill, the colony and *Edit files* permission already set (the same skill can be added to any agent from the skill picker). The panel lists who looks after each object.
+An agent with the **Colony objects** skill (`default-objects`, one of the skills that ship with hive-am) gets three tools: `object_list`, `object_logs` and `object_action` (start, stop, restart). To make one, select an resource on the map and press **Create a manager agent** in its panel: it opens the new-agent form with the skill, the colony and *Edit files* permission already set (the same skill can be added to any agent from the skill picker). The panel lists who looks after each resource.
 
 The rules are enforced by the server, not just written in the skill:
 
-- An agent sees only the objects of **its own colony**; one with no colony sees the objects that have none. Another colony's object looks like one that does not exist.
+- An agent sees only the resources of **its own colony**; one with no colony sees the resources that have none. Another colony's resource looks like one that does not exist.
 - A **read-only** agent can list and read logs but cannot start, stop or restart anything. (Claude blocks every MCP tool in read-only mode anyway.)
-- There is **no tool to create, edit or delete** objects, nor to change the command they run: that stays with people.
+- There is **no tool to create, edit or delete** resources, nor to change the command they run: that stays with people.
 - Each action an agent takes is written in the server's log (`[hive-am] manager asked to restart`), so you can tell who did what.
 - An agent without the skill is refused even if it reaches the tools.
 
@@ -144,7 +144,7 @@ Every field that holds a path uses the same picker (`PathPicker` in `web/compone
 
 ## 15.8 Not there yet
 
-Docker objects cannot be created on a remote Docker host, and PM2 is not integrated: a server object runs its command in its own process group and survives a restart of hive-am (see 15.1), but hive-am's supervisor (automatic restarts, health checks) only works while hive-am is running.
+Docker resources cannot be created on a remote Docker host, and PM2 is not integrated: a server resource runs its command in its own process group and survives a restart of hive-am (see 15.1), but hive-am's supervisor (automatic restarts, health checks) only works while hive-am is running.
 
 ## 15.9 Seeing the values
 
@@ -169,15 +169,15 @@ API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/obje
 
 ## 15.10 Services and members
 
-A compose object lists its **services** like Docker Desktop: state (with health), image, published ports (they open in the browser), CPU and memory, and start / stop / restart / logs for each one without touching the others. A cluster lists its **members** as a tree: state, what each runs, CPU and memory, and under a compose member its services; the order arrows set the start order. API: `POST /api/objects/:id/service {service, action}` (only from this machine).
+A compose resource lists its **services** like Docker Desktop: state (with health), image, published ports (they open in the browser), CPU and memory, and start / stop / restart / logs for each one without touching the others. A cluster lists its **members** as a tree: state, what each runs, CPU and memory, and under a compose member its services; the order arrows set the start order. API: `POST /api/objects/:id/service {service, action}` (only from this machine).
 
-Each service has **Inspect** (how it runs, variables — secrets stay hidden until you show them —, ports, mounts, networks, health checks), a **shell** inside its container, **Create again** (removes the container and creates it from its image; what is inside is lost) and **Build again** (builds the image and creates the container). The whole object has **Create again** / **Build again** too, in **More**. An existing container is never removed, so it cannot be created again from here.
+Each service has **Inspect** (how it runs, variables — secrets stay hidden until you show them —, ports, mounts, networks, health checks), a **shell** inside its container, **Create again** (removes the container and creates it from its image; what is inside is lost) and **Build again** (builds the image and creates the container). The whole resource has **Create again** / **Build again** too, in **More**. An existing container is never removed, so it cannot be created again from here.
 
-**App templates.** Creating a Docker object, **From a template** lists ready-made services (Redis, Valkey, PostgreSQL, MariaDB, MySQL, MongoDB, RabbitMQ, MinIO, Nginx, Mailpit, Adminer). Fill the few values (version, ports, user, password — a random password is suggested) and hive-am writes `docker-compose.yml` under its data folder (`stacks/<name>/`) and creates a compose object, which you start when you want (the first start downloads the images). You can edit the file later. API: `GET /api/object-templates`, `POST /api/objects/from-template {template, name, values, colony_id}`.
+**App templates.** Creating a Docker resource, **From a template** lists ready-made services (Redis, Valkey, PostgreSQL, MariaDB, MySQL, MongoDB, RabbitMQ, MinIO, Nginx, Mailpit, Adminer). Fill the few values (version, ports, user, password — a random password is suggested) and hive-am writes `docker-compose.yml` under its data folder (`stacks/<name>/`) and creates a compose resource, which you start when you want (the first start downloads the images). You can edit the file later. API: `GET /api/object-templates`, `POST /api/objects/from-template {template, name, values, colony_id}`.
 
 ## 15.11 Databases
 
-A **database** object is *used*, not started: hive-am opens a connection when it is asked something (its state, the schema, a query) and closes it right after, so nothing stays connected. Four engines: **MySQL / MariaDB**, **PostgreSQL**, **SQLite** and **SQL Server**.
+A **database** resource is *used*, not started: hive-am opens a connection when it is asked something (its state, the schema, a query) and closes it right after, so nothing stays connected. Four engines: **MySQL / MariaDB**, **PostgreSQL**, **SQLite** and **SQL Server**.
 
 - **Creating one.** Pick *Database*, then the engine on its tile. You can paste a **connection URL** (`postgresql://user:pass@host:5432/app?sslmode=require`, `mysql://…`, `mssql://…`, `sqlite:///path/app.db`) and the fields are filled in (what the URL says about SSL too, and any query parameter that is a driver property of that engine goes to the properties); or fill host, port, user, password and the database that opens by default; for SQLite, the file. **Test connection** works before saving, with what the form says. The name can stay empty: it is taken from the database and the engine. The password stays on the server: the interface receives it empty, and saving with it empty keeps the saved one.
 - **SSL / TLS.** *Use SSL* encrypts the connection; the certificate of the server is checked unless *accept a self-signed certificate* is on (encrypted, not verified). For a server signed by a private authority, or one that asks the client to identify itself, give the files of the **CA certificate**, the **client certificate** and the **client key** (`.pem`, absolute paths, read each time it connects; a missing file says which one). Other TLS options (`ssl.minVersion`, `ssl.ciphers`, `ssl.servername`) are in the driver properties.

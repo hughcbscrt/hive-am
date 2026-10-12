@@ -1,12 +1,12 @@
 # 16. Terminals
 
-A panel at the bottom of every screen holds **terminals** (real shells) and the **logs** of objects, in tabs. Open it with **Ctrl+`** (or the *Terminal* button at the bottom of the left rail); the first time it starts a terminal in your home folder. Drag its top edge to resize it: the screen above gets the height that is left, so nothing hides behind it (a chat stays usable while you watch a server).
+A panel at the bottom of every screen holds **terminals** (real shells) and the **logs** of resources, in tabs. Open it with **Ctrl+`** (or the *Terminal* button at the bottom of the left rail); the first time it starts a terminal in your home folder. Drag its top edge to resize it: the screen above gets the height that is left, so nothing hides behind it (a chat stays usable while you watch a server).
 
 ## 16.1 What you can open
 
 - **+** a terminal in the folder of the last one (home at first); the folder button asks for a folder.
 - From an **agent**'s header: a terminal in the agent's folder.
-- From an **object**'s panel (see [15](15-colony-objects.md)): for a **server**, *Terminal here* (in its folder); for a Docker container (created or existing), *Shell in the container* (`docker exec -it … bash`, or `sh` when there is no bash); a compose project has several containers, so it only has logs. Every kind that has logs also has *Logs in the panel*.
+- From an **resource**'s panel (see [15](15-colony-objects.md)): for a **server**, *Terminal here* (in its folder); for a Docker container (created or existing), *Shell in the container* (`docker exec -it … bash`, or `sh` when there is no bash); a compose project has several containers, so it only has logs. Every kind that has logs also has *Logs in the panel*.
 
 Tabs show what is open; × closes one (a terminal is ended); a grey dot means the shell ended (its exit code is in the tooltip and printed in the terminal). The panel's state (open, height, last tab) is remembered by the browser.
 

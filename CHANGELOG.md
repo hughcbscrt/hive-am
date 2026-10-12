@@ -39,6 +39,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Tags in the git explorer: a Tags tab lists the repository's tags; each one can be browsed read-only (its files as they were at that tag, with Markdown preview, and the changes of its commit). The working folder is never touched.
 
 ### Changed
+- The **Objects** section is now called **Resources** (menu, titles, messages and docs; the `/objects` address, the API and the "Colony objects" skill keep their names).
+- Opening Resources no longer flickers: it used to show the empty state, redirect to the first one and rebuild the whole screen; now it shows the first one directly.
 
 - Menus redesigned after reviewing them in the browser: one `Menu` with icons, a line that says what each action does, groups and separators, red for what loses data, check boxes for options, arrow-key navigation and opening upwards when there is no room. The services of a compose project and the members of a cluster show start / stop and restart on the row, and the rest (logs, shell, inspect, create again, build again, open, remove) in **⋯**; the HTTP file bar is the file name with its counts, **Run the whole file** and **More** (run with data, stop at the first failure, export); **Copy as…** groups the formats (command line, code, message).
 - Settings of an object: the sections are always one column in a fixed order (no more cards moving to the side or below when an option changes), with a list of sections at the left that jumps to one and marks the one being read.

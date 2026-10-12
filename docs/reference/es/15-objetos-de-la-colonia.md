@@ -1,8 +1,8 @@
-# 15. Objetos de la colonia
+# 15. Recursos de la colonia
 
-## 15.0 La pantalla de Objetos
+## 15.0 La pantalla de Recursos
 
-**Objetos** en el riel izquierdo abre una pantalla armada como la de un agente: la lista de objetos a la izquierda (agrupados por colonia, con un punto de estado, con buscador y que se contrae a iconos; **+** crea uno) y el objeto elegido a la derecha, con una cabecera (estado y Iniciar / Detener / Reiniciar, *Terminal aquí* donde aplica) y pestañas. En el mapa de la Colonia, elegir un hexágono sigue mostrando la tarjeta chica, ahora con **Abrir panel** (y el lápiz lleva a su configuración).
+**Recursos** en el riel izquierdo abre una pantalla armada como la de un agente: la lista de recursos a la izquierda (agrupados por colonia, con un punto de estado, con buscador y que se contrae a iconos; **+** crea uno) y el recurso elegido a la derecha, con una cabecera (estado y Iniciar / Detener / Reiniciar, *Terminal aquí* donde aplica) y pestañas. En el mapa de la Colonia, elegir un hexágono sigue mostrando la tarjeta chica, ahora con **Abrir panel** (y el lápiz lleva a su configuración).
 
 | Tipo | Pestañas |
 |---|---|
@@ -13,12 +13,12 @@
 - **Distribución:** cada pestaña usa todo el ancho y el alto de la pantalla: la última salida del Resumen crece para llenar lo que queda, los Logs llenan la pantalla y la Configuración se acomoda en tantas columnas de tarjetas como quepan (*General*, *Cómo corre*, *Entorno*, *Mantenerlo sano*… una columna en el cajón de creación). Los detalles de estado que el servidor escribe en inglés ("2/3 running", "exited with code 3") se muestran en el idioma de la interfaz.
 - **Resumen:** el estado (y desde hace cuánto corre), lo que usa (CPU y memoria con un historial corto, procesos, red y disco en Docker), sus detalles (comando, carpeta, puerto, política de reinicio, chequeo de salud; o imagen, puertos, red, reinicios, límites) y su última salida. Un proyecto compose lista sus servicios; un clúster lista sus miembros (15.2c).
 - **Logs:** la pantalla completa. Búsqueda con resaltado (o *solo coincidencias*), líneas de error y de advertencia con color, seguir el final (deja de seguir si subes con el scroll), ajuste de línea, tamaño del texto, pausa, limpiar la vista, copiar y descargar. Conserva los últimos 800 000 caracteres y dibuja las últimas 4 000 líneas. En un clúster cada miembro tiene su color y una etiqueta para ocultarlo.
-- **Configuración:** los mismos campos que al crear, ahí mismo, con una barra que dice si hay algo sin guardar (*Guardar*, *Descartar* y *Guardar y reiniciar* cuando está corriendo) y *Eliminar*. Los cambios de un objeto que corre se aplican al reiniciarlo.
+- **Configuración:** los mismos campos que al crear, ahí mismo, con una barra que dice si hay algo sin guardar (*Guardar*, *Descartar* y *Guardar y reiniciar* cuando está corriendo) y *Eliminar*. Los cambios de un recurso que corre se aplican al reiniciarlo.
 
 
-Además de agentes, una colonia puede tener **objetos**: cosas que hive-am mantiene corriendo o vigila junto a ellos. Hay cuatro tipos: **servidores**, **Docker**, **peticiones HTTP** y **clústeres** (en la primera versión se llamaban *jefe*: la API todavía acepta ese nombre y los que ya existían se convirtieron). Aparecen en el mapa de la Colonia como hexágonos (con el color del tipo y un punto de estado), dentro de la colonia a la que pertenecen o sueltos. Al pulsar uno ves su estado, lo inicias, detienes o reinicias y lees sus logs; el lápiz lo edita.
+Además de agentes, una colonia puede tener **recursos**: cosas que hive-am mantiene corriendo o vigila junto a ellos. Hay cuatro tipos: **servidores**, **Docker**, **peticiones HTTP** y **clústeres** (en la primera versión se llamaban *jefe*: la API todavía acepta ese nombre y los que ya existían se convirtieron). Aparecen en el mapa de la Colonia como hexágonos (con el color del tipo y un punto de estado), dentro de la colonia a la que pertenecen o sueltos. Al pulsar uno ves su estado, lo inicias, detienes o reinicias y lees sus logs; el lápiz lo edita.
 
-Se crea con **Nuevo objeto** (arriba a la derecha en la pantalla Colonia): eliges el tipo, un nombre, la colonia y los ajustes de abajo.
+Se crea con **Nuevo recurso** (arriba a la derecha en la pantalla Colonia): eliges el tipo, un nombre, la colonia y los ajustes de abajo.
 
 ## 15.1 Servidor
 
@@ -29,7 +29,7 @@ Un comando de shell que hive-am mantiene corriendo. Además de los campos de aba
 | Carpeta | Ruta absoluta donde corre el comando. |
 | Comando de inicio | Se ejecuta con `sh -c` (p. ej. `npm run dev`, `java -jar app.jar`). |
 | Comando para detener (opcional) | Se ejecuta primero al detener (p. ej. `docker compose down`). Después el proceso se detiene siempre. |
-| Puerto (opcional) | El objeto está **Iniciando** hasta que algo escuche en `127.0.0.1:<puerto>`, y luego **Corriendo**. Un proceso vivo dos minutos sin abrirlo se muestra como error. |
+| Puerto (opcional) | El recurso está **Iniciando** hasta que algo escuche en `127.0.0.1:<puerto>`, y luego **Corriendo**. Un proceso vivo dos minutos sin abrirlo se muestra como error. |
 | Variables de entorno | `NOMBRE=valor`, una por línea, sumadas a las de hive-am. |
 
 Cómo corre: el comando arranca en su **propio grupo de procesos** con la salida directo a `~/.hive-am/objects/<id>.log`, y el pid y la hora de inicio se guardan en `<id>.json`. Por eso:
@@ -37,7 +37,7 @@ Cómo corre: el comando arranca en su **propio grupo de procesos** con la salida
 - El servidor **sigue corriendo si hive-am se reinicia**; después se vuelve a encontrar por ese pid y esa hora de inicio (un pid que el sistema reutiliza para otra cosa no se confunde con él).
 - **Detener** señala todo el grupo (`sh`, `npm`, `node`…): primero `SIGTERM`, y `SIGKILL` si no terminó en 8 s (`HIVE_AM_OBJECT_STOP_MS`).
 - Estados: **Detenido** (nunca iniciado, detenido por ti o terminado con código 0), **Error** (terminó con código distinto de 0 o por una señal; el detalle dice cuál), **Iniciando**, **Corriendo**.
-- Un log de más de 5 MB se aparta como `.log.1` cuando el objeto arranca.
+- Un log de más de 5 MB se aparta como `.log.1` cuando el recurso arranca.
 
 ## 15.1b Mantener sano un servidor
 
@@ -54,7 +54,7 @@ Los reinicios, los chequeos y el recorte del log ocurren donde se revisa el esta
 
 Necesita el comando `docker`. Cada valor se pasa como un argumento aparte (sin shell) y los nombres y mapeos se validan (se rechaza una imagen o un volumen que parezca una opción).
 
-| Modo | Qué hace hive-am | Al eliminar el objeto |
+| Modo | Qué hace hive-am | Al eliminar el recurso |
 |---|---|---|
 | **Crear un contenedor** (imagen, puertos `8080:80`, volúmenes, variables, política de reinicio, comando) | `docker run -d --name hive-am-<id> --label hive-am.object=<id>`, luego `start` / `stop` / `restart` | Se elimina el contenedor. |
 | **Proyecto compose** (archivo, nombre del proyecto, servicios) | `docker compose -f archivo [-p proyecto] up -d / stop / restart` | El proyecto se detiene, **no** se elimina. |
@@ -69,11 +69,11 @@ El estado sale de `docker inspect` (corriendo, reiniciando, terminado con un có
 Una carpeta de archivos `.http` / `.rest` en el formato de los clientes REST de IntelliJ y VS Code. Abre su pantalla (ver 15.0): la pestaña **Peticiones** tiene a la izquierda los archivos `.http` (hasta 300 archivos, 4 niveles) con sus peticiones debajo; pulsa un archivo para ver sus peticiones y ejecutarlo completo, o una petición para verla a la derecha con su respuesta. Estado: **Listo** (la carpeta está; el detalle dice cuántas peticiones tiene) o **Error**.
 
 - **Formato:** `###` separa peticiones (el texto que sigue es el nombre, o `# @name x`); `@nombre = valor` define una variable; la línea de petición es `MÉTODO URL [HTTP/1.1]`; las líneas que empiezan con `?` o `&` continúan la URL; las cabeceras siguen hasta la primera línea en blanco; el resto es el cuerpo (`< ./archivo.json` inserta un archivo junto al `.http`, dentro de la carpeta); los manejadores `> {% … %}` se ignoran.
-- **Variables:** `{{nombre}}` toma su valor del entorno elegido (los archivos env por encima de los propios del objeto) y, si el entorno no lo tiene, de las variables del archivo (`@nombre = valor`), y `{{$uuid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}` y `{{$randomInt}}` se generan. Los entornos salen de `http-client.env.json` (y de `http-client.private.env.json` encima, para secretos) en la carpeta del archivo o en cualquiera por encima; `$shared` aplica a todos. El objeto puede tener un entorno por defecto.
+- **Variables:** `{{nombre}}` toma su valor del entorno elegido (los archivos env por encima de los propios del recurso) y, si el entorno no lo tiene, de las variables del archivo (`@nombre = valor`), y `{{$uuid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}` y `{{$randomInt}}` se generan. Los entornos salen de `http-client.env.json` (y de `http-client.private.env.json` encima, para secretos) en la carpeta del archivo o en cualquiera por encima; `$shared` aplica a todos. El recurso puede tener un entorno por defecto.
 - **Ejecución:** el servidor envía la petición con `fetch` (60 s de límite, sigue redirecciones, las respuestas de más de 2 MB se cortan, las binarias se describen y no se imprimen). Una petición con un valor que no se puede resolver **no se envía**: el ejecutor nombra los `{{variables}}` que faltan antes de que pulses Ejecutar. **Ctrl+Enter** ejecuta la petición elegida; el icono de lista de un archivo ejecuta todas sus peticiones en orden, cada una conserva su última respuesta y un punto indica cómo salió. La respuesta se ve como Respuesta (JSON con formato), Cabeceras y Petición; la petición mostrada oculta los valores de `Authorization`, `Cookie` y cabeceras de API key.
-- **Límites:** solo URLs `http` / `https`; no se lee nada fuera de la carpeta (se rechaza una ruta que salga de ella, incluso por un enlace); ejecutar una petición solo se acepta desde la app local. Los objetos HTTP no tienen logs y no se inician ni se detienen.
+- **Límites:** solo URLs `http` / `https`; no se lee nada fuera de la carpeta (se rechaza una ruta que salga de ella, incluso por un enlace); ejecutar una petición solo se acepta desde la app local. Los recursos HTTP no tienen logs y no se inician ni se detienen.
 
-**Variables del objeto.** Además de los archivos env, un objeto HTTP tiene sus propias **Variables** (su pestaña, y una sección del formulario de creación): una página que explica cómo funcionan, **Todos los entornos** (valores que aplican sin importar el entorno que elijas) y una pestaña por entorno (`dev`, `qa`…, que solo aplican cuando se elige ese entorno; si allí falta un valor se usa el de *Todos los entornos*), cada una con filas nombre / valor. Un panel lista **las variables que usan tus archivos** (leídas de los `{{…}}` de cada petición) y, de cada una, si está definida aquí, en *Todos los entornos*, por un archivo env, por una línea `@nombre`, o si **falta**: pulsa una que falte para agregarla. El campo de nombre sugiere esos nombres mientras escribes. Sirven para cuando no hay un `http-client.env.json`, o le falta algo; **un archivo env gana** cuando define la misma variable (la fila lo avisa). Una variable se puede marcar como **secreto**: se oculta al guardar (aparece como *guardado*), la API nunca devuelve su valor y guardarla vacía conserva la que ya estaba; escribe un valor nuevo para reemplazarla. Los secretos se guardan en la base de datos de hive-am en esta máquina, **sin cifrar**, igual que el token del bot de Telegram.
+**Variables del recurso.** Además de los archivos env, un recurso HTTP tiene sus propias **Variables** (su pestaña, y una sección del formulario de creación): una página que explica cómo funcionan, **Todos los entornos** (valores que aplican sin importar el entorno que elijas) y una pestaña por entorno (`dev`, `qa`…, que solo aplican cuando se elige ese entorno; si allí falta un valor se usa el de *Todos los entornos*), cada una con filas nombre / valor. Un panel lista **las variables que usan tus archivos** (leídas de los `{{…}}` de cada petición) y, de cada una, si está definida aquí, en *Todos los entornos*, por un archivo env, por una línea `@nombre`, o si **falta**: pulsa una que falte para agregarla. El campo de nombre sugiere esos nombres mientras escribes. Sirven para cuando no hay un `http-client.env.json`, o le falta algo; **un archivo env gana** cuando define la misma variable (la fila lo avisa). Una variable se puede marcar como **secreto**: se oculta al guardar (aparece como *guardado*), la API nunca devuelve su valor y guardarla vacía conserva la que ya estaba; escribe un valor nuevo para reemplazarla. Los secretos se guardan en la base de datos de hive-am en esta máquina, **sin cifrar**, igual que el token del bot de Telegram.
 
 ### Encadenar peticiones: scripts de respuesta y la sesión
 
@@ -82,13 +82,13 @@ Una petición puede guardar valores de su respuesta para las siguientes, o compr
 - **Scripts** (`> {% … %}` después del cuerpo, o en una línea): se ejecutan tras la respuesta. `client.global.set("token", response.body.token)` guarda un valor (usable como `{{token}}` desde entonces); `client.global.get`, `clear(nombre)` y `clearAll()` leen y olvidan; `client.test("nombre", function () { client.assert(response.status === 200, "mensaje"); })` comprueba la respuesta (cada prueba se muestra como pasada o fallida, con su mensaje); `client.log(...)` escribe en la Consola. Están disponibles `response.status`, `response.body` (el JSON ya leído, o el texto), `response.headers.valueOf("X-Nombre")` y `response.contentType.mimeType`. La pantalla de Peticiones muestra un icono de llave en las que tienen script, una pestaña **Pruebas** (`2/3`), una etiqueta *Guardó: token* y un punto de color en la lista (rojo cuando el estado es un error, falló una prueba o el script no pudo ejecutarse).
 - **Referencias a respuestas:** una petición con nombre (`### login` o `# @name login`, una palabra) puede usarse en las siguientes: `{{login.response.body.$.token}}` (o `.token`, `.items[0].id`), `{{login.response.headers.X-Session}}`, `{{login.response.status}}`, `{{login.response.body.*}}` (todo el texto). Una petición que usa la respuesta de otra que todavía no se ejecutó lo dice y ofrece ejecutarla antes.
 - **Orden y secuencia:** el icono de lista de un archivo ejecuta sus peticiones en orden, así cada una encuentra lo que guardó la anterior; *Detener al primer fallo* termina la ejecución en el primer error, estado de error, prueba fallida o script que no pudo ejecutarse.
-- **La sesión:** lo que guardan los scripts, y la última respuesta de cada petición con nombre, viven en memoria por objeto HTTP (un panel **Sesión** al pie de la columna izquierda): puedes ver los valores, poner uno a mano, olvidar uno o todos. Terminan cuando hive-am se detiene. **Ganan** sobre los entornos, las variables del objeto y las líneas `@nombre`, porque algo los puso a propósito y después. La pestaña Variables muestra qué variables guarda el script de una petición (*la guarda la respuesta de “login”*), así que no cuentan como faltantes.
+- **La sesión:** lo que guardan los scripts, y la última respuesta de cada petición con nombre, viven en memoria por recurso HTTP (un panel **Sesión** al pie de la columna izquierda): puedes ver los valores, poner uno a mano, olvidar uno o todos. Terminan cuando hive-am se detiene. **Ganan** sobre los entornos, las variables del recurso y las líneas `@nombre`, porque algo los puso a propósito y después. La pestaña Variables muestra qué variables guarda el script de una petición (*la guarda la respuesta de “login”*), así que no cuentan como faltantes.
 - **No se ejecuta JavaScript.** El script lo lee un analizador pequeño y lo ejecuta un intérprete pequeño que solo conoce lo que esos scripts necesitan: valores, `response`, `client`, `JSON.parse` / `stringify`, `Math.floor` / `round` / `min` / `max`, `String` / `Number` / `parseInt` / `parseFloat`, `var` / `let` / `const`, `if` / `else`, funciones flecha y expresiones `function` (para `map`, `filter`, `find`, `some`, `every` y para `client.test`), comparaciones, `&&`, `||`, `??`, `? :`, `+` (números y texto), plantillas de texto, y una lista corta de métodos de texto (`includes`, `startsWith`, `endsWith`, `indexOf`, `toLowerCase`, `toUpperCase`, `trim`, `split`, `slice`, `substring`, `replace`) y de listas (`includes`, `indexOf`, `join`, `slice`, `map`, `filter`, `find`, `some`, `every`). No hay `require`, `process`, `fetch`, `eval`, `new`, bucles, `try`, `await` ni acceso a prototipos (`constructor`, `__proto__`…), y un script solo puede hacer una cantidad limitada de trabajo, así que un `.http` de otra persona no puede ejecutar código en tu máquina. Un script que usa algo fuera de eso **no se ejecuta** y la respuesta dice qué no está soportado (la petición en sí ya se envió). Un *archivo* de script (`> ./checks.js`) tampoco se ejecuta: escribe el script dentro del `.http`.
 - **API:** `GET /api/objects/:id/http/session` (`{ globals, responses }`), `POST …/http/session` (`{ name, value }`), `DELETE …/http/session[?name=]`; la respuesta de una ejecución agrega `tests`, `logs`, `set`, `scriptError`, `scriptFile`.
 
 ## 15.2c Clúster
 
-Agrupa servidores y contenedores Docker **de la misma colonia** (no otros clústeres ni objetos HTTP). Su **Resumen** es una tabla de miembros: estado, desde cuándo, el orden de inicio (subir / bajar) e iniciar / detener / reiniciar / quitar uno por uno; un selector agrega más. Sus **Logs** tienen un color y una etiqueta para ocultar a cada miembro. **Iniciar todo** inicia los miembros en el orden en que están listados, saltando los que ya están arriba; **Detener todo** los detiene en el orden contrario; **Reiniciar todo** hace ambas cosas. Que uno falle no impide intentar los demás: los fallos se informan juntos. Su estado sale de sus miembros: **Corriendo** cuando todos lo están, **Iniciando** mientras uno inicia, **Error** cuando uno falló o solo algunos están arriba (el detalle dice cuáles), **Detenido** cuando ninguno lo está. Sus logs son los de los miembros con `[nombre]` delante de cada línea (el cursor son los cursores de los miembros juntos, así que seguirlo devuelve solo lo nuevo). En el mapa se une a sus miembros con líneas punteadas. Eliminar un clúster deja a sus miembros como están; eliminar un miembro, o moverlo a otra colonia, lo saca de los clústeres.
+Agrupa servidores y contenedores Docker **de la misma colonia** (no otros clústeres ni recursos HTTP). Su **Resumen** es una tabla de miembros: estado, desde cuándo, el orden de inicio (subir / bajar) e iniciar / detener / reiniciar / quitar uno por uno; un selector agrega más. Sus **Logs** tienen un color y una etiqueta para ocultar a cada miembro. **Iniciar todo** inicia los miembros en el orden en que están listados, saltando los que ya están arriba; **Detener todo** los detiene en el orden contrario; **Reiniciar todo** hace ambas cosas. Que uno falle no impide intentar los demás: los fallos se informan juntos. Su estado sale de sus miembros: **Corriendo** cuando todos lo están, **Iniciando** mientras uno inicia, **Error** cuando uno falló o solo algunos están arriba (el detalle dice cuáles), **Detenido** cuando ninguno lo está. Sus logs son los de los miembros con `[nombre]` delante de cada línea (el cursor son los cursores de los miembros juntos, así que seguirlo devuelve solo lo nuevo). En el mapa se une a sus miembros con líneas punteadas. Eliminar un clúster deja a sus miembros como están; eliminar un miembro, o moverlo a otra colonia, lo saca de los clústeres.
 
 ## 15.2d Sugerencias de Docker y de los archivos
 
@@ -110,25 +110,25 @@ API: `GET /api/docker/containers`, `GET /api/docker/images`, `GET /api/docker/co
 
 | Ruta | Qué hace |
 |---|---|
-| `GET /api/objects` | Todos los objetos con su estado. |
+| `GET /api/objects` | Todos los recursos con su estado. |
 | `POST /api/objects` | `{ name, kind, colony_id?, config }` |
 | `PATCH /api/objects/:id` | `{ name?, colony_id?, config? }` (el tipo no cambia). |
 | `DELETE /api/objects/:id` | Lo elimina (ver 15.2 para lo que pasa con el contenedor). |
 | `POST /api/objects/:id/action` | `{ action: "start" \| "stop" \| "restart" }` |
 | `GET /api/objects/:id/logs?tail=&after=` | `{ text, cursor, reset? }` |
-| `GET /api/objects/:id/stats` | Lo que usa ahora un servidor o un objeto Docker: `{ cpu, memBytes, memLimitBytes, pids, net, block, info, services? }` |
+| `GET /api/objects/:id/stats` | Lo que usa ahora un servidor o un recurso Docker: `{ cpu, memBytes, memLimitBytes, pids, net, block, info, services? }` |
 
-**Seguridad:** los objetos ejecutan comandos, así que crearlos, cambiarlos, eliminarlos y actuar sobre ellos se rechaza cuando la petición no viene de la app local (la misma regla que las acciones de git). Leer está abierto como el resto de la API, que solo escucha en `127.0.0.1`.
+**Seguridad:** los recursos ejecutan comandos, así que crearlos, cambiarlos, eliminarlos y actuar sobre ellos se rechaza cuando la petición no viene de la app local (la misma regla que las acciones de git). Leer está abierto como el resto de la API, que solo escucha en `127.0.0.1`.
 
-## 15.5 Agentes que cuidan objetos
+## 15.5 Agentes que cuidan recursos
 
-Un agente con la skill **Colony objects** (`default-objects`, una de las skills que vienen con hive-am) recibe tres herramientas: `object_list`, `object_logs` y `object_action` (iniciar, detener, reiniciar). Para crear uno, elige un objeto en el mapa y pulsa **Crear un agente administrador** en su panel: abre el formulario de agente nuevo con la skill, la colonia y el permiso *Editar archivos* ya puestos (la misma skill se puede agregar a cualquier agente desde el selector de skills). El panel muestra quién cuida cada objeto.
+Un agente con la skill **Colony objects** (`default-objects`, una de las skills que vienen con hive-am) recibe tres herramientas: `object_list`, `object_logs` y `object_action` (iniciar, detener, reiniciar). Para crear uno, elige un recurso en el mapa y pulsa **Crear un agente administrador** en su panel: abre el formulario de agente nuevo con la skill, la colonia y el permiso *Editar archivos* ya puestos (la misma skill se puede agregar a cualquier agente desde el selector de skills). El panel muestra quién cuida cada recurso.
 
 Las reglas las aplica el servidor, no solo las escribe la skill:
 
-- Un agente ve solo los objetos de **su propia colonia**; uno sin colonia ve los que no tienen. El objeto de otra colonia se ve como si no existiera.
+- Un agente ve solo los recursos de **su propia colonia**; uno sin colonia ve los que no tienen. El recurso de otra colonia se ve como si no existiera.
 - Un agente de **solo lectura** puede listar y leer logs pero no iniciar, detener ni reiniciar nada. (Claude bloquea todas las herramientas MCP en solo lectura de todos modos.)
-- **No hay herramienta para crear, editar ni eliminar** objetos, ni para cambiar el comando que corren: eso queda para las personas.
+- **No hay herramienta para crear, editar ni eliminar** recursos, ni para cambiar el comando que corren: eso queda para las personas.
 - Cada acción de un agente queda escrita en el log del servidor (`[hive-am] manager asked to restart`), para saber quién hizo qué.
 - Un agente sin la skill es rechazado aunque llegue a las herramientas.
 
@@ -144,7 +144,7 @@ Todo campo que guarda una ruta usa el mismo selector (`PathPicker` en `web/compo
 
 ## 15.8 Lo que falta
 
-Los objetos Docker no se pueden crear en un host Docker remoto y PM2 no está integrado: un objeto servidor ejecuta su comando en su propio grupo de procesos y sobrevive a un reinicio de hive-am (ver 15.1), pero el supervisor de hive-am (reinicios automáticos, chequeos de salud) solo funciona mientras hive-am está corriendo.
+Los recursos Docker no se pueden crear en un host Docker remoto y PM2 no está integrado: un recurso servidor ejecuta su comando en su propio grupo de procesos y sobrevive a un reinicio de hive-am (ver 15.1), pero el supervisor de hive-am (reinicios automáticos, chequeos de salud) solo funciona mientras hive-am está corriendo.
 
 ## 15.9 Ver los valores
 
@@ -169,15 +169,15 @@ API: `GET /api/objects/:id/http/variables?file=&index=&env=`, `GET|PUT /api/obje
 
 ## 15.10 Servicios y miembros
 
-Un objeto compose lista sus **servicios** como Docker Desktop: estado (con salud), imagen, puertos publicados (se abren en el navegador), CPU y memoria, y iniciar / detener / reiniciar / logs de cada uno sin tocar los demás. Un clúster lista sus **miembros** como un árbol: estado, qué ejecuta cada uno, CPU y memoria, y bajo un miembro compose sus servicios; las flechas de orden fijan el orden de inicio. API: `POST /api/objects/:id/service {service, action}` (solo desde esta máquina).
+Un recurso compose lista sus **servicios** como Docker Desktop: estado (con salud), imagen, puertos publicados (se abren en el navegador), CPU y memoria, y iniciar / detener / reiniciar / logs de cada uno sin tocar los demás. Un clúster lista sus **miembros** como un árbol: estado, qué ejecuta cada uno, CPU y memoria, y bajo un miembro compose sus servicios; las flechas de orden fijan el orden de inicio. API: `POST /api/objects/:id/service {service, action}` (solo desde esta máquina).
 
-Cada servicio tiene **Inspeccionar** (cómo corre, variables —los secretos siguen ocultos hasta que los muestras—, puertos, montajes, redes, chequeos de salud), una **shell** dentro de su contenedor, **Crear de nuevo** (quita el contenedor y lo crea desde su imagen; lo que hay dentro se pierde) y **Reconstruir** (construye la imagen y crea el contenedor). El objeto completo también tiene **Crear de nuevo** / **Reconstruir** en **Más**. Un contenedor que ya existía nunca se elimina, así que no se puede crear de nuevo desde aquí.
+Cada servicio tiene **Inspeccionar** (cómo corre, variables —los secretos siguen ocultos hasta que los muestras—, puertos, montajes, redes, chequeos de salud), una **shell** dentro de su contenedor, **Crear de nuevo** (quita el contenedor y lo crea desde su imagen; lo que hay dentro se pierde) y **Reconstruir** (construye la imagen y crea el contenedor). El recurso completo también tiene **Crear de nuevo** / **Reconstruir** en **Más**. Un contenedor que ya existía nunca se elimina, así que no se puede crear de nuevo desde aquí.
 
-**Plantillas de apps.** Al crear un objeto Docker, **Desde una plantilla** ofrece servicios listos (Redis, Valkey, PostgreSQL, MariaDB, MySQL, MongoDB, RabbitMQ, MinIO, Nginx, Mailpit, Adminer). Llena los pocos valores (versión, puertos, usuario, contraseña —se sugiere una aleatoria—) y hive-am escribe `docker-compose.yml` en su carpeta de datos (`stacks/<nombre>/`) y crea un objeto compose, que inicias cuando quieras (el primer inicio descarga las imágenes). Puedes editar el archivo después. API: `GET /api/object-templates`, `POST /api/objects/from-template {template, name, values, colony_id}`.
+**Plantillas de apps.** Al crear un recurso Docker, **Desde una plantilla** ofrece servicios listos (Redis, Valkey, PostgreSQL, MariaDB, MySQL, MongoDB, RabbitMQ, MinIO, Nginx, Mailpit, Adminer). Llena los pocos valores (versión, puertos, usuario, contraseña —se sugiere una aleatoria—) y hive-am escribe `docker-compose.yml` en su carpeta de datos (`stacks/<nombre>/`) y crea un recurso compose, que inicias cuando quieras (el primer inicio descarga las imágenes). Puedes editar el archivo después. API: `GET /api/object-templates`, `POST /api/objects/from-template {template, name, values, colony_id}`.
 
 ## 15.11 Bases de datos
 
-Un objeto **base de datos** se *usa*, no se inicia: hive-am abre una conexión cuando le piden algo (su estado, el esquema, una consulta) y la cierra enseguida, así que nada queda conectado. Cuatro motores: **MySQL / MariaDB**, **PostgreSQL**, **SQLite** y **SQL Server**.
+Un recurso **base de datos** se *usa*, no se inicia: hive-am abre una conexión cuando le piden algo (su estado, el esquema, una consulta) y la cierra enseguida, así que nada queda conectado. Cuatro motores: **MySQL / MariaDB**, **PostgreSQL**, **SQLite** y **SQL Server**.
 
 - **Crearla.** Elige *Base de datos* y el motor en su tarjeta. Puedes pegar una **URL de conexión** (`postgresql://usuario:clave@host:5432/app?sslmode=require`, `mysql://…`, `mssql://…`, `sqlite:///ruta/app.db`) y se rellenan los campos (también lo que la URL diga de SSL, y cada parámetro que sea una propiedad del driver de ese motor pasa a las propiedades); o rellena servidor, puerto, usuario, contraseña y la base que se abre por defecto; en SQLite, el archivo. **Probar conexión** funciona antes de guardar, con lo que dice el formulario. El nombre puede quedar vacío: se toma de la base y el motor. La contraseña se queda en el servidor: la interfaz la recibe vacía, y guardar con ella vacía conserva la guardada.
 - **SSL / TLS.** *Usar SSL* cifra la conexión; se verifica el certificado del servidor salvo que *aceptar un certificado autofirmado* esté activo (cifrada, sin verificar). Para un servidor firmado por una autoridad privada, o que pide que el cliente se identifique, indica los archivos del **certificado de la CA**, el **certificado del cliente** y la **llave del cliente** (`.pem`, rutas absolutas, se leen cada vez que conecta; si falta uno dice cuál). Otras opciones de TLS (`ssl.minVersion`, `ssl.ciphers`, `ssl.servername`) están en las propiedades del driver.
