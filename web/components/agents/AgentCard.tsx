@@ -6,6 +6,7 @@ import { useI18n } from '@/lib/i18n/index';
 import { PROVIDERS, ago, permissionLabel, shortPath } from '@/lib/meta';
 import { activity } from '@/lib/activity';
 import { Hex, RoleChip, StatusChip } from '@/components/ui';
+import type { Agent } from '@/lib/types';
 
 const OPEN_DELAY = 280;   // ms of hovering before the card appears
 const CARD_W = 310;
@@ -63,52 +64,72 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   return <div className="ap-row"><dt>{label}</dt><dd>{children}</dd></div>;
 }
 
-function AgentCard({ anchor }: { anchor: Anchor }) {
+/** What an agent card says (shared by the hover preview and the card that stays open after a click). */
+export function AgentDetails({ agent: a, hideColony = false }: { agent: Agent; hideColony?: boolean }) {
   const { t } = useI18n();
   const { agents, colonies, live } = useHive();
-  const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ left: number; top: number; side: 'right' | 'left' } | null>(null);
-  const a = agents.find((x) => x.id === anchor.id);
-
-  // Place it beside the anchor (right if there is room, otherwise left) and keep it inside the window.
-  useLayoutEffect(() => {
-    const h = ref.current?.offsetHeight ?? 0;
-    const { rect } = anchor;
-    const side = rect.right + GAP + CARD_W + 8 <= window.innerWidth ? 'right' : 'left';
-    const left = side === 'right' ? rect.right + GAP : Math.max(8, rect.left - GAP - CARD_W);
-    const top = Math.min(Math.max(8, rect.top + rect.height / 2 - h / 2), Math.max(8, window.innerHeight - h - 8));
-    setPos({ left, top, side });
-  }, [anchor, a?.status, a?.description]);
-
-  if (!a) return null;
   const col = colonies.find((c) => c.id === a.colony_id);
   const act = activity(live[a.id]);
   const workers = a.worker_ids.map((id) => agents.find((x) => x.id === id)?.name).filter(Boolean) as string[];
   const bosses = agents.filter((q) => q.role === 'orchestrator' && q.worker_ids.includes(a.id)).map((q) => q.name);
   const list = (names: string[]) => (names.length > 4 ? `${names.slice(0, 4).join(', ')} ${t('hover.more', { count: names.length - 4 })}` : names.join(', '));
-
-  return (
-    <div ref={ref} className={`ap-card ${pos?.side ?? 'right'}`} role="tooltip" style={{ left: pos?.left ?? -9999, top: pos?.top ?? -9999, width: CARD_W, visibility: pos ? 'visible' : 'hidden' }}>
-      <div className="ap-head">
-        <Hex agent={a} />
-        <div className="grow" style={{ minWidth: 0 }}>
-          <b className="ap-name">{a.name}</b>
-          <div className="row gap-s wrap" style={{ marginTop: 4 }}><RoleChip role={a.role} /><StatusChip status={a.status} /></div>
-        </div>
+  return (<>
+    <div className="ap-head">
+      <Hex agent={a} />
+      <div className="grow" style={{ minWidth: 0 }}>
+        <b className="ap-name">{a.name}</b>
+        <div className="row gap-s wrap" style={{ marginTop: 4 }}><RoleChip role={a.role} /><StatusChip status={a.status} /></div>
       </div>
-      <p className={`ap-desc ${a.description ? '' : 'muted'}`}>{a.description || t('switcher.noDescription')}</p>
-      {act && <div className="ap-now"><i className="dot run" />{act}</div>}
-      <dl className="ap-rows">
-        <Row label={t('form.provider')}>{PROVIDERS[a.provider].label}{a.model ? ` · ${a.model}` : ` · ${t('model.cliDefault')}`}</Row>
-        <Row label={t('inherit.permissions')}>{permissionLabel(a.effective.permission)}</Row>
-        <Row label={t('colony.folder')}><span className="mono">{shortPath(a.effective.cwd)}</span>{a.effective.inherited.includes('cwd') && <span className="muted"> · {t('colony.fromColony')}</span>}</Row>
-        <Row label={t('form.colony')}>{col ? <><i className="cdot" style={{ background: col.color || 'var(--honey)' }} />{col.name}</> : <span className="muted">{t('common.noColony')}</span>}</Row>
-        {a.role === 'orchestrator'
-          ? <Row label={t('form.team')}>{workers.length ? list(workers) : <span className="muted">{t('colony.noWorkers')}</span>}</Row>
-          : <Row label={t('rel.directedBy')}>{bosses.length ? list(bosses) : <span className="muted">{t('hover.noOrchestrator')}</span>}</Row>}
-        <Row label={t('colony.session')}><span className="mono">{a.session_id ? `${a.session_id.slice(0, 12)}…` : t('colony.noSession')}</span></Row>
-        <Row label={t('agents.col.updated')}>{ago(a.updated_at)}{!!a.queued && a.queued > 0 && <span className="muted"> · {t('queue.count', { count: a.queued })}</span>}</Row>
-      </dl>
     </div>
-  );
+    <p className={`ap-desc ${a.description ? '' : 'muted'}`}>{a.description || t('switcher.noDescription')}</p>
+    {act && <div className="ap-now"><i className="dot run" />{act}</div>}
+    <dl className="ap-rows">
+      <Row label={t('form.provider')}>{PROVIDERS[a.provider].label}{a.model ? ` · ${a.model}` : ` · ${t('model.cliDefault')}`}</Row>
+      <Row label={t('inherit.permissions')}>{permissionLabel(a.effective.permission)}</Row>
+      <Row label={t('colony.folder')}><span className="mono">{shortPath(a.effective.cwd)}</span>{a.effective.inherited.includes('cwd') && <span className="muted"> · {t('colony.fromColony')}</span>}</Row>
+      {!hideColony && <Row label={t('form.colony')}>{col ? <><i className="cdot" style={{ background: col.color || 'var(--honey)' }} />{col.name}</> : <span className="muted">{t('common.noColony')}</span>}</Row>}
+      {a.role === 'orchestrator'
+        ? <Row label={t('form.team')}>{workers.length ? list(workers) : <span className="muted">{t('colony.noWorkers')}</span>}</Row>
+        : <Row label={t('rel.directedBy')}>{bosses.length ? list(bosses) : <span className="muted">{t('hover.noOrchestrator')}</span>}</Row>}
+      <Row label={t('colony.session')}><span className="mono">{a.session_id ? `${a.session_id.slice(0, 12)}…` : t('colony.noSession')}</span></Row>
+      <Row label={t('agents.col.updated')}>{ago(a.updated_at)}{!!a.queued && a.queued > 0 && <span className="muted"> · {t('queue.count', { count: a.queued })}</span>}</Row>
+    </dl>
+  </>);
+}
+
+/**
+ * A card beside an element of the canvas that stays where it is while the canvas scrolls or the window changes. It is the one place that
+ * says what a hex is: the hover preview shows it without actions; a click keeps it open (`pinned`) and adds the actions.
+ */
+export function AnchoredCard({ target, width = CARD_W, pinned = false, onClose, children, label }: { target: Element | DOMRect | null; width?: number; pinned?: boolean; onClose?: () => void; children: React.ReactNode; label?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; side: 'right' | 'left' } | null>(null);
+  const place = useCallback(() => {
+    if (!target) return;
+    const h = ref.current?.offsetHeight ?? 0, rect = target instanceof DOMRect ? target : target.getBoundingClientRect();
+    const side = rect.right + GAP + width + 8 <= window.innerWidth ? 'right' : 'left';
+    const left = side === 'right' ? rect.right + GAP : Math.max(8, rect.left - GAP - width);
+    const top = Math.min(Math.max(8, rect.top + rect.height / 2 - h / 2), Math.max(8, window.innerHeight - h - 8));
+    setPos((p) => (p && p.left === left && p.top === top && p.side === side ? p : { left, top, side }));
+  }, [target, width]);
+  useLayoutEffect(place);
+  useEffect(() => {
+    if (!pinned) return;
+    window.addEventListener('scroll', place, true); window.addEventListener('resize', place);
+    const ro = typeof ResizeObserver !== 'undefined' && ref.current ? new ResizeObserver(place) : null; if (ro && ref.current) ro.observe(ref.current);
+    const down = (e: PointerEvent) => { const n = e.target as Element; if (ref.current?.contains(n) || n.closest('.cell, [role="dialog"], .modal, .drawer, .menu-pop')) return; onClose?.(); };
+    document.addEventListener('pointerdown', down);
+    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); ro?.disconnect(); document.removeEventListener('pointerdown', down); };
+  }, [pinned, place, onClose]);
+  if (!target || typeof document === 'undefined') return null;
+  return createPortal(
+    <div ref={ref} className={`ap-card ${pinned ? 'pinned' : ''} ${pos?.side ?? 'right'}`} role={pinned ? 'complementary' : 'tooltip'} aria-label={label} style={{ left: pos?.left ?? -9999, top: pos?.top ?? -9999, width, visibility: pos ? 'visible' : 'hidden' }}>{children}</div>,
+    document.body);
+}
+
+function AgentCard({ anchor }: { anchor: Anchor }) {
+  const { agents } = useHive();
+  const a = agents.find((x) => x.id === anchor.id);
+  if (!a) return null;
+  return <AnchoredCard target={anchor.rect}><AgentDetails agent={a} /></AnchoredCard>;
 }

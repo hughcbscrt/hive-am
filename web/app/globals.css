@@ -1171,3 +1171,16 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .oc .muted.small, .oc .field-hint, .oc .hint { font-size: 12px; }
 .of-card > header h4 { font-size: 14px; }
 .ov-empty { display: flex; align-items: center; gap: 8px; margin: 0; padding: 6px 0; }
+
+/* The card that stays open after a click on a hex: the hover card, interactive, with the actions. */
+.ap-card.pinned { pointer-events: auto; max-height: calc(100vh - 16px); overflow-y: auto; animation: ap-in .12s ease-out; }
+.ap-card.pinned::before { display: none; }
+.ap-card.pinned.right { box-shadow: -1px 0 0 var(--line-strong), 0 22px 48px -16px rgba(0, 0, 0, .4); }
+.ap-corner { position: absolute; top: 8px; right: 8px; z-index: 1; }
+.ap-card.pinned .ap-head { padding-right: 64px; }
+.ap-pin-field { margin-top: 12px; } .ap-pin-actions { margin-top: 12px; gap: 8px; }
+.ap-card.pinned .obj-panel .ap-corner + .row { padding-right: 70px; }
+@keyframes ap-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px) { .ap-card.pinned { display: block; left: 8px !important; right: 8px; top: auto !important; bottom: 8px; width: auto !important; max-height: 70vh; } }
+.ap-pin-field > label { font-size: 12.5px; color: var(--muted); }
+.ap-pin-field .select { font-size: 13px; padding: 7px 10px; }

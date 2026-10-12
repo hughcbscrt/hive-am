@@ -2,7 +2,8 @@
 import { TerminalButton } from '@/components/dock/TerminalButton';
 import { useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, FileText, Pencil, Play, RotateCw, Square, UserPlus } from 'lucide-react';
+import { ExternalLink, FileText, Pencil, Play, RotateCw, Square, UserPlus, X } from 'lucide-react';
+import { AnchoredCard } from '@/components/agents/AgentCard';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { ago, shortPath } from '@/lib/meta';
@@ -28,7 +29,7 @@ export function objectSummary(o: ObjectView): string {
 }
 
 /** The panel shown when an object of the colony map is selected: its state, start/stop/restart, and its logs. */
-export function ObjectPanel({ object: o, onCreateManager }: { object: ObjectView; onCreateManager: () => void }) {
+export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { object: ObjectView; target: Element | null; onClose: () => void; onCreateManager: () => void }) {
   const { t } = useI18n();
   const { agents, objects } = useHive();
   const dock = useDock();
@@ -49,9 +50,10 @@ export function ObjectPanel({ object: o, onCreateManager }: { object: ObjectView
   const live = st === 'running' || st === 'starting';
   const members = o.kind === 'cluster' ? (o.config as ClusterConfig).members.map((id) => objects.find((x) => x.id === id)).filter((x): x is ObjectView => !!x) : [];
   return (
-    <aside className="side-float card card-pad col obj-panel" style={{ gap: 12 }} aria-label={o.name}>
-      <div className="card-corner row gap-s"><Link className="btn ghost icon sm" href={`/objects/${o.id}?tab=config`} aria-label={t('obj.act.edit')} title={t('obj.act.edit')}><Pencil size={15} /></Link></div>
-      <div className="row gap-l" style={{ paddingRight: 44 }}>
+    <AnchoredCard target={target} pinned width={380} label={o.name} onClose={onClose}>
+     <div className="col obj-panel" style={{ gap: 12 }}>
+      <div className="ap-corner row gap-s"><Link className="btn ghost icon sm" href={`/objects/${o.id}?tab=config`} aria-label={t('obj.act.edit')} title={t('obj.act.edit')}><Pencil size={15} /></Link><button className="btn ghost icon sm" onClick={onClose} aria-label={t('common.close')} title={`${t('common.close')} (Esc)`}><X size={16} /></button></div>
+      <div className="row gap-l" style={{ paddingRight: 70 }}>
         <span className="obj-ico" style={{ ['--c' as never]: color }}><Icon size={22} /></span>
         <div className="grow" style={{ minWidth: 0 }}>
           <h2 style={{ fontSize: 20, overflowWrap: 'anywhere' }}>{o.name}</h2>
@@ -92,6 +94,7 @@ export function ObjectPanel({ object: o, onCreateManager }: { object: ObjectView
           : <p className="muted small" style={{ margin: 0 }}>{t('obj.managers.none')}</p>}
         <button className="btn sm" style={{ marginTop: 8 }} onClick={onCreateManager}><UserPlus size={14} />{t('obj.managers.create')}</button>
       </div>}
-    </aside>
+     </div>
+    </AnchoredCard>
   );
 }

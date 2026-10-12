@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Plus, Settings2, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
@@ -12,7 +12,7 @@ import { ColonyEditor } from '@/components/agents/ColonyEditor';
 import { AgentEditDrawer } from '@/components/agents/AgentEditDrawer';
 import { DeleteAgentModal } from '@/components/agents/DeleteAgentModal';
 import { HelpPopover } from '@/components/HelpPopover';
-import { useAgentCard } from '@/components/agents/AgentCard';
+import { AgentDetails, AnchoredCard, useAgentCard } from '@/components/agents/AgentCard';
 import { useI18n } from '@/lib/i18n';
 import { ObjectPanel } from '@/components/objects/ObjectPanel';
 import { ObjectEditor } from '@/components/objects/ObjectEditor';
@@ -105,6 +105,9 @@ export default function Colony() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const selected = agents.find((a) => a.id === sel) ?? null;
   const selectedObject = objects.find((o) => o.id === sel) ?? null;
+  // The card of what is selected opens beside its hex, so the element has to be found once the canvas is drawn.
+  const [pinEl, setPinEl] = useState<Element | null>(null);
+  useLayoutEffect(() => { setPinEl(sel ? document.querySelector(`[data-sid="${sel}"]`) : null); }, [sel, agents.length, objects.length]);
   useEffect(() => {
     if (!sel) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) setSel(null); };
@@ -185,7 +188,7 @@ export default function Colony() {
                     if (o) {
                       const { icon: Icon, color } = KIND[o.kind];
                       return (
-                        <button key={o.id} className={`cell fill obj st-${o.state.status} ${o.state.status === 'running' ? 'running' : ''}`} style={{ ...style, ['--c' as any]: color }} aria-pressed={sel === o.id}
+                        <button key={o.id} data-sid={o.id} className={`cell fill obj st-${o.state.status} ${o.state.status === 'running' ? 'running' : ''}`} style={{ ...style, ['--c' as any]: color }} aria-pressed={sel === o.id}
                           onClick={() => setSel(o.id === sel ? null : o.id)} aria-label={`${o.name}, ${t(`obj.kind.${o.kind}`)}, ${t(`obj.status.${o.state.status}`)}`} title={o.state.detail ? `${t(`obj.status.${o.state.status}`)} — ${o.state.detail}` : t(`obj.status.${o.state.status}`)}>
                           <span className="shape" />
                           <span className="label"><Icon size={16} /><b>{o.name}</b><small>{t(`obj.status.${o.state.status}`)}</small></span>
@@ -199,10 +202,10 @@ export default function Colony() {
                       </button>
                     );
                     return (
-                      <button key={a.id} className={`cell fill ${a.role === 'orchestrator' ? 'queen' : ''} ${a.status === 'running' ? 'running' : ''} ${focus && !related.has(a.id) ? 'dim' : ''} ${focus && related.has(a.id) && a.id !== focus ? 'linked' : ''}`}
-                        onMouseEnter={(e) => { setHover(a.id); card.bind(a.id).onMouseEnter(e); }} onMouseLeave={() => { setHover(null); card.bind(a.id).onMouseLeave(); }} onFocus={(e) => { setHover(a.id); card.bind(a.id).onFocus(e); }} onBlur={() => { setHover(null); card.bind(a.id).onBlur(); }}
+                      <button key={a.id} data-sid={a.id} className={`cell fill ${a.role === 'orchestrator' ? 'queen' : ''} ${a.status === 'running' ? 'running' : ''} ${focus && !related.has(a.id) ? 'dim' : ''} ${focus && related.has(a.id) && a.id !== focus ? 'linked' : ''}`}
+                        onMouseEnter={(e) => { setHover(a.id); if (a.id !== sel) card.bind(a.id).onMouseEnter(e); }} onMouseLeave={() => { setHover(null); card.bind(a.id).onMouseLeave(); }} onFocus={(e) => { setHover(a.id); card.bind(a.id).onFocus(e); }} onBlur={() => { setHover(null); card.bind(a.id).onBlur(); }}
                         style={{ ...style, ['--c' as any]: PROVIDERS[a.provider].color }} aria-pressed={sel === a.id}
-                        onClick={() => setSel(a.id === sel ? null : a.id)} aria-label={`${a.name}, ${t(`role.${a.role}`)}, ${PROVIDERS[a.provider].short}, ${t(`status.${a.status}`)}`}>
+                        onClick={() => { card.bind(a.id).onClick(); setSel(a.id === sel ? null : a.id); }} aria-label={`${a.name}, ${t(`role.${a.role}`)}, ${PROVIDERS[a.provider].short}, ${t(`status.${a.status}`)}`}>
                         <span className="shape" />
                         <span className="label"><b>{a.name}</b><small>{PROVIDERS[a.provider].short}</small></span>
                         {a.status !== 'idle' && <span className={`pip ${a.status === 'error' ? 'err' : ''}`} />}
@@ -258,28 +261,20 @@ export default function Colony() {
           </div>
         </div>
 
-          {selectedObject ? <ObjectPanel key={selectedObject.id} object={selectedObject} onCreateManager={() => setCreating({ colonyId: selectedObject.colony_id ?? undefined, manager: true })} /> : selected ? (
-            <aside className="side-float card card-pad col" style={{ gap: 14 }} aria-label={selected.name}>
-              <div className="card-corner row gap-s"><button className="btn ghost icon sm" onClick={() => setEditingAgent(selected.id)} aria-label={t('colony.settingsFor', { name: selected.name })} title={t('colony.agentSettings')}><SlidersHorizontal size={17} /></button><button className="btn ghost icon sm" onClick={() => setSel(null)} aria-label={t('common.close')} title={`${t('common.close')} (Esc)`}><X size={16} /></button></div>
-              <div className="row gap-l" style={{ paddingRight: 70 }}><Hex agent={selected} size="lg" /><div className="grow"><h2 style={{ fontSize: 22 }}>{selected.name}</h2><div className="row gap-s wrap" style={{ marginTop: 6 }}><RoleChip role={selected.role} /><StatusChip status={selected.status} /></div></div></div>
-              {selected.description && <p style={{ margin: 0 }}>{selected.description}</p>}
-              <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 14px', fontSize: 13.5 }}>
-                <dt className="muted">{t('form.provider')}</dt><dd style={{ margin: 0 }}><ProviderBadge provider={selected.provider} /></dd>
-                <dt className="muted">{t('field.model')}</dt><dd style={{ margin: 0 }}>{selected.model || t('model.cliDefault')}</dd>
-                <dt className="muted">{t('colony.folder')}</dt><dd className="mono" style={{ margin: 0, wordBreak: 'break-all' }}>{shortPath(selected.effective.cwd)}{selected.effective.inherited.includes('cwd') && <span className="muted"> · {t('colony.fromColony')}</span>}</dd>
-                <dt className="muted">{t('colony.session')}</dt><dd className="mono" style={{ margin: 0 }}>{selected.session_id ? selected.session_id.slice(0, 13) + '…' : t('colony.noSession')}</dd>
-                {selected.role === 'orchestrator' && (<><dt className="muted">{t('form.team')}</dt><dd style={{ margin: 0 }}>{selected.worker_ids.length ? selected.worker_ids.map(name).join(', ') : t('colony.noWorkers')}</dd></>)}
-              </dl>
-              <div className="field"><label>{t('form.colony')}</label>
+          {selectedObject ? <ObjectPanel key={selectedObject.id} object={selectedObject} target={pinEl} onClose={() => setSel(null)} onCreateManager={() => setCreating({ colonyId: selectedObject.colony_id ?? undefined, manager: true })} /> : selected ? (
+            <AnchoredCard key={selected.id} target={pinEl} pinned width={340} label={selected.name} onClose={() => setSel(null)}>
+              <div className="ap-corner row gap-s"><button className="btn ghost icon sm" onClick={() => setEditingAgent(selected.id)} aria-label={t('colony.settingsFor', { name: selected.name })} title={t('colony.agentSettings')}><SlidersHorizontal size={16} /></button><button className="btn ghost icon sm" onClick={() => setSel(null)} aria-label={t('common.close')} title={`${t('common.close')} (Esc)`}><X size={16} /></button></div>
+              <AgentDetails agent={selected} hideColony />
+              <div className="field ap-pin-field"><label>{t('form.colony')}</label>
                 <select className="select" value={selColony?.id ?? ''} onChange={(e) => void moveTo(selected, e.target.value)}>
                   <option value="">{t('common.noColony')}</option>{colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div className="row">
+              <div className="row ap-pin-actions">
                 <Link className="btn primary grow" href={`/agents/${selected.id}`}>{t('colony.openChat')} <ArrowRight size={16} /></Link>
                 <button className="btn danger icon" onClick={() => setDeleting(selected.id)} aria-label={t('agent.delete')} title={t('agent.delete')}><Trash2 size={16} /></button>
               </div>
-            </aside>
+            </AnchoredCard>
           ) : null}
       </div>
       <div className="card card-pad recent">

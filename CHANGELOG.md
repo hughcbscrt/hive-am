@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ## [Unreleased]
 
 ### Added
+- Colony map: clicking an agent or an object now keeps open the same card that the hover shows, beside its hex, instead of the panel in the corner. It has the same details plus the actions (open chat, settings, change colony, delete; for objects start/stop/restart, terminal, logs, who looks after it). It follows the hex when the canvas scrolls, closes with Esc, the X or a click outside, and becomes a sheet at the bottom on narrow screens.
 - Big Docker logs no longer slow the log view: the "what is new" call read the whole file (4 s on a 200 MB log, now 25 ms), and a stale cursor could bring back all of it. Containers hive-am creates also get a default log limit (10 MB x 3) instead of none. The server settings explain that restarts and health checks only work while hive-am runs.
 
 - App templates for Docker objects: when creating one, **From a template** offers Redis, Valkey, PostgreSQL, MariaDB, MySQL, MongoDB, RabbitMQ, MinIO, Nginx, Mailpit and Adminer; you fill a few values (version, ports, user, password — each password starts random) and hive-am writes the compose file under its data folder (`stacks/`) and creates the object (it is not started: the first run downloads the images). Values are checked before anything is written. API: `GET /api/object-templates`, `POST /api/objects/from-template`.
