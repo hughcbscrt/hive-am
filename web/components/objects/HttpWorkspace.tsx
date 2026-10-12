@@ -336,7 +336,7 @@ const sessionBlock = (
               <File size={20} className="muted" />
               <div className="grow" style={{ minWidth: 0 }}><h3 className="mono" title={picked.relFile}>{picked.relFile}</h3>
                 <p className="muted small" style={{ margin: 0 }}>{t('hw.fileInfo', { count: picked.requests.length })}{fileInsp ? ` · ${t('hw2.vars.count', { count: fileInsp.vars.length })}` : ''}</p></div>
-              <button className="btn primary" disabled={!!busy} onClick={() => void runFile(picked)}><ListChecks size={15} />{t('http.runFile')}</button>
+              <button className="btn primary sm" disabled={!!busy} onClick={() => void runFile(picked)}><ListChecks size={14} />{t('http.runFile')}</button>
               <FileMenu objectId={o.id} file={picked.relFile} onBatch={() => setBatch(true)} stopOnFail={stopOnFail} onStopOnFail={setStopOnFail} />
             </div>
             <Segmented value={fileTab} onChange={setFileTab} options={[{ id: 'requests', label: `${t('hw2.tab.requests')} · ${picked.requests.length}` }, { id: 'vars', label: `${t('hw2.tab.vars')}${fileInsp?.vars.length ? ` · ${fileInsp.vars.length}` : ''}` }, { id: 'source', label: t('hw2.tab.source') }]} />
