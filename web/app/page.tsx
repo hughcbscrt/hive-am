@@ -12,7 +12,7 @@ import { ColonyEditor } from '@/components/agents/ColonyEditor';
 import { AgentEditDrawer } from '@/components/agents/AgentEditDrawer';
 import { DeleteAgentModal } from '@/components/agents/DeleteAgentModal';
 import { HelpPopover } from '@/components/HelpPopover';
-import { AgentDetails, AnchoredCard, useAgentCard } from '@/components/agents/AgentCard';
+import { AgentDetails, AnchoredCard } from '@/components/agents/AgentCard';
 import { useI18n } from '@/lib/i18n';
 import { ObjectPanel } from '@/components/objects/ObjectPanel';
 import { ObjectEditor } from '@/components/objects/ObjectEditor';
@@ -78,7 +78,6 @@ export default function Colony() {
   const toast = useToast();
   const [sel, setSel] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
-  const card = useAgentCard();
   const [creating, setCreating] = useState<{ colonyId?: string; manager?: boolean } | null>(null);
   const [editing, setEditing] = useState<Colony | 'new' | null>(null);
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
@@ -203,9 +202,9 @@ export default function Colony() {
                     );
                     return (
                       <button key={a.id} data-sid={a.id} className={`cell fill ${a.role === 'orchestrator' ? 'queen' : ''} ${a.status === 'running' ? 'running' : ''} ${focus && !related.has(a.id) ? 'dim' : ''} ${focus && related.has(a.id) && a.id !== focus ? 'linked' : ''}`}
-                        onMouseEnter={(e) => { setHover(a.id); if (a.id !== sel) card.bind(a.id).onMouseEnter(e); }} onMouseLeave={() => { setHover(null); card.bind(a.id).onMouseLeave(); }} onFocus={(e) => { setHover(a.id); card.bind(a.id).onFocus(e); }} onBlur={() => { setHover(null); card.bind(a.id).onBlur(); }}
+                        onMouseEnter={() => setHover(a.id)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(a.id)} onBlur={() => setHover(null)}
                         style={{ ...style, ['--c' as any]: PROVIDERS[a.provider].color }} aria-pressed={sel === a.id}
-                        onClick={() => { card.bind(a.id).onClick(); setSel(a.id === sel ? null : a.id); }} aria-label={`${a.name}, ${t(`role.${a.role}`)}, ${PROVIDERS[a.provider].short}, ${t(`status.${a.status}`)}`}>
+                        onClick={() => setSel(a.id === sel ? null : a.id)} aria-label={`${a.name}, ${t(`role.${a.role}`)}, ${PROVIDERS[a.provider].short}, ${t(`status.${a.status}`)}`}>
                         <span className="shape" />
                         <span className="label"><b>{a.name}</b><small>{PROVIDERS[a.provider].short}</small></span>
                         {a.status !== 'idle' && <span className={`pip ${a.status === 'error' ? 'err' : ''}`} />}
@@ -287,7 +286,6 @@ export default function Colony() {
                 </div>
               ))}</div>}
       </div>
-      {card.node}
       {deleting && agents.find((a) => a.id === deleting) && <DeleteAgentModal agent={agents.find((a) => a.id === deleting)!} onClose={() => setDeleting(null)} onDeleted={() => setSel(null)} />}
       {creating && <NewAgentDrawer presetColonyId={creating.colonyId} manager={creating.manager} onClose={() => setCreating(null)} onCreated={(id) => setSel(id)} />}
       {editingAgent && agents.find((a) => a.id === editingAgent) && <AgentEditDrawer key={editingAgent} agent={agents.find((a) => a.id === editingAgent)!} onClose={() => setEditingAgent(null)} />}
