@@ -1170,3 +1170,4 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .ow-tabs .tab { font-size: 13px; }
 .oc .muted.small, .oc .field-hint, .oc .hint { font-size: 12px; }
 .of-card > header h4 { font-size: 14px; }
+.ov-empty { display: flex; align-items: center; gap: 8px; margin: 0; padding: 6px 0; }

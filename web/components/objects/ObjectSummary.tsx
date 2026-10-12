@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useLogStream } from '@/lib/useLogStream';
@@ -112,9 +113,12 @@ export function ObjectSummary({ object: o, onSeeLogs }: { object: ObjectView; on
         {details.length > 0 && <section className="ov-card"><div className="eyebrow">{t('ow.info')}</div><dl className="ov-dl">{details.map(([k, v], i) => <Row key={i} k={k} v={v} />)}</dl></section>}
       </div>
 
-      {o.kind === 'docker' && stats?.services && stats.services.length > 0 && (
-        <section className="ov-card wide"><div className="eyebrow">{t('ow.d.services')} · {info.running ?? 0}/{info.services ?? 0}</div>
-          <ServicesTable objectId={o.id} services={stats.services} onLogs={(sv) => onSeeLogs(`${sv}-`)} onChanged={reload} /></section>
+      {o.kind === 'docker' && (o.config as DockerConfig).mode === 'compose' && (
+        <section className="ov-card wide"><div className="eyebrow">{t('ow.d.services')}{stats?.services?.length ? ` · ${info.running ?? 0}/${info.services ?? 0}` : ''}</div>
+          {stats === null ? <p className="muted small ov-empty"><Loader2 size={14} className="spin" /> {t('ow.svc.loading')}</p>
+            : stats.services && stats.services.length > 0 ? <ServicesTable objectId={o.id} services={stats.services} onLogs={(sv) => onSeeLogs(`${sv}-`)} onChanged={reload} />
+            : <p className="muted small ov-empty">{t(live ? 'ow.svc.none' : 'ow.svc.stopped')}</p>}
+        </section>
       )}
       {o.kind === 'cluster' && <section className="ov-card wide"><div className="eyebrow">{t('cl.members')}</div><ClusterMembers cluster={o} /></section>}
       <section className="ov-card wide grow">
