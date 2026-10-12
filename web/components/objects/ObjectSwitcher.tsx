@@ -38,7 +38,7 @@ export function ObjectSwitcher({ activeId, collapsed = false, onToggle }: { acti
             <div key={g.key} className="mini-group">
               <div className="mini-sep" title={`${g.name} · ${g.items.length}`} style={g.color ? { ['--c' as never]: g.color } : undefined} />
               {g.items.map((o) => { const { icon: Icon, color } = KIND[o.kind]; return (
-                <Link key={o.id} href={`/objects/${o.id}`} className="sw-item mini" aria-current={o.id === activeId ? 'page' : undefined} aria-label={o.name} title={`${o.name} — ${t(`obj.status.${o.state.status}`)}`}>
+                <Link key={o.id} href={`/resources/${o.id}`} className="sw-item mini" aria-current={o.id === activeId ? 'page' : undefined} aria-label={o.name} title={`${o.name} — ${t(`obj.status.${o.state.status}`)}`}>
                   <span className="sw-av"><span className="obj-ico sm" style={{ ['--c' as never]: color }}><Icon size={17} /></span><StatusDot status={o.state.status} className="sw-dot" /></span>
                 </Link>); })}
             </div>
@@ -61,7 +61,7 @@ export function ObjectSwitcher({ activeId, collapsed = false, onToggle }: { acti
           <div key={g.key}>
             <div className="switcher-group">{g.color && <i className="cdot" style={{ background: g.color }} />}{g.name}<span>{g.items.length}</span></div>
             {g.items.map((o) => { const { icon: Icon, color } = KIND[o.kind]; return (
-              <Link key={o.id} href={`/objects/${o.id}`} className="sw-item" aria-current={o.id === activeId ? 'page' : undefined}>
+              <Link key={o.id} href={`/resources/${o.id}`} className="sw-item" aria-current={o.id === activeId ? 'page' : undefined}>
                 <span className="sw-av"><span className="obj-ico sm" style={{ ['--c' as never]: color }}><Icon size={17} /></span></span>
                 <span className="sw-body">
                   <span className="sw-top"><b>{o.name}</b></span>

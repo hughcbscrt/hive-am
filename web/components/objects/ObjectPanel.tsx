@@ -60,7 +60,7 @@ export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { o
   return (
     <AnchoredCard target={target} pinned width={380} label={o.name} onClose={onClose}>
      <div className="col obj-panel" style={{ gap: 12 }}>
-      <div className="ap-corner row gap-s"><Link className="btn ghost icon sm" href={`/objects/${o.id}?tab=config`} aria-label={t('obj.act.edit')} title={t('obj.act.edit')}><Pencil size={15} /></Link><button className="btn ghost icon sm" onClick={onClose} aria-label={t('common.close')} title={`${t('common.close')} (Esc)`}><X size={16} /></button></div>
+      <div className="ap-corner row gap-s"><Link className="btn ghost icon sm" href={`/resources/${o.id}?tab=config`} aria-label={t('obj.act.edit')} title={t('obj.act.edit')}><Pencil size={15} /></Link><button className="btn ghost icon sm" onClick={onClose} aria-label={t('common.close')} title={`${t('common.close')} (Esc)`}><X size={16} /></button></div>
       <div className="row gap-l" style={{ paddingRight: 70 }}>
         <span className="obj-ico" style={{ ['--c' as never]: color }}><Icon size={22} /></span>
         <div className="grow" style={{ minWidth: 0 }}>
@@ -74,7 +74,7 @@ export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { o
       {(o.state.detail || o.state.since) && (
         <p className="muted small" style={{ margin: 0 }}>{[detailText(t, o.state.detail), o.state.since && live ? t('obj.since', { time: ago(o.state.since) }) : '', o.state.pid ? t('obj.pid', { pid: o.state.pid }) : ''].filter(Boolean).join(' · ')}</p>
       )}
-      <Link className="btn primary" href={`/objects/${o.id}`}><ExternalLink size={15} />{t('obj.open')}</Link>
+      <Link className="btn primary" href={`/resources/${o.id}`}><ExternalLink size={15} />{t('obj.open')}</Link>
       {o.kind !== 'cluster' && <div className="mono small obj-cmd" title={objectSummary(o)}>{objectSummary(o)}</div>}
       {o.kind === 'database' && (
         <div className="row gap-s wrap">

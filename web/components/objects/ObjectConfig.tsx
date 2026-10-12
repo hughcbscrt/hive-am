@@ -38,7 +38,7 @@ export function ObjectConfig({ object: o }: { object: ObjectView }) {
   };
   const del = async () => {
     setBusy(true);
-    try { await api.del(`/objects/${o.id}`); await refresh(['objects']); toast(t('obj.deleted')); router.push('/objects'); }
+    try { await api.del(`/objects/${o.id}`); await refresh(['objects']); toast(t('obj.deleted')); router.push('/resources'); }
     catch (e) { setErr(e instanceof Error ? e.message : ''); setConfirmDel(false); setBusy(false); }
   };
 

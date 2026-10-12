@@ -85,7 +85,7 @@ export function ClusterMembers({ cluster }: { cluster: ObjectView }) {
                       <button className="btn ghost icon sm" disabled={i === members.length - 1 || !!busy} onClick={() => move(i, 1)} aria-label={t('cl.down')} title={t('cl.down')}><ArrowDown size={14} /></button></td>
                     <td><span className="row gap-s">
                       {sv && sv.length > 0 ? <button className="cm-chev" onClick={() => toggle(m.id)} aria-expanded={expanded} aria-label={expanded ? t('svc.collapse') : t('svc.expand')} title={expanded ? t('svc.collapse') : t('svc.expand')}>{expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button> : <span style={{ width: 20 }} />}
-                      <Link href={`/objects/${m.id}`} className="cm-name"><Icon size={15} style={{ color }} /><b>{m.name}</b></Link></span></td>
+                      <Link href={`/resources/${m.id}`} className="cm-name"><Icon size={15} style={{ color }} /><b>{m.name}</b></Link></span></td>
                     <td className="mono small svc-img" title={summaryOf(m, st)}>{summaryOf(m, st) || '—'}</td>
                     <td><span className="row gap-s small"><StatusDot status={m.state.status} />{t(`obj.status.${m.state.status}`)}</span>
                       <span className="muted small">{[detailText(t, m.state.detail), m.state.since && live ? t('obj.since', { time: ago(m.state.since) }) : ''].filter(Boolean).join(' · ')}</span></td>
@@ -97,7 +97,7 @@ export function ClusterMembers({ cluster }: { cluster: ObjectView }) {
                         : <button className="btn ghost icon sm" disabled={!!busy} onClick={() => void act(m, 'start')} aria-label={t('obj.act.start')} title={t('obj.act.start')}><Play size={14} /></button>}
                       <button className="btn ghost icon sm" disabled={!!busy} onClick={() => void act(m, 'restart')} aria-label={t('obj.act.restart')} title={t('obj.act.restart')}><RotateCw size={14} /></button>
                       <Menu label={t('svc.more')} icon={<MoreHorizontal size={15} />} iconOnly>{(close) => (<>
-                        <MenuItem icon={<ExternalLink size={15} />} onClick={() => { close(); router.push(`/objects/${m.id}`); }}>{t('cl.open')}</MenuItem>
+                        <MenuItem icon={<ExternalLink size={15} />} onClick={() => { close(); router.push(`/resources/${m.id}`); }}>{t('cl.open')}</MenuItem>
                         <MenuSep />
                         <MenuItem icon={<X size={15} />} danger hint={t('cl.remove.hint')} disabled={!!busy} onClick={() => { close(); void saveMembers(ids.filter((x) => x !== m.id)); }}>{t('cl.remove')}</MenuItem>
                       </>)}</Menu></td>

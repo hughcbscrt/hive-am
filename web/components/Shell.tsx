@@ -52,7 +52,7 @@ function Nav() {
       <div className="brand"><HiveMark /><div>hive-am<small>{t('app.tagline')}</small></div></div>
       <LanguageSwitch />
       {item('/', t('nav.colony'), <Hexagon size={18} />, running || undefined)}
-      {item('/objects', t('nav.objects'), <Server size={18} />, objects.length || undefined)}
+      {item('/resources', t('nav.objects'), <Server size={18} />, objects.length || undefined)}
       {item('/agents', t('nav.agents'), <Users size={18} />, agents.length)}
       {item('/relations', t('nav.relations'), <Network size={18} />)}
       {item('/connections', t('nav.connections'), <Plug size={18} />, connections.length || undefined)}
