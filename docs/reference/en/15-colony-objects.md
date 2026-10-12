@@ -144,7 +144,7 @@ Every field that holds a path uses the same picker (`PathPicker` in `web/compone
 
 ## 15.8 Not there yet
 
-Docker objects cannot be created on a remote Docker host, and PM2 is not integrated: a server object runs its command in its own process group and survives a restart of hive-am (see 15.2), but hive-am's supervisor (automatic restarts, health checks) only works while hive-am is running.
+Docker objects cannot be created on a remote Docker host, and PM2 is not integrated: a server object runs its command in its own process group and survives a restart of hive-am (see 15.1), but hive-am's supervisor (automatic restarts, health checks) only works while hive-am is running.
 
 ## 15.9 Seeing the values
 
