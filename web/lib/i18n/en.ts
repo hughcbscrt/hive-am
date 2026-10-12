@@ -1297,6 +1297,8 @@ export const en = {
   "db.copied": "Copied",
   "db.download": "Download CSV",
   "db.schema.filter": "Filter tables",
+  "db.schema.collapseAll": "Collapse all schemas",
+  "db.schema.expandAll": "Expand all schemas",
   "db.schema.refresh": "Reload the schema",
   "db.schema.loading": "Reading the schema…",
   "db.schema.empty": "No tables here.",

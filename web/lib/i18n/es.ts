@@ -1295,6 +1295,8 @@ export const es: Record<DictKey, string> = {
   "db.copied": "Copiado",
   "db.download": "Descargar CSV",
   "db.schema.filter": "Filtrar tablas",
+  "db.schema.collapseAll": "Contraer todos los esquemas",
+  "db.schema.expandAll": "Expandir todos los esquemas",
   "db.schema.refresh": "Volver a leer el esquema",
   "db.schema.loading": "Leyendo el esquema…",
   "db.schema.empty": "No hay tablas aquí.",

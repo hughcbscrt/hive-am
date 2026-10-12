@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import { BookMarked, ChevronDown, ChevronRight, Copy, Download, Loader2, Play, RefreshCw, Save, Search, Table2, Trash2, Eye, Lock, Unlock } from 'lucide-react';
+import { BookMarked, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, Download, Loader2, Play, RefreshCw, Save, Search, Table2, Trash2, Eye, Lock, Unlock } from 'lucide-react';
 import { api } from '@/lib/api';
 import { ago } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n/index';
@@ -195,12 +195,16 @@ function SchemaPane({ o, schema, err, loading, onReload, database, setDatabase, 
     return [...m];
   }, [schema, filter]);
   const single = groups.length === 1;
+  const names = useMemo(() => [...new Set((schema?.tables ?? []).map((tb) => tb.schema))], [schema]);
+  const allOpen = names.every((n) => open[n] !== false);
+  const setAll = (v: boolean) => setOpen(Object.fromEntries(names.map((n) => [n, v])));
   return (
     <div className="dbs">
       <aside className="dbs-list">
         <div className="dbs-head">
           {dbs.length > 1 && <select className="select" value={cur ?? ''} onChange={(e) => { setSel(null); setDatabase(e.target.value); }} aria-label={t('db.database.pick')}>{dbs.map((d) => <option key={d} value={d}>{d}</option>)}</select>}
           <div className="search grow"><Search size={14} /><input className="input" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('db.schema.filter')} aria-label={t('db.schema.filter')} /></div>
+          {names.length > 1 && <button className="btn ghost icon sm" onClick={() => setAll(!allOpen)} aria-label={allOpen ? t('db.schema.collapseAll') : t('db.schema.expandAll')} title={allOpen ? t('db.schema.collapseAll') : t('db.schema.expandAll')}>{allOpen ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}</button>}
           <button className="btn ghost icon sm" onClick={onReload} aria-label={t('db.schema.refresh')} title={t('db.schema.refresh')}><RefreshCw size={14} className={loading ? 'spin' : ''} /></button>
         </div>
         <div className="dbs-tree">
