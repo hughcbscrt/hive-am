@@ -245,9 +245,9 @@ export function parseDatabase(c: any): DatabaseConfig {
 }
 
 export function parseCluster(c: any): ClusterConfig {
-  if (!Array.isArray(c?.members)) throw new ObjectError('Choose the objects it groups');
+  if (!Array.isArray(c?.members)) throw new ObjectError('Choose the resources it groups');
   const members = [...new Set(c.members.map((x: unknown) => str(x, 'A member')))] as string[];
-  if (members.length > 30) throw new ObjectError('A cluster groups at most 30 objects');
+  if (members.length > 30) throw new ObjectError('A cluster groups at most 30 resources');
   return { members };
 }
 

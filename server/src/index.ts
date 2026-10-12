@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { handle } from './api.js';
 import { bus } from './runtime.js';
-import { skills } from './db.js';
+import { db, skills } from './db.js';
 import { DEFAULT_SKILLS } from './skills/defaults.js';
 import { seedIfEmpty } from './seed.js';
 import { API_PORT } from './mcp-config.js';
@@ -16,6 +16,8 @@ import { armObjects } from './objects/index.js';
 import { attachTerminal, isLocalRequest, terminalsEnabled } from './terminals.js';
 
 skills.seedDefaults(DEFAULT_SKILLS);
+// The section "Objects" became "Resources": the skill that came with hive-am follows, unless the person already renamed it.
+db.prepare("UPDATE skills SET name='Colony resources' WHERE id='default-objects' AND name='Colony objects' AND NOT EXISTS (SELECT 1 FROM skills WHERE lower(name)='colony resources')").run();
 seedIfEmpty();
 migrateChannelSkill();
 armWakeups();

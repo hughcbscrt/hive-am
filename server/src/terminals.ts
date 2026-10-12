@@ -59,7 +59,7 @@ function plan(spec: TerminalSpec): { cwd: string; file: string; args: string[]; 
     cwd = resolved(a).cwd; title ||= a.name;
   }
   if (typeof spec.objectId === 'string') {
-    const o = objectsStore.get(spec.objectId); if (!o) throw new TerminalError('That object no longer exists');
+    const o = objectsStore.get(spec.objectId); if (!o) throw new TerminalError('That resource no longer exists');
     title ||= o.name;
     if (o.kind === 'server') cwd = (o.config as ServerConfig).cwd;
     else if (o.kind === 'docker') {
@@ -75,7 +75,7 @@ function plan(spec: TerminalSpec): { cwd: string; file: string; args: string[]; 
       } else target = c.mode === 'existing' ? c.container! : containerName(o.id);
       // A shell inside the container: bash when it has one, sh otherwise.
       file = 'docker'; args = ['exec', '-it', target, 'sh', '-c', 'command -v bash >/dev/null 2>&1 && exec bash || exec sh'];
-    } else throw new TerminalError('This kind of object has no terminal.');
+    } else throw new TerminalError('This kind of resource has no terminal.');
   }
   if (!existsSync(cwd) || !statSync(cwd).isDirectory()) throw new TerminalError(`The folder ${cwd} does not exist`);
   return { cwd, file, args, title: title || cwd.split('/').filter(Boolean).pop() || '/' };

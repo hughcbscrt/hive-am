@@ -91,7 +91,7 @@ await objectAction(other.id, 'stop');
 check((await st(other.id)) === 'stopped', 'and can be stopped from the new one');
 
 // ---------------------------------------------------------------- input
-check(await rejects(() => createObject({ name: 'web-app', kind: 'server', config: { cwd: dir, start: 'x' } }), /already an object/), 'names are unique');
+check(await rejects(() => createObject({ name: 'web-app', kind: 'server', config: { cwd: dir, start: 'x' } }), /already a resource/), 'names are unique');
 check(await rejects(() => createObject({ name: 'x1', kind: 'server', config: { cwd: 'relative', start: 'x' } }), /absolute/), 'a relative folder is refused');
 check(await rejects(() => createObject({ name: 'x2', kind: 'server', config: { cwd: dir, start: '' } }), /command/), 'an empty command is refused');
 check(await rejects(() => createObject({ name: 'x3', kind: 'server', config: { cwd: dir, start: 'x', port: 70000 } }), /port/), 'a port out of range is refused');

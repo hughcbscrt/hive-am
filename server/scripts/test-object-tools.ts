@@ -59,7 +59,7 @@ const l2 = session(loner.id, 'objects'); const lr = await l2.call('object_list')
 check(lr.text.includes('free-job') && !lr.text.includes('colony-job'), 'an agent with no colony sees the objects that have none');
 
 const x = await m.call('object_action', { name: 'free-job', action: 'start' });
-check(x.err && /no object named/.test(x.text), 'acting on an object of another colony is refused, as if it did not exist');
+check(x.err && /no resource named/.test(x.text), 'acting on an object of another colony is refused, as if it did not exist');
 const bad = await m.call('object_action', { name: 'colony-job', action: 'delete' });
 check(bad.err && /start, stop or restart/.test(bad.text), 'an unknown action is refused');
 

@@ -39,7 +39,7 @@ function checkMembers(kind: string, colony: string | null, config: unknown, self
   if (kind !== 'cluster') return;
   for (const id of (config as ClusterConfig).members) {
     const m = objectsStore.get(id);
-    if (!m || m.id === selfId) throw new ObjectError('One of the objects it groups does not exist');
+    if (!m || m.id === selfId) throw new ObjectError('One of the resources it groups does not exist');
     if (m.kind !== 'server' && m.kind !== 'docker') throw new ObjectError(`"${m.name}" cannot be grouped: only servers and Docker containers can`);
     if ((m.colony_id ?? null) !== (colony ?? null)) throw new ObjectError(`"${m.name}" is not in the same colony as the cluster`);
   }
@@ -51,9 +51,9 @@ export const objectsStore = {
   byName(name: string) { const r = db.prepare('SELECT * FROM colony_objects WHERE name=?').get(name); return r ? row(r) : undefined; },
   create(input: { name: unknown; kind: unknown; colony_id?: unknown; config: unknown }): ObjectRow {
     const p = { ...input, kind: kindOf(input.kind) };
-    if (!isKind(p.kind)) throw new ObjectError('Unknown kind of object');
+    if (!isKind(p.kind)) throw new ObjectError('Unknown kind of resource');
     const name = parseName(p.name), config = parseConfig(p.kind, p.config);
-    if (objectsStore.byName(name)) throw new ObjectError(`There is already an object named "${name}"`);
+    if (objectsStore.byName(name)) throw new ObjectError(`There is already a resource named "${name}"`);
     const colony = p.colony_id ? String(p.colony_id) : null;
     if (colony && !colonies.get(colony)) throw new ObjectError('That colony no longer exists');
     checkMembers(p.kind, colony, config);
@@ -62,10 +62,10 @@ export const objectsStore = {
     return objectsStore.get(id)!;
   },
   update(id: string, p: { name?: unknown; colony_id?: unknown; config?: unknown }): ObjectRow {
-    const cur = objectsStore.get(id); if (!cur) throw new ObjectError('Object not found');
+    const cur = objectsStore.get(id); if (!cur) throw new ObjectError('Resource not found');
     const name = p.name !== undefined ? parseName(p.name) : cur.name;
     const other = objectsStore.byName(name);
-    if (other && other.id !== id) throw new ObjectError(`There is already an object named "${name}"`);
+    if (other && other.id !== id) throw new ObjectError(`There is already a resource named "${name}"`);
     if (cur.kind === 'http' && p.config) keepSecrets(cur.config as HttpConfig, p.config);
     if (cur.kind === 'database' && p.config) keepPassword(cur.config as DatabaseConfig, p.config as Record<string, unknown>);
     const config = p.config !== undefined ? parseConfig(cur.kind as ObjectKind, p.config) : cur.config;

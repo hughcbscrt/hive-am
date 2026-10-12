@@ -122,7 +122,7 @@ API: `GET /api/docker/containers`, `GET /api/docker/images`, `GET /api/docker/co
 
 ## 15.5 Agents that look after resources
 
-An agent with the **Colony objects** skill (`default-objects`, one of the skills that ship with hive-am) gets three tools: `object_list`, `object_logs` and `object_action` (start, stop, restart). To make one, select an resource on the map and press **Create a manager agent** in its panel: it opens the new-agent form with the skill, the colony and *Edit files* permission already set (the same skill can be added to any agent from the skill picker). The panel lists who looks after each resource.
+An agent with the **Colony resources** skill (`default-objects`, one of the skills that ship with hive-am) gets three tools: `object_list`, `object_logs` and `object_action` (start, stop, restart). To make one, select an resource on the map and press **Create a manager agent** in its panel: it opens the new-agent form with the skill, the colony and *Edit files* permission already set (the same skill can be added to any agent from the skill picker). The panel lists who looks after each resource.
 
 The rules are enforced by the server, not just written in the skill:
 

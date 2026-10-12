@@ -90,8 +90,8 @@ Whatever your skills say: when you answer a \`[hive:channel]\` message, never wr
 You cannot write on your own between messages. To tell the person something later, call \`wake_me\` (${toolName(a.provider, 'wake_me')}) with \`minutes\` and a \`note\`; you are woken then, in the same place, and answer. When you start a long command in the background and want to know the moment it ends, use \`wake_when_done\` (${toolName(a.provider, 'wake_when_done')}) with its pid. For something that repeats (every weekday at 9, every 30 minutes…) use \`schedule_create\` (${toolName(a.provider, 'schedule_create')}); \`schedule_list\` and \`schedule_cancel\` (${toolName(a.provider, 'schedule_list')}, ${toolName(a.provider, 'schedule_cancel')}) show or stop them. Follow the "Wake-ups" skill, and never promise a later notice without calling it.`);
   }
   if (a.skill_ids.includes(OBJECTS_SKILL_ID)) {
-    parts.push(`## Colony objects
-You look after the servers and containers of your colony. Tools: \`object_list\` (${toolName(a.provider, 'object_list')}) shows them with their state; \`object_logs\` (${toolName(a.provider, 'object_logs')}) reads the latest output of one; \`object_action\` (${toolName(a.provider, 'object_action')}) starts, stops or restarts one${a.permission === 'plan' ? ' (not available to you: you are read-only)' : ''}. Follow the "Colony objects" skill. You cannot create or change objects.`);
+    parts.push(`## Colony resources
+You look after the servers and containers of your colony. Tools: \`object_list\` (${toolName(a.provider, 'object_list')}) shows them with their state; \`object_logs\` (${toolName(a.provider, 'object_logs')}) reads the latest output of one; \`object_action\` (${toolName(a.provider, 'object_action')}) starts, stops or restarts one${a.permission === 'plan' ? ' (not available to you: you are read-only)' : ''}. Follow the "Colony resources" skill. You cannot create or change resources.`);
   }
   if (a.skill_ids.includes(NOTEBOOK_SKILL_ID)) {
     const nb = { read: toolName(a.provider, 'notebook_read'), add: toolName(a.provider, 'notebook_add'), rewrite: toolName(a.provider, 'notebook_rewrite') };

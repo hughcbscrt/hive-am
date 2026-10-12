@@ -87,7 +87,7 @@ async function composeStats(c: DockerConfig): Promise<ObjectStats> {
 
 export async function objectStats(o: ObjectRow): Promise<ObjectStats> {
   if (o.kind === 'server') return serverStats(o);
-  if (o.kind !== 'docker') throw new ObjectError('This kind of object has no usage figures');
+  if (o.kind !== 'docker') throw new ObjectError('This kind of resource has no usage figures');
   const c = o.config as DockerConfig;
   return c.mode === 'compose' ? composeStats(c) : containerStats(c.mode === 'existing' ? c.container! : containerName(o.id));
 }

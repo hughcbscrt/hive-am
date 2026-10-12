@@ -272,7 +272,7 @@ route('GET', '/api/sessions', () => {
 
 // ---- colony objects (servers and Docker containers hive-am keeps running) ----
 /** They run commands, so, like the git actions, they only accept requests from the local app. */
-const objectGuard = (req: IncomingMessage) => { try { localOnly(req); } catch { throw new HttpError(403, 'Objects can only be changed from the local app'); } };
+const objectGuard = (req: IncomingMessage) => { try { localOnly(req); } catch { throw new HttpError(403, 'Resources can only be changed from the local app'); } };
 const objectSafe = async <T,>(fn: () => Promise<T> | T): Promise<T> => { try { return await fn(); } catch (e) { if (e instanceof ObjectError) throw bad(e.message); throw e; } };
 // The agents' side (tools `object_list`, `object_action`, `object_logs`): `from` is the agent; scope and permission are checked in objects/agent.ts.
 route('POST', '/api/agent-objects/list', async ({ req }) => { const b = await body(req); return objectSafe(() => ({ objects: agentObjects(b.from) })); });

@@ -13,7 +13,7 @@ import type { Agent } from '@/lib/types';
 export const OBJECTS_SKILL_ID = 'default-objects';
 
 /** Step 1: start from a type (or blank). Step 2: fill in the details. */
-/** `manager`: an agent that looks after the objects of a colony (it starts with the "Colony objects" skill, and edit permission so it can start and stop them). */
+/** `manager`: an agent that looks after the objects of a colony (it starts with the "Colony resources" skill, and edit permission so it can start and stop them). */
 export function NewAgentDrawer({ onClose, onCreated, presetTypeId, presetColonyId, manager = false }: { onClose: () => void; onCreated?: (id: string) => void; presetTypeId?: string; presetColonyId?: string; manager?: boolean }) {
   const { t } = useI18n();
   const { types, agents, refresh, colonies } = useHive();

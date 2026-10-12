@@ -86,7 +86,7 @@ export function armObjects(): void {
   timer = setInterval(() => void tick(), POLL_MS); timer.unref?.();
 }
 
-const get = (id: string): ObjectRow => objectsStore.get(id) ?? (() => { throw new ObjectError('Object not found'); })();
+const get = (id: string): ObjectRow => objectsStore.get(id) ?? (() => { throw new ObjectError('Resource not found'); })();
 
 /** Starts, stops or restarts one server or container. */
 async function act(o: ObjectRow, action: 'start' | 'stop' | 'restart'): Promise<void> {
@@ -127,7 +127,7 @@ async function actOnCluster(o: ObjectRow, action: 'start' | 'stop' | 'restart'):
 export async function objectAction(id: string, action: unknown): Promise<ObjectView> {
   const o = get(id);
   if (action === 'recreate' || action === 'rebuild') {
-    if (o.kind !== 'docker') throw new ObjectError('Only a Docker object can be created again');
+    if (o.kind !== 'docker') throw new ObjectError('Only a Docker resource can be created again');
     try { await recreateDocker(o.id, o.config as DockerConfig, action === 'rebuild'); }
     finally { await refreshStates().catch(() => undefined); changed(); }
     return viewOf(o);
@@ -143,7 +143,7 @@ export async function objectAction(id: string, action: unknown): Promise<ObjectV
 /** The configuration of a container (or of one service of a compose project) as Docker reports it. */
 export async function objectInspect(id: string, service?: string) {
   const o = get(id);
-  if (o.kind !== 'docker') throw new ObjectError('Only a Docker object can be inspected');
+  if (o.kind !== 'docker') throw new ObjectError('Only a Docker resource can be inspected');
   return inspectDocker(o.id, o.config as DockerConfig, service);
 }
 
@@ -199,10 +199,10 @@ export async function objectLogs(id: string, q: { tail?: number; after?: string 
 export const statsOf = async (id: string) => { const { objectStats } = await import('./stats.js'); return objectStats(get(id)); };
 
 /** The requests of an HTTP object, and running one of them. */
-export const httpScan = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return scanHttp((o.config as HttpConfig).folder, (o.config as HttpConfig).variables); };
-export const httpDescribe = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return describeHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id)); };
+export const httpScan = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP resource'); return scanHttp((o.config as HttpConfig).folder, (o.config as HttpConfig).variables); };
+export const httpDescribe = (id: string, file: string, index: number, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP resource'); return describeHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id)); };
 export const httpRun = async (id: string, file: string, index: number, env?: string) => {
-  const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object');
+  const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP resource');
   const cfg = o.config as HttpConfig, useEnv = env ?? cfg.env ?? '';
   let name = `#${index}`, method = '';
   try { const it = parseHttpFile(readHttpFile(cfg.folder, file), file).requests[index]; if (it) { name = it.name; method = it.method; } } catch { /* the run reports it */ }
@@ -220,21 +220,21 @@ export const httpDocs = (id: string, format: 'markdown' | 'postman', file?: stri
 export const httpHistory = (id: string) => { httpObjectOf(id); return listHistory(id); };
 export const httpHistoryClear = (id: string) => { httpObjectOf(id); clearHistory(id); return []; };
 
-export const httpInspect = (id: string, file: string | undefined, index: number | undefined, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return inspectHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id)); };
-export const httpExport = (id: string, file: string, index: number, format: ExportFormat, env?: string, redact = false) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return exportHttp((o.config as HttpConfig).folder, file, index, format, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id), redact); };
-export const httpFileRead = (id: string, file: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return { file, content: readHttpFile((o.config as HttpConfig).folder, file) }; };
-export const httpFileCreate = (id: string, file: string, content: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return { file: createHttpFile((o.config as HttpConfig).folder, file, content) }; };
-export const httpFileWrite = (id: string, file: string, content: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); writeHttpFile((o.config as HttpConfig).folder, file, content); return { ok: true }; };
+export const httpInspect = (id: string, file: string | undefined, index: number | undefined, env?: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP resource'); return inspectHttp((o.config as HttpConfig).folder, file, index, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id)); };
+export const httpExport = (id: string, file: string, index: number, format: ExportFormat, env?: string, redact = false) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP resource'); return exportHttp((o.config as HttpConfig).folder, file, index, format, env ?? (o.config as HttpConfig).env, (o.config as HttpConfig).variables, sessionOf(o.id), redact); };
+export const httpFileRead = (id: string, file: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP resource'); return { file, content: readHttpFile((o.config as HttpConfig).folder, file) }; };
+export const httpFileCreate = (id: string, file: string, content: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP resource'); return { file: createHttpFile((o.config as HttpConfig).folder, file, content) }; };
+export const httpFileWrite = (id: string, file: string, content: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP resource'); writeHttpFile((o.config as HttpConfig).folder, file, content); return { ok: true }; };
 
 /** The values kept while an HTTP object is used (see http.ts): look at them, set one, forget one or all. */
-const httpObjectOf = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return o; };
-const httpObject = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP object'); return o; };
+const httpObjectOf = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP resource'); return o; };
+const httpObject = (id: string) => { const o = get(id); if (o.kind !== 'http') throw new ObjectError('That is not an HTTP resource'); return o; };
 export const httpSession = (id: string) => sessionView(httpObject(id).id);
 export const httpSessionSet = (id: string, name: string, value: string) => { sessionSet(httpObject(id).id, name, value); return sessionView(id); };
 export const httpSessionClear = (id: string, name?: string) => { sessionClear(httpObject(id).id, name); return sessionView(id); };
 
 /** A database object: what its connection can show and run (see database.ts). Reading the schema or running a query uses the saved password. */
-const dbOf = (id: string) => { const o = get(id); if (o.kind !== 'database') throw new ObjectError('That is not a database object'); return { o, cfg: o.config as DatabaseConfig }; };
+const dbOf = (id: string) => { const o = get(id); if (o.kind !== 'database') throw new ObjectError('That is not a database resource'); return { o, cfg: o.config as DatabaseConfig }; };
 export const dbSchemaOf = (id: string, database?: string) => dbSchema(dbOf(id).cfg, database);
 export const dbColumnsOf = (id: string, p: { database?: string; schema: string; table: string }) => dbColumns(dbOf(id).cfg, p);
 export async function dbRun(id: string, p: { sql: string; database?: string }) {
