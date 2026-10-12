@@ -5,8 +5,10 @@ import { bus } from '../runtime.js';
 import { renderTemplate, listTemplates } from './templates.js';
 import { composeServiceAction, inspectDocker, recreateDocker, type DockerAction, dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
 import { recordRun, listHistory, clearHistory } from './http-history.js';
+import { dbColumns, dbQuery, dbSchema, dbState, dbTest, forgetDatabase } from './database.js';
+import { addSaved, clearQueries, forgetQueries, listQueries, listSaved, recordQuery, removeSaved } from './db-history.js';
 import { exportCollection, parseHttpFile, createHttpFile, exportHttp, type ExportFormat, describeHttp, dropSession, inspectHttp, readHttpFile, runHttp, scanHttp, writeHttpFile, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
-import { ObjectError, type ClusterConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
+import { ObjectError, parseDatabase, type ClusterConfig, type DatabaseConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
 import { forgetServer, serverLogs, serverState, startServer, stopServer } from './runner.js';
 import { forgetSupervision, resetSupervision, supervise } from './supervisor.js';
 import { maskConfig, objectsStore } from './store.js';
@@ -56,7 +58,7 @@ async function serverStateSupervised(o: ObjectRow): Promise<ObjectState> {
 export async function stateOf(o: ObjectRow): Promise<ObjectState> {
   const s = o.kind === 'server' ? await serverStateSupervised(o)
     : o.kind === 'docker' ? await dockerState(o.id, o.config as DockerConfig)
-    : o.kind === 'http' ? httpState(o) : clusterState(o);
+    : o.kind === 'http' ? httpState(o) : o.kind === 'database' ? await dbState(o.id, o.config as DatabaseConfig) : clusterState(o);
   states.set(o.id, s);
   return s;
 }
@@ -132,6 +134,7 @@ export async function objectAction(id: string, action: unknown): Promise<ObjectV
   }
   if (action !== 'start' && action !== 'stop' && action !== 'restart') throw new ObjectError('Unknown action');
   if (o.kind === 'http') throw new ObjectError('HTTP requests are not started or stopped: open them and run a request.');
+  if (o.kind === 'database') throw new ObjectError('A database is not started or stopped: open it and run a query.');
   try { if (o.kind === 'cluster') await actOnCluster(o, action); else await act(o, action); }
   finally { await refreshStates().catch(() => undefined); changed(); }
   return viewOf(o);
@@ -177,7 +180,7 @@ export async function objectServiceAction(id: string, service: unknown, action: 
  */
 export async function objectLogs(id: string, q: { tail?: number; after?: string }): Promise<{ text: string; cursor: string; reset?: boolean }> {
   const o = get(id);
-  if (o.kind === 'http') return { text: '', cursor: '' };
+  if (o.kind === 'http' || o.kind === 'database') return { text: '', cursor: '' };
   if (o.kind === 'cluster') {
     const members = (o.config as ClusterConfig).members.map((m) => objectsStore.get(m)).filter((m): m is ObjectRow => !!m);
     let before: Record<string, string> = {}; try { before = q.after ? JSON.parse(q.after) : {}; } catch { /* a fresh start */ }
@@ -230,15 +233,45 @@ export const httpSession = (id: string) => sessionView(httpObject(id).id);
 export const httpSessionSet = (id: string, name: string, value: string) => { sessionSet(httpObject(id).id, name, value); return sessionView(id); };
 export const httpSessionClear = (id: string, name?: string) => { sessionClear(httpObject(id).id, name); return sessionView(id); };
 
+/** A database object: what its connection can show and run (see database.ts). Reading the schema or running a query uses the saved password. */
+const dbOf = (id: string) => { const o = get(id); if (o.kind !== 'database') throw new ObjectError('That is not a database object'); return { o, cfg: o.config as DatabaseConfig }; };
+export const dbSchemaOf = (id: string, database?: string) => dbSchema(dbOf(id).cfg, database);
+export const dbColumnsOf = (id: string, p: { database?: string; schema: string; table: string }) => dbColumns(dbOf(id).cfg, p);
+export async function dbRun(id: string, p: { sql: string; database?: string }) {
+  const { cfg } = dbOf(id);
+  try {
+    const r = await dbQuery(cfg, p);
+    recordQuery(id, { sql: p.sql, database: p.database, ok: true, ms: r.ms, rows: r.columns.length ? r.rows.length : undefined, affected: r.affected });
+    return r;
+  } catch (e) { recordQuery(id, { sql: p.sql, database: p.database, ok: false, ms: 0, error: e instanceof Error ? e.message : 'failed' }); throw e; }
+}
+export const dbHistory = (id: string) => { dbOf(id); return listQueries(id); };
+export const dbHistoryClear = (id: string) => { dbOf(id); clearQueries(id); return []; };
+export const dbSavedList = (id: string) => { dbOf(id); return listSaved(id); };
+export const dbSavedAdd = (id: string, p: { name?: unknown; sql?: unknown; database?: unknown }) => {
+  dbOf(id); const name = String(p.name ?? '').trim().slice(0, 80), sql = String(p.sql ?? '');
+  if (!name || !sql.trim()) throw new ObjectError('Give the query a name and some text');
+  try { return addSaved(id, { name, sql, database: p.database ? String(p.database) : undefined }); } catch (e) { throw new ObjectError(e instanceof Error ? e.message : 'could not save'); }
+};
+export const dbSavedRemove = (id: string, savedId: string) => { dbOf(id); if (!removeSaved(id, savedId)) throw new ObjectError('Saved query not found'); return listSaved(id); };
+/** Tries a connection before it is saved: the config comes from the form; an empty password means the one already saved (of that object). */
+export async function dbTestConfig(p: { id?: unknown; config?: unknown }) {
+  const raw: Record<string, unknown> = { ...((p.config ?? {}) as Record<string, unknown>) };
+  if (p.id && !raw.password) { const o = objectsStore.get(String(p.id)); if (o?.kind === 'database' && (o.config as DatabaseConfig).engine === raw.engine) raw.password = (o.config as DatabaseConfig).password; }
+  const cfg = parseDatabase(raw);
+  const r = await dbTest(cfg);
+  return r;
+}
+
 /** Deleting an object also removes what hive-am made for it (see docker.ts for what is left alone). */
 export async function removeObject(id: string): Promise<boolean> {
   const o = objectsStore.get(id); if (!o) return false;
   if (o.kind === 'server') { await stopServer(o.id, o.config as ServerConfig).catch(() => undefined); forgetServer(o.id); }
   else if (o.kind === 'docker') await removeDocker(o.id, o.config as DockerConfig);
-  states.delete(id); counts.delete(id); forgetSupervision(id); dropSession(id); clearHistory(id);
+  states.delete(id); counts.delete(id); forgetSupervision(id); dropSession(id); clearHistory(id); forgetDatabase(id); forgetQueries(id);
   const ok = objectsStore.remove(id); changed();
   return ok;
 }
 
 export const createObject = (p: Parameters<typeof objectsStore.create>[0]) => { const o = objectsStore.create(p); void stateOf(o).then(changed); changed(); return viewOf(o); };
-export const updateObject = (id: string, p: Parameters<typeof objectsStore.update>[1]) => { const o = objectsStore.update(id, p); void stateOf(o).then(changed); changed(); return viewOf(o); };
+export const updateObject = (id: string, p: Parameters<typeof objectsStore.update>[1]) => { const o = objectsStore.update(id, p); forgetDatabase(id); void stateOf(o).then(changed); changed(); return viewOf(o); };

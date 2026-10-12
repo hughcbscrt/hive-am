@@ -30,7 +30,7 @@ import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashAp
 import { composeServices, listContainers, listImages } from './objects/docker-info.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from './objects/agent.js';
 import { TerminalError, closeTerminal, createTerminal, isLocalRequest, listTerminals, terminalsEnabled } from './terminals.js';
-import { ObjectError, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, objectInspect, objectLogs, removeObject, updateObject } from './objects/index.js';
+import { ObjectError, dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, objectInspect, objectLogs, removeObject, updateObject } from './objects/index.js';
 import { gitCompare, gitCompareDiff, gitGrep, gitImageAt, gitRefs } from './git/browse.js';
 import { GitOpError, gitBlame, gitBranchCreate, gitBranchDelete, gitRefFile, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitTagFile, gitTagTree, gitTags, gitUnresolve, type PullMode } from './git/ops.js';
 
@@ -305,6 +305,16 @@ route('GET', '/api/objects/:id/http/docs', ({ params, url }) => objectSafe(() =>
 route('GET', '/api/objects/:id/http/history', ({ params }) => objectSafe(() => httpHistory(params[0])));
 route('DELETE', '/api/objects/:id/http/history', ({ req, params }) => { objectGuard(req); return objectSafe(() => httpHistoryClear(params[0])); });
 route('POST', '/api/objects/:id/http/run', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => httpRun(params[0], String(p.file ?? ''), Number(p.index ?? 0), p.env ? String(p.env) : undefined)); });
+// ---- database objects (a connection opens per request; local app only, because it uses the saved password) ----
+route('POST', '/api/object-db/test', async ({ req }) => { objectGuard(req); const p = await body(req); return objectSafe(() => dbTestConfig(p)); });
+route('GET', '/api/objects/:id/db/schema', ({ req, params, url }) => { objectGuard(req); return objectSafe(() => dbSchemaOf(params[0], url.searchParams.get('database') ?? undefined)); });
+route('GET', '/api/objects/:id/db/columns', ({ req, params, url }) => { objectGuard(req); return objectSafe(() => dbColumnsOf(params[0], { database: url.searchParams.get('database') ?? undefined, schema: url.searchParams.get('schema') ?? '', table: url.searchParams.get('table') ?? '' })); });
+route('POST', '/api/objects/:id/db/query', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => dbRun(params[0], { sql: String(p.sql ?? ''), database: p.database ? String(p.database) : undefined })); });
+route('GET', '/api/objects/:id/db/history', ({ req, params }) => { objectGuard(req); return objectSafe(() => dbHistory(params[0])); });
+route('DELETE', '/api/objects/:id/db/history', ({ req, params }) => { objectGuard(req); return objectSafe(() => dbHistoryClear(params[0])); });
+route('GET', '/api/objects/:id/db/saved', ({ req, params }) => { objectGuard(req); return objectSafe(() => dbSavedList(params[0])); });
+route('POST', '/api/objects/:id/db/saved', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => dbSavedAdd(params[0], p)); });
+route('DELETE', '/api/objects/:id/db/saved/:sid', ({ req, params }) => { objectGuard(req); return objectSafe(() => dbSavedRemove(params[0], params[1])); });
 route('GET', '/api/objects/:id/logs', ({ params, url }) => objectSafe(() => objectLogs(params[0], { tail: url.searchParams.get('tail') ? Number(url.searchParams.get('tail')) : undefined, after: url.searchParams.get('after') ?? undefined })));
 
 // ---- terminals (real shells shown in the bottom panel; see terminals.ts) ----

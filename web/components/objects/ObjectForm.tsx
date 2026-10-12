@@ -7,9 +7,10 @@ import { Suggest } from './Suggest';
 import { TemplatePicker } from './TemplatePicker';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
-import type { ClusterConfig, DockerConfig, HttpConfig, HttpScan, ObjectKind, ObjectView, ServerConfig } from '@/lib/types';
+import type { ClusterConfig, DatabaseConfig, DbEngine, DockerConfig, HttpConfig, HttpScan, ObjectKind, ObjectView, ServerConfig } from '@/lib/types';
 import { KIND, envToText, lines, textToEnv } from './meta';
 import { VarsEditor, type Vars } from './VarsEditor';
+import { DatabaseCards } from './DatabaseCards';
 
 type Mode = NonNullable<DockerConfig['mode']> | 'template';
 export interface Draft {
@@ -20,6 +21,7 @@ export interface Draft {
   template: string; tplValues: Record<string, string>;
   mode: Mode; image: string; ports: string; volumes: string; dockerRestart: string; command: string; file: string; project: string; services: string; container: string;
   memory: string; cpus: string; network: string;
+  engine: DbEngine; dbHost: string; dbPort: string; dbUser: string; dbPassword: string; dbPasswordSet: boolean; dbName: string; dbFile: string; dbSsl: boolean; dbTrust: boolean; dbReadOnly: boolean; dbTimeout: string; dbMaxRows: string;
 }
 const n = (v: number | undefined) => (v === undefined ? '' : String(v));
 
@@ -28,6 +30,7 @@ export const draftFrom = (o?: ObjectView, colony?: string, kind?: ObjectKind): D
   const d = (o?.kind === 'docker' ? o.config : {}) as Partial<DockerConfig>;
   const h = (o?.kind === 'http' ? o.config : {}) as Partial<HttpConfig>;
   const c = (o?.kind === 'cluster' ? o.config : {}) as Partial<ClusterConfig>;
+  const q = (o?.kind === 'database' ? o.config : {}) as Partial<DatabaseConfig>;
   return {
     name: o?.name ?? '', colony_id: o?.colony_id ?? colony ?? '', kind: o?.kind ?? kind ?? 'server',
     cwd: s.cwd ?? '', start: s.start ?? '', stop: s.stop ?? '', port: n(s.port), env: envToText(o?.kind === 'server' ? s.env : d.env),
@@ -38,13 +41,16 @@ export const draftFrom = (o?: ObjectView, colony?: string, kind?: ObjectKind): D
     mode: d.mode ?? (o ? 'container' : 'template'), image: d.image ?? '', ports: (d.ports ?? []).join('\n'), volumes: (d.volumes ?? []).join('\n'), dockerRestart: d.restart ?? 'no', command: d.command ?? '',
     file: d.file ?? '', project: d.project ?? '', services: (d.services ?? []).join(', '), container: d.container ?? '',
     memory: d.memory ?? '', cpus: n(d.cpus), network: d.network ?? '',
+    engine: q.engine ?? 'postgresql', dbHost: q.host ?? '', dbPort: n(q.port), dbUser: q.user ?? '', dbPassword: '', dbPasswordSet: !!q.passwordSet, dbName: q.database ?? '', dbFile: q.file ?? '',
+    dbSsl: !!q.ssl, dbTrust: !!q.trustCert, dbReadOnly: q.readOnly !== false, dbTimeout: n(q.timeoutSec), dbMaxRows: n(q.maxRows),
   };
 };
 
 const num = (v: string) => (v.trim() === '' ? undefined : Number(v));
 
 /** The body the server expects for this draft. */
-export function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | ClusterConfig {
+export function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | DatabaseConfig | ClusterConfig {
+  if (d.kind === 'database') return dbConfigOf(d);
   if (d.kind === 'http') return { folder: d.folder.trim(), env: d.defEnv.trim() || undefined, variables: Object.keys(d.variables).length ? d.variables : undefined };
   if (d.kind === 'cluster') return { members: d.members };
   if (d.kind === 'server') {
@@ -63,7 +69,13 @@ export function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | C
   };
 }
 
-const Card = ({ title, hint, wide = false, children }: { title: string; hint?: string; wide?: boolean; children: React.ReactNode }) => (
+/** What the server expects for a database draft (the password empty means: keep the saved one). */
+export const dbConfigOf = (d: Draft): DatabaseConfig => d.engine === 'sqlite'
+  ? { engine: 'sqlite', file: d.dbFile.trim(), readOnly: d.dbReadOnly, timeoutSec: num(d.dbTimeout), maxRows: num(d.dbMaxRows) }
+  : { engine: d.engine, host: d.dbHost.trim() || undefined, port: num(d.dbPort), user: d.dbUser.trim() || undefined, password: d.dbPassword, database: d.dbName.trim() || undefined,
+      ssl: d.dbSsl || undefined, trustCert: d.dbSsl && d.dbTrust ? true : undefined, readOnly: d.dbReadOnly, timeoutSec: num(d.dbTimeout), maxRows: num(d.dbMaxRows) };
+
+export const Card = ({ title, hint, wide = false, children }: { title: string; hint?: string; wide?: boolean; children: React.ReactNode }) => (
   <section className={`of-card ${wide ? 'wide' : ''}`} id={`of-${title.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-')}`} data-title={title}><header><h4>{title}</h4>{hint && <p className="muted small">{hint}</p>}</header>{children}</section>
 );
 
@@ -94,8 +106,8 @@ function ServicePicker({ file, project, services, onServices, onProject }: { fil
 }
 
 /** The settings of an object, as fields in cards (one column in a drawer, several on a wide screen). Used to create one and to change it. */
-export function ObjectFields({ d, set, setD, scan, showKind = false, error }: {
-  d: Draft; set: <K extends keyof Draft>(k: K, v: Draft[K]) => void; setD: (f: (x: Draft) => Draft) => void;
+export function ObjectFields({ d, set, setD, scan, showKind = false, error, objectId }: {
+  objectId?: string; d: Draft; set: <K extends keyof Draft>(k: K, v: Draft[K]) => void; setD: (f: (x: Draft) => Draft) => void;
   scan?: HttpScan | null; showKind?: boolean; error?: string;
 }) {
   const { t } = useI18n();
@@ -121,7 +133,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error }: {
       {showKind && (
         <Card title={t('obj.kind.pick')} wide>
           <div className="okinds">
-            {(['server', 'docker', 'http', 'cluster'] as ObjectKind[]).map((k) => { const { icon: Icon, color } = KIND[k]; return (
+            {(['server', 'docker', 'http', 'database', 'cluster'] as ObjectKind[]).map((k) => { const { icon: Icon, color } = KIND[k]; return (
               <button key={k} type="button" className="okind" aria-pressed={d.kind === k} style={{ ['--c' as never]: color }} onClick={() => set('kind', k)}>
                 <Icon size={20} /><b>{t(`obj.kind.${k}`)}</b><small>{t(`obj.kind.${k}.hint`)}</small>
               </button>); })}
@@ -141,7 +153,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error }: {
       {d.kind === 'http' ? (<>
         {showKind && <Card title={t('of.files')}>{httpFiles}</Card>}
         {showKind && <Card title={t('of.vars')} wide><VarsEditor value={d.variables} onChange={(v) => set('variables', v)} fileEnvs={fileEnvs} fileVars={scan?.fileVars} used={scan?.used} fileDefined={scan?.fileDefined} setBy={scan?.setBy} /></Card>}
-      </>) : d.kind === 'cluster' ? (
+      </>) : d.kind === 'database' ? (<DatabaseCards d={d} set={set} objectId={objectId} />) : d.kind === 'cluster' ? (
         <Card title={t('of.members')} hint={t('obj.f.members.hint')}>
           {(() => {
             const pool = objects.filter((o) => (o.kind === 'server' || o.kind === 'docker') && (o.colony_id ?? '') === d.colony_id);

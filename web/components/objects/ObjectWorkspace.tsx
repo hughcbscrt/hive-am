@@ -1,11 +1,11 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Hammer, Info, MoreHorizontal, Play, RefreshCcw, RotateCw, Square } from 'lucide-react';
+import { ArrowLeft, Hammer, Info, Loader2, MoreHorizontal, Play, PlugZap, RefreshCcw, RotateCw, Square } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
-import type { ClusterConfig, DockerConfig, ObjectView } from '@/lib/types';
+import type { ClusterConfig, DatabaseConfig, DockerConfig, ObjectView } from '@/lib/types';
 import { useToast } from '@/components/ui';
 import { KIND, STATUS_TONE, detailText } from './meta';
 import { StatusDot } from './ObjectPanel';
@@ -18,9 +18,10 @@ import { ServiceDetail } from './ServiceDetail';
 import { TerminalButton } from '@/components/dock/TerminalButton';
 import { HttpWorkspace } from './HttpWorkspace';
 import { HttpVars } from './HttpVars';
+import { DbWorkspace } from './DbWorkspace';
 
-type Tab = 'summary' | 'logs' | 'config' | 'requests' | 'history' | 'vars';
-const tabsOf = (o: ObjectView): Tab[] => (o.kind === 'http' ? ['requests', 'history', 'vars', 'config'] : ['summary', 'logs', 'config']);
+type Tab = 'summary' | 'logs' | 'config' | 'requests' | 'history' | 'vars' | 'query' | 'schema';
+const tabsOf = (o: ObjectView): Tab[] => (o.kind === 'http' ? ['requests', 'history', 'vars', 'config'] : o.kind === 'database' ? ['query', 'schema', 'history', 'config'] : ['summary', 'logs', 'config']);
 
 /** One object on a whole screen, like an agent: the list at the left, and its tabs (summary, logs, settings — or requests and variables). */
 export function ObjectWorkspace({ id }: { id?: string }) {
@@ -60,6 +61,12 @@ function Screen({ object: o }: { object: ObjectView }) {
     try { await api.post(`/objects/${o.id}/action`, { action }); }
     catch (e) { toast(`${t('obj.act.failed', { action: t(`obj.act.${action}`) })}: ${e instanceof Error ? e.message : ''}`, 'err'); } finally { setBusy(null); }
   };
+  // A database is not started: this asks it for its state again right away (the list refreshes it every few seconds on its own).
+  const testDb = async () => {
+    setBusy('test');
+    try { const r = await api.post<{ version: string; ms: number }>('/object-db/test', { id: o.id, config: o.config }); toast(`${t('db.test.ok')} · ${r.version} · ${r.ms} ms`); }
+    catch (e) { toast(e instanceof Error ? e.message : '', 'err'); } finally { setBusy(null); }
+  };
   const cluster = o.kind === 'cluster';
   const members = cluster ? (o.config as ClusterConfig).members : [];
   const { objects } = useHive();
@@ -79,7 +86,10 @@ function Screen({ object: o }: { object: ObjectView }) {
             {o.state.detail && <span className="muted small">· {detailText(t, o.state.detail)}</span>}
           </div>
         </div>
-        {o.kind !== 'http' && (<>
+        {o.kind === 'database' && (
+          <button className="btn sm" disabled={!!busy} onClick={() => void testDb()}>{busy === 'test' ? <Loader2 size={14} className="spin" /> : <PlugZap size={14} />}{t('db.test')}</button>
+        )}
+        {o.kind !== 'http' && o.kind !== 'database' && (<>
           <button className="btn primary sm" disabled={!!busy || (cluster ? st === 'running' : live)} onClick={() => void act('start')}><Play size={14} />{t(cluster ? 'obj.act.startAll' : 'obj.act.start')}</button>
           <button className="btn sm" disabled={!!busy || (!live && st !== 'error')} onClick={() => void act('stop')}><Square size={14} />{t(cluster ? 'obj.act.stopAll' : 'obj.act.stop')}</button>
           <button className="btn sm" disabled={!!busy} onClick={() => void act('restart')}><RotateCw size={14} />{t(cluster ? 'obj.act.restartAll' : 'obj.act.restart')}</button>
@@ -96,11 +106,12 @@ function Screen({ object: o }: { object: ObjectView }) {
       <div className="tabs ow-tabs" role="tablist">
         {tabs.map((x) => <button key={x} className="tab" role="tab" aria-selected={tab === x} onClick={() => { if (x === 'logs') setLogFilter(''); setTab(x); }}>{t(`ow.tab.${x}`)}</button>)}
       </div>
-      <div className={`ow-body ${tab === 'logs' || tab === 'requests' || tab === 'history' ? 'full' : ''}`}>
+      <div className={`ow-body ${tab === 'logs' || tab === 'requests' || tab === 'history' || tab === 'query' || tab === 'schema' ? 'full' : ''}`}>
         {tab === 'summary' && <ObjectSummary object={o} onSeeLogs={(filter) => { setLogFilter(filter ?? ''); setTab('logs'); }} />}
         {tab === 'logs' && <LogPane key={logFilter} id={o.id} members={cluster ? memberNames : undefined} initialFilter={logFilter || undefined} />}
         {tab === 'config' && <ObjectConfig object={o} />}
-        {(tab === 'requests' || tab === 'history') && <HttpWorkspace object={o} pane={tab} onOpenVars={() => setTab('vars')} onGoRequests={() => setTab('requests')} />}
+        {o.kind === 'database' && (tab === 'query' || tab === 'schema' || tab === 'history') && <DbWorkspace object={o} pane={tab} onPane={setTab} />}
+        {o.kind === 'http' && (tab === 'requests' || tab === 'history') && <HttpWorkspace object={o} pane={tab} onOpenVars={() => setTab('vars')} onGoRequests={() => setTab('requests')} />}
         {tab === 'vars' && <HttpVars object={o} />}
       </div>
       {inspecting && <ServiceDetail objectId={o.id} title={o.name} onClose={() => setInspecting(false)} />}

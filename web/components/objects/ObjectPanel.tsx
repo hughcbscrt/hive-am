@@ -2,18 +2,20 @@
 import { TerminalButton } from '@/components/dock/TerminalButton';
 import { useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, FileText, Pencil, Play, RotateCw, Square, UserPlus, X } from 'lucide-react';
+import { Database, ExternalLink, FileText, Loader2, Lock, Pencil, PlugZap, Play, RotateCw, Square, Unlock, UserPlus, X } from 'lucide-react';
 import { AnchoredCard } from '@/components/agents/AgentCard';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { ago, shortPath } from '@/lib/meta';
-import type { ClusterConfig, DockerConfig, HttpConfig, ObjectView, ServerConfig } from '@/lib/types';
+import type { ClusterConfig, DatabaseConfig, DockerConfig, HttpConfig, ObjectView, ServerConfig } from '@/lib/types';
 import { useToast } from '@/components/ui';
 import { useHive } from '@/lib/store';
 import { useDock } from '@/lib/dock';
 import { OBJECTS_SKILL_ID } from '@/components/agents/NewAgentDrawer';
 import { KIND, STATUS_TONE, detailText } from './meta';
 import { LogView } from './LogView';
+
+const DB_LABEL = { mysql: 'MySQL / MariaDB', postgresql: 'PostgreSQL', sqlite: 'SQLite', mssql: 'SQL Server' } as const;
 
 export function StatusDot({ status, className = '' }: { status: ObjectView['state']['status']; className?: string }) {
   return <i className={`odot ${STATUS_TONE[status]} ${className}`} aria-hidden />;
@@ -23,6 +25,7 @@ export function StatusDot({ status, className = '' }: { status: ObjectView['stat
 export function objectSummary(o: ObjectView): string {
   if (o.kind === 'server') { const c = o.config as ServerConfig; return c.start; }
   if (o.kind === 'http') return shortPath((o.config as HttpConfig).folder);
+  if (o.kind === 'database') { const c = o.config as DatabaseConfig; return c.engine === 'sqlite' ? shortPath(c.file ?? '') : `${c.host || '127.0.0.1'}${c.port ? `:${c.port}` : ''}${c.database ? `/${c.database}` : ''}`; }
   if (o.kind === 'cluster') return `${(o.config as ClusterConfig).members.length}`;
   const c = o.config as DockerConfig;
   return c.mode === 'container' ? c.image ?? '' : c.mode === 'compose' ? shortPath(c.file ?? '') : c.container ?? '';
@@ -48,6 +51,11 @@ export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { o
     finally { setBusy(null); }
   };
   const live = st === 'running' || st === 'starting';
+  const testDb = async () => {
+    setBusy('test');
+    try { const r = await api.post<{ version: string; ms: number }>('/object-db/test', { id: o.id, config: o.config }); toast(`${t('db.test.ok')} · ${r.version} · ${r.ms} ms`); }
+    catch (e) { toast(e instanceof Error ? e.message : '', 'err'); } finally { setBusy(null); }
+  };
   const members = o.kind === 'cluster' ? (o.config as ClusterConfig).members.map((id) => objects.find((x) => x.id === id)).filter((x): x is ObjectView => !!x) : [];
   return (
     <AnchoredCard target={target} pinned width={380} label={o.name} onClose={onClose}>
@@ -68,7 +76,14 @@ export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { o
       )}
       <Link className="btn primary" href={`/objects/${o.id}`}><ExternalLink size={15} />{t('obj.open')}</Link>
       {o.kind !== 'cluster' && <div className="mono small obj-cmd" title={objectSummary(o)}>{objectSummary(o)}</div>}
-      {o.kind === 'http' ? null : (<>
+      {o.kind === 'database' && (
+        <div className="row gap-s wrap">
+          <span className="db-badge"><Database size={12} />{DB_LABEL[(o.config as DatabaseConfig).engine]}</span>
+          {(o.config as DatabaseConfig).readOnly !== false ? <span className="db-badge ro"><Lock size={12} />{t('db.readonly.badge')}</span> : <span className="db-badge rw"><Unlock size={12} />{t('db.write.badge')}</span>}
+          <button className="btn sm" disabled={!!busy} onClick={() => void testDb()}>{busy === 'test' ? <Loader2 size={14} className="spin" /> : <PlugZap size={14} />}{t('db.test')}</button>
+        </div>
+      )}
+      {o.kind === 'http' || o.kind === 'database' ? null : (<>
         <div className="row gap-s wrap">
           <button className="btn primary sm" disabled={!!busy || (o.kind === 'cluster' ? st === 'running' : live)} onClick={() => void act('start')}><Play size={14} />{t(o.kind === 'cluster' ? 'obj.act.startAll' : 'obj.act.start')}</button>
           <button className="btn sm" disabled={!!busy || (!live && st !== 'error' && !(o.kind === 'cluster' && members.some((m) => m.state.status === 'running')))} onClick={() => void act('stop')}><Square size={14} />{t(o.kind === 'cluster' ? 'obj.act.stopAll' : 'obj.act.stop')}</button>
@@ -88,7 +103,7 @@ export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { o
         </div>
         <div><div className="eyebrow" style={{ marginBottom: 6 }}>{t('obj.logs')}</div><LogView id={o.id} /></div>
       </>)}
-      {o.kind !== 'http' && <div className="obj-managers">
+      {o.kind !== 'http' && o.kind !== 'database' && <div className="obj-managers">
         <div className="eyebrow" style={{ marginBottom: 6 }}>{t('obj.managers')}</div>
         {managers.length ? <div className="row gap-s wrap">{managers.map((a) => <Link key={a.id} href={`/agents/${a.id}`} className="chip" title={a.permission === 'plan' ? t('obj.managers.readonly') : undefined}>{a.name}{a.permission === 'plan' ? ` · ${t('obj.managers.ro')}` : ''}</Link>)}</div>
           : <p className="muted small" style={{ margin: 0 }}>{t('obj.managers.none')}</p>}

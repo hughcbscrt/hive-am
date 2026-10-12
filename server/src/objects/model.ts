@@ -4,7 +4,7 @@
  */
 export class ObjectError extends Error {}
 
-export type ObjectKind = 'server' | 'docker' | 'http' | 'cluster';
+export type ObjectKind = 'server' | 'docker' | 'http' | 'database' | 'cluster';
 /** `ready` is for objects that are not run but used (HTTP requests): their files are there and can be used. */
 export type ObjectStatus = 'running' | 'starting' | 'stopped' | 'error' | 'unknown' | 'ready';
 
@@ -61,10 +61,33 @@ export interface HttpConfig {
   /** Variables of hive-am, per environment (`$shared` applies to all), for when there is no http-client.env.json or it lacks something. The files win. */
   variables?: Record<string, Record<string, HttpVariable>>;
 }
+/** A database hive-am connects to (it is used, not started): browse its tables and run queries. */
+export type DbEngine = 'mysql' | 'postgresql' | 'sqlite' | 'mssql';
+export const DB_ENGINES: Record<DbEngine, { label: string; port: number }> = {
+  mysql: { label: 'MySQL / MariaDB', port: 3306 }, postgresql: { label: 'PostgreSQL', port: 5432 }, sqlite: { label: 'SQLite', port: 0 }, mssql: { label: 'SQL Server', port: 1433 },
+};
+export interface DatabaseConfig {
+  engine: DbEngine;
+  /** A server engine: where it is (default 127.0.0.1) and its port (default the engine's own). */
+  host?: string; port?: number; user?: string;
+  /** Stays on the server: the interface receives it empty, with `passwordSet` saying there is one. Saving it empty keeps the stored one. */
+  password?: string; passwordSet?: boolean;
+  /** The database to open (the one that opens by default). */
+  database?: string;
+  /** SQLite: the file. */
+  file?: string;
+  ssl?: boolean;
+  /** With ssl: accept a certificate that is not signed by a known authority (self-signed). */
+  trustCert?: boolean;
+  /** Only reads are allowed (default true). It is checked by hive-am and, where the engine allows it, by the connection itself. */
+  readOnly?: boolean;
+  /** Seconds a query may take (default 30) and rows it may return (default 1000). */
+  timeoutSec?: number; maxRows?: number;
+}
 /** Groups other objects (servers and containers of the same colony) to start, stop and read them together. */
 export interface ClusterConfig { members: string[] }
 
-export interface ObjectRow { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig | HttpConfig | ClusterConfig; created_at: number; updated_at: number }
+export interface ObjectRow { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig | HttpConfig | DatabaseConfig | ClusterConfig; created_at: number; updated_at: number }
 export interface ObjectState { status: ObjectStatus; /** Why, in a few words (an exit code, "unhealthy", "docker is not available"…). */ detail?: string; pid?: number; since?: number }
 export type ObjectView = ObjectRow & { state: ObjectState };
 
@@ -194,6 +217,27 @@ export function parseHttp(c: any): HttpConfig {
   return { folder, env: envName, variables };
 }
 
+const HOST = /^[A-Za-z0-9._\-]{1,255}$|^\[[0-9A-Fa-f:.]{2,45}\]$/;
+export function parseDatabase(c: any): DatabaseConfig {
+  const engine = oneOf(c?.engine, ['mysql', 'postgresql', 'sqlite', 'mssql'] as const, 'The engine');
+  if (!engine) throw new ObjectError('Choose the engine: MySQL, PostgreSQL, SQLite or SQL Server');
+  const common = { readOnly: c?.readOnly === false ? false : true, timeoutSec: num(c?.timeoutSec, 'The query timeout', 1, 600), maxRows: num(c?.maxRows, 'The row limit', 1, 10000) };
+  if (engine === 'sqlite') {
+    const file = str(c?.file, 'The file');
+    if (!file.startsWith('/')) throw new ObjectError('The file must be an absolute path');
+    return { engine, file, ...common };
+  }
+  const host = optStr(c?.host, 'The host', 255) ?? '127.0.0.1';
+  if (!HOST.test(host)) throw new ObjectError('The host is not valid');
+  const database = optStr(c?.database, 'The database', 128);
+  if (database && /[\0\r\n;]/.test(database)) throw new ObjectError('The database name is not valid');
+  return {
+    engine, host, port: c?.port === undefined || c?.port === null || c?.port === '' ? undefined : port(c.port, 'The port'),
+    user: optStr(c?.user, 'The user', 200), password: typeof c?.password === 'string' && c.password !== '' ? str(c.password, 'The password', 1000) : undefined, database,
+    ssl: c?.ssl ? true : undefined, trustCert: c?.ssl && c?.trustCert ? true : undefined, ...common,
+  };
+}
+
 export function parseCluster(c: any): ClusterConfig {
   if (!Array.isArray(c?.members)) throw new ObjectError('Choose the objects it groups');
   const members = [...new Set(c.members.map((x: unknown) => str(x, 'A member')))] as string[];
@@ -201,15 +245,15 @@ export function parseCluster(c: any): ClusterConfig {
   return { members };
 }
 
-export function parseConfig(kind: ObjectKind, c: unknown): ServerConfig | DockerConfig | HttpConfig | ClusterConfig {
-  return kind === 'server' ? parseServer(c) : kind === 'docker' ? parseDocker(c) : kind === 'http' ? parseHttp(c) : parseCluster(c);
+export function parseConfig(kind: ObjectKind, c: unknown): ServerConfig | DockerConfig | HttpConfig | DatabaseConfig | ClusterConfig {
+  return kind === 'server' ? parseServer(c) : kind === 'docker' ? parseDocker(c) : kind === 'http' ? parseHttp(c) : kind === 'database' ? parseDatabase(c) : parseCluster(c);
 }
 export function parseName(v: unknown): string {
   const name = str(v, 'The name', NAME_MAX);
   if (!name) throw new ObjectError('Give it a name');
   return name;
 }
-export const isKind = (k: unknown): k is ObjectKind => k === 'server' || k === 'docker' || k === 'http' || k === 'cluster';
+export const isKind = (k: unknown): k is ObjectKind => k === 'server' || k === 'docker' || k === 'http' || k === 'database' || k === 'cluster';
 /** `boss` was the first name of a cluster: the API still accepts it. */
 export const kindOf = (k: unknown): unknown => (k === 'boss' ? 'cluster' : k);
 

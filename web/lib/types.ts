@@ -117,7 +117,7 @@ export interface StashDetail { sha: string; untrackedSha: string | null; untrack
 export interface GitListing { path: string; entries: { name: string; dir: boolean }[]; truncated: boolean }
 
 // ---- colony objects (servers and Docker containers) ----
-export type ObjectKind = 'server' | 'docker' | 'http' | 'cluster';
+export type ObjectKind = 'server' | 'docker' | 'http' | 'database' | 'cluster';
 export type ObjectStatus = 'running' | 'starting' | 'stopped' | 'error' | 'unknown' | 'ready';
 export interface HealthConfig { kind: 'http' | 'tcp' | 'command'; target: string; intervalSec?: number; timeoutSec?: number; retries?: number; restartWhenUnhealthy?: boolean }
 export interface ServerConfig {
@@ -132,9 +132,14 @@ export interface DockerConfig {
 }
 export interface HttpVariable { value: string; secret?: boolean; set?: boolean }
 export interface HttpConfig { folder: string; env?: string; variables?: Record<string, Record<string, HttpVariable>> }
+export type DbEngine = 'mysql' | 'postgresql' | 'sqlite' | 'mssql';
+export interface DatabaseConfig {
+  engine: DbEngine; host?: string; port?: number; user?: string; password?: string; passwordSet?: boolean; database?: string; file?: string;
+  ssl?: boolean; trustCert?: boolean; readOnly?: boolean; timeoutSec?: number; maxRows?: number;
+}
 export interface ClusterConfig { members: string[] }
 export interface ObjectState { status: ObjectStatus; detail?: string; pid?: number; since?: number }
-export interface ObjectView { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig | HttpConfig | ClusterConfig; state: ObjectState; created_at: number; updated_at: number }
+export interface ObjectView { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig | HttpConfig | DatabaseConfig | ClusterConfig; state: ObjectState; created_at: number; updated_at: number }
 
 // ---- HTTP-requests objects ----
 export interface HttpRequestItem { id: string; index: number; name: string; method: string; url: string; headers: { name: string; value: string }[]; body?: string; line: number; variables: string[]; refs: string[]; named?: string; script?: string; scriptFile?: string }
@@ -167,3 +172,11 @@ export interface HttpRun {
   request: { method: string; url: string; headers: { name: string; value: string }[]; body?: string };
   status: number; statusText: string; durationMs: number; size: number; headers: { name: string; value: string }[]; body: string; truncated: boolean; binary: boolean; contentType: string;
 }
+
+// ---- database objects ----
+export interface DbResult { columns: { name: string }[]; rows: unknown[][]; truncated: boolean; affected?: number; ms: number }
+export interface DbTable { schema: string; name: string; type: 'table' | 'view'; rows?: number }
+export interface DbSchema { engine: DbEngine; databases: string[]; database: string; tables: DbTable[] }
+export interface DbTableColumn { name: string; type: string; nullable: boolean; key?: string; default?: string | null }
+export interface DbHistoryEntry { n: number; at: number; sql: string; database?: string; ok: boolean; ms: number; rows?: number; affected?: number; error?: string }
+export interface DbSaved { id: string; name: string; sql: string; database?: string; at: number }

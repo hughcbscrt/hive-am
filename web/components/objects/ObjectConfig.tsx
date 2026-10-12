@@ -45,7 +45,7 @@ export function ObjectConfig({ object: o }: { object: ObjectView }) {
   return (
     <div className="oc">
       <div className="oc-body">
-        <div className="oc-form"><ObjectFields d={d} set={set} setD={setD} scan={scan} error={err} /></div>
+        <div className="oc-form"><ObjectFields objectId={o.id} d={d} set={set} setD={setD} scan={scan} error={err} /></div>
       </div>
       <div className="savebar oc-bar">
         <span className="muted small grow">{dirty ? t('ow.cfg.dirty') : t('ow.cfg.saved')}{dirty && restartable ? ` · ${live ? t('ow.cfg.appliesRunning') : t('ow.cfg.applies')}` : ''}</span>

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { colonies, db } from '../db.js';
-import { ObjectError, kindOf, type HttpConfig, parseConfig, parseName, isKind, type ClusterConfig, type ObjectKind, type ObjectRow } from './model.js';
+import { ObjectError, kindOf, type DatabaseConfig, type HttpConfig, parseConfig, parseName, isKind, type ClusterConfig, type ObjectKind, type ObjectRow } from './model.js';
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS colony_objects (
@@ -14,6 +14,7 @@ db.exec("UPDATE colony_objects SET kind='cluster' WHERE kind='boss'");
 
 /** The secret values of an HTTP object stay on the server: what the interface receives has them empty (and `set` says there is one). */
 export function maskConfig(o: ObjectRow): ObjectRow {
+  if (o.kind === 'database') { const { password, ...rest } = o.config as DatabaseConfig; return { ...o, config: { ...rest, password: '', passwordSet: !!password } }; }
   if (o.kind !== 'http') return o;
   const c = o.config as HttpConfig; if (!c.variables) return o;
   const variables = Object.fromEntries(Object.entries(c.variables).map(([env, vars]) => [env, Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, v.secret ? { value: '', secret: true, set: v.value !== '' } : v]))]));
@@ -24,6 +25,11 @@ function keepSecrets(old: HttpConfig | undefined, incoming: any) {
   for (const [env, vars] of Object.entries((incoming?.variables ?? {}) as Record<string, Record<string, any>>)) {
     for (const [k, v] of Object.entries(vars ?? {})) if (v?.secret && !v.value && old?.variables?.[env]?.[k]?.secret) v.value = old.variables[env][k].value;
   }
+}
+
+/** A database saved with the password left empty keeps the one it had (unless the engine changed: then it was for another server). */
+function keepPassword(old: DatabaseConfig, incoming: Record<string, unknown>) {
+  if ((incoming.password === undefined || incoming.password === '') && old.password && incoming.engine === old.engine) incoming.password = old.password;
 }
 
 const row = (r: any): ObjectRow => ({ ...r, config: JSON.parse(r.config) });
@@ -61,6 +67,7 @@ export const objectsStore = {
     const other = objectsStore.byName(name);
     if (other && other.id !== id) throw new ObjectError(`There is already an object named "${name}"`);
     if (cur.kind === 'http' && p.config) keepSecrets(cur.config as HttpConfig, p.config);
+    if (cur.kind === 'database' && p.config) keepPassword(cur.config as DatabaseConfig, p.config as Record<string, unknown>);
     const config = p.config !== undefined ? parseConfig(cur.kind as ObjectKind, p.config) : cur.config;
     const colony = p.colony_id === undefined ? cur.colony_id : p.colony_id ? String(p.colony_id) : null;
     if (colony && !colonies.get(colony)) throw new ObjectError('That colony no longer exists');
