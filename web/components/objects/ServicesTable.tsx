@@ -13,11 +13,11 @@ import { StatusDot } from './ObjectPanel';
 
 const tone = (s: ServiceStat) => (s.state === 'running' ? (/unhealthy/i.test(s.health) ? 'error' : /starting/i.test(s.health) ? 'starting' : 'running') : s.state === 'exited' || s.state === 'dead' ? 'error' : s.state === 'restarting' ? 'starting' : 'stopped');
 
-/** "16379→6379, 16380→6379": each published port opens on this machine. */
+/** "16379->6379, 16380->6379": each published port opens on this machine. */
 function Ports({ ports }: { ports: string }) {
   const list = ports.split(',').map((p) => p.trim()).filter(Boolean);
   if (!list.length) return <span className="muted">—</span>;
-  return <span className="svc-ports">{list.map((p) => { const host = /^(\d+)→/.exec(p)?.[1]; return host ? <a key={p} className="mono" href={`http://localhost:${host}`} target="_blank" rel="noreferrer" title={`http://localhost:${host}`}>{p}</a> : <span key={p} className="mono">{p}</span>; })}</span>;
+  return <span className="svc-ports">{list.map((p) => { const host = /^(\d+)(?:->|→)/.exec(p)?.[1]; return host ? <a key={p} className="mono" href={`http://localhost:${host}`} target="_blank" rel="noreferrer" title={`http://localhost:${host}`}>{p}</a> : <span key={p} className="mono">{p}</span>; })}</span>;
 }
 
 /**

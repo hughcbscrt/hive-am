@@ -66,8 +66,8 @@ async function composeStats(c: DockerConfig): Promise<ObjectStats> {
   const ps = await run('docker', [...args, 'ps', '--all', '--format', 'json', ...(c.services ?? [])], { cwd: dirname(c.file!) });
   const t = ps.out.trim();
   const items: any[] = t.startsWith('[') ? (() => { try { return JSON.parse(t); } catch { return []; } })() : t.split('\n').flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } });
-  // "16379→6379" once, even when Docker lists the same port for IPv4 and IPv6
-  const portsOf = (x: any) => [...new Set(((x.Publishers ?? []) as any[]).filter((p) => p.PublishedPort).map((p) => `${p.PublishedPort}→${p.TargetPort}`))].join(', ') || String(x.Ports ?? '');
+  // "16379->6379" once, even when Docker lists the same port for IPv4 and IPv6
+  const portsOf = (x: any) => [...new Set(((x.Publishers ?? []) as any[]).filter((p) => p.PublishedPort).map((p) => `${p.PublishedPort}->${p.TargetPort}`))].join(', ') || String(x.Ports ?? '');
   const services: ServiceStat[] = items.map((x) => ({ name: String(x.Service ?? x.Name ?? ''), container: String(x.Name ?? ''), image: String(x.Image ?? ''), state: String(x.State ?? ''), health: String(x.Health ?? ''), status: String(x.Status ?? ''), ports: portsOf(x), cpu: null, memBytes: null }));
   const ids = items.filter((x) => x.State === 'running').map((x) => String(x.ID ?? x.Name));
   let cpu = 0, mem = 0, pids = 0;
