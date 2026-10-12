@@ -56,7 +56,7 @@ export function ObjectConfig({ object: o }: { object: ObjectView }) {
 
   return (
     <div className="oc">
-      <div className="oc-body">
+      <div className={`oc-body ${secs.length > 1 ? 'with-nav' : ''}`}>
         {secs.length > 1 && <nav className="of-nav" aria-label={t('ow.tab.config')}>{secs.map((x) => <button key={x.id} type="button" className={active === x.id || (!active && x === secs[0]) ? 'on' : ''} onClick={() => { document.getElementById(x.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setActive(x.id); }}>{x.title}</button>)}</nav>}
         <div className="oc-form" ref={form}><ObjectFields d={d} set={set} setD={setD} scan={scan} error={err} /></div>
       </div>

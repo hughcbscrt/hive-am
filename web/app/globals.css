@@ -381,10 +381,10 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 
 /* ---------- session stats ---------- */
 .stats-wrap { background: var(--surface); border-bottom: 1px solid var(--line); }
-.statsbar { width: 100%; display: flex; align-items: center; gap: 4px 18px; flex-wrap: wrap; padding: 8px 24px; border: 0; background: none; text-align: left; font-size: 12.5px; color: var(--muted); }
+.statsbar { width: 100%; display: flex; align-items: center; gap: 4px 18px; flex-wrap: wrap; padding: 9px 24px; border: 0; background: none; text-align: left; font-size: 13.5px; color: var(--muted); }
 .statsbar:hover { background: var(--surface-2); }
 .statsbar .sb { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; } .statsbar .sb b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 1px; }
-.statsbar .sb svg { color: var(--ink-2); opacity: .7; }
+.statsbar .sb svg { width: 15px; height: 15px; color: var(--ink-2); opacity: .7; }
 .statsbar em { font-style: normal; }
 .chev2 { margin-left: auto; transition: transform .15s; } .chev2.open { transform: rotate(180deg); }
 .statspanel { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; padding: 6px 24px 18px; animation: fade .15s; }
@@ -1129,13 +1129,14 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .cm-chev { border: 0; background: none; padding: 0; width: 20px; height: 20px; display: inline-grid; place-items: center; color: var(--muted); cursor: pointer; border-radius: 5px; } .cm-chev:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
 
 /* settings: one column, fixed order, with the list of sections at the left */
-.oc-body { display: grid; grid-template-columns: 190px minmax(0, 780px); gap: 24px; padding: 20px 24px 28px; align-items: start; }
+.oc-body { display: grid; grid-template-columns: minmax(0, 780px); gap: 24px; padding: 20px 24px 28px; align-items: start; }
+.oc-body.with-nav { grid-template-columns: 220px minmax(0, 780px); }
 .oc-body .oc-form { padding: 0; max-width: none; }
 .of-nav { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 2px; }
-.of-nav button { text-align: left; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--muted); padding: 7px 10px; border-radius: 8px; cursor: pointer; border-left: 3px solid transparent; }
+.of-nav button { text-align: left; border: 0; background: none; font: inherit; font-size: 14.5px; color: var(--muted); padding: 9px 12px; border-radius: 8px; cursor: pointer; border-left: 3px solid transparent; }
 .of-nav button:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--ink); }
 .of-nav button.on { color: var(--ink); font-weight: 600; background: var(--surface); border-left-color: var(--honey); }
-@media (max-width: 900px) { .oc-body { grid-template-columns: 1fr; } .of-nav { position: static; flex-direction: row; flex-wrap: wrap; } }
+@media (max-width: 900px) { .oc-body.with-nav { grid-template-columns: 1fr; } .of-nav { position: static; flex-direction: row; flex-wrap: wrap; } }
 
 .modal.wide { top: 6vh; width: min(860px, calc(100vw - 32px)); max-height: 88vh; overflow: auto; }
 
