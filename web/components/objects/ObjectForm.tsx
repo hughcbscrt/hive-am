@@ -159,7 +159,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error }: {
           <Field label={t('obj.f.port')} hint={t('obj.f.port.hint')}>{text('port', { placeholder: '3000' })}</Field>
         </Card>
         <Card title={t('of.env')}><Field label={t('obj.f.env')} hint={t('obj.f.env.hint')}><textarea className="textarea mono" rows={5} value={d.env} onChange={(e) => set('env', e.target.value)} /></Field></Card>
-        <Card title={t('obj.sup.title')}>
+        <Card title={t('obj.sup.title')} hint={t('obj.sup.note')}>
           <Field label={t('obj.sup.restart')} hint={t('obj.sup.restart.hint')}>
             <div className="row gap-s"><select className="select" value={d.restart} onChange={(e) => set('restart', e.target.value)}>
               <option value="no">{t('obj.sup.restart.no')}</option><option value="on-failure">{t('obj.sup.restart.fail')}</option><option value="always">{t('obj.sup.restart.always')}</option></select>

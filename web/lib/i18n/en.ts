@@ -867,6 +867,7 @@ export const en = {
   "vars.add": "Add a variable",
   "vars.delEnv": "Delete this environment",
   "vars.note": "The requests use them as {{name}}. Secrets are stored on this machine in hive-am’s database, without encryption.",
+  "obj.sup.note": "While hive-am is running it restarts the server when it ends and checks its health. If hive-am is off, the server keeps running but nobody restarts it; hive-am takes over again when it starts.",
   "obj.sup.title": "Keeping it healthy",
   "obj.sup.restart": "If it ends by itself",
   "obj.sup.restart.hint": "Stopping it yourself is never undone.",

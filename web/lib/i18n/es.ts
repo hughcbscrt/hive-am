@@ -865,6 +865,7 @@ export const es: Record<DictKey, string> = {
   "vars.add": "Agregar una variable",
   "vars.delEnv": "Eliminar este entorno",
   "vars.note": "Las peticiones las usan como {{nombre}}. Los secretos se guardan en esta máquina, en la base de datos de hive-am, sin cifrar.",
+  "obj.sup.note": "Mientras hive-am está corriendo reinicia el servidor cuando termina y revisa su salud. Si hive-am está apagado, el servidor sigue corriendo pero nadie lo reinicia; hive-am retoma el cuidado cuando arranca.",
   "obj.sup.title": "Mantenerlo sano",
   "obj.sup.restart": "Si termina por sí solo",
   "obj.sup.restart.hint": "Detenerlo tú nunca se deshace.",

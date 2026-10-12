@@ -91,7 +91,8 @@ export async function startDocker(id: string, c: DockerConfig): Promise<void> {
   if (c.memory) args.push('--memory', c.memory);
   if (c.cpus) args.push('--cpus', String(c.cpus));
   if (c.network) args.push('--network', c.network);
-  if (c.logMaxMb) args.push('--log-opt', `max-size=${Math.max(1, Math.round(c.logMaxMb * 1024))}k`, '--log-opt', 'max-file=3');
+  // A container always gets a log limit (10 MB x 3 unless set): docker's default is no limit, and a chatty container fills the disk.
+  args.push('--log-opt', `max-size=${Math.max(1, Math.round((c.logMaxMb ?? 10) * 1024))}k`, '--log-opt', 'max-file=3');
   if (c.stopTimeoutSec) args.push('--stop-timeout', String(c.stopTimeoutSec));
   if (c.restart && c.restart !== 'no') args.push('--restart', c.restart);
   for (const p of c.ports ?? []) args.push('-p', p);
@@ -198,10 +199,18 @@ const STAMP = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/;
  * The latest output. `after` is the time (RFC 3339) of the last line already seen; without it the last `tail` lines come back.
  * Lines carry docker's own timestamp, which is what makes "only what is new" possible; it is cut out of the text shown.
  */
+/**
+ * `--since` alone makes docker read the whole log file on every call (4 s for a 200 MB log, measured), so it always goes with `--tail`, which
+ * lets it read from the end: a poll costs the same however big the log is. If more than SINCE_TAIL lines arrived between two polls the
+ * oldest of them are skipped; the log pane shows the latest anyway.
+ */
+const SINCE_TAIL = 2000;
+const tailArgs = (o: { tail?: number; after?: string }) => o.after ? ['--since', o.after, '--tail', String(SINCE_TAIL)] : ['--tail', String(Math.max(1, Math.min(o.tail ?? 300, 5000)))];
+
 export async function dockerLogs(id: string, c: DockerConfig, o: { tail?: number; after?: string }): Promise<{ text: string; cursor: string }> {
   const base = c.mode === 'compose'
-    ? composeArgs(c, ['logs', '--no-color', '--timestamps', ...(o.after ? ['--since', o.after] : ['--tail', String(Math.max(1, Math.min(o.tail ?? 300, 5000)))]), ...(c.services ?? [])])
-    : ['logs', '--timestamps', ...(o.after ? ['--since', o.after] : ['--tail', String(Math.max(1, Math.min(o.tail ?? 300, 5000)))]), nameOf(id, c)];
+    ? composeArgs(c, ['logs', '--no-color', '--timestamps', ...tailArgs(o), ...(c.services ?? [])])
+    : ['logs', '--timestamps', ...tailArgs(o), nameOf(id, c)];
   if (c.mode === 'compose') checkCompose(c);
   const r = await dk(base, { cwd: c.mode === 'compose' ? dirname(c.file!) : undefined, timeout: 20_000 });
   if (r.code !== 0 && !r.out && !r.err) return { text: '', cursor: o.after ?? '' };
