@@ -10,7 +10,7 @@ import { useHive } from '@/lib/store';
 import type { ClusterConfig, DatabaseConfig, DbEngine, DockerConfig, HttpConfig, HttpScan, ObjectKind, ObjectView, ServerConfig } from '@/lib/types';
 import { KIND, envToText, lines, textToEnv } from './meta';
 import { VarsEditor, type Vars } from './VarsEditor';
-import { DatabaseCards } from './DatabaseCards';
+import { DatabaseCards, suggestDbName } from './DatabaseCards';
 
 type Mode = NonNullable<DockerConfig['mode']> | 'template';
 export interface Draft {
@@ -21,7 +21,7 @@ export interface Draft {
   template: string; tplValues: Record<string, string>;
   mode: Mode; image: string; ports: string; volumes: string; dockerRestart: string; command: string; file: string; project: string; services: string; container: string;
   memory: string; cpus: string; network: string;
-  engine: DbEngine; dbHost: string; dbPort: string; dbUser: string; dbPassword: string; dbPasswordSet: boolean; dbName: string; dbFile: string; dbSsl: boolean; dbTrust: boolean; dbReadOnly: boolean; dbTimeout: string; dbMaxRows: string;
+  engine: DbEngine; dbHost: string; dbPort: string; dbUser: string; dbPassword: string; dbPasswordSet: boolean; dbName: string; dbFile: string; dbSsl: boolean; dbTrust: boolean; dbReadOnly: boolean; dbTimeout: string; dbMaxRows: string; dbProps: Record<string, string>;
 }
 const n = (v: number | undefined) => (v === undefined ? '' : String(v));
 
@@ -42,7 +42,7 @@ export const draftFrom = (o?: ObjectView, colony?: string, kind?: ObjectKind): D
     file: d.file ?? '', project: d.project ?? '', services: (d.services ?? []).join(', '), container: d.container ?? '',
     memory: d.memory ?? '', cpus: n(d.cpus), network: d.network ?? '',
     engine: q.engine ?? 'postgresql', dbHost: q.host ?? '', dbPort: n(q.port), dbUser: q.user ?? '', dbPassword: '', dbPasswordSet: !!q.passwordSet, dbName: q.database ?? '', dbFile: q.file ?? '',
-    dbSsl: !!q.ssl, dbTrust: !!q.trustCert, dbReadOnly: q.readOnly !== false, dbTimeout: n(q.timeoutSec), dbMaxRows: n(q.maxRows),
+    dbSsl: !!q.ssl, dbTrust: !!q.trustCert, dbReadOnly: q.readOnly !== false, dbTimeout: n(q.timeoutSec), dbMaxRows: n(q.maxRows), dbProps: { ...(q.props ?? {}) },
   };
 };
 
@@ -70,10 +70,15 @@ export function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | D
 }
 
 /** What the server expects for a database draft (the password empty means: keep the saved one). */
-export const dbConfigOf = (d: Draft): DatabaseConfig => d.engine === 'sqlite'
-  ? { engine: 'sqlite', file: d.dbFile.trim(), readOnly: d.dbReadOnly, timeoutSec: num(d.dbTimeout), maxRows: num(d.dbMaxRows) }
+export const dbConfigOf = (d: Draft): DatabaseConfig => {
+  // A property with no value is not set; the SSL ones only count while SSL is on.
+  const entries = Object.entries(d.dbProps).filter(([k, v]) => v.trim() !== '' && (d.dbSsl || !k.startsWith('ssl.')));
+  const props = entries.length ? Object.fromEntries(entries) : undefined;
+  return d.engine === 'sqlite'
+  ? { engine: 'sqlite', file: d.dbFile.trim(), props, readOnly: d.dbReadOnly, timeoutSec: num(d.dbTimeout), maxRows: num(d.dbMaxRows) }
   : { engine: d.engine, host: d.dbHost.trim() || undefined, port: num(d.dbPort), user: d.dbUser.trim() || undefined, password: d.dbPassword, database: d.dbName.trim() || undefined,
-      ssl: d.dbSsl || undefined, trustCert: d.dbSsl && d.dbTrust ? true : undefined, readOnly: d.dbReadOnly, timeoutSec: num(d.dbTimeout), maxRows: num(d.dbMaxRows) };
+      ssl: d.dbSsl || undefined, trustCert: d.dbSsl && d.dbTrust ? true : undefined, props, readOnly: d.dbReadOnly, timeoutSec: num(d.dbTimeout), maxRows: num(d.dbMaxRows) };
+};
 
 export const Card = ({ title, hint, wide = false, children }: { title: string; hint?: string; wide?: boolean; children: React.ReactNode }) => (
   <section className={`of-card ${wide ? 'wide' : ''}`} id={`of-${title.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-')}`} data-title={title}><header><h4>{title}</h4>{hint && <p className="muted small">{hint}</p>}</header>{children}</section>
@@ -141,7 +146,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
         </Card>
       )}
       <Card title={t('of.general')}>
-        <Field label={t('obj.f.name')} error={error}>{text('name')}</Field>
+        <Field label={t('obj.f.name')} error={error}>{text('name', { placeholder: d.kind === 'database' ? suggestDbName(d) : undefined })}</Field>
         <Field label={t('obj.colony')}>
           <select className="select" value={d.colony_id} onChange={(e) => setD((x) => ({ ...x, colony_id: e.target.value, members: [] }))}>
             <option value="">{t('obj.noColony')}</option>{colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -153,7 +158,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
       {d.kind === 'http' ? (<>
         {showKind && <Card title={t('of.files')}>{httpFiles}</Card>}
         {showKind && <Card title={t('of.vars')} wide><VarsEditor value={d.variables} onChange={(v) => set('variables', v)} fileEnvs={fileEnvs} fileVars={scan?.fileVars} used={scan?.used} fileDefined={scan?.fileDefined} setBy={scan?.setBy} /></Card>}
-      </>) : d.kind === 'database' ? (<DatabaseCards d={d} set={set} objectId={objectId} />) : d.kind === 'cluster' ? (
+      </>) : d.kind === 'database' ? (<DatabaseCards d={d} set={set} setD={setD} objectId={objectId} creating={showKind} />) : d.kind === 'cluster' ? (
         <Card title={t('of.members')} hint={t('obj.f.members.hint')}>
           {(() => {
             const pool = objects.filter((o) => (o.kind === 'server' || o.kind === 'docker') && (o.colony_id ?? '') === d.colony_id);

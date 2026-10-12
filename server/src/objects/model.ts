@@ -2,6 +2,8 @@
  * Objects of a colony: things that are not agents but live next to them. A server is a command that hive-am keeps running; a Docker
  * object is a container (or a compose project) that hive-am starts, stops and reads the logs of.
  */
+import { parseProps } from './driver-props.js';
+
 export class ObjectError extends Error {}
 
 export type ObjectKind = 'server' | 'docker' | 'http' | 'database' | 'cluster';
@@ -81,6 +83,8 @@ export interface DatabaseConfig {
   trustCert?: boolean;
   /** Only reads are allowed (default true). It is checked by hive-am and, where the engine allows it, by the connection itself. */
   readOnly?: boolean;
+  /** Properties of the driver, by the name the Node driver gives them (see driver-props.ts). Values are text; the server types them. */
+  props?: Record<string, string>;
   /** Seconds a query may take (default 30) and rows it may return (default 1000). */
   timeoutSec?: number; maxRows?: number;
 }
@@ -225,16 +229,18 @@ export function parseDatabase(c: any): DatabaseConfig {
   if (engine === 'sqlite') {
     const file = str(c?.file, 'The file');
     if (!file.startsWith('/')) throw new ObjectError('The file must be an absolute path');
-    return { engine, file, ...common };
+    return { engine, file, props: parseProps(engine, c?.props), ...common };
   }
   const host = optStr(c?.host, 'The host', 255) ?? '127.0.0.1';
   if (!HOST.test(host)) throw new ObjectError('The host is not valid');
   const database = optStr(c?.database, 'The database', 128);
   if (database && /[\0\r\n;]/.test(database)) throw new ObjectError('The database name is not valid');
+  const props = parseProps(engine, c?.props);
+  if (props && !c?.ssl && Object.keys(props).some((k) => k.startsWith('ssl.'))) throw new ObjectError('The SSL properties need "Use SSL" on');
   return {
     engine, host, port: c?.port === undefined || c?.port === null || c?.port === '' ? undefined : port(c.port, 'The port'),
     user: optStr(c?.user, 'The user', 200), password: typeof c?.password === 'string' && c.password !== '' ? str(c.password, 'The password', 1000) : undefined, database,
-    ssl: c?.ssl ? true : undefined, trustCert: c?.ssl && c?.trustCert ? true : undefined, ...common,
+    ssl: c?.ssl ? true : undefined, trustCert: c?.ssl && c?.trustCert ? true : undefined, props, ...common,
   };
 }
 

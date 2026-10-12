@@ -27,6 +27,7 @@ import { emptyUsage } from './pricing.js';
 import { createReadStream } from 'node:fs';
 import { findRepo, gitDiff, gitFile, gitImagePath, gitList, gitStatus, gitTree, isPathError } from './git/repo.js';
 import { listStashes, planSwitch, smartCancel, smartFinish, smartSwitch, stashApply, stashDetail, stashDrop, stashSave } from './git/switch.js';
+import { DRIVER_PROPS } from './objects/driver-props.js';
 import { composeServices, listContainers, listImages } from './objects/docker-info.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from './objects/agent.js';
 import { TerminalError, closeTerminal, createTerminal, isLocalRequest, listTerminals, terminalsEnabled } from './terminals.js';
@@ -306,6 +307,7 @@ route('GET', '/api/objects/:id/http/history', ({ params }) => objectSafe(() => h
 route('DELETE', '/api/objects/:id/http/history', ({ req, params }) => { objectGuard(req); return objectSafe(() => httpHistoryClear(params[0])); });
 route('POST', '/api/objects/:id/http/run', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => httpRun(params[0], String(p.file ?? ''), Number(p.index ?? 0), p.env ? String(p.env) : undefined)); });
 // ---- database objects (a connection opens per request; local app only, because it uses the saved password) ----
+route('GET', '/api/object-db/props', () => DRIVER_PROPS);
 route('POST', '/api/object-db/test', async ({ req }) => { objectGuard(req); const p = await body(req); return objectSafe(() => dbTestConfig(p)); });
 route('GET', '/api/objects/:id/db/schema', ({ req, params, url }) => { objectGuard(req); return objectSafe(() => dbSchemaOf(params[0], url.searchParams.get('database') ?? undefined)); });
 route('GET', '/api/objects/:id/db/columns', ({ req, params, url }) => { objectGuard(req); return objectSafe(() => dbColumnsOf(params[0], { database: url.searchParams.get('database') ?? undefined, schema: url.searchParams.get('schema') ?? '', table: url.searchParams.get('table') ?? '' })); });

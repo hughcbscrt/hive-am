@@ -1,7 +1,8 @@
 import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';
-import { Worker } from 'node:worker_threads';
+import { spawn } from 'node:child_process';
 import { DB_ENGINES, ObjectError, type DatabaseConfig, type ObjectState } from './model.js';
+import { plain, propValues, tlsOptions } from './driver-props.js';
 
 /**
  * A database object is used, not started: hive-am opens a connection when it is asked something (state, schema, a query) and closes it
@@ -85,9 +86,11 @@ const fixed = (n: number | undefined, d: number) => (n && n > 0 ? n : d);
 
 async function openMysql(cfg: DatabaseConfig, database?: string): Promise<Conn> {
   const m: any = await import('mysql2'); const mysql = m.default ?? m;
+  const pv = propValues('mysql', cfg.props);
   const c = mysql.createConnection({
+    connectTimeout: CONNECT_MS, ...plain(pv),
     host: cfg.host, port: fixed(cfg.port, DB_ENGINES.mysql.port), user: cfg.user, password: cfg.password, database: database ?? cfg.database,
-    ssl: cfg.ssl ? { rejectUnauthorized: !cfg.trustCert } : undefined, connectTimeout: CONNECT_MS, dateStrings: true, supportBigNumbers: true, bigNumberStrings: true, rowsAsArray: true,
+    ssl: cfg.ssl ? tlsOptions(pv, !cfg.trustCert) : undefined, dateStrings: true, supportBigNumbers: true, bigNumberStrings: true, rowsAsArray: true,
   });
   await new Promise<void>((ok, no) => c.connect((e: Error | null) => (e ? no(e) : ok())));
   c.on('error', () => undefined);
@@ -115,9 +118,13 @@ async function openMysql(cfg: DatabaseConfig, database?: string): Promise<Conn> 
 async function openPg(cfg: DatabaseConfig, database?: string): Promise<Conn> {
   const m: any = await import('pg'); const pg = m.default ?? m;
   const cm: any = await import('pg-cursor'); const Cursor = cm.default ?? cm;
+  const pv = propValues('postgresql', cfg.props);
+  const { search_path: path, options: extra, ...rest } = plain(pv);
+  const options = [extra, path !== undefined ? `-c search_path=${String(path).replace(/ /g, '')}` : undefined].filter(Boolean).join(' ') || undefined;
   const c = new pg.Client({
+    connectionTimeoutMillis: CONNECT_MS, ...rest, options,
     host: cfg.host, port: fixed(cfg.port, DB_ENGINES.postgresql.port), user: cfg.user, password: cfg.password, database: database ?? cfg.database ?? undefined,
-    ssl: cfg.ssl ? { rejectUnauthorized: !cfg.trustCert } : undefined, connectionTimeoutMillis: CONNECT_MS,
+    ssl: cfg.ssl ? tlsOptions(pv, !cfg.trustCert) : undefined,
   });
   c.on('error', () => undefined);
   await c.connect();
@@ -141,9 +148,15 @@ async function openPg(cfg: DatabaseConfig, database?: string): Promise<Conn> {
 
 async function openMssql(cfg: DatabaseConfig, database?: string): Promise<Conn> {
   const m: any = await import('mssql'); const mssql = m.default ?? m;
+  const pv = propValues('mssql', cfg.props);
+  const { connectionTimeout, ...opts } = plain(pv);
+  const crypto = cfg.ssl ? tlsOptions(pv, true) : undefined; if (crypto) delete crypto.rejectUnauthorized;
   const pool = new mssql.ConnectionPool({
-    server: cfg.host, port: fixed(cfg.port, DB_ENGINES.mssql.port), user: cfg.user, password: cfg.password, database: database ?? cfg.database,
-    options: { encrypt: !!cfg.ssl, trustServerCertificate: cfg.ssl ? !!cfg.trustCert : true }, connectionTimeout: CONNECT_MS, pool: { max: 1, min: 0 },
+    server: cfg.host, user: cfg.user, password: cfg.password, database: database ?? cfg.database,
+    // A named instance is found by its name, so it takes no port.
+    ...(opts.instanceName !== undefined ? {} : { port: fixed(cfg.port, DB_ENGINES.mssql.port) }),
+    options: { ...opts, encrypt: !!cfg.ssl, trustServerCertificate: cfg.ssl ? !!cfg.trustCert : true, ...(crypto && Object.keys(crypto).length ? { cryptoCredentialsDetails: crypto } : {}) },
+    connectionTimeout: connectionTimeout ?? CONNECT_MS, pool: { max: 1, min: 0 },
   });
   pool.on('error', () => undefined);
   await pool.connect();
@@ -165,33 +178,52 @@ async function openMssql(cfg: DatabaseConfig, database?: string): Promise<Conn> 
   };
 }
 
-/** better-sqlite3 is synchronous: a long query would stop all of hive-am, so it runs in its own thread that can be stopped. */
-const SQLITE_WORKER = `
-const { parentPort, workerData: w } = require('node:worker_threads');
+/**
+ * better-sqlite3 is synchronous and has no way to interrupt a statement, so a query that never ends cannot be stopped from inside
+ * the process (not even in a thread: it would go on using a core forever). It runs in a process of its own that is killed at the timeout.
+ */
+const SQLITE_CHILD = `
+const w = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
 const Database = require(w.mod);
-let db;
+let db, out;
 try {
-  db = new Database(w.file, { readonly: w.readOnly, fileMustExist: true });
+  db = new Database(w.file, { readonly: w.readOnly, fileMustExist: true, ...(w.timeout !== undefined ? { timeout: w.timeout } : {}) });
+  for (const [k, v] of Object.entries(w.pragmas)) db.pragma(k + ' = ' + v);
   const stmt = db.prepare(w.sql);
   if (stmt.reader) {
     const columns = stmt.columns().map((c) => ({ name: c.name })); stmt.raw(true);
     const rows = []; let truncated = false;
-    for (const r of stmt.iterate()) { if (rows.length >= w.max) { truncated = true; break; } rows.push(r); }
-    parentPort.postMessage({ ok: true, columns, rows, truncated });
-  } else { const r = stmt.run(); parentPort.postMessage({ ok: true, columns: [], rows: [], truncated: false, affected: r.changes }); }
-} catch (e) { parentPort.postMessage({ ok: false, error: String(e && e.message || e) }); }
-finally { try { db && db.close(); } catch {} }
+    for (const r of stmt.iterate()) { if (rows.length >= w.max) { truncated = true; break; } rows.push(r.map((v) => typeof v === 'bigint' ? v.toString() : (Buffer.isBuffer(v) ? { $blob: v.toString('base64') } : v))); }
+    out = { ok: true, columns, rows, truncated };
+  } else { const r = stmt.run(); out = { ok: true, columns: [], rows: [], truncated: false, affected: r.changes }; }
+} catch (e) { out = { ok: false, error: String(e && e.message || e) }; }
+try { db && db.close(); } catch {}
+process.stdout.write(JSON.stringify(out));
 `;
+const SQLITE_MAX_OUT = 64 * 1024 * 1024;
 
 function openSqlite(cfg: DatabaseConfig): Conn {
   if (!existsSync(cfg.file!)) throw new ObjectError('The SQLite file does not exist');
   const mod = req.resolve('better-sqlite3');
+  // The values were checked when the object was saved (a number, true/false or one of a few words), so they are safe in a PRAGMA.
+  const { timeout, ...rest } = plain(propValues('sqlite', cfg.props));
+  const pragmas = Object.fromEntries(Object.entries(rest).map(([k, v]) => [k, typeof v === 'boolean' ? (v ? 1 : 0) : v]));
   return {
     run: (sql, o) => new Promise((ok, no) => {
-      const w = new Worker(SQLITE_WORKER, { eval: true, workerData: { mod, file: cfg.file, sql, max: o.max, readOnly: o.readOnly } });
-      const timer = setTimeout(() => { void w.terminate(); no(new Error(`The query took more than ${Math.round(o.timeoutMs / 1000)} s`)); }, o.timeoutMs);
-      w.once('message', (m: any) => { clearTimeout(timer); void w.terminate(); m.ok ? ok({ columns: m.columns, rows: m.rows, truncated: m.truncated, affected: m.affected }) : no(new Error(m.error)); });
-      w.once('error', (e) => { clearTimeout(timer); no(e); });
+      const child = spawn(process.execPath, ['-e', SQLITE_CHILD], { stdio: ['pipe', 'pipe', 'ignore'] });
+      const chunks: Buffer[] = []; let size = 0, done = false;
+      const finish = (err?: Error, v?: Omit<DbResult, 'ms'>) => { if (done) return; done = true; clearTimeout(timer); child.kill('SIGKILL'); err ? no(err) : ok(v!); };
+      const timer = setTimeout(() => finish(new Error(`The query took more than ${Math.round(o.timeoutMs / 1000)} s`)), o.timeoutMs);
+      child.stdout.on('data', (c: Buffer) => { size += c.length; if (size > SQLITE_MAX_OUT) finish(new Error('The result is too big: use fewer rows or columns')); else chunks.push(c); });
+      child.once('error', (e) => finish(e));
+      child.once('close', () => {
+        if (done) return;
+        try {
+          const m = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          m.ok ? finish(undefined, { columns: m.columns, rows: m.rows.map((r: unknown[]) => r.map((v) => (v && typeof v === 'object' && '$blob' in v ? Buffer.from((v as { $blob: string }).$blob, 'base64') : v))), truncated: m.truncated, affected: m.affected }) : finish(new Error(m.error));
+        } catch { finish(new Error('The SQLite process ended without an answer')); }
+      });
+      child.stdin.end(JSON.stringify({ mod, file: cfg.file, sql, max: o.max, readOnly: o.readOnly, timeout, pragmas }));
     }),
     close: async () => undefined,
   };

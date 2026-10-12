@@ -135,8 +135,12 @@ export interface HttpConfig { folder: string; env?: string; variables?: Record<s
 export type DbEngine = 'mysql' | 'postgresql' | 'sqlite' | 'mssql';
 export interface DatabaseConfig {
   engine: DbEngine; host?: string; port?: number; user?: string; password?: string; passwordSet?: boolean; database?: string; file?: string;
-  ssl?: boolean; trustCert?: boolean; readOnly?: boolean; timeoutSec?: number; maxRows?: number;
+  ssl?: boolean; trustCert?: boolean; props?: Record<string, string>; readOnly?: boolean; timeoutSec?: number; maxRows?: number;
 }
+export type DriverPropType = 'string' | 'number' | 'boolean' | 'choice' | 'file';
+export type DriverPropGroup = 'session' | 'network' | 'ssl' | 'advanced';
+/** A property the driver of a database engine takes (the list comes from the server: see driver-props.ts). */
+export interface DriverProp { name: string; type: DriverPropType; group: DriverPropGroup; desc: string; es: string; choices?: string[]; min?: number; max?: number; placeholder?: string }
 export interface ClusterConfig { members: string[] }
 export interface ObjectState { status: ObjectStatus; detail?: string; pid?: number; since?: number }
 export interface ObjectView { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig | HttpConfig | DatabaseConfig | ClusterConfig; state: ObjectState; created_at: number; updated_at: number }

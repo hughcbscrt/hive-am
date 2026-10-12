@@ -6,6 +6,7 @@ import { useHive } from '@/lib/store';
 import type { ObjectKind, ObjectView } from '@/lib/types';
 import { Drawer, useToast } from '@/components/ui';
 import { ObjectFields, draftFrom, toConfig, useDraft } from './ObjectForm';
+import { suggestDbName } from './DatabaseCards';
 
 /** Creating an object. (Changing one is done in its own screen: see ObjectWorkspace.) */
 export function ObjectEditor({ presetColonyId, presetKind, onClose, onSaved }: { presetColonyId?: string; presetKind?: ObjectKind; onClose: () => void; onSaved?: (id: string) => void }) {
@@ -17,13 +18,14 @@ export function ObjectEditor({ presetColonyId, presetKind, onClose, onSaved }: {
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
-    if (!d.name.trim()) { setErr(t('obj.err.name')); return; }
+    const name = d.name.trim() || (d.kind === 'database' ? suggestDbName(d) : '');
+    if (!name) { setErr(t('obj.err.name')); return; }
     setBusy(true); setErr('');
     try {
       if (d.kind === 'docker' && d.mode === 'template' && !d.template) { setErr(t('tpl.pick')); setBusy(false); return; }
       const r = d.kind === 'docker' && d.mode === 'template'
-        ? await api.post<ObjectView>('/objects/from-template', { name: d.name.trim(), colony_id: d.colony_id || null, template: d.template, values: d.tplValues })
-        : await api.post<ObjectView>('/objects', { name: d.name.trim(), colony_id: d.colony_id || null, kind: d.kind, config: toConfig(d) });
+        ? await api.post<ObjectView>('/objects/from-template', { name, colony_id: d.colony_id || null, template: d.template, values: d.tplValues })
+        : await api.post<ObjectView>('/objects', { name, colony_id: d.colony_id || null, kind: d.kind, config: toConfig(d) });
       await refresh(['objects']);
       toast(t('obj.created')); onSaved?.(r.id); onClose();
     } catch (e) { setErr(e instanceof Error ? e.message : t('edit.saveFailed')); setBusy(false); }
