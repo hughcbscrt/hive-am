@@ -1168,7 +1168,8 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .menu-item .mi-box { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--line-strong); display: grid; place-items: center; color: #fff; } .menu-item .mi-box.on { background: var(--honey); border-color: var(--honey); color: var(--ink); }
 
 /* Object settings use the same small text as the agent stats bar (12.5px). */
-.oc .field > label, .oc .label { font-size: 12.5px; }
-.oc .input, .oc select, .oc textarea, .oc .btn { font-size: 12.5px; }
+.of-card .field > label, .of-card .label, .oc .field > label, .oc .label { font-size: 12.5px; }
+.of-card .input, .of-card select, .of-card textarea, .of-card .btn, .of-card .seg button, .oc .input, .oc select, .oc textarea, .oc .btn { font-size: 12.5px; }
+.ow-tabs .tab { font-size: 13px; }
 .oc .muted.small, .oc .field-hint, .oc .hint { font-size: 12px; }
 .of-card > header h4 { font-size: 14px; }
