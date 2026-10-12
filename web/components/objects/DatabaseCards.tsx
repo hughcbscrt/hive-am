@@ -1,4 +1,5 @@
 'use client';
+import { PasswordInput } from '@/components/PasswordInput';
 import { useState } from 'react';
 import { CheckCircle2, ChevronRight, Database as DbIcon, Link2, Loader2, PlugZap, XCircle } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -62,7 +63,7 @@ export function DatabaseCards({ d, set, setD, objectId, creating = false }: {
         <Field label={t('db.port')}>{text('dbPort', { placeholder: String(DB_ENGINES[d.engine].port) })}</Field>
         <Field label={t('db.user')}>{text('dbUser', { mono: true })}</Field>
         <Field label={t('db.password')} hint={d.dbPasswordSet && !d.dbPassword ? t('db.password.saved') : undefined}>
-          <input className="input mono" type="password" value={d.dbPassword} autoComplete="new-password" placeholder={d.dbPasswordSet ? '••••••••' : ''} onChange={(e) => set('dbPassword', e.target.value)} />
+          <PasswordInput value={d.dbPassword} autoComplete="new-password" placeholder={d.dbPasswordSet ? '••••••••' : ''} onChange={(e) => set('dbPassword', e.target.value)} />
         </Field>
       </div>
       <Field label={t('db.database')} hint={t('db.database.hint')}>{text('dbName', { mono: true })}</Field>

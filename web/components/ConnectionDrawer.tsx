@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { ago } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n';
 import type { AllowedChat, AllowedUser, Connection, ConnectionThread, Provider } from '@/lib/types';
+import { PasswordInput } from './PasswordInput';
 import { Drawer, Field, Hex, ModelField, Modal, Segmented, useToast } from './ui';
 
 type Silent = 'notice' | 'send_text' | 'ignore';
@@ -125,7 +126,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
         {agent && agent.provider === 'opencode' && <p className="hint" style={{ margin: 0 }}>{t('conn.perm.opencode')}</p>}
 
         <Field label={t('conn.token')} hint={t('conn.token.hint')} error={errs.token}>
-          <input className="input mono" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} placeholder={tokenHint ? t('conn.token.keep', { hint: tokenHint }) : '123456:ABC…'} />
+          <PasswordInput autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} placeholder={tokenHint ? t('conn.token.keep', { hint: tokenHint }) : '123456:ABC…'} />
         </Field>
 
         <Field label={t('conn.allowed')} hint={t('conn.allowed.hint')}>

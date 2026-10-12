@@ -43,7 +43,7 @@ function suggest(text: string, caret: number, vars: VarInfo[], named: string[]):
 }
 
 /** Where the caret is on the screen, measured with a hidden copy of the text with the same layout. */
-function caretXY(ta: HTMLTextAreaElement, pos: number): { x: number; y: number } {
+export function caretXY(ta: HTMLTextAreaElement, pos: number): { x: number; y: number } {
   const cs = getComputedStyle(ta); const m = document.createElement('div');
   for (const p of ['fontFamily', 'fontSize', 'lineHeight', 'letterSpacing', 'tabSize', 'paddingTop', 'paddingLeft', 'paddingRight', 'paddingBottom', 'borderTopWidth', 'borderLeftWidth', 'borderRightWidth', 'boxSizing'] as const) (m.style as unknown as Record<string, string>)[p] = cs[p];
   m.style.cssText += ';position:absolute;visibility:hidden;white-space:pre;top:0;left:0;width:' + ta.clientWidth + 'px';

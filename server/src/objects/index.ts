@@ -6,7 +6,7 @@ import { renderTemplate, listTemplates } from './templates.js';
 import { composeServiceAction, inspectDocker, recreateDocker, type DockerAction, dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
 import { recordRun, listHistory, clearHistory } from './http-history.js';
 import { dbColumns, dbQuery, dbSchema, dbState, dbTest, forgetDatabase } from './database.js';
-import { addSaved, clearQueries, forgetQueries, listQueries, listSaved, recordQuery, removeSaved } from './db-history.js';
+import { addSaved, clearQueries, forgetQueries, listQueries, listSaved, recordQuery, removeSaved, updateSaved } from './db-history.js';
 import { exportCollection, parseHttpFile, createHttpFile, exportHttp, type ExportFormat, describeHttp, dropSession, inspectHttp, readHttpFile, runHttp, scanHttp, writeHttpFile, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
 import { ObjectError, parseDatabase, type ClusterConfig, type DatabaseConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
 import { forgetServer, serverLogs, serverState, startServer, stopServer } from './runner.js';
@@ -252,6 +252,14 @@ export const dbSavedAdd = (id: string, p: { name?: unknown; sql?: unknown; datab
   dbOf(id); const name = String(p.name ?? '').trim().slice(0, 80), sql = String(p.sql ?? '');
   if (!name || !sql.trim()) throw new ObjectError('Give the query a name and some text');
   try { return addSaved(id, { name, sql, database: p.database ? String(p.database) : undefined }); } catch (e) { throw new ObjectError(e instanceof Error ? e.message : 'could not save'); }
+};
+export const dbSavedUpdate = (id: string, savedId: string, p: { name?: unknown; sql?: unknown; database?: unknown }) => {
+  dbOf(id);
+  const name = p.name === undefined ? undefined : String(p.name).trim().slice(0, 80), sql = p.sql === undefined ? undefined : String(p.sql);
+  if (name === '' || (sql !== undefined && !sql.trim())) throw new ObjectError('Give the query a name and some text');
+  const e = updateSaved(id, savedId, { name, sql, database: p.database === undefined ? undefined : p.database ? String(p.database) : null });
+  if (!e) throw new ObjectError('Saved query not found');
+  return e;
 };
 export const dbSavedRemove = (id: string, savedId: string) => { dbOf(id); if (!removeSaved(id, savedId)) throw new ObjectError('Saved query not found'); return listSaved(id); };
 /** Tries a connection before it is saved: the config comes from the form; an empty password means the one already saved (of that object). */

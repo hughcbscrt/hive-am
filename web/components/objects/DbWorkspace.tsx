@@ -1,16 +1,17 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import { BookMarked, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, Download, Loader2, Play, RefreshCw, Save, Search, Table2, Trash2, Eye, Lock, Unlock } from 'lucide-react';
+import { AlignLeft, BookMarked, Pencil, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, Download, Loader2, Play, RefreshCw, Save, Search, Table2, Trash2, Eye, Lock, Unlock } from 'lucide-react';
 import { api } from '@/lib/api';
 import { ago } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n/index';
 import { useGitPrefs } from '@/lib/git/gitPrefs';
 import type { DatabaseConfig, DbEngine, DbHistoryEntry, DbResult, DbSaved, DbSchema, DbTable, DbTableColumn, ObjectView } from '@/lib/types';
 import { Modal, useToast } from '@/components/ui';
-import { CodeEditor } from '@/components/git/CodeEditor';
+import { SqlEditor } from './SqlEditor';
+import { formatSql, type SqlCtx } from '@/lib/sql';
 import { GitSettings } from '@/components/git/GitSettings';
 import { HelpPopover } from '@/components/HelpPopover';
-import { Menu, MenuGroup, MenuItem } from '@/components/Menu';
+import { Menu, MenuGroup, MenuItem, MenuSep } from '@/components/Menu';
 
 export type DbPane = 'query' | 'schema' | 'history';
 const SHOWN_STEP = 500;
@@ -46,6 +47,23 @@ export function DbWorkspace({ object: o, pane, onPane }: { object: ObjectView; p
   const [hist, setHist] = useState<DbHistoryEntry[] | null>(null);
   const [naming, setNaming] = useState(false);
   const area = useRef<HTMLTextAreaElement | null>(null);
+  // The columns of each table, loaded when the editor asks for them (to suggest them), kept while the database is the same.
+  const colCache = useRef(new Map<string, string[] | 'loading'>());
+  const [, bump] = useState(0);
+  const colKey = (tb: DbTable) => `${database ?? ''}|${tb.schema}.${tb.name}`;
+  const ctx = useMemo<SqlCtx>(() => ({
+    schema,
+    cols: (tb) => { const c = colCache.current.get(colKey(tb)); return Array.isArray(c) ? c : undefined; },
+    need: (tb) => {
+      const k = colKey(tb); if (colCache.current.has(k)) return; colCache.current.set(k, 'loading');
+      const cur = database ?? schema?.database;
+      api.get<DbTableColumn[]>(`/objects/${o.id}/db/columns?schema=${encodeURIComponent(tb.schema)}&table=${encodeURIComponent(tb.name)}${cur && schema && schema.engine !== 'sqlite' ? `&database=${encodeURIComponent(cur)}` : ''}`)
+        .then((c) => colCache.current.set(k, c.map((x) => x.name))).catch(() => colCache.current.delete(k)).finally(() => bump((n) => n + 1));
+    },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [schema, database, o.id]);
+  useEffect(() => { colCache.current.clear(); }, [o.id, o.updated_at, database]);
+  const pick = useRef<{ from: number; to: number } | null>(null);
 
   useEffect(() => { try { setSqlState(localStorage.getItem(key) ?? ''); } catch { /* none */ } }, [key]);
   const setSql = (v: string) => { setSqlState(v); try { localStorage.setItem(key, v); } catch { /* none */ } };
@@ -70,7 +88,24 @@ export function DbWorkspace({ object: o, pane, onPane }: { object: ObjectView; p
     finally { setBusy(false); loadHistory(); }
   };
   const openTable = (tb: DbTable) => { const q = selectFrom(schema?.engine ?? cfg.engine, tb); setSql(q); onPane('query'); void run(q); };
-  const use = (q: string, db?: string) => { setSql(q); if (db !== undefined) setDatabase(db); onPane('query'); };
+  /** A query from the history or the saved ones goes at the end of the editor (what you already typed stays) and is left selected, so Ctrl+Enter runs just it. */
+  const use = (q: string, db?: string) => {
+    const base = sql.trimEnd(); const lead = base ? `${base}\n\n` : '';
+    setSql(lead + q); pick.current = { from: lead.length, to: lead.length + q.length };
+    if (db !== undefined) setDatabase(db); onPane('query');
+  };
+  useEffect(() => {
+    const r = pick.current, el = area.current; if (!r || !el || pane !== 'query') return;
+    pick.current = null;
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(r.from, r.to); el.scrollTop = el.scrollHeight; });
+  });
+  const format = async () => {
+    const el = area.current; const sel = el && el.selectionEnd > el.selectionStart;
+    try {
+      if (sel && el) { const out = await formatSql(sql.slice(el.selectionStart, el.selectionEnd), schema?.engine ?? cfg.engine); setSql(sql.slice(0, el.selectionStart) + out + sql.slice(el.selectionEnd)); }
+      else setSql(await formatSql(sql, schema?.engine ?? cfg.engine));
+    } catch (e) { toast(t('db.format.fail', { error: e instanceof Error ? e.message.split('\n')[0] : '' }), 'err'); }
+  };
   const save = async (name: string) => {
     try { await api.post(`/objects/${o.id}/db/saved`, { name, sql, database }); toast(t('db.saved.done')); loadHistory(); }
     catch (e) { toast(e instanceof Error ? e.message : '', 'err'); }
@@ -79,11 +114,11 @@ export function DbWorkspace({ object: o, pane, onPane }: { object: ObjectView; p
   return (
     <div className="dbw">
       {pane === 'query' && (
-        <QueryPane o={o} sql={sql} setSql={setSql} area={area} run={() => void run()} busy={busy} result={result} error={error} schema={schema}
-          database={database} setDatabase={setDatabase} saved={saved} onSave={() => setNaming(true)} onUse={use} />
+        <QueryPane o={o} sql={sql} setSql={setSql} area={area} run={() => void run()} format={() => void format()} ctx={ctx} busy={busy} result={result} error={error} schema={schema}
+          database={database} setDatabase={setDatabase} saved={saved} onSave={() => setNaming(true)} onUse={use} onManage={() => onPane('history')} />
       )}
       {pane === 'schema' && <SchemaPane o={o} schema={schema} err={schemaErr} loading={loadingSchema} onReload={() => void loadSchema(database)} database={database} setDatabase={setDatabase} onOpen={openTable} />}
-      {pane === 'history' && <HistoryPane o={o} hist={hist} saved={saved} onUse={use} onChanged={loadHistory} />}
+      {pane === 'history' && <HistoryPane o={o} hist={hist} saved={saved} sql={sql} database={database} onUse={use} onChanged={loadHistory} />}
       {naming && <NameModal onClose={() => setNaming(false)} onSave={(n) => { setNaming(false); void save(n); }} />}
     </div>
   );
@@ -96,9 +131,9 @@ function ReadOnlyBadge({ cfg }: { cfg: DatabaseConfig }) {
     : <span className="db-badge rw" title={t('db.readonly.off')}><Unlock size={12} />{t('db.write.badge')}</span>;
 }
 
-function QueryPane({ o, sql, setSql, area, run, busy, result, error, schema, database, setDatabase, saved, onSave, onUse }: {
-  o: ObjectView; sql: string; setSql: (v: string) => void; area: MutableRefObject<HTMLTextAreaElement | null>; run: () => void; busy: boolean; result: DbResult | null; error: string;
-  schema: DbSchema | null; database?: string; setDatabase: (d: string | undefined) => void; saved: DbSaved[]; onSave: () => void; onUse: (q: string, db?: string) => void;
+function QueryPane({ o, sql, setSql, area, run, format, ctx, busy, result, error, schema, database, setDatabase, saved, onSave, onUse, onManage }: {
+  o: ObjectView; sql: string; setSql: (v: string) => void; area: MutableRefObject<HTMLTextAreaElement | null>; run: () => void; format: () => void; ctx: SqlCtx; busy: boolean; result: DbResult | null; error: string;
+  schema: DbSchema | null; database?: string; setDatabase: (d: string | undefined) => void; saved: DbSaved[]; onSave: () => void; onUse: (q: string, db?: string) => void; onManage: () => void;
 }) {
   const { t } = useI18n();
   const prefs = useGitPrefs();
@@ -109,9 +144,11 @@ function QueryPane({ o, sql, setSql, area, run, busy, result, error, schema, dat
       <div className="dbq-bar">
         <button className="btn primary sm" disabled={busy || !sql.trim()} onClick={run} title="Ctrl/⌘ + Enter">{busy ? <Loader2 size={14} className="spin" /> : <Play size={14} />}{busy ? t('db.running') : t('db.run')}</button>
         <button className="btn sm" disabled={!sql.trim()} onClick={onSave}><Save size={14} />{t('db.save')}</button>
+        <button className="btn sm" disabled={!sql.trim()} onClick={format} title={t('db.format.hint')}><AlignLeft size={14} />{t('db.format')}</button>
         <Menu label={t('db.saved')} icon={<BookMarked size={14} />}>{(close) => (<>
           {saved.length === 0 ? <p className="muted small" style={{ margin: 8, maxWidth: 240 }}>{t('db.saved.none')}</p>
             : <MenuGroup label={t('db.saved.title')}>{saved.map((s) => <MenuItem key={s.id} hint={s.sql.replace(/\s+/g, ' ').slice(0, 70)} onClick={() => { close(); onUse(s.sql, s.database); }}>{s.name}</MenuItem>)}</MenuGroup>}
+          <MenuSep /><MenuItem icon={<Pencil size={14} />} onClick={() => { close(); onManage(); }}>{t('db.saved.manage')}</MenuItem>
         </>)}</Menu>
         {dbs.length > 1 && (
           <select className="select db-pick" value={database ?? schema?.database ?? ''} onChange={(e) => setDatabase(e.target.value)} aria-label={t('db.database.pick')} title={t('db.database.pick')}>
@@ -120,12 +157,12 @@ function QueryPane({ o, sql, setSql, area, run, busy, result, error, schema, dat
         )}
         <span className="grow" />
         <ReadOnlyBadge cfg={cfg} />
-        <HelpPopover size="sm" label={t('common.help')} title={t('db.help.title')}><p>{t('db.help.1')}</p><p>{t('db.help.2')}</p></HelpPopover>
+        <HelpPopover size="sm" align="end" label={t('common.help')} title={t('db.help.title')}><p>{t('db.help.1')}</p><p>{t('db.help.2')}</p><p>{t('db.help.3')}</p><p>{t('db.help.4')}</p></HelpPopover>
         <GitSettings compact />
       </div>
       <div className="db-ed gx" data-gx-theme={prefs.theme} style={{ ['--g-tab' as never]: prefs.tabSize }}>
-        <CodeEditor value={sql} onChange={setSql} path="query.sql" areaRef={area} label={t('db.editor')}
-          onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); } }} />
+        <SqlEditor value={sql} onChange={setSql} areaRef={area} ctx={ctx} label={t('db.editor')}
+          onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); } else if (e.altKey && e.shiftKey && e.key.toLowerCase() === 'f') { e.preventDefault(); format(); } }} />
       </div>
       <div className="dbq-res">
         {busy && !result && !error ? <p className="muted small db-note"><Loader2 size={14} className="spin" /> {t('db.running')}</p>
@@ -203,9 +240,11 @@ function SchemaPane({ o, schema, err, loading, onReload, database, setDatabase, 
       <aside className="dbs-list">
         <div className="dbs-head">
           {dbs.length > 1 && <select className="select" value={cur ?? ''} onChange={(e) => { setSel(null); setDatabase(e.target.value); }} aria-label={t('db.database.pick')}>{dbs.map((d) => <option key={d} value={d}>{d}</option>)}</select>}
+          <div className="dbs-tools">
           <div className="search grow"><Search size={14} /><input className="input" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('db.schema.filter')} aria-label={t('db.schema.filter')} /></div>
           {names.length > 1 && <button className="btn ghost icon sm" onClick={() => setAll(!allOpen)} aria-label={allOpen ? t('db.schema.collapseAll') : t('db.schema.expandAll')} title={allOpen ? t('db.schema.collapseAll') : t('db.schema.expandAll')}>{allOpen ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}</button>}
           <button className="btn ghost icon sm" onClick={onReload} aria-label={t('db.schema.refresh')} title={t('db.schema.refresh')}><RefreshCw size={14} className={loading ? 'spin' : ''} /></button>
+          </div>
         </div>
         <div className="dbs-tree">
           {err ? <p className="gx-note err">{err}</p> : !schema && loading ? <p className="muted small db-note"><Loader2 size={14} className="spin" /> {t('db.schema.loading')}</p>
@@ -241,19 +280,25 @@ function SchemaPane({ o, schema, err, loading, onReload, database, setDatabase, 
   );
 }
 
-function HistoryPane({ o, hist, saved, onUse, onChanged }: { o: ObjectView; hist: DbHistoryEntry[] | null; saved: DbSaved[]; onUse: (q: string, db?: string) => void; onChanged: () => void }) {
+function HistoryPane({ o, hist, saved, sql, database, onUse, onChanged }: { o: ObjectView; hist: DbHistoryEntry[] | null; saved: DbSaved[]; sql: string; database?: string; onUse: (q: string, db?: string) => void; onChanged: () => void }) {
   const { t } = useI18n();
   const toast = useToast();
-  const clear = async () => { try { await api.del(`/objects/${o.id}/db/history`); onChanged(); } catch (e) { toast(e instanceof Error ? e.message : '', 'err'); } };
-  const drop = async (id: string) => { try { await api.del(`/objects/${o.id}/db/saved/${id}`); onChanged(); } catch (e) { toast(e instanceof Error ? e.message : '', 'err'); } };
+  const [renaming, setRenaming] = useState<DbSaved | null>(null);
+  const [confirm, setConfirm] = useState<DbSaved | null>(null);
+  const fail = (e: unknown) => toast(e instanceof Error ? e.message : '', 'err');
+  const clear = async () => { try { await api.del(`/objects/${o.id}/db/history`); onChanged(); } catch (e) { fail(e); } };
+  const drop = async (id: string) => { try { await api.del(`/objects/${o.id}/db/saved/${id}`); setConfirm(null); onChanged(); } catch (e) { fail(e); } };
+  const patch = async (id: string, body: { name?: string; sql?: string; database?: string }, done?: string) => { try { await api.patch(`/objects/${o.id}/db/saved/${id}`, body); if (done) toast(done); onChanged(); } catch (e) { fail(e); } };
   return (
     <div className="dbh">
       <section>
         <div className="row gap-s"><h3 className="grow">{t('db.saved.title')}</h3></div>
         {saved.length === 0 ? <p className="muted small">{t('db.saved.none')}</p> : saved.map((s) => (
           <div key={s.id} className="dbh-row">
-            <button className="dbh-main" onClick={() => onUse(s.sql, s.database)}><b>{s.name}</b><code className="mono">{s.sql.replace(/\s+/g, ' ').slice(0, 160)}</code></button>
-            <button className="btn ghost icon sm" onClick={() => void drop(s.id)} aria-label={t('db.delete')} title={t('db.delete')}><Trash2 size={14} /></button>
+            <button className="dbh-main" onClick={() => onUse(s.sql, s.database)} title={t('db.saved.use')}><b>{s.name}</b><code className="mono">{s.sql.replace(/\s+/g, ' ').slice(0, 160)}</code></button>
+            <button className="btn ghost icon sm" onClick={() => setRenaming(s)} aria-label={t('db.saved.rename')} title={t('db.saved.rename')}><Pencil size={14} /></button>
+            <button className="btn ghost icon sm" disabled={!sql.trim() || sql === s.sql} onClick={() => void patch(s.id, { sql, database: database ?? '' }, t('db.saved.updated'))} aria-label={t('db.saved.replace')} title={t('db.saved.replace')}><Save size={14} /></button>
+            <button className="btn ghost icon sm" onClick={() => setConfirm(s)} aria-label={t('db.delete')} title={t('db.delete')}><Trash2 size={14} /></button>
           </div>))}
       </section>
       <section>
@@ -266,17 +311,24 @@ function HistoryPane({ o, hist, saved, onUse, onChanged }: { o: ObjectView; hist
             </button>
           </div>))}
       </section>
+      {renaming && <NameModal title={t('db.saved.rename')} initial={renaming.name} onClose={() => setRenaming(null)} onSave={(n) => { const r = renaming; setRenaming(null); void patch(r.id, { name: n }, t('db.saved.updated')); }} />}
+      {confirm && (
+        <Modal title={t('db.saved.delete.title', { name: confirm.name })} onClose={() => setConfirm(null)}>
+          <p style={{ margin: 0 }} className="muted">{t('db.saved.delete.body')}</p>
+          <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn ghost" onClick={() => setConfirm(null)}>{t('common.cancel')}</button><button className="btn danger" onClick={() => void drop(confirm.id)}>{t('db.delete')}</button></div>
+        </Modal>
+      )}
     </div>
   );
 }
 
-function NameModal({ onClose, onSave }: { onClose: () => void; onSave: (n: string) => void }) {
+function NameModal({ onClose, onSave, title, initial = '' }: { onClose: () => void; onSave: (n: string) => void; title?: string; initial?: string }) {
   const { t } = useI18n();
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initial);
   return (
-    <Modal title={t('db.save')} onClose={onClose}>
+    <Modal title={title ?? t('db.save')} onClose={onClose}>
       <div className="field"><label>{t('db.saved.name')}</label><input className="input" autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) onSave(name.trim()); }} /></div>
-      <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn ghost" onClick={onClose}>{t('common.cancel')}</button><button className="btn primary" disabled={!name.trim()} onClick={() => onSave(name.trim())}>{t('db.save')}</button></div>
+      <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn ghost" onClick={onClose}>{t('common.cancel')}</button><button className="btn primary" disabled={!name.trim()} onClick={() => onSave(name.trim())}>{title ? t('common.saveChanges') : t('db.save')}</button></div>
     </Modal>
   );
 }

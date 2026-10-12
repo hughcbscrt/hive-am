@@ -31,7 +31,7 @@ import { DRIVER_PROPS } from './objects/driver-props.js';
 import { composeServices, listContainers, listImages } from './objects/docker-info.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from './objects/agent.js';
 import { TerminalError, closeTerminal, createTerminal, isLocalRequest, listTerminals, terminalsEnabled } from './terminals.js';
-import { ObjectError, dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, objectInspect, objectLogs, removeObject, updateObject } from './objects/index.js';
+import { ObjectError, dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, objectInspect, objectLogs, removeObject, updateObject } from './objects/index.js';
 import { gitCompare, gitCompareDiff, gitGrep, gitImageAt, gitRefs } from './git/browse.js';
 import { GitOpError, gitBlame, gitBranchCreate, gitBranchDelete, gitRefFile, gitBranches, gitCommitDetail, gitCommitChanges, gitCommitDiff, gitDiscardAll, gitDiscardFile, gitDiscardHunk, gitDiscardLines, gitFetch, gitLog, gitMerge, gitMergeAbort, gitPull, gitPush, gitRebaseContinue, gitResolveContent, gitResolveSide, gitSwitch, gitTagFile, gitTagTree, gitTags, gitUnresolve, type PullMode } from './git/ops.js';
 
@@ -316,6 +316,7 @@ route('GET', '/api/objects/:id/db/history', ({ req, params }) => { objectGuard(r
 route('DELETE', '/api/objects/:id/db/history', ({ req, params }) => { objectGuard(req); return objectSafe(() => dbHistoryClear(params[0])); });
 route('GET', '/api/objects/:id/db/saved', ({ req, params }) => { objectGuard(req); return objectSafe(() => dbSavedList(params[0])); });
 route('POST', '/api/objects/:id/db/saved', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => dbSavedAdd(params[0], p)); });
+route('PATCH', '/api/objects/:id/db/saved/:sid', async ({ req, params }) => { objectGuard(req); const p = await body(req); return objectSafe(() => dbSavedUpdate(params[0], params[1], p)); });
 route('DELETE', '/api/objects/:id/db/saved/:sid', ({ req, params }) => { objectGuard(req); return objectSafe(() => dbSavedRemove(params[0], params[1])); });
 route('GET', '/api/objects/:id/logs', ({ params, url }) => objectSafe(() => objectLogs(params[0], { tail: url.searchParams.get('tail') ? Number(url.searchParams.get('tail')) : undefined, after: url.searchParams.get('after') ?? undefined })));
 

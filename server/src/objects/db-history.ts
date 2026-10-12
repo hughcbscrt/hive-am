@@ -39,6 +39,15 @@ export function addSaved(id: string, p: { name: string; sql: string; database?: 
   const e: DbSaved = { id: randomUUID(), name: p.name, sql: p.sql.slice(0, SQL_MAX), database: p.database, at: Date.now() };
   list.unshift(e); save('db-saved', id, list); return e;
 }
+/** Renames a saved query and/or replaces its text (and database); it keeps its place in the list. */
+export function updateSaved(id: string, savedId: string, p: { name?: string; sql?: string; database?: string | null }): DbSaved | undefined {
+  const list = load<DbSaved>('db-saved', id), e = list.find((x) => x.id === savedId);
+  if (!e) return undefined;
+  if (p.name !== undefined) e.name = p.name;
+  if (p.sql !== undefined) e.sql = p.sql.slice(0, SQL_MAX);
+  if (p.database !== undefined) e.database = p.database ?? undefined;
+  save('db-saved', id, list); return e;
+}
 export function removeSaved(id: string, savedId: string): boolean {
   const list = load<DbSaved>('db-saved', id), i = list.findIndex((x) => x.id === savedId);
   if (i < 0) return false; list.splice(i, 1); save('db-saved', id, list); return true;
