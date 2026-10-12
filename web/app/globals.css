@@ -1229,7 +1229,7 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .of-adv > summary::-webkit-details-marker { display: none; }
 .of-adv > summary svg { transition: transform .15s; } .of-adv[open] > summary svg { transform: rotate(90deg); }
 .of-adv > summary .muted { font-weight: 400; }
-.of-adv[open] { padding-bottom: 12px; } .of-adv > .of-card { margin: 0 12px; }
+.of-adv[open] { padding-bottom: 12px; } .of-adv > .of-card { margin: 0 12px; } .of-adv > .of-card + .of-card { margin-top: 12px; }   /* a <details> does not lay its children out as a flex column */
 .dprops { display: flex; flex-direction: column; gap: 10px; }
 .dprop { display: flex; flex-direction: column; gap: 2px; }
 .dprop-row { display: grid; grid-template-columns: minmax(120px, 36%) 1fr auto; gap: 8px; align-items: center; }
