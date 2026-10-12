@@ -10,11 +10,12 @@ const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
  * previous call). `paused` stops asking. `max` is how many characters are kept; the oldest go first.
  */
 export function useLogStream(id: string, { max = 800_000, pollMs = 1000, paused = false }: { max?: number; pollMs?: number; paused?: boolean } = {}) {
-  const [text, setText] = useState<string | null>(null);
+  // `dropped` counts the lines that fell off the front, so a line keeps the same number while newer ones arrive (stable keys for the view).
+  const [st, setSt] = useState<{ text: string | null; dropped: number }>({ text: null, dropped: 0 });
   const cursor = useRef('');
   const gen = useRef(0);
 
-  useEffect(() => { setText(null); cursor.current = ''; gen.current++; }, [id]);
+  useEffect(() => { setSt({ text: null, dropped: 0 }); cursor.current = ''; gen.current++; }, [id]);
   useEffect(() => {
     if (paused) return;
     let dead = false, timer: ReturnType<typeof setTimeout>; const mine = gen.current;
@@ -25,11 +26,13 @@ export function useLogStream(id: string, { max = 800_000, pollMs = 1000, paused 
         if (dead || mine !== gen.current) return;
         cursor.current = r.cursor || cursor.current;
         const add = r.text.replace(ANSI, '');
-        setText((cur) => {
-          const base = r.reset ? '' : cur ?? '';
-          if (!add) return cur ?? '';
-          const joined = base && !base.endsWith('\n') && !add.startsWith('\n') ? `${base}\n${add}` : base + add;
-          return joined.length > max ? joined.slice(joined.length - max) : joined;
+        setSt((cur) => {
+          if (!add && !r.reset) return cur;
+          const base = r.reset ? '' : cur.text ?? '';
+          const joined = !add ? base : base && !base.endsWith('\n') && !add.startsWith('\n') ? `${base}\n${add}` : base + add;
+          if (joined.length <= max) return { text: joined, dropped: r.reset ? 0 : cur.dropped };
+          const cut = joined.length - max, gone = joined.slice(0, cut);
+          return { text: joined.slice(cut), dropped: (r.reset ? 0 : cur.dropped) + gone.split('\n').length - 1 };
         });
       } catch { /* the next tick tries again */ }
       if (!dead) timer = setTimeout(tick, pollMs);
@@ -38,6 +41,6 @@ export function useLogStream(id: string, { max = 800_000, pollMs = 1000, paused 
     return () => { dead = true; clearTimeout(timer); };
   }, [id, paused, max, pollMs]);
 
-  const clear = useCallback(() => setText(''), []);
-  return { text, clear };
+  const clear = useCallback(() => setSt((c) => ({ text: '', dropped: c.dropped + (c.text ? c.text.split('\n').length : 0) })), []);
+  return { text: st.text, dropped: st.dropped, clear };
 }

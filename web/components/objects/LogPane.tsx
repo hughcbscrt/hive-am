@@ -1,10 +1,11 @@
 'use client';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDownToLine, Copy, Download, Eraser, Pause, Play, Search, WrapText, ZoomIn, ZoomOut } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/index';
 import { useLogStream } from '@/lib/useLogStream';
 
-const SHOWN = 4000;       // rows drawn; the rest is kept (and downloaded) but not drawn
+const SHOWN = 2000;
+const CHUNK = 50;       // rows drawn; the rest is kept (and downloaded) but not drawn
 const LEVEL_ERR = /\b(error|fatal|exception|panic|fail(ed|ure)?|traceback)\b/i, LEVEL_WARN = /\b(warn(ing)?|deprecated)\b/i;
 const COLORS = ['#0f8f9e', '#c0399a', '#7a4de0', '#d4663f', '#2f8f5b', '#9a7400', '#2f5bea', '#c2412d'];
 
@@ -15,8 +16,9 @@ const COLORS = ['#0f8f9e', '#c0399a', '#7a4de0', '#d4663f', '#2f8f5b', '#9a7400'
 export function LogPane({ id, members, initialFilter }: { id: string; members?: string[]; /** Opens with this text searched, showing only the matching lines (e.g. the lines of one service). */ initialFilter?: string }) {
   const { t } = useI18n();
   const [paused, setPaused] = useState(false);
-  const { text, clear } = useLogStream(id, { paused });
+  const { text, dropped, clear } = useLogStream(id, { paused });
   const [q, setQ] = useState(initialFilter ?? '');
+  const dq = useDeferredValue(q);       // typing stays instant; the lines catch up a moment later
   const [only, setOnly] = useState(!!initialFilter);
   const [follow, setFollow] = useState(true);
   const [wrap, setWrap] = useState(true);
@@ -29,29 +31,26 @@ export function LogPane({ id, members, initialFilter }: { id: string; members?: 
 
   const all = useMemo(() => (text ? text.split('\n') : []), [text]);
   const rows = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    const out: { line: string; member?: string; level: '' | 'err' | 'warn'; hit: boolean }[] = [];
-    for (const line of all) {
+    const needle = dq.trim().toLowerCase();
+    const out: { line: string; idx: number; member?: string }[] = [];
+    for (let i = 0; i < all.length; i++) {
+      const line = all[i];
       const m = members ? /^\[([^\]]+)\] /.exec(line) : null;
       if (m && hidden.has(m[1])) continue;
-      const hit = !!needle && line.toLowerCase().includes(needle);
-      if (only && needle && !hit) continue;
-      out.push({ line, member: m?.[1], level: LEVEL_ERR.test(line) ? 'err' : LEVEL_WARN.test(line) ? 'warn' : '', hit });
+      if (only && needle && !line.toLowerCase().includes(needle)) continue;
+      out.push({ line, idx: dropped + i, member: m?.[1] });
     }
     return out;
-  }, [all, q, only, hidden, members]);
+  }, [all, dq, only, hidden, members, dropped]);
   const shown = rows.length > SHOWN ? rows.slice(rows.length - SHOWN) : rows;
-  const hits = q.trim() ? rows.filter((r) => r.hit).length : 0;
+  // The rows go in blocks of CHUNK lines (by their absolute number): a block that did not change is not even looked at again, which is what
+  // keeps a chatty log smooth (drawing the 2000 rows again on every poll froze the pane).
+  const chunks = useMemo(() => { const m = new Map<number, typeof shown>(); for (const r of shown) { const c = Math.floor(r.idx / CHUNK); const a = m.get(c); if (a) a.push(r); else m.set(c, [r]); } return [...m]; }, [shown]);
+  const hits = useMemo(() => { const n = dq.trim().toLowerCase(); return n ? rows.filter((r) => r.line.toLowerCase().includes(n)).length : 0; }, [rows, dq]);
 
   useEffect(() => { const el = box.current; if (el && follow) el.scrollTop = el.scrollHeight; }, [shown, follow]);
   const onScroll = () => { const el = box.current; if (!el) return; const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 40; if (!atEnd && follow) setFollow(false); else if (atEnd && !follow) setFollow(true); };
 
-  const highlight = (line: string) => {
-    const needle = q.trim(); if (!needle) return line;
-    const parts: React.ReactNode[] = []; const low = line.toLowerCase(), nl = needle.toLowerCase(); let i = 0, k = 0;
-    for (let at = low.indexOf(nl); at >= 0; at = low.indexOf(nl, i)) { parts.push(line.slice(i, at), <mark key={k++}>{line.slice(at, at + needle.length)}</mark>); i = at + needle.length; }
-    parts.push(line.slice(i)); return parts.map((p, j) => <Fragment key={j}>{p}</Fragment>);
-  };
   const download = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([all.join('\n')], { type: 'text/plain' })); a.download = `${id.slice(0, 8)}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.log`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); };
 
   return (
@@ -73,10 +72,7 @@ export function LogPane({ id, members, initialFilter }: { id: string; members?: 
           <button key={m} className={`lp-chip ${hidden.has(m) ? 'off' : ''}`} style={{ ['--c' as never]: COLORS[i % COLORS.length] }} aria-pressed={!hidden.has(m)} onClick={() => setHidden((h) => { const n = new Set(h); if (n.has(m)) n.delete(m); else n.add(m); return n; })}>{m}</button>))}</div>
       )}
       <div className={`lp-body mono ${wrap ? 'wrap' : ''}`} ref={box} onScroll={onScroll} tabIndex={0} style={{ fontSize: size }}>
-        {text === null ? <p className="muted">{t('git.loading')}</p> : shown.length === 0 ? <p className="muted">{t('obj.logs.empty')}</p> : shown.map((r, i) => {
-          const mi = r.member ? members?.indexOf(r.member) ?? -1 : -1;
-          return <div key={i} className={`lp-row ${r.level} ${r.hit ? 'hit' : ''}`} style={mi >= 0 ? { ['--c' as never]: COLORS[mi % COLORS.length] } : undefined}>{r.member && mi >= 0 ? <><b className="lp-src">[{r.member}]</b>{highlight(r.line.slice(r.member.length + 3))}</> : highlight(r.line)}</div>;
-        })}
+        {text === null ? <p className="muted">{t('git.loading')}</p> : shown.length === 0 ? <p className="muted">{t('obj.logs.empty')}</p> : chunks.map(([c, rs]) => <Chunk key={c} rows={rs} members={members} needle={dq.trim()} />)}
       </div>
       <div className="lp-foot muted small">
         <span>{t('lp.lines', { count: rows.length })}{rows.length > SHOWN ? ` · ${t('lp.shown', { count: SHOWN })}` : ''}{paused ? ` · ${t('lp.paused')}` : ''}</span>
@@ -85,3 +81,23 @@ export function LogPane({ id, members, initialFilter }: { id: string; members?: 
     </div>
   );
 }
+
+/** One line. */
+function Row({ line, member, mi, needle }: { line: string; member?: string; mi: number; needle: string }) {
+  const level = LEVEL_ERR.test(line) ? 'err' : LEVEL_WARN.test(line) ? 'warn' : '';
+  const body = member && mi >= 0 ? line.slice(member.length + 3) : line;
+  let hit = false;
+  const parts: React.ReactNode[] = [];
+  if (needle) {
+    const low = body.toLowerCase(), nl = needle.toLowerCase(); let i = 0, k = 0;
+    for (let at = low.indexOf(nl); at >= 0; at = low.indexOf(nl, i)) { hit = true; parts.push(body.slice(i, at), <mark key={k++}>{body.slice(at, at + needle.length)}</mark>); i = at + needle.length; }
+    parts.push(body.slice(i));
+  }
+  const text = needle ? parts.map((p, j) => <Fragment key={j}>{p}</Fragment>) : body;
+  return <div className={`lp-row ${level} ${hit ? 'hit' : ''}`} style={mi >= 0 ? { ['--c' as never]: COLORS[mi % COLORS.length] } : undefined}>{member && mi >= 0 ? <><b className="lp-src">[{member}]</b>{text}</> : text}</div>;
+}
+
+type LogRow = { line: string; idx: number; member?: string };
+const Chunk = memo(function Chunk({ rows, members, needle }: { rows: LogRow[]; members?: string[]; needle: string }) {
+  return <>{rows.map((r) => <Row key={r.idx} line={r.line} member={r.member} mi={r.member ? members?.indexOf(r.member) ?? -1 : -1} needle={needle} />)}</>;
+}, (a, b) => a.needle === b.needle && a.members === b.members && a.rows.length === b.rows.length && a.rows.every((r, i) => r.idx === b.rows[i].idx && r.line === b.rows[i].line));
