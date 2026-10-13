@@ -1,4 +1,5 @@
 // Cron parsing and next-run computation, including time zones and daylight-saving changes. No model involved. Usage: npx tsx scripts/test-cron.ts
+import './_guard.js';
 import { parseCron, nextCron, nextRuns, minGapMinutes, validTimezone, CronError } from '../src/cron.js';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `got ${JSON.stringify(got)} want ${JSON.stringify(want)}`); if (!ok) fail++; };

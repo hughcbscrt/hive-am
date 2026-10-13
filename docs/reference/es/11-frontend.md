@@ -8,19 +8,20 @@ Next.js 15 (App Router) + React 19 + TypeScript. Casi todo es **componente de cl
 
 Mapa del enjambre y panel de detalle.
 
-- **Cabecera:** el título con un icono de ayuda (**?**) que abre un popover con "cómo leer el mapa" (se cierra con Esc, clic fuera o el mismo icono), y los botones **New colony** y **New agent**.
-- **Estadísticas:** agentes, colonias, orquestadores, trabajando ahora y tareas en curso.
-- **Panal:** una celda hexagonal por agente, agrupadas por colonia (ver 11.2).
+- **Cabecera:** el título con un icono de ayuda (**?**) que abre un popover con "cómo leer el mapa" (se cierra con Esc, clic fuera o el mismo icono), y un único menú **New** (agente, colonia, recurso).
+- **Estadísticas:** agentes, recursos, orquestadores, trabajando ahora y tareas en curso; cada una es un **enlace** (a la lista de agentes, a la pantalla de recursos o al feed reciente).
+- **Carga y errores:** un esqueleto mientras la API no ha respondido y, si falla, un aviso de error con botón *Reintentar* (nunca una colonia vacía).
+- **Panal:** una celda hexagonal por agente, agrupadas por colonia (ver 11.2). Además de arrastrar, las colonias (por su nombre) y los hexágonos libres se pueden **mover con las flechas del teclado** (Mayús para pasos mayores).
 - **Panel derecho:** al seleccionar una celda muestra descripción, proveedor, modelo, carpeta efectiva ("· from colony" si es heredada), sesión, equipo (orquestadores), un **selector de colonia** (mueve al agente), botón **Open chat** y, en la esquina superior derecha, el botón de **ajustes** que abre `AgentEditDrawer`.
-- **Recent delegations:** últimas 6, se refrescan cada 6 s.
+- **Recent delegations:** las últimas 6, tomadas del store (`dispatches`, que refresca el WebSocket, sin sondeo), con enlaces al agente y a la sesión.
 
 ### Agents (`/agents`)
 
-Tabla con búsqueda (nombre, descripción, carpeta), filtros por rol y proveedor, y columnas: agente, proveedor · modelo, colonia, carpeta efectiva, estado y última actualización. La fila completa es clicable. Estados vacíos distintos para "sin agentes" y "sin resultados".
+Tabla con búsqueda (nombre, descripción, carpeta), filtros por rol y proveedor, y columnas: agente, proveedor · modelo, colonia, carpeta efectiva, estado y última actualización. La fila completa es clicable **y accesible con teclado** (Tab, luego Enter o Espacio), y la tabla se desplaza en horizontal en el móvil. La búsqueda y los filtros de rol y proveedor se recuerdan en el navegador (`hive-am.agents.q`, `.role`, `.provider`). Estados vacíos distintos para "sin agentes" y "sin resultados".
 
 ### Agente (`/agents/<id>`)
 
-Selector de agentes + chat + ajustes plegables (ver [documento 10](10-chat-y-visualizacion.md)). En la cabecera, el control **Chat / Cambios** alterna entre la conversación y el [explorador de cambios de git](13-explorador-de-cambios-git.md). El panel de ajustes tiene dos pestañas:
+Selector de agentes + chat + ajustes plegables (ver [documento 10](10-chat-y-visualizacion.md)). La cabecera es un `WorkspaceHeader`. El panel de ajustes y su pestaña viven en la URL (`?tab=config|notebook|sessions`), así que un enlace los abre; en pantallas de más de 1100 px el panel abierto reserva su ancho en el chat (ya no lo tapa) y su ancho se arrastra y se recuerda. En la cabecera, el control **Chat / Cambios** alterna entre la conversación y el [explorador de cambios de git](13-explorador-de-cambios-git.md). El panel de ajustes tiene dos pestañas:
 
 - **Configuration:** `AgentForm` completo con barra inferior *Save changes* / *Discard* y botón *Delete agent* (con confirmación).
 - **Sessions:** conversaciones y tareas delegadas.
@@ -28,7 +29,7 @@ Selector de agentes + chat + ajustes plegables (ver [documento 10](10-chat-y-vis
 Cabecera: volver a Colony, avatar, nombre, rol, proveedor, modelo, estado, **New conversation** (con confirmación) y **Settings**.
 
 ### Connections (`/connections`)
-Tarjetas de las conexiones externas con su estado en vivo (se refresca cada 5 s) y un panel lateral para crearlas o editarlas. Detalle en el [documento 14](14-conexiones-externas.md).
+Tarjetas de las conexiones externas con su estado en vivo (se refresca cada 5 s) y un panel lateral para crearlas o editarlas (cerrarlo con cambios sin guardar pregunta antes). Detalle en el [documento 14](14-conexiones-externas.md).
 
 ### Types (`/types`)
 
@@ -36,7 +37,7 @@ Tarjetas de tipos (rol, proveedor, modelo, nº de skills, nº de agentes que lo 
 
 ### Skills (`/skills`)
 
-Lista a la izquierda (búsqueda y uso `N agents · M types`) y editor a la derecha (nombre, descripción, instrucciones con pestañas *Write/Preview*). Botón *Delete* con confirmación que indica a cuántos agentes/tipos afecta.
+Lista a la izquierda (búsqueda y uso `N agents · M types`) y editor a la derecha (nombre, descripción, instrucciones con pestañas *Write/Preview*). Botón *Delete* con confirmación que indica a cuántos agentes/tipos afecta. Cambiar de skill, o salir, con cambios sin guardar pide confirmación; un borrado fallido muestra un aviso de error.
 
 ### Relations (`/relations`)
 
@@ -44,7 +45,7 @@ Lienzo de React Flow; ver [documento 9](09-orquestacion-y-relaciones.md#lienzo-r
 
 ### Sessions (`/sessions`)
 
-Lista por día con búsqueda y filtro por proveedor, y panel de transcripción (solo texto, markdown) con enlace **Open agent**.
+Lista por día con búsqueda y filtro por proveedor, y panel de transcripción con enlace **Open agent**. La sesión elegida está en la URL (`?session=<id>`). La transcripción usa los bloques del propio chat (`History`), así que **se ven las llamadas a herramientas y el razonamiento** y los mensajes largos ya no se pliegan.
 
 ## 11.2 El panal (mapa de Colony)
 
@@ -67,11 +68,25 @@ Implementado en `app/page.tsx`, sin librerías de gráficos: celdas HTML posicio
 
 **Ajuste a la pantalla.** Un `ResizeObserver` mide el panel y escala el mapa completo con `transform: scale(k)` (`k ≤ 1`, nunca amplía) para que quepa sin scroll horizontal.
 
+**Mover cosas y zoom.** Una colonia se arrastra por la etiqueta con su nombre, y un agente o recurso sin colonia por su hexágono (un arrastre se distingue de un clic por un umbral de 6 px); la posición se guarda en este navegador (`localStorage`, `hive-colony-layout`) como píxeles absolutos del lienzo, y un botón devuelve todo a su lugar. El mapa tiene **zoom** (botones − / +, Ctrl/⌘ + rueda, 40–250 %, guardado en `hive-colony-zoom`) sobre la escala de ajuste a la pantalla; con zoom el panel se desplaza.
+
 **Hover/selección.** El estado `focus = hover ?? seleccionado` decide qué celdas y líneas se resaltan o se atenúan (`dim`, `linked`).
 
 ## 11.3 Estado global (`lib/store.tsx`)
 
-Un solo contexto React (`useHive()`), sin librerías de estado. Contiene los datos (agentes, tipos, skills, colonias, proveedores), el estado de conexión, los turnos en vivo y el contador `finished`. Expone `refresh(['agents'|'types'|'skills'|'colonies'])`, `agent(id)` y `clearLive(id)`. Detalle del WebSocket en el [documento 5](05-comunicacion-back-front.md#56-estado-en-el-navegador-libstoretsx).
+Un solo contexto React (`useHive()`), sin librerías de estado. Contiene los datos (agentes, tipos, skills, colonias, proveedores), el estado de conexión, los turnos en vivo y el contador `finished`. Guarda también `dispatches` (el registro de delegaciones, que se recarga cuando el WebSocket avisa de cambios) y el estado de carga: `ready` es `true` solo cuando la API ha respondido, `error` lleva el mensaje y `retry()` lo intenta de nuevo. Expone `refresh([...])`, `agent(id)` y `clearLive(id)`. Por rendimiento hay hooks estrechos (`useHiveSelector`, `useHiveData`, `useLive`, `useFinished`, `useAgent`, `useHiveActions`); `useHive()` conserva su forma de siempre. El WebSocket es `wss:` si la página es https. Detalle del WebSocket en el [documento 5](05-comunicacion-back-front.md#56-estado-en-el-navegador-libstoretsx).
+
+Hooks de utilidad en `web/lib/hooks/`:
+
+| Hook | Qué hace |
+|---|---|
+| `usePolling(fn, ms, opts)` | Llamada periódica que nunca se solapa, se pausa con la pestaña oculta, aumenta la espera ante errores y avisa una vez por racha |
+| `usePersistentState(key, initial)` | Estado guardado como JSON en `localStorage` (seguro si el almacenamiento está bloqueado; el primer render usa el valor por defecto) |
+| `useQueryState(key, initial)` | Estado en la URL (`?tab=`) con `history.replaceState`: sin recarga y sin entradas de historial |
+| `useUnsavedGuard(dirty)` | Avisa antes de cerrar o recargar la pestaña con cambios sin guardar. Dentro de la app, los paneles preguntan con un `ConfirmDialog` antes de descartarlos (sin `window.confirm` nativo) |
+| `useResizableWidth({ key, min, default, max, side })` | El ancho al que se arrastra un cajón o panel, recordado en `localStorage` (lo usan `Drawer` y el panel de ajustes del agente) |
+
+`lib/api.ts` lanza `ApiError` (con `status`), acepta `{ signal, timeoutMs }` en cada llamada y ofrece `isAbort(e)`. `lib/format.ts` tiene `fmtTime`, `fmtDate` y `fmtDateTime`, que usan el idioma de la app y no el del navegador.
 
 `lib/types.ts` **replica a mano** los tipos del backend (`server/src/types.ts`). No hay paquete compartido: si cambias un tipo de la API, actualiza ambos.
 
@@ -81,8 +96,16 @@ Un solo contexto React (`useHive()`), sin librerías de estado. Contiene los dat
 |---|---|
 | `Hex` | Avatar hexagonal con iniciales; color del proveedor, o miel si es orquestador; tamaños `sm`, normal, `lg` |
 | `ProviderBadge`, `StatusChip`, `RoleChip` | Etiquetas pequeñas de proveedor, estado y rol |
-| `Drawer` / `Modal` | Panel lateral y diálogo; se cierran con Esc o clic en el fondo. El `Drawer` es **ampliable**: botón de ampliar en su cabecera (560 px ↔ 1100 px), borde izquierdo arrastrable (mín. 420 px, máx. pantalla − 80 px) y doble clic para alternar; el ancho se recuerda en `localStorage` (`hive-am.drawerWidth`) y lo comparten todos los paneles (crear y editar agente, etc.) |
-| `Field`, `Segmented` | Campo con etiqueta, ayuda y error; control segmentado |
+| `Dialog` / `Modal` / `Drawer` | Un solo mecanismo de capas (`Dialog.tsx`): se dibujan en un portal, el resto de la página queda `inert` mientras hay uno abierto, hay una **pila global** (solo el de arriba atiende Esc, así que un modal sobre un cajón ya no cierra los dos), el foco queda atrapado dentro y se devuelve a lo que lo abrió al cerrar, y se bloquea el desplazamiento de la página. El foco inicial va al elemento con `data-autofocus` (si no, al primer control que no sea el de cerrar); un elemento que debe seguir activo bajo un diálogo lleva `data-live`. `Modal` tiene botón de cerrar. El `Drawer` es **ampliable**: botón de ampliar en su cabecera (560 px ↔ 1100 px), borde izquierdo arrastrable (mín. 420 px, máx. pantalla − 80 px) y doble clic para alternar; el ancho se recuerda (`hive-am.drawerWidth`, con `useResizableWidth`) y lo comparten todos los paneles |
+| `ConfirmDialog` | Confirmación (`danger` pone el foco inicial en Cancelar): maneja el estado de ocupado y, si la acción falla, muestra un aviso de error y no se cierra |
+| `Tabs` / `TabPanel` | Pestañas con roles ARIA, tabindex itinerante y teclas Izquierda/Derecha/Inicio/Fin; el mismo `idPrefix` va en ambos |
+| `EmptyState`, `Banner`, `SearchInput`, `CheckRow` | El estado vacío (con `className`), el aviso (con un botón `action` opcional, p. ej. *Reintentar*), el cuadro de búsqueda (con `ref`, `autoFocus` y `onKeyDown`) y la fila con casilla (`compact` para listas densas) |
+| `WorkspaceHeader` | Cabecera de las pantallas de agente y de recurso: enlace de vuelta, avatar, título, una acción primaria y secundarias que **colapsan en el `Menu`** cuando la propia cabecera mide menos de 760 px |
+| `useCombobox` (`combobox.ts`) | Ids, `aria-activedescendant` y `aria-controls` para listas desplegables (`SkillPicker`, `PickSearch`, `Suggest`) |
+| `MasterDetail` (`objects/`) | La maqueta lista y detalle que comparten las pantallas de recursos |
+| `objects/db/` y `objects/http/` | Las pantallas de recursos de base de datos y HTTP divididas por responsabilidad: `DbWorkspace.tsx` conserva el estado y las pestañas y monta `QueryPane`, `Results`, `SchemaPane`, `HistoryPane` y `NameModal` (helpers SQL puros en `dbSql.ts`); `HttpWorkspace.tsx` es una carcasa fina sobre el hook `useHttpWorkspace` (todo el estado, efectos y acciones) y los componentes de presentación `HttpRequestList`, `HttpResponseView`, `HttpResponseTabs`, `HttpFileView`, `HttpHistoryPane` y `HttpSessionBlock` |
+| `MemberPick` (`agents/`) | Selector de miembros que usa el editor de colonias |
+| `Field`, `Segmented` | Campo con etiqueta, ayuda y error (la etiqueta queda ligada a su `input`, `select`, `textarea` o `PasswordInput` con `useId`); control segmentado |
 | `ProviderPicker` | Tres tarjetas con indicador de instalado |
 | `ModelField` | Texto libre con sugerencias del proveedor |
 | `PermissionField` | Control segmentado con la explicación del permiso elegido |
@@ -90,7 +113,8 @@ Un solo contexto React (`useHive()`), sin librerías de estado. Contiene los dat
 | `SkillPicker` (modo y peso) | Cada skill elegida es una pill con su botón `siempre` / `a demanda` (se elige por agente, tipo o colonia); bajo el selector se suma lo que va siempre en el prompt |
 | `NotebookPanel` | Pestaña **Cuaderno** de los ajustes del agente: edita su memoria (ver 7.3.2) |
 | `FolderPicker` | Campo de ruta + explorador de carpetas (usa `GET /api/fs/dirs`) |
-| `Toaster` / `useToast` | Avisos transitorios |
+| `Toaster` / `useToast` | Avisos transitorios: los errores se anuncian (`role="alert"`), cierre manual, pausa al pasar el puntero o con foco, los avisos idénticos no se repiten, máximo 5 |
+| `PathPicker` | Selector de carpeta o archivo; muestra la carga y, si `GET /api/fs/dirs` falla, el error con un botón *Reintentar* |
 | `AgentForm` | Formulario único de agente (incluye herencia y *Team*) |
 | `ColonyEditor` | Editor de colonias + diálogo de herencia |
 | `NewAgentDrawer`, `AgentEditDrawer` | Crear y editar agentes en panel lateral |
@@ -101,7 +125,7 @@ Un solo archivo CSS, organizado por secciones comentadas (shell, primitivas, hex
 
 ### Tokens de diseño
 
-Definidos en `:root` y redefinidos para el tema oscuro:
+Definidos en `:root` y redefinidos para el tema oscuro (un solo bloque oscuro, `:root[data-theme='dark']`):
 
 | Grupo | Variables |
 |---|---|
@@ -109,15 +133,19 @@ Definidos en `:root` y redefinidos para el tema oscuro:
 | Texto | `--ink`, `--ink-2`, `--muted` |
 | Líneas | `--line`, `--line-strong` |
 | Acento | `--honey`, `--honey-ink`, `--honey-soft` (miel: orquestadores y acciones primarias) |
-| Estado | `--ok`, `--err`, `--err-soft` |
+| Estado | `--ok`, `--err`, `--err-soft`, `--err-ink` (texto de error), `--danger` (alias de `--err`) |
+| Colores por significado | `--cluster` (clusters), `--link-manager` (enlaces de gestor), `--series-mix` (cuánto se mezclan con el fondo las series de los gráficos en oscuro) |
+| Capas | `--z-1` … `--z-6`, `--z-drop`, `--z-pop`, `--z-side`, `--z-menu`, `--z-dock`, `--z-card`, `--z-fullscreen`, `--z-dialog`, `--z-toast`, `--z-tooltip`: no hay números de `z-index` sueltos en el CSS |
+| Tamaño de letra | `--fs-micro` (11), `--fs-caption` (11,5), `--fs-small` (12), `--fs-hint` (12,5), `--fs-ui` (13), `--fs-ui-lg` (13,5), `--fs-body` (14), `--fs-lead` (15) |
 | Proveedores | `--p-claude`, `--p-opencode`, `--p-kiro` |
 | Forma | `--radius`, `--radius-sm`, `--shadow` |
 | Tipografía | `--font-display` (Bricolage Grotesque), `--font-body` (Hanken Grotesk), `--font-mono` (JetBrains Mono) |
 
 ### Tema claro/oscuro
 
-- Atributo `data-theme` en `<html>`: `light` o `dark`. Sin atributo se sigue `prefers-color-scheme`.
-- El botón **Switch theme** (barra lateral) alterna y guarda la elección en `localStorage` (`hive-theme`).
+- Atributo `data-theme` en `<html>`: `light` o `dark`. Un script en línea de `layout.tsx` lo fija (y `lang`) **antes del primer pintado** a partir de `localStorage` o, sin elección guardada, de `prefers-color-scheme` (que sigue observando), así una página oscura nunca parpadea en claro.
+- El botón **Switch theme** (barra lateral, con `aria-pressed`) alterna y guarda la elección en `localStorage` (`hive-theme`).
+- El contraste de `--muted` y `--ok` se subió para cumplir 4,5:1 en texto en el tema claro.
 - Las iniciales de los hexágonos son oscuras en tema oscuro para mantener el contraste.
 
 ### Tipografía
@@ -129,6 +157,8 @@ Las fuentes se cargan con `next/font/google` en `layout.tsx`, por lo que **la pr
 - Puntos de corte: **1100 px** (las columnas se apilan) y **760 px** (la barra lateral pasa a barra superior).
 - Foco visible en todos los controles (`:focus-visible`), `aria-label` en botones de solo icono, `aria-pressed`/`aria-current`/`aria-selected` en controles de estado, `role="dialog"` en paneles y diálogos.
 - `prefers-reduced-motion` desactiva animaciones y transiciones.
+- Los diálogos atrapan y devuelven el foco; las pestañas, el árbol de archivos y las listas se manejan con teclado; el chat es un `role="log"`; las filas de tabla que abren algo son enfocables.
+- Unas clases de utilidad sustituyen estilos en línea repetidos: `.cluster` (fila que se ajusta), `.stack-s`, `.stack-l`, `.gap-xs`, `.gap-m`, `.push-r`, `.ellipsis` y `.mt-*`, además de las anteriores `.row`, `.col`, `.grow`, `.gap-s`, `.gap-l`.
 
 ### Convención y una lección aprendida
 
@@ -146,6 +176,7 @@ Los selectores son **globales**: un nombre de clase genérico puede chocar con o
 ## 11.6 Rendimiento
 
 - El historial del chat está memoizado (`History`), cada bloque markdown también (`Md`, `Blocks`), y la caja de texto guarda su propio estado.
+- Los componentes que solo necesitan datos (chat, navegación, colonia) leen los hooks estrechos del store, así que el estado `live` en streaming no los vuelve a renderizar con cada token.
 - El mapa se calcula con `useMemo` a partir de agentes y colonias.
 - El lienzo de relaciones usa su propio estado de nodos y solo recalcula el layout cuando cambian los agentes.
 

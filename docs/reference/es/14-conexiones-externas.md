@@ -49,7 +49,7 @@ El servidor MCP `hive` (`server/mcp/dispatch.mjs`) anuncia herramientas según l
 | Capacidad | Herramientas | Quién la tiene |
 |---|---|---|
 | `dispatch` | `list_agents`, `dispatch` | Orquestadores con al menos un subagente |
-| `channel` | `channel_reply`, `channel_send_file`, `channel_mute` | Agentes con al menos una conexión **activa** |
+| `channel` | `channel_reply`, `channel_send_file`, `channel_react`, `channel_mute` | Agentes con al menos una conexión **activa** |
 | `memory` | `notebook_read`, `notebook_add`, `notebook_rewrite` | Agentes con la skill Notebook ([7.3.2](07-agentes-tipos-skills-colonias.md#732-el-cuaderno-del-agente)) |
 | `skills` | `skill_read` | Agentes con alguna skill *a demanda* ([7.3.3](07-agentes-tipos-skills-colonias.md#733-carga-bajo-demanda)) |
 
@@ -109,6 +109,7 @@ Configuración de la conexión (`config`, sin migración):
 - **Mensaje dirigido (`Addressed: yes`):** mención `@bot`, nombre/alias, respuesta a un mensaje del bot o comando. Se entrega al instante, con aviso de cola e indicador de «escribiendo».
 - **Charla no dirigida (`Addressed: no`, solo en `open`):** se guarda y se espera a que el chat **pause 4 s** (una ráfaga es un solo turno); si el agente está ocupado se reintenta hasta 5 veces y, si sigue ocupado, queda como contexto del siguiente turno. No hay aviso de cola ni «escribiendo», y terminar sin responder es un resultado normal (no se avisa ni se envía su texto). Un fallo de ese turno solo se registra en el log, no se publica en el grupo.
 - **Contexto pendiente:** los mensajes del hilo que el agente no llegó a ver (charla guardada mientras estaba en silencio o esperando) van en el siguiente mensaje, tras una línea `[hive:context]` (hasta 30, 500 caracteres cada uno). Se lleva la cuenta con `threads.seen_id`. En el chat se muestran plegados bajo la burbuja.
+- **Reacciones (`channel_react`):** el agente puede poner UN emoji en el mensaje que atiende (un 👍 para «entendido», un 🙏 para agradecer) en vez de escribir; cuenta como su respuesta. Cada plataforma permite solo algunos: un adaptador declara `reactions` e implementa `react`. En Telegram es la lista fija de la Bot API (`TELEGRAM_REACTIONS`, sin los groseros; ✅ o 😂 no están), un corazón escrito como ❤️ se envía como ❤, y un grupo que limitó sus reacciones responde con un error legible. La herramienta rechaza lo que no está permitido y lista los válidos. La skill «Chat channels» tiene una sección *Reactions* (cuándo reaccionar, qué emoji, qué no hacer); una biblioteca que ya tenía la skill recibe la sección una sola vez, sin tocar lo que la persona escribió.
 - **Silencio por hilo (`threads.muted`):** si alguien le pide que se calle, el agente llama a `channel_mute({ muted: true })`; con `/mute` pasa lo mismo sin pasar por el agente. Solo afecta a **ese hilo** (el grupo o ese tema). En silencio, la charla no dirigida no lo despierta (solo se guarda); sí lo despiertan una mención, un alias, una respuesta a su mensaje o un comando, con `Muted: yes` en la cabecera. Para que vuelva basta pedírselo así (`channel_mute({ muted: false })`) o usar `/unmute`. También se puede cambiar desde el panel de la conexión.
 - **Coherencia:** las instrucciones del agente (`composeInstructions`) le piden hablar solo si aporta algo, afirmar como hecho únicamente lo comprobado en archivos/herramientas o dicho antes en la conversación, no contradecirse sin explicar qué cambió y corregir abiertamente un error propio. Todos los hilos comparten una sola sesión, así que lo que dijo en otro hilo lo recuerda.
 - **Privacidad de Telegram:** por defecto un bot **no ve** los mensajes de grupo que no lo mencionan (privacy mode). En modo `open` hay que desactivarlo en @BotFather (`/setprivacy` → Disable) y volver a añadir el bot a cada grupo; la conexión lo detecta (`getMe.can_read_all_group_messages`) y muestra el aviso en su estado.
@@ -226,6 +227,7 @@ Todas bajo `/api`, solo origen local.
 | `PATCH /connections/:id/threads/:threadId` | `{ muted }`: silencia o reactiva un hilo |
 | `POST /channel/reply` | Lo usa el MCP `hive` (`channel_reply`) |
 | `POST /channel/send-file` | Lo usa el MCP `hive` (`channel_send_file`): `{ from, path, caption? }` |
+| `POST /channel/react` | Lo usa el MCP `hive` (`channel_react`): `{ from, emoji }` pone un emoji en el mensaje que se está atendiendo; el adaptador de la plataforma lo valida (`adapter.react`) |
 | `POST /channel/mute` | Lo usa el MCP `hive` (`channel_mute`): `{ from, muted }` sobre el hilo que se está atendiendo |
 
 **Los tokens nunca se devuelven:** en lugar del valor, la API envía `{ set: true, hint: "••••1234" }`. Los errores de validación (`400`) cubren: tipo desconocido, nombre repetido, token faltante, agente inexistente y agente en modo `plan`.
@@ -247,6 +249,7 @@ Scripts en `server/scripts/` (usan una carpeta de datos temporal y agentes reale
 | `sim-groups.ts <proveedor> [modelo]` | Grupos contra una plataforma falsa: charla de un grupo no autorizado ignorada, aviso con el id del chat, charla no dirigida (una ráfaga = un turno `Addressed: no`, sin respuesta), mención por alias, petición de silencio (`channel_mute`), silencio efectivo (sin turno nuevo), vuelta a hablar y `/mute` · `/unmute`. |
 | `test-rate.ts` | El límite de despertares con ventana deslizante (sin modelo). |
 | `test-addressing.ts` / `sim-chatter.ts <proveedor> [modelo]` | A quién va un mensaje de grupo, con frases de chats reales (sin modelo); un grupo donde dos personas hablan y el agente se mantiene fuera salvo que lo llamen, por un error o por un peligro. |
+| `test-reactions.ts` | Reacciones: lo que Telegram permite (y los errores legibles) y la sección *Reactions* de la skill Chat channels, incluida su adición única a una biblioteca existente (sin modelo, sin red). |
 | `test-watch.ts` / `sim-watch.ts <proveedor> [modelo]` | `wake_when_done`: el vigilante ve terminar un proceso, aparecer un archivo marcador o agotarse el tiempo y rechaza entradas malas (sin modelo); el agente lanza un trabajo en segundo plano, lo vigila y reporta solo, tras un aviso inmediato. |
 | `test-format.ts` | Texto hacia Telegram: selector de emoji para emojis pelones, enlaces de mención, y que una mención no active el filtro de secretos. Sin modelo. |
 | `test-cron.ts` / `test-schedules.ts` | Análisis de cron, próximas ejecuciones con zonas horarias y horario de verano; validación de programas, límites, deduplicación, ejecuciones perdidas omitidas y pausa. Sin modelo. |

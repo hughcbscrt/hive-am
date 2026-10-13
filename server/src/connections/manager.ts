@@ -8,6 +8,7 @@ import { handleInbound } from './router.js';
 import { findSecret, SECRET_REFUSAL } from './secrets.js';
 import { connections, threadMessages, threads } from './store.js';
 import type { AdapterStatus, ChannelAdapter, ChannelKind, Connection } from './types.js';
+import { DomainError } from '../errors.js';
 
 const TEXTUAL = /\.(txt|md|csv|json|svg|log|ya?ml|toml|ini|conf|sh|sql)$/i; // files whose text is checked for secrets before they are sent
 
@@ -23,7 +24,18 @@ export const adapterFor = (connectionId: string) => running.get(connectionId);
 export const connectionStatus = (id: string): AdapterStatus =>
   running.get(id)?.status() ?? { state: 'stopped' };
 
-export async function startConnection(id: string): Promise<void> {
+// Starting is serialized per connection: two starts at once (the interface saving while startAll runs) would each build an adapter,
+// and the one that lost the `running` slot would keep polling the platform for ever with nobody able to stop it.
+const starting = new Map<string, Promise<void>>();
+export function startConnection(id: string): Promise<void> {
+  const prev = starting.get(id) ?? Promise.resolve();
+  const next = prev.then(() => doStart(id));
+  starting.set(id, next);
+  void next.finally(() => { if (starting.get(id) === next) starting.delete(id); });
+  return next;
+}
+
+async function doStart(id: string): Promise<void> {
   await stopConnection(id);
   const c = connections.get(id);
   if (!c || !c.enabled) return;
@@ -49,10 +61,11 @@ export async function stopConnection(id: string): Promise<void> {
   try { await a.stop(); } catch { /* already down */ }
 }
 
+let cleaner: ReturnType<typeof setInterval> | undefined;
 export const startAll = () => {
   // Received files are kept for a while, then removed.
   cleanInbox();
-  setInterval(() => cleanInbox(), 6 * 3_600_000).unref();
+  cleaner ??= setInterval(() => cleanInbox(), 6 * 3_600_000).unref();
   return Promise.all(connections.list().filter((c) => c.enabled).map((c) => startConnection(c.id)));
 };
 export const stopAll = () => Promise.all([...running.keys()].map(stopConnection));
@@ -65,7 +78,7 @@ export async function testConnection(id: string): Promise<string> {
   return a.test(c.allowed.map((u) => u.id));
 }
 
-export class ChannelError extends Error {}
+export class ChannelError extends DomainError {}
 
 export { SendError } from './outbound.js';
 
@@ -98,6 +111,23 @@ export async function channelReply(agentId: string, text: string): Promise<{ sen
   threadMessages.record(thread.id, 'out', externalId, { name: agents.get(agentId)?.name }, text);
   origin.replied = true;
   return { sent: true, parts: 1 };
+}
+
+/** `channel_react`: puts an emoji on the message the agent is handling. What counts as a valid emoji depends on the platform (see `ChannelAdapter.reactions`). */
+export async function channelReact(agentId: string, emoji: unknown): Promise<{ reacted: boolean; emoji: string }> {
+  if (!agents.get(agentId)) throw new ChannelError('Unknown agent');
+  const e = String(emoji ?? '').trim();
+  if (!e || e.length > 16) throw new ChannelError('Give one emoji');
+  const origin = liveOrigin(agentId);
+  if (!origin?.messageId) throw new ChannelError('No channel message is being handled right now, so there is nothing to react to.');
+  const adapter = running.get(origin.connectionId);
+  if (!adapter?.react) throw new ChannelError('This connection cannot react to messages. Answer with channel_reply instead.');
+  const thread = threads.get(origin.threadId);
+  if (!thread) throw new ChannelError('The thread no longer exists.');
+  try { await adapter.react(thread.target, origin.messageId, e); }
+  catch (err) { throw new ChannelError(err instanceof Error ? err.message : 'The reaction failed'); }
+  origin.replied = true;   // a reaction can be the whole answer ("ok", "thanks")
+  return { reacted: true, emoji: e };
 }
 
 /** `channel_send_file`: sends a file from the agent's working folder (or inbox) to the thread of the message it is handling. */

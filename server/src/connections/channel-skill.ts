@@ -1,5 +1,5 @@
 import { agents, db, skills } from '../db.js';
-import { CHANNELS_SKILL_ID, WAKEUPS_SKILL_ID } from '../skills/defaults.js';
+import { CHANNELS_SKILL_ID, REACTIONS_SECTION, WAKEUPS_SKILL_ID } from '../skills/defaults.js';
 import { connections } from './store.js';
 
 /**
@@ -42,4 +42,15 @@ export function migrateChannelSkill(): void {
   if (done || !skills.get(CHANNELS_SKILL_ID)) return;
   db.prepare("INSERT OR IGNORE INTO seeded_skills (slug) VALUES ('migrate:channels')").run();
   syncChannelSkill(...connections.list().map((c) => c.agent_id));
+}
+
+/** Once: the "Chat channels" skill that was already in the library learns about reactions (the section is added; nothing the person wrote is touched). */
+export function addReactionsToChannelSkill(): void {
+  if (db.prepare("SELECT 1 FROM seeded_skills WHERE slug='migrate:channels-reactions'").get()) return;
+  db.prepare("INSERT OR IGNORE INTO seeded_skills (slug) VALUES ('migrate:channels-reactions')").run();
+  const s = skills.get(CHANNELS_SKILL_ID);
+  if (!s || s.content.includes('channel_react')) return;
+  const at = s.content.indexOf('## Keeping quiet');
+  const content = at >= 0 ? `${s.content.slice(0, at)}${REACTIONS_SECTION}\n${s.content.slice(at)}` : `${s.content.trimEnd()}\n\n${REACTIONS_SECTION}`;
+  skills.update(s.id, { content });
 }

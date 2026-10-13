@@ -1,10 +1,18 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Block, ChatMessage, MsgMeta } from '../types.js';
+import { stripInstructions } from '../providers/preamble.js';
+import { jsonLines } from './lines.js';
 
 const DIR = join(homedir(), '.kiro', 'sessions', 'cli');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Changes when the conversation changes (used to cache what is computed from it). */
+export function kiroSig(sessionId: string): string | null {
+  if (!UUID.test(sessionId)) return null;
+  try { const st = statSync(join(DIR, `${sessionId}.jsonl`)); return `${st.mtimeMs}:${st.size}`; } catch { return null; }
+}
 
 export function readKiro(sessionId: string): ChatMessage[] {
   if (!UUID.test(sessionId)) return [];
@@ -16,16 +24,14 @@ export function readKiro(sessionId: string): ChatMessage[] {
   const flush = () => { if (lastAssistant && turnIdx >= 0 && turns[turnIdx]) lastAssistant.meta = turns[turnIdx]; lastAssistant = null; };
   const tools = new Map<string, Extract<Block, { type: 'tool' }>>();
 
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
-    if (!line) continue;
-    let e: any; try { e = JSON.parse(line); } catch { continue; }
+  for (const e of jsonLines(file)) {
     const d = e.data; if (!d) continue;
     const ts = d.meta?.timestamp ? d.meta.timestamp * 1000 : null;
 
     if (e.kind === 'Prompt') {
       flush(); turnIdx++;
       const text = (d.content ?? []).filter((b: any) => b.kind === 'text').map((b: any) => b.data).join('');
-      if (text.trim()) out.push({ id: d.message_id, role: 'user', ts, blocks: [{ type: 'text', text: text.replace(/^<instructions[^>]*>[\s\S]*?<\/instructions>\s*/, '') }] });
+      if (text.trim()) out.push({ id: d.message_id, role: 'user', ts, blocks: [{ type: 'text', text: stripInstructions(text) }] });
     } else if (e.kind === 'AssistantMessage') {
       const blocks: Block[] = [];
       for (const b of d.content ?? []) {

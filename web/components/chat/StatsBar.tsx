@@ -52,22 +52,22 @@ export function StatsBar({ agent, session }: { agent: Agent; session?: string | 
           <section>
             <div className="eyebrow">{t('stats.mix')}</div>
             <div className="mixbar" role="img" aria-label={t('stats.mix')}>
-              <i style={{ width: `${(u.cacheRead / sum) * 100}%`, background: 'var(--p-opencode)' }} />
-              <i style={{ width: `${(u.cacheWrite / sum) * 100}%`, background: 'var(--p-kiro)' }} />
-              <i style={{ width: `${(u.input / sum) * 100}%`, background: 'var(--honey)' }} />
-              <i style={{ width: `${(u.output / sum) * 100}%`, background: 'var(--p-claude)' }} />
+              <i className="fa-c-cr" style={{ width: `${(u.cacheRead / sum) * 100}%` }} />
+              <i className="fa-c-cw" style={{ width: `${(u.cacheWrite / sum) * 100}%` }} />
+              <i className="fa-c-in" style={{ width: `${(u.input / sum) * 100}%` }} />
+              <i className="fa-c-out" style={{ width: `${(u.output / sum) * 100}%` }} />
             </div>
             <dl className="legend">
-              <div><i style={{ background: 'var(--p-opencode)' }} /><dt>{t('stats.cacheRead')}</dt><dd>{fmtTokens(u.cacheRead)}</dd></div>
-              <div><i style={{ background: 'var(--p-kiro)' }} /><dt>{t('stats.cacheWrite')}</dt><dd>{fmtTokens(u.cacheWrite)}</dd></div>
-              <div><i style={{ background: 'var(--honey)' }} /><dt>{t('stats.input')}</dt><dd>{fmtTokens(u.input)}</dd></div>
-              <div><i style={{ background: 'var(--p-claude)' }} /><dt>{t('stats.output')}</dt><dd>{fmtTokens(u.output)}{u.reasoning > 0 && <span className="muted"> ({t('stats.thinking', { tokens: fmtTokens(u.reasoning) })})</span>}</dd></div>
+              <div><i className="fa-c-cr" /><dt>{t('stats.cacheRead')}</dt><dd>{fmtTokens(u.cacheRead)}</dd></div>
+              <div><i className="fa-c-cw" /><dt>{t('stats.cacheWrite')}</dt><dd>{fmtTokens(u.cacheWrite)}</dd></div>
+              <div><i className="fa-c-in" /><dt>{t('stats.input')}</dt><dd>{fmtTokens(u.input)}</dd></div>
+              <div><i className="fa-c-out" /><dt>{t('stats.output')}</dt><dd>{fmtTokens(u.output)}{u.reasoning > 0 && <span className="muted"> ({t('stats.thinking', { tokens: fmtTokens(u.reasoning) })})</span>}</dd></div>
             </dl>
-            {s.models.length > 0 && (<><div className="eyebrow" style={{ marginTop: 14 }}>{t('stats.models')}</div>{s.models.map((m) => <div key={m.model} className="row small" style={{ justifyContent: 'space-between' }}><span className="mono">{m.model}</span><span className="muted">{t('stats.modelLine', { count: m.messages, out: fmtTokens(m.output) })}</span></div>)}</>)}
+            {s.models.length > 0 && (<><div className="eyebrow mt-m">{t('stats.models')}</div>{s.models.map((m) => <div key={m.model} className="row small between"><span className="mono">{m.model}</span><span className="muted">{t('stats.modelLine', { count: m.messages, out: fmtTokens(m.output) })}</span></div>)}</>)}
           </section>
           <section>
             <div className="eyebrow">{t('stats.toolsUsed')} {s.toolTimeMs > 0 && <span className="muted">· {t('stats.totalTime', { time: fmtDur(s.toolTimeMs) })}</span>}</div>
-            {s.tools.length === 0 ? <p className="muted small" style={{ margin: '6px 0 0' }}>{t('stats.noTools')}</p> : s.tools.slice(0, 9).map((x) => (
+            {s.tools.length === 0 ? <p className="muted small m0 mt-s">{t('stats.noTools')}</p> : s.tools.slice(0, 9).map((x) => (
               <div key={x.name} className="toolrow" title={t('stats.toolTitle', { count: x.count, time: fmtDur(x.totalMs) })}>
                 <span className="mono tn">{x.name.replace(/^mcp__/, '').replace('__', ' · ')}</span>
                 <span className="tbar"><i style={{ width: `${(x.count / maxTool) * 100}%` }} /></span>
@@ -76,7 +76,7 @@ export function StatsBar({ agent, session }: { agent: Agent; session?: string | 
               </div>
             ))}
           </section>
-          <section style={{ gridColumn: '1 / -1' }}>
+          <section className="fa-span">
             <div className="eyebrow">{t('stats.perTurn')}</div>
             <div className="spark" role="list">
               {s.timeline.slice(-40).map((x, i) => (

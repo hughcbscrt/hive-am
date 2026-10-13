@@ -4,8 +4,8 @@ Un **proveedor** es un CLI de agente de código instalado en tu máquina. hive-a
 
 Hay exactamente tres proveedores (`Provider = 'claude' | 'opencode' | 'kiro'`), registrados en dos sitios:
 
-- `server/src/providers/index.ts`: tabla `runners` (proveedor → función generadora).
-- `server/src/api.ts`: tabla `PROVIDERS` (proveedor → binario y nombre para detección de instalación).
+- `server/src/providers/index.ts`: el registro `providers` (proveedor → `ProviderAdapter`, con un `id` y un generador `run(o)`), más `runners`, los mismos adaptadores como funciones sueltas.
+- `server/src/services/providers.ts`: tabla `PROVIDERS` (proveedor → binario y nombre para detección de instalación).
 
 ## 6.1 Contrato de un runner
 
@@ -32,10 +32,10 @@ Un runner debe: construir los argumentos, lanzar el CLI con `spawnLines`, y **tr
   > **Por qué `PWD`:** Node hereda `PWD` del servidor de hive-am; OpenCode confía en `PWD` por encima del `cwd` real y registraba las sesiones en la carpeta del servidor. Fijarlo explícitamente lo corrige para los tres proveedores.
 - Entrega **stdout línea a línea** (`readline`), ignorando líneas vacías.
 - `stdin`: si se da texto, lo escribe y cierra; si no, cierra el stdin de inmediato.
-- Cancelación: al abortarse la señal envía `SIGTERM` al proceso.
+- Cancelación: al abortarse la señal envía `SIGTERM` al proceso, y si sigue vivo tras un periodo de gracia (5 s, `HIVE_AM_KILL_GRACE_MS`) envía `SIGKILL`.
 - Termina con `exit` y no con `close`: algunos CLIs (OpenCode) lanzan un servicio en segundo plano que hereda el pipe de stdout y haría que `close` no ocurriera nunca. Tras `exit` espera 250 ms para vaciar el pipe y luego lo destruye.
 - Si el proceso sale con código ≠ 0 y no fue cancelado, lanza un `Error` con el código y los últimos 600 caracteres de stderr. El runtime lo convierte en un evento `error`.
-- `safeJson(línea)` parsea sin lanzar excepciones.
+- `safeJson(línea)` parsea sin lanzar excepciones. `spawnJson` es `spawnLines` más `safeJson` (las líneas que no son JSON se saltan) y `flattenText` convierte el resultado de una herramienta (texto, lista de bloques u otro JSON) en texto; los tres runners los comparten.
 
 ## 6.3 Claude Code (`providers/claude.ts`)
 
@@ -181,8 +181,8 @@ Modelos fuera de esas familias no tienen costo estimado. Las estimaciones se mar
 
 1. **Tipos:** añade el valor a `Provider` en `server/src/types.ts` y `web/lib/types.ts`.
 2. **Runner:** crea `server/src/providers/<nombre>.ts` con un generador `(o: TurnOptions) => AsyncGenerator<StreamEvent>` usando `spawnLines`. Fija `cwd` y recuerda emitir `session` en cuanto conozcas el id.
-3. **Registro:** añádelo a `runners` (`providers/index.ts`) y a `PROVIDERS` (`api.ts`).
-4. **Historial:** crea un lector en `server/src/history/<nombre>.ts` que devuelva `ChatMessage[]` y enlázalo en `history/index.ts`.
+3. **Registro:** añádelo a `providers` y `runners` (`providers/index.ts`) y a `PROVIDERS` (`services/providers.ts`).
+4. **Historial:** crea un lector en `server/src/history/<nombre>.ts` que devuelva `ChatMessage[]` y regístralo en `historyReaders` (`history/index.ts`).
 5. **Modelos:** añade la rama en `models.ts`.
 6. **Interfaz:** añade nombre, color y descripción en `web/lib/meta.ts` (`PROVIDERS`) y la variable de color `--p-<nombre>` en `globals.css` (claro y oscuro).
 7. **Instrucciones:** si el CLI no tiene flag de system prompt, usa `withInstructions`; si sí lo tiene, pásalas en cada turno.

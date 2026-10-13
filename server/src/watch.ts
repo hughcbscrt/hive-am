@@ -8,6 +8,7 @@ import { liveOrigin, liveSource } from './runtime.js';
 import { adapterFor } from './connections/manager.js';
 import { connections, threadMessages, threads } from './connections/store.js';
 import { deliverTo } from './wake.js';
+import { DomainError } from './errors.js';
 
 /**
  * "Tell me the moment it finishes." The agent starts a long command in the background itself (`nohup … > log 2>&1 &`) and asks hive-am to
@@ -15,19 +16,13 @@ import { deliverTo } from './wake.js';
  * was asked, to read the result and report. hive-am only checks that a process is alive; it never runs anything. A job on another machine
  * works too when it is started through a local `ssh`, which lives as long as the remote command does.
  */
-export class WatchError extends Error {}
+export class WatchError extends DomainError {}
 
 const POLL_MS = Number(process.env.HIVE_AM_WATCH_POLL_MS) || 1500;
 const MS_PER_MINUTE = Number(process.env.HIVE_AM_WAKE_MS_PER_MINUTE) || 60_000;
 export const WATCH_DEFAULT_MINUTES = 120, WATCH_MAX_MINUTES = 240, WATCH_MAX_PENDING = 5;
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS agent_watches (
-  id TEXT PRIMARY KEY, agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-  connection_id TEXT, thread_id TEXT REFERENCES threads(id) ON DELETE CASCADE,
-  pid INTEGER NOT NULL, pid_stamp TEXT, file TEXT, log TEXT, note TEXT NOT NULL,
-  started_at INTEGER NOT NULL, deadline INTEGER NOT NULL, req_id TEXT, req_name TEXT
-);`);
+// The table (agent_watches) is created by db/migrations.ts.
 
 export interface Watch {
   id: string; agent_id: string; connection_id: string | null; thread_id: string | null; pid: number; pid_stamp: string | null; file: string | null; log: string | null;

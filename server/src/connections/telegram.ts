@@ -5,6 +5,8 @@ import { cursors } from './store.js';
 import type { AdapterStatus, Attachment, ChannelAdapter, Connection, Inbound, Target } from './types.js';
 
 const MAX_PART = 3500;          // Telegram allows 4096; leave room for the HTML tags added after splitting
+/** The emoji Telegram lets a bot put on a message (Bot API `ReactionTypeEmoji`), without the rude ones (🖕 🤬 💩 🤮 😡). */
+export const TELEGRAM_REACTIONS = ['👍', '👎', '❤', '🔥', '🥰', '👏', '😁', '🤔', '🤯', '😱', '😢', '🎉', '🤩', '🙏', '👌', '🕊', '🤡', '🥱', '🥴', '😍', '🐳', '❤‍🔥', '🌚', '🌭', '💯', '🤣', '⚡', '🍌', '🏆', '💔', '🤨', '😐', '🍓', '🍾', '💋', '😈', '😴', '😭', '🤓', '👻', '👨‍💻', '👀', '🎃', '🙈', '😇', '😨', '🤝', '✍', '🤗', '🫡', '🎅', '🎄', '☃', '💅', '🤪', '🗿', '🆒', '💘', '🙉', '🦄', '😘', '💊', '🙊', '😎', '👾', '🤷', '🤷‍♂', '🤷‍♀'] as const;
 const TYPING_EVERY_MS = 4500;   // «typing…» lasts ~5 s
 const TYPING_MAX_MS = 20 * 60_000;   // safety net: never pulse for longer than this, whatever happens to the turn
 const MIN_GAP_MS = 350;         // stay well under Telegram's ~1 message/second per chat
@@ -14,6 +16,13 @@ class TelegramError extends Error {
   constructor(msg: string, public code: number, public retryAfter?: number) { super(msg); }
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const CALL_TIMEOUT_MS = Number(process.env.HIVE_AM_TELEGRAM_TIMEOUT_MS) || 30_000;      // a Bot API call that does not answer in this long is a dead connection (a half-open socket never errors by itself)
+const POLL_SLACK_MS = 15_000;        // on top of the long-poll wait Telegram is told about
+const UPLOAD_TIMEOUT_MS = 120_000;
+const DOWNLOAD_TIMEOUT_MS = 60_000;
+/** Aborts when `signal` does or when `ms` pass, whichever comes first. */
+const within = (ms: number, signal?: AbortSignal) => (signal ? AbortSignal.any([signal, AbortSignal.timeout(ms)]) : AbortSignal.timeout(ms));
+const timedOut = (e: unknown) => e instanceof Error && e.name === 'TimeoutError';
 
 /** The files of a Telegram message: photos (the biggest size), documents, audio, voice notes, videos and GIFs. Stickers are ignored. */
 function attachmentsOf(msg: any): Attachment[] {
@@ -55,7 +64,10 @@ export class TelegramAdapter implements ChannelAdapter {
   private get base() { return `${(this.conn.config.api_base as string) || 'https://api.telegram.org'}/bot${this.conn.config.token}`; }
 
   private async call<T = any>(method: string, body: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
-    const res = await fetch(`${this.base}/${method}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal });
+    const wait = method === 'getUpdates' ? Number(body.timeout ?? 0) * 1000 + POLL_SLACK_MS : CALL_TIMEOUT_MS;
+    let res: Response;
+    try { res = await fetch(`${this.base}/${method}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: within(wait, signal) }); }
+    catch (e) { throw timedOut(e) ? new TelegramError(`Telegram ${method} did not answer in time`, 0) : e; }
     const j: any = await res.json().catch(() => ({}));
     if (!j.ok) throw new TelegramError(j.description ?? `Telegram ${method} failed (${res.status})`, j.error_code ?? res.status, j.parameters?.retry_after);
     return j.result as T;
@@ -177,7 +189,9 @@ export class TelegramAdapter implements ChannelAdapter {
 
   /** Telegram methods that take a file are multipart, not JSON. */
   private async upload(method: string, form: FormData): Promise<any> {
-    const res = await fetch(`${this.base}/${method}`, { method: 'POST', body: form });
+    let res: Response;
+    try { res = await fetch(`${this.base}/${method}`, { method: 'POST', body: form, signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS) }); }
+    catch (e) { throw timedOut(e) ? new TelegramError(`Telegram ${method} did not answer in time`, 0) : e; }
     const j: any = await res.json().catch(() => ({}));
     if (!j.ok) throw new TelegramError(j.description ?? `Telegram ${method} failed (${res.status})`, j.error_code ?? res.status, j.parameters?.retry_after);
     return j.result;
@@ -210,12 +224,26 @@ export class TelegramAdapter implements ChannelAdapter {
     if (!info.file_path) throw new Error('Telegram gave no path for the file');
     if ((info.file_size ?? 0) > MAX_FILE_BYTES) throw new Error('too big (limit 20 MB)');
     const base = (this.conn.config.api_base as string) || 'https://api.telegram.org';
-    const res = await fetch(`${base}/file/bot${this.conn.config.token}/${info.file_path}`, { signal: this.abort.signal });
+    const res = await fetch(`${base}/file/bot${this.conn.config.token}/${info.file_path}`, { signal: within(DOWNLOAD_TIMEOUT_MS, this.abort.signal) });
     if (!res.ok) throw new Error(`download failed (${res.status})`);
     const buf = Buffer.from(await res.arrayBuffer());
     if (buf.length > MAX_FILE_BYTES) throw new Error('too big (limit 20 MB)');
     writeFileSync(dest, buf);
     return buf.length;
+  }
+
+  /** What a bot may react with on Telegram (the fixed list of the Bot API, minus the rude ones). A group can narrow it further. */
+  readonly reactions = TELEGRAM_REACTIONS;
+  async react(to: Target, ref: string, emoji: string): Promise<void> {
+    const wanted = emoji.replace(/\uFE0F/g, '').trim();
+    const emo = TELEGRAM_REACTIONS.find((r) => r.replace(/\uFE0F/g, '') === wanted);
+    if (!emo) throw new Error(`Telegram does not allow “${emoji}” as a reaction. The ones you can use: ${TELEGRAM_REACTIONS.join(' ')}`);
+    if (!ref) throw new Error('There is no message to react to.');
+    try { await this.call('setMessageReaction', { chat_id: to.chat, message_id: Number(ref), reaction: [{ type: 'emoji', emoji: emo }] }); }
+    catch (e) {
+      if (e instanceof TelegramError && /REACTION_INVALID|reaction/i.test(e.message)) throw new Error(`This chat does not accept ${emo} as a reaction (a group can limit them). Try another one, or answer with text.`);
+      throw e;
+    }
   }
 
   async send(to: Target, text: string): Promise<{ externalId: string }> {

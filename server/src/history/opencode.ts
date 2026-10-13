@@ -4,8 +4,19 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Block, ChatMessage } from '../types.js';
 import { estimateCost } from '../pricing.js';
+import { stripInstructions as stripPreamble } from '../providers/preamble.js';
 
 const DB = join(homedir(), '.local', 'share', 'opencode', 'opencode.db');
+
+/** Changes when the conversation changes (used to cache what is computed from it). */
+export function opencodeSig(sessionId: string): string | null {
+  if (!existsSync(DB)) return null;
+  const db = new Database(DB, { readonly: true, fileMustExist: true });
+  try {
+    const r = db.prepare('SELECT COUNT(*) n, COALESCE(MAX(time_created), 0) t FROM session_message WHERE session_id=?').get(sessionId) as { n: number; t: number };
+    return `${r.n}:${r.t}`;
+  } catch { return null; } finally { db.close(); }
+}
 
 export function readOpencode(sessionId: string): ChatMessage[] {
   if (!existsSync(DB)) return [];
@@ -49,7 +60,7 @@ export function readOpencode(sessionId: string): ChatMessage[] {
 function stripInstructions(t: string) {
   let x = t.trim();
   if (x.length > 1 && x.startsWith('"') && x.endsWith('"')) x = x.slice(1, -1);
-  return x.replace(/^<instructions[^>]*>[\s\S]*?<\/instructions>\s*/, '').trim();
+  return stripPreamble(x).trim();
 }
 
 /** Folder OpenCode recorded for a session, or null if unknown. Used to avoid resuming a session that belongs to another folder. */

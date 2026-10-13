@@ -4,6 +4,7 @@ import { adapterFor } from './connections/manager.js';
 import { deliverScheduled } from './connections/router.js';
 import { connections, threads } from './connections/store.js';
 import { liveOrigin, liveSource, sendTurn } from './runtime.js';
+import { DomainError } from './errors.js';
 
 /**
  * Wake-ups. An agent only runs while it handles a message, so "I'll tell you when it finishes" cannot be kept by an agent that just
@@ -11,21 +12,14 @@ import { liveOrigin, liveSource, sendTurn } from './runtime.js';
  * Asked from a chat (Telegram, Slack…) the wake-up comes back to that same thread; asked from the hive-am web chat it comes back as a
  * message of the agent's own conversation.
  */
-export class WakeError extends Error {}
+export class WakeError extends DomainError {}
 
 export const WAKE_MIN_MINUTES = 1, WAKE_MAX_MINUTES = 240, WAKE_MAX_PENDING = 5;
 const WAKE_MS = Number(process.env.HIVE_AM_WAKE_MS_PER_MINUTE) || 60_000;   // tests shrink a "minute"
+const RETRY_MS = Number(process.env.HIVE_AM_WAKE_RETRY_MS) || 5000;      // wait before trying a delivery again
 const TOO_LATE_MS = 2 * 3_600_000;                                          // after a long outage, an old reminder is no longer useful
 
-db.exec(`
-DROP TABLE IF EXISTS wakeups;
-CREATE TABLE IF NOT EXISTS agent_wakeups (
-  id TEXT PRIMARY KEY, agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-  connection_id TEXT, thread_id TEXT REFERENCES threads(id) ON DELETE CASCADE,
-  due_at INTEGER NOT NULL, note TEXT NOT NULL, created_at INTEGER NOT NULL
-);`);
-// Who asked (only kept when it was in a group): the reminder mentions them. Older databases get the columns here.
-for (const col of ['req_id TEXT', 'req_name TEXT']) { try { db.exec(`ALTER TABLE agent_wakeups ADD COLUMN ${col}`); } catch { /* already there */ } }
+// The table (agent_wakeups) is created by db/migrations.ts.
 
 interface Wake { id: string; agent_id: string; connection_id: string | null; thread_id: string | null; due_at: number; note: string; created_at: number; req_id: string | null; req_name: string | null }
 const rows = {
@@ -93,9 +87,13 @@ async function fire(id: string, tries: number): Promise<void> {
   const w = rows.get(id); if (!w) return;
   try {
     const out = await deliverTo(w, wakeText(w, 'channel_reply'), `🔔 ${wakeText(w)}`, () => { rows.remove(id); });
-    if (out === 'retry') { if (tries < 12) { w.due_at = Date.now() + 5000; arm(w, tries + 1); } else rows.remove(id); }
+    if (out === 'retry') { if (tries < 12) { w.due_at = Date.now() + RETRY_MS; arm(w, tries + 1); } else rows.remove(id); }
     else if (out === 'dropped') rows.remove(id);
-  } catch (e) { console.warn(`[wake] wake-up of agent ${agents.get(w.agent_id)?.name ?? w.agent_id} failed: ${e instanceof Error ? e.message : e}`); }
+  } catch (e) {
+    console.warn(`[wake] wake-up of agent ${agents.get(w.agent_id)?.name ?? w.agent_id} failed: ${e instanceof Error ? e.message : e}`);
+    // A failure before the message was handed over (the platform erred) must not strand the row: with no timer it would count as pending until the next restart. Try again a few times, then give up.
+    if (rows.get(id)) { if (tries < 12) { w.due_at = Date.now() + RETRY_MS; arm(w, tries + 1); } else rows.remove(id); }
+  }
 }
 
 /** Re-arms the wake-ups saved before a restart (called once at startup). */

@@ -2,10 +2,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Boxes, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, Sun, Users, Plug } from 'lucide-react';
+import { Boxes, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, Server, SquareTerminal, Sun, Users, Plug } from 'lucide-react';
 import { HiveProvider, useHive } from '@/lib/store';
 import { I18nProvider, LOCALES, useI18n } from '@/lib/i18n';
 import { Toaster } from './ui';
+import { Tooltips } from './Tooltips';
+import { DockProvider, useDock } from '@/lib/dock';
+import { TerminalDock } from './dock/TerminalDock';
 
 function HiveMark() {
   return <img src="/icon.png" width={34} height={34} alt="" aria-hidden className="brand-mark" />;
@@ -29,13 +32,19 @@ function LanguageSwitch() {
 function Nav() {
   const path = usePathname();
   const { t } = useI18n();
-  const { agents, types, skills, connections, connected } = useHive();
-  const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
-  useEffect(() => { try { const saved = localStorage.getItem('hive-theme') as 'light' | 'dark' | null; if (saved) { setTheme(saved); document.documentElement.dataset.theme = saved; } } catch { /* ignore */ } }, []);
+  const { agents, types, skills, connections, objects, connected } = useHive();
+  const dock = useDock();
+  // The inline script in layout.tsx already applied the theme (saved or the system's); this only follows it.
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const el = document.documentElement, read = () => setDark(el.dataset.theme === 'dark');
+    read();
+    const mo = new MutationObserver(read); mo.observe(el, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => mo.disconnect();
+  }, []);
   const flip = () => {
-    const dark = theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
     const next = dark ? 'light' : 'dark';
-    setTheme(next); document.documentElement.dataset.theme = next;
+    document.documentElement.dataset.theme = next;
     try { localStorage.setItem('hive-theme', next); } catch { /* ignore */ }
   };
   const running = agents.filter((a) => a.status === 'running').length;
@@ -48,6 +57,7 @@ function Nav() {
       <div className="brand"><HiveMark /><div>hive-am<small>{t('app.tagline')}</small></div></div>
       <LanguageSwitch />
       {item('/', t('nav.colony'), <Hexagon size={18} />, running || undefined)}
+      {item('/resources', t('nav.objects'), <Server size={18} />, objects.length || undefined)}
       {item('/agents', t('nav.agents'), <Users size={18} />, agents.length)}
       {item('/relations', t('nav.relations'), <Network size={18} />)}
       {item('/connections', t('nav.connections'), <Plug size={18} />, connections.length || undefined)}
@@ -58,8 +68,9 @@ function Nav() {
       <div className="nav-label">{t('nav.history')}</div>
       {item('/sessions', t('nav.sessions'), <History size={18} />)}
       <div className="rail-foot">
+        <button type="button" className="nav" onClick={dock.toggle} aria-pressed={dock.open} title={`${t('dock.nav')} (Ctrl+\`)`}><SquareTerminal size={18} /><span className="t">{t('dock.nav')}</span>{dock.tabs.length > 0 && <span className="count">{dock.tabs.length}</span>}</button>
         <div className="conn"><i className={`dot ${connected ? 'ok' : 'err'}`} />{connected ? t('nav.connected') : t('nav.offline')}</div>
-        <button className="btn ghost sm" onClick={flip} style={{ justifyContent: 'flex-start' }}>{theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />} {t('nav.switchTheme')}</button>
+        <button type="button" className="nav" onClick={flip} aria-pressed={dark}>{dark ? <Sun size={18} /> : <Moon size={18} />}<span className="t">{t('nav.switchTheme')}</span></button>
       </div>
     </nav>
   );
@@ -69,9 +80,13 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <I18nProvider>
       <HiveProvider>
-        <Toaster>
-          <div className="shell"><Nav /><main className="main">{children}</main></div>
-        </Toaster>
+        <DockProvider>
+          <Toaster>
+            <Tooltips />
+            <div className="shell"><Nav /><main className="main">{children}</main></div>
+            <TerminalDock />
+          </Toaster>
+        </DockProvider>
       </HiveProvider>
     </I18nProvider>
   );

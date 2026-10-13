@@ -1,4 +1,5 @@
 import { agents } from '../db.js';
+import { parseJson } from '../db/json.js';
 import { liveTurn, queueDepth, sendTurn, stopAgent } from '../runtime.js';
 import { calledByName as aliasCall, directedAtOther, firstNames } from './addressing.js';
 import { allow } from './rate.js';
@@ -6,7 +7,7 @@ import { saveAttachments } from './files.js';
 import { describeImages, validVision } from './vision.js';
 import { channelPrompt } from './prompt.js';
 import { connections, threadMessages, threads } from './store.js';
-import type { AllowedChat, AllowedUser, ChannelAdapter, Connection, Inbound, OnSilent, Origin, Thread } from './types.js';
+import type { AllowedChat, AllowedUser, ChannelAdapter, Connection, Inbound, OnSilent, Origin, SavedFile, Thread } from './types.js';
 
 const MAX_INPUT = 8000;
 const DEFAULT_RATE = 20; // messages per user per minute
@@ -167,10 +168,10 @@ async function deliver(conn: Connection, adapter: ChannelAdapter, thread: Thread
   const ahead = queueDepth(agent.id) + (liveTurn(agent.id) ? 1 : 0);
   if (addressed && ahead > 0 && !scheduled) await reply(say(conn, T.queued(ahead)));
 
-  const unseen = threadMessages.unseen(thread.id, fresh.seen_id, msgId).map((r) => ({ name: r.user_name ?? r.user_id ?? '?', text: r.text as string, files: r.files ? JSON.parse(r.files) : undefined }));
+  const unseen = threadMessages.unseen(thread.id, fresh.seen_id, msgId).map((r) => ({ name: r.user_name ?? r.user_id ?? '?', text: r.text as string, files: r.files ? parseJson<SavedFile[] | undefined>(r.files, undefined, `thread message ${r.id} files`) : undefined }));
   threads.markSeen(thread.id, msgId);
 
-  const origin: Origin = { connectionId: conn.id, threadId: thread.id, externalKey: m.externalKey, platform: conn.kind, place: m.place, userName: m.userName, userId: m.userId, group: !!m.group, mention: m.mention, addressed, replied: false, effort: EFFORTS.includes(conn.config.effort) ? conn.config.effort : undefined };
+  const origin: Origin = { connectionId: conn.id, threadId: thread.id, externalKey: m.externalKey, platform: conn.kind, place: m.place, userName: m.userName, userId: m.userId, group: !!m.group, mention: m.mention, addressed, replied: false, messageId: m.externalId, effort: EFFORTS.includes(conn.config.effort) ? conn.config.effort : undefined };
   if (addressed) await adapter.busy(m.target, 'working', m.externalId).catch(() => undefined);
   const startedAt = Date.now();
   let res = await sendTurn(agent.id, channelPrompt(conn.kind, m, { addressed, muted: fresh.muted, unseen }), 'user', undefined, undefined, origin);

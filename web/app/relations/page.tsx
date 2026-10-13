@@ -1,20 +1,21 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Background, BaseEdge, Controls, EdgeLabelRenderer, getBezierPath, Handle, Position, ReactFlow, applyNodeChanges,
   type Connection, type Edge, type EdgeProps, type Node, type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { LayoutGrid, X } from 'lucide-react';
-import { useHive } from '@/lib/store';
+import { useHiveData } from '@/lib/store';
+import { usePersistentState } from '@/lib/hooks/usePersistentState';
 import { api } from '@/lib/api';
-import { PROVIDERS } from '@/lib/meta';
+import { PROVIDERS, SERIES_COLORS } from '@/lib/meta';
 import type { Agent } from '@/lib/types';
-import { Hex, useToast } from '@/components/ui';
+import { Banner, EmptyState, Hex, useToast } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
 
-/** One colour per orchestrator, so overlapping lines can still be told apart. */
-const LINE_COLORS = ['#e8a317', '#2f5bea', '#c0399a', '#0f8f9e', '#7a4de0', '#d4663f', '#2f8f5b', '#9a7400'];
+/** One colour per orchestrator, so overlapping lines can still be told apart; lightened in the dark theme (--series-mix). */
+const lineColor = (i: number) => { const c = SERIES_COLORS[i % SERIES_COLORS.length]; return `color-mix(in srgb, ${c} calc(100% - var(--series-mix, 0%)), white)`; };
 const STORE_KEY = 'hive-rel-pos-v2';
 const GAP_X = 190, ROW_Y = 280;
 
@@ -74,17 +75,14 @@ function autoLayout(agents: Agent[]): Record<string, { x: number; y: number }> {
 
 export default function Relations() {
   const { t, locale } = useI18n();
-  const { agents, refresh, ready } = useHive();
+  const { agents, refresh, ready, error, retry } = useHiveData();
   const toast = useToast();
-  const [dragged, setDragged] = useState<Record<string, { x: number; y: number }>>({});
+  const [dragged, setDragged] = usePersistentState<Record<string, { x: number; y: number }>>(STORE_KEY, {});
   const [nodes, setNodes] = useState<Node<NodeData>[]>([]);
   const [hoverNode, setHoverNode] = useState<string | null>(null);
   const [hoverEdge, setHoverEdge] = useState<string | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [fitKey, setFitKey] = useState(0);
-  const loaded = useRef(false);
-
-  useEffect(() => { try { setDragged(JSON.parse(localStorage.getItem(STORE_KEY) ?? '{}')); } catch { /* ignore */ } loaded.current = true; }, []);
 
   const layout = useMemo(() => autoLayout(agents), [agents]);
   useEffect(() => {
@@ -113,7 +111,7 @@ export default function Relations() {
     const related = !!focus && (q.id === focus || w === focus);
     return {
       id, source: q.id, target: w, type: 'link' as const, animated: agents.find((x) => x.id === w)?.status === 'running',
-      data: { color: LINE_COLORS[(qIndex.get(q.id) ?? 0) % LINE_COLORS.length], dim: !!focus && !related, active: related || hoverEdge === id, show: related || hoverEdge === id, label: t('rel.disconnectLabel', { worker: name(w), orchestrator: q.name }), onRemove: () => disconnect(q.id, w) },
+      data: { color: lineColor(qIndex.get(q.id) ?? 0), dim: !!focus && !related, active: related || hoverEdge === id, show: related || hoverEdge === id, label: t('rel.disconnectLabel', { worker: name(w), orchestrator: q.name }), onRemove: () => disconnect(q.id, w) },
     };
   })), [agents, focus, hoverEdge, qIndex, disconnect, locale]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -126,9 +124,9 @@ export default function Relations() {
   const onNodesChange = useCallback((c: NodeChange<Node<NodeData>>[]) => {
     setNodes((n) => applyNodeChanges(c, n));
     const done = c.filter((x) => x.type === 'position' && !x.dragging && x.position);
-    if (done.length) setDragged((d) => { const next = { ...d }; for (const x of done) if (x.type === 'position' && x.position) next[x.id] = x.position; try { localStorage.setItem(STORE_KEY, JSON.stringify(next)); } catch { /* ignore */ } return next; });
+    if (done.length) setDragged((d) => { const next = { ...d }; for (const x of done) if (x.type === 'position' && x.position) next[x.id] = x.position; return next; });
   }, []);
-  const arrange = () => { setDragged({}); try { localStorage.removeItem(STORE_KEY); } catch { /* ignore */ } setFitKey((k) => k + 1); toast(t('rel.layoutReset')); };
+  const arrange = () => { setDragged({}); setFitKey((k) => k + 1); toast(t('rel.layoutReset')); };
   const onConnect = (c: Connection) => { if (c.source && c.target) connect(c.source, c.target); };
 
   const selected = agents.find((a) => a.id === sel);
@@ -140,8 +138,12 @@ export default function Relations() {
       <div className="rel-hud"><h1>{t('nav.relations')}</h1><p>{t('rel.hud')}</p></div>
       <div className="rel-tools"><button className="btn sm" onClick={arrange}><LayoutGrid size={14} />{t('rel.autoArrange')}</button></div>
 
-      {ready && agents.length === 0 ? (
-        <div className="empty" style={{ margin: '140px auto', maxWidth: 420, background: 'var(--surface)' }}><h3>{t('rel.empty.title')}</h3><p>{t('rel.empty.body')}</p></div>
+      {!ready ? (
+        error
+          ? <div className="rel-empty"><Banner kind="err"><div className="row gap-s wrap"><span className="grow">{t('cx.loadFailed')} {error}</span><button className="btn sm" onClick={() => void retry()}>{t('cx.retry')}</button></div></Banner></div>
+          : <div className="rel-empty comb-skel" role="status" aria-label={t('cx.loading')}><div className="skel" style={{ width: 200, height: 120 }} /></div>
+      ) : agents.length === 0 ? (
+        <div className="rel-empty"><EmptyState title={t('rel.empty.title')} body={t('rel.empty.body')} /></div>
       ) : (
         <ReactFlow key={fitKey} nodes={shown} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
           onNodesChange={onNodesChange} onConnect={onConnect}
@@ -155,12 +157,12 @@ export default function Relations() {
 
       {selected && (
         <aside className="rel-panel card">
-          <div className="row gap-l"><Hex agent={selected} /><div className="grow"><b style={{ fontFamily: 'var(--font-display)', fontSize: 17 }}>{selected.name}</b><div className="muted small">{t(`role.${selected.role}`)}</div></div>
+          <div className="row gap-l"><Hex agent={selected} /><div className="grow"><b className="rel-panel-name">{selected.name}</b><div className="muted small">{t(`role.${selected.role}`)}</div></div>
             <button className="btn ghost icon sm" onClick={() => setSel(null)} aria-label={t('common.close')}><X size={16} /></button></div>
           {selected.role === 'orchestrator' ? (
             <>
               <div className="eyebrow">{t('rel.delegatesTo', { count: selected.worker_ids.length })}</div>
-              {selected.worker_ids.length === 0 && <p className="muted small" style={{ margin: 0 }}>{t('rel.noWorkers')}</p>}
+              {selected.worker_ids.length === 0 && <p className="muted small m0">{t('rel.noWorkers')}</p>}
               {selected.worker_ids.map((w) => (
                 <div key={w} className="relrow"><span className="grow">{name(w)}</span><button className="btn sm" onClick={() => disconnect(selected.id, w)}>{t('rel.disconnect')}</button></div>
               ))}
@@ -172,9 +174,9 @@ export default function Relations() {
           ) : (
             <>
               <div className="eyebrow">{t('rel.directedBy')}</div>
-              {orchestrators.filter((q) => q.worker_ids.includes(selected.id)).length === 0 && <p className="muted small" style={{ margin: 0 }}>{t('rel.noOrchestrators')}</p>}
+              {orchestrators.filter((q) => q.worker_ids.includes(selected.id)).length === 0 && <p className="muted small m0">{t('rel.noOrchestrators')}</p>}
               {orchestrators.filter((q) => q.worker_ids.includes(selected.id)).map((q) => (
-                <div key={q.id} className="relrow"><i className="cdot" style={{ background: LINE_COLORS[(qIndex.get(q.id) ?? 0) % LINE_COLORS.length], margin: 0 }} /><span className="grow">{q.name}</span><button className="btn sm" onClick={() => disconnect(q.id, selected.id)}>{t('rel.disconnect')}</button></div>
+                <div key={q.id} className="relrow"><i className="cdot cx-chip-dot" style={{ background: lineColor(qIndex.get(q.id) ?? 0) }} /><span className="grow">{q.name}</span><button className="btn sm" onClick={() => disconnect(q.id, selected.id)}>{t('rel.disconnect')}</button></div>
               ))}
               <select className="select" value="" onChange={(e) => e.target.value && connect(e.target.value, selected.id)} aria-label={t('rel.connectOrchestrator')}>
                 <option value="">{t('rel.connectOrchestrator')}</option>

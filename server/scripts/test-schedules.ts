@@ -1,5 +1,6 @@
 // Recurring schedules without a model: validation, limits, de-duplication, missed runs and pausing. Usage:
 //   HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4470 npx tsx scripts/test-schedules.ts
+import './_guard.js';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

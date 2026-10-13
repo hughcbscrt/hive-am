@@ -3,7 +3,7 @@ import { DATA_DIR } from '../db.js';
 import { join } from 'node:path';
 
 const INBOX_ROOT = join(DATA_DIR, 'inbox');
-import { spawnLines, safeJson } from './spawn.js';
+import { spawnJson } from './spawn.js';
 import { dispatchMcpConfigOpencode } from '../mcp-config.js';
 import { opencodeSessionDir } from '../history/opencode.js';
 import { withInstructions } from './preamble.js';
@@ -65,9 +65,7 @@ export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> 
   let sawSession = false;
 
   try {
-    for await (const line of spawnLines({ cmd: 'opencode', args, cwd: agent.cwd, env, signal: o.signal })) {
-      const ev = safeJson(line);
-      if (!ev) continue;
+    for await (const ev of spawnJson({ cmd: 'opencode', args, cwd: agent.cwd, env, signal: o.signal })) {
       if (ev.sessionID && !sawSession) { sawSession = true; yield { t: 'session', sessionId: ev.sessionID }; }
       const p = ev.part;
       if (!p) continue;

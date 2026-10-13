@@ -1,4 +1,5 @@
 // Text going to Telegram: emoji presentation and mentions of people. No model. Usage: npx tsx scripts/test-format.ts
+import './_guard.js';
 import { emojiPresentation, mdToTelegramHtml } from '../src/connections/format.js';
 import { findSecret } from '../src/connections/secrets.js';
 import { TelegramAdapter } from '../src/connections/telegram.js';

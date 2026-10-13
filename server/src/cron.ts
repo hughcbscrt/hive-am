@@ -1,9 +1,10 @@
+import { DomainError } from './errors.js';
 /**
  * Cron expressions (5 fields: minute hour day-of-month month day-of-week) evaluated in a time zone.
  * The next run is computed from calendar days and local times and then mapped to an instant, so daylight-saving changes behave:
  * a local time that does not exist (the hour skipped in spring) is skipped, and one that happens twice (autumn) runs once, the first time.
  */
-export class CronError extends Error {}
+export class CronError extends DomainError {}
 
 export interface CronSpec { minute: number[]; hour: number[]; dom: number[]; month: number[]; dow: number[]; domAny: boolean; dowAny: boolean }
 

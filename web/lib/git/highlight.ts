@@ -26,13 +26,27 @@ import typescript from 'highlight.js/lib/languages/typescript';
 import xml from 'highlight.js/lib/languages/xml';
 import yaml from 'highlight.js/lib/languages/yaml';
 
-const LANGS: Record<string, unknown> = { bash, c, cpp, csharp, css, diff, dockerfile, go, ini, java, javascript, json, kotlin, makefile, markdown, perl, php, python, ruby, rust, scss, sql, swift, typescript, xml, yaml };
-for (const [n, l] of Object.entries(LANGS)) hljs.registerLanguage(n, l as never);
+/** The .http / .rest request files (IntelliJ and VS Code format): requests, headers, @variables, {{variables}}, ### separators and handlers. */
+const httpfile = (h: typeof hljs) => ({
+  name: 'httpfile', case_insensitive: false,
+  contains: [
+    { className: 'section', begin: /^#{3,}.*$/ },
+    { className: 'comment', begin: /^[ \t]*(#(?!##)|\/\/)/, end: /$/ },
+    { className: 'variable', begin: /\{\{/, end: /\}\}/ },
+    { begin: /^@[\w.-]+\s*=/, returnBegin: true, contains: [{ className: 'attr', begin: /@[\w.-]+/ }], end: /$/ },
+    { className: 'keyword', begin: /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT)\b/ },
+    { className: 'attr', begin: /^[A-Za-z][\w-]*(?=:\s)/ },
+    { className: 'meta', begin: /^>\s*\{%|^%\}/ },
+    h.QUOTE_STRING_MODE, h.C_NUMBER_MODE,
+  ],
+});
+const LANGS: Record<string, unknown> = { httpfile, bash, c, cpp, csharp, css, diff, dockerfile, go, ini, java, javascript, json, kotlin, makefile, markdown, perl, php, python, ruby, rust, scss, sql, swift, typescript, xml, yaml };
+for (const [n, l] of Object.entries(LANGS)) hljs.registerLanguage(n, (typeof l === 'function' && n === 'httpfile' ? () => (l as (h: typeof hljs) => never)(hljs) : l) as never);
 
 const EXT: Record<string, string> = {
   js: 'javascript', mjs: 'javascript', cjs: 'javascript', jsx: 'javascript', ts: 'typescript', tsx: 'typescript', json: 'json', css: 'css', scss: 'scss', html: 'xml', htm: 'xml', xml: 'xml', svg: 'xml', vue: 'xml', svelte: 'xml',
   md: 'markdown', mdx: 'markdown', py: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java', kt: 'kotlin', swift: 'swift', c: 'c', h: 'c', cpp: 'cpp', cc: 'cpp', hpp: 'cpp', cs: 'csharp', php: 'php', pl: 'perl', pm: 'perl',
-  sh: 'bash', bash: 'bash', zsh: 'bash', yml: 'yaml', yaml: 'yaml', toml: 'ini', ini: 'ini', conf: 'ini', cfg: 'ini', sql: 'sql', diff: 'diff', patch: 'diff', mk: 'makefile',
+  http: 'httpfile', rest: 'httpfile', sh: 'bash', bash: 'bash', zsh: 'bash', yml: 'yaml', yaml: 'yaml', toml: 'ini', ini: 'ini', conf: 'ini', cfg: 'ini', sql: 'sql', diff: 'diff', patch: 'diff', mk: 'makefile',
 };
 
 export function languageOf(path: string): string | null {

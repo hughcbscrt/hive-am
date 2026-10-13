@@ -1,4 +1,5 @@
 // Who a group message is for, with phrases from real chats. No model. Usage: npx tsx scripts/test-addressing.ts
+import './_guard.js';
 import { calledByName, directedAtOther, firstNames } from '../src/connections/addressing.js';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `got ${JSON.stringify(got)} want ${JSON.stringify(want)}`); if (!ok) fail++; };

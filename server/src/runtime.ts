@@ -11,7 +11,8 @@ export type BusMessage =
   | { kind: 'event'; agentId: string; turnId: string; event: StreamEvent }
   | { kind: 'turn_start'; agentId: string; turnId: string; prompt: string; source: 'user' | 'dispatch'; from?: string; channel?: { platform: string; place: string; user: string } }
   | { kind: 'status'; agentId: string; status: 'idle' | 'running' | 'error' | 'queued'; queued: number }
-  | { kind: 'agents_changed' };
+  | { kind: 'agents_changed' }
+  | { kind: 'objects_changed' };
 
 export const bus = new EventEmitter();
 bus.setMaxListeners(0);
@@ -72,19 +73,20 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
   emit({ kind: 'turn_start', agentId, turnId, prompt, source, from, channel: origin && { platform: origin.platform, place: origin.place, user: origin.userName } });
   emit({ kind: 'status', agentId, status: 'running', queued: s.queued });
 
-  const base = composeInstructions(agent, delegated);
-  const nbVersion = notebooks.get(agentId).version;
-  const instructions = [base, notebookBlock(agent)].filter(Boolean).join('\n\n');
-  const hash = createHash('sha1').update(base).digest('hex').slice(0, 16);
-  // The conversation is re-sent the instructions when its configuration changed, or when the notes were edited behind its back (by the user, or in another conversation).
-  const refreshInstructions = !delegated && !!agent.session_id && (raw.instr_hash !== hash || notebooks.get(agentId).seen < nbVersion);
-
   let text = '';
   let summary: string | undefined;
   let error: string | undefined;
+  let hash = '', nbVersion = 0;
   const push = (event: StreamEvent) => { s.live?.events.push(event); emit({ kind: 'event', agentId, turnId, event }); };
 
   try {
+    // Composing the instructions can fail too (a damaged skill row...): that is this turn's error, and it must not leave the agent "running" forever.
+    const base = composeInstructions(agent, delegated);
+    nbVersion = notebooks.get(agentId).version;
+    const instructions = [base, notebookBlock(agent)].filter(Boolean).join('\n\n');
+    hash = createHash('sha1').update(base).digest('hex').slice(0, 16);
+    // The conversation is re-sent the instructions when its configuration changed, or when the notes were edited behind its back (by the user, or in another conversation).
+    const refreshInstructions = !delegated && !!agent.session_id && (raw.instr_hash !== hash || notebooks.get(agentId).seen < nbVersion);
     const stream = runners[agent.provider]({
       agent, prompt, signal: controller.signal,
       instructions, refreshInstructions,

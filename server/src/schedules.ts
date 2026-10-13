@@ -5,13 +5,14 @@ import { adapterFor } from './connections/manager.js';
 import { deliverScheduled } from './connections/router.js';
 import { connections, threads } from './connections/store.js';
 import { liveOrigin, liveSource, queueDepth, sendTurn } from './runtime.js';
+import { DomainError } from './errors.js';
 
 /**
  * Recurring schedules an agent sets for itself ("every weekday at 9, check the QA logs and tell me"). Like a wake-up, a run reaches the agent
  * in the place where the schedule was made: the same chat thread, or its own web conversation. Cost is bounded: a minimum interval between runs,
  * a limit per agent, no catching up after an outage (a missed run is skipped, never replayed) and no run while the agent is already behind.
  */
-export class ScheduleError extends Error {}
+export class ScheduleError extends DomainError {}
 
 const MS_PER_MINUTE = Number(process.env.HIVE_AM_WAKE_MS_PER_MINUTE) || 60_000;      // tests shrink a "minute" (only for "every N minutes")
 export const MIN_INTERVAL_MINUTES = Number(process.env.HIVE_AM_SCHEDULE_MIN_MINUTES) || 15;
@@ -21,21 +22,7 @@ const BUSY_QUEUE = 2;                    // skip a run when this many messages a
 const KEEP_RUNS = 50;
 const MAX_TIMER_MS = 2_147_483_647;
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS agent_schedules (
-  id TEXT PRIMARY KEY, agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-  connection_id TEXT, thread_id TEXT REFERENCES threads(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL, expr TEXT NOT NULL, tz TEXT NOT NULL, note TEXT NOT NULL,
-  enabled INTEGER NOT NULL DEFAULT 1, next_due INTEGER, created_at INTEGER NOT NULL,
-  last_fired_at INTEGER, fire_count INTEGER NOT NULL DEFAULT 0, last_status TEXT, last_detail TEXT
-);
-CREATE TABLE IF NOT EXISTS schedule_runs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, schedule_id TEXT NOT NULL REFERENCES agent_schedules(id) ON DELETE CASCADE,
-  fired_at INTEGER NOT NULL, status TEXT NOT NULL, detail TEXT, duration_ms INTEGER
-);
-CREATE INDEX IF NOT EXISTS idx_schedule_runs ON schedule_runs (schedule_id, id);`);
-// Who asked (only kept when it was in a group): each run mentions them. Older databases get the columns here.
-for (const col of ['req_id TEXT', 'req_name TEXT']) { try { db.exec(`ALTER TABLE agent_schedules ADD COLUMN ${col}`); } catch { /* already there */ } }
+// The tables (agent_schedules, schedule_runs) are created by db/migrations.ts.
 
 export type RunStatus = 'delivered' | 'failed' | 'skipped_muted' | 'skipped_busy' | 'skipped_missed' | 'skipped_disabled' | 'skipped_reassigned';
 export interface Schedule {

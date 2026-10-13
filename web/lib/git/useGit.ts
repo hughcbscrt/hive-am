@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePolling } from '@/lib/hooks/usePolling';
 import { api } from '@/lib/api';
 import { useHive } from '@/lib/store';
 import type { Agent, GitStatus, GitTree } from '@/lib/types';
@@ -35,14 +36,11 @@ export function useGit(agent: Agent | undefined, active: boolean) {
     finally { if (my === seq.current) setLoading(false); }
   }, [id]);
 
-  // New folder (e.g. the colony's folder changed) → forget what we had.
+  // New folder (e.g. the colony's folder changed): forget what we had.
   useEffect(() => { setTree(null); setStatus(null); }, [cwd]);
   useEffect(() => { void load(active); }, [load, active, fin, cwd]);
-  useEffect(() => {
-    if (!active || !running) return;
-    const i = setInterval(() => void load(true), 5000);
-    return () => clearInterval(i);
-  }, [active, running, load]);
+  // While the agent works and the explorer is open: every 5 s, paused with the tab hidden. load() keeps its own errors, so nothing repeats as a toast.
+  usePolling(() => load(true), 5000, { enabled: active && running, immediate: false });
 
   return { status, tree, loading, error, refresh: useCallback(() => load(true), [load]) };
 }

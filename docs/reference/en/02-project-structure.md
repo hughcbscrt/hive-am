@@ -14,13 +14,25 @@ hive-am/
 │   ├── tsconfig.json
 │   ├── mcp/
 │   │   └── dispatch.mjs      # `hive` MCP server (stdio): delegation, channel, notebook and skills
-│   ├── scripts/              # simulations with real agents (sim-*.ts) and a fake Telegram API
+│   ├── scripts/              # tests without a model (test-*.ts), simulations with real agents (sim-*.ts) and a fake Telegram API
 │   └── src/
 │       ├── index.ts          # server ENTRY POINT
-│       ├── api.ts            # REST routes, validation, CORS
+│       ├── api.ts            # facade: exports handle() (CORS, 404, errors); the routes are in http/
 │       ├── runtime.ts        # per-agent queue, turns, delegation, event bus
 │       ├── instructions.ts   # what an agent is told (composed instructions) and which MCP tools it gets
 │       ├── db.ts             # SQLite schema, migrations, data access
+│       ├── errors.ts         # DomainError (kind, code): base of the domain error classes
+│       ├── db/
+│       │   ├── migrations.ts # the schema, versioned with PRAGMA user_version
+│       │   └── json.ts       # parseJson: safe reading of JSON columns
+│       ├── http/             # HTTP layer behind api.ts
+│       │   ├── router.ts     # route table, :param matching, malformed URL → 400
+│       │   ├── errors.ts     # HttpError and toHttpError (DomainError kind → status)
+│       │   ├── guards.ts     # requireLocal, isLocalRequest
+│       │   ├── body.ts       # JSON body with a limit (413); larger limit for uploads
+│       │   ├── validate.ts   # typed validation helpers
+│       │   └── routes/*.ts   # the routes, one file per domain (agents, git, resources…)
+│       ├── services/         # domain rules that are more than HTTP (agents, colonies, connections, notebook, schedules, providers)
 │       ├── types.ts          # shared backend types
 │       ├── seed.ts           # first-run initial data
 │       ├── models.ts         # list of models per provider (cached)
@@ -50,7 +62,7 @@ hive-am/
 │       │   ├── fake.ts       # in-memory platform for the simulations
 │       │   └── index.ts      # registers the available platforms
 │       ├── providers/
-│       │   ├── index.ts      # provider → runner table
+│       │   ├── index.ts      # ProviderAdapter and provider → adapter registry
 │       │   ├── spawn.ts      # process launcher (spawnLines)
 │       │   ├── preamble.ts   # instructions preamble (OpenCode, Kiro and Claude on resume)
 │       │   ├── claude.ts     # Claude Code runner
@@ -58,6 +70,7 @@ hive-am/
 │       │   └── kiro.ts       # Kiro runner
 │       └── history/
 │           ├── index.ts      # readHistory(): dispatches to the right reader
+│           ├── lines.ts      # jsonLines(): JSONL reading shared by the readers
 │           ├── claude.ts     # reads ~/.claude/projects/**/<id>.jsonl
 │           ├── opencode.ts   # reads opencode.db (SQLite, read-only)
 │           └── kiro.ts       # reads ~/.kiro/sessions/cli/<id>.jsonl and .json
@@ -81,6 +94,13 @@ hive-am/
     ├── components/
     │   ├── Shell.tsx         # sidebar, theme, global providers
     │   ├── ui.tsx            # primitives: Drawer, Modal, Field, pickers (including SkillPicker), toasts, Hex…
+    │   ├── Dialog.tsx        # Dialog / Modal / Drawer: portal, inert background, global stack, focus trap
+    │   ├── ConfirmDialog.tsx # confirmation with busy state and error toast
+    │   ├── Tabs.tsx          # Tabs / TabPanel with ARIA roles and arrow keys
+    │   ├── Primitives.tsx    # EmptyState, Banner, SearchInput, CheckRow
+    │   ├── WorkspaceHeader.tsx    # workspace header: secondary actions collapse into a menu
+    │   ├── Toast.tsx         # Toaster / useToast
+    │   ├── combobox.ts       # useCombobox: accessible dropdown lists
     │   ├── MarkdownEditor.tsx     # Markdown editor with toolbar, split view and shortcuts
     │   ├── HelpPopover.tsx   # help icon with popover
     │   ├── ConnectionDrawer.tsx   # create/edit a connection
@@ -92,6 +112,7 @@ hive-am/
     │   │   ├── AgentSwitcher.tsx      # side list to switch agent
     │   │   ├── AgentCard.tsx          # card with an agent's data on hover
     │   │   ├── DeleteAgentModal.tsx   # confirm and delete
+    │   │   ├── MemberPick.tsx         # picker of colony members
     │   │   ├── ColonyEditor.tsx       # create/edit colonies + inheritance question
     │   │   └── NotebookPanel.tsx      # Notebook tab of the agent settings
     │   ├── chat/             # the conversation
@@ -108,6 +129,8 @@ hive-am/
     │       ├── Code.tsx / CodeEditor.tsx  # highlighted code and its editor
     │       ├── ConflictResolver.tsx       # conflict resolution
     │       ├── StashManager.tsx   # list and view of stashes
+    │       ├── GitTabs.tsx / FileTree.tsx / FileView.tsx / FilePreview.tsx   # side tabs, tree (ARIA), viewer and preview
+    │       ├── HistoryList.tsx / BranchMenu.tsx / CommitDialog.tsx / DiscardConfirm.tsx   # history, branches, commit and discard confirmations
     │       ├── SwitchDialog.tsx   # warning before switching branch while other agents are working
     │       └── StatusLetter.tsx   # status letter (M, A, D…)
     └── lib/
@@ -120,6 +143,7 @@ hive-am/
         ├── channel.ts        # reads the origin header of a channel message
         ├── activity.ts       # "what is it doing" for an agent in one line
         ├── useDismiss.ts     # close on outside click or Escape
+        ├── hooks/            # usePolling, usePersistentState, useUnsavedGuard, useResizableWidth, useQueryState
         ├── git/              # Changes tab utilities
         │   ├── useGit.ts     # hook of the changes explorer
         │   ├── gitTree.ts    # file tree
@@ -136,20 +160,24 @@ hive-am/
             └── es.ts         # Spanish catalog (must have the same keys)
 ```
 
-There are no automated test folders yet; verification is described in [document 12](12-operations-and-troubleshooting.md).
+There is no test framework: `server/scripts/test-*.ts` are standalone scripts (21) that need no model, and the web is checked with `tsc`. How to run them is in [document 12](12-operations-and-troubleshooting.md#124-how-to-verify-changes-without-automated-tests).
 
 ## Backend: what each file does
 
 | File | Responsibility |
 |---|---|
-| `index.ts` | Runs `seedIfEmpty()`, creates the HTTP server on `127.0.0.1:<port>`, mounts the WebSocket at `/ws` and subscribes each client to the runtime's event bus. |
-| `api.ts` | Route table (`route(method, path, handler)`), JSON body reading, `HttpError` errors (400/404), open CORS, detection of installed providers, folder picker. |
+| `index.ts` | Runs `seedIfEmpty()`, creates the HTTP server on `127.0.0.1:<port>`, mounts the WebSocket at `/ws` and subscribes each client to the runtime's event bus. Orderly shutdown on SIGINT/SIGTERM (5 s limit), a clear error if the port is taken, and the policy for unhandled errors. |
+| `api.ts` | Facade of about 50 lines that exports `handle`: open CORS, `OPTIONS`, the 404 of a nonexistent route and the single place where an error becomes a response. The pending `TODO(security)` on CORS/Origin lives here. |
+| `http/*` | `router.ts` (route table), `errors.ts` (`HttpError`, `toHttpError`), `guards.ts` (`requireLocal`), `body.ts` (2 MiB JSON limit, about 135 MB for uploads, 413), `validate.ts` and `routes/*.ts` (one file per domain). |
+| `services/*` | Domain rules that were inside handlers: `agents` (effective folder, inheritance, validation), `colonies`, `connections`, `notebook`, `schedules` and `providers` (installed CLIs, `PROVIDERS`). |
+| `errors.ts` | `DomainError` with `kind` (`invalid`, `forbidden`, `not_found`, `conflict`, `unavailable`) and `code`; the base of the error classes of each module. |
 | `runtime.ts` | `sendTurn` (per-agent queue), `execute` (one turn), `dispatch` (delegation), `stopAgent`, `liveTurn`, `liveOrigin`, `bus`. |
 | `instructions.ts` | `composeInstructions` (identity, prompt, skills, team, channels, notebook), `notebookBlock`, `lazySkills` and `mcpCaps`: which MCP tools each agent gets. |
-| `db.ts` | Creates the tables, applies light migrations, exposes `skills`, `types`, `colonies`, `agents`, `dispatches` and the `resolved()` function; it also stores how each assigned skill is loaded. |
+| `db.ts` | Opens the database and runs the migrations, exposes `skills`, `types`, `colonies`, `agents`, `dispatches` and the `resolved()` function (prepared statements cached; creating or updating an agent, a type or a colony is one transaction); it also stores how each assigned skill is loaded. |
+| `db/migrations.ts`, `db/json.ts` | The whole schema as a list of idempotent migrations versioned with `PRAGMA user_version`, and `parseJson` to read JSON columns without throwing. |
 | `types.ts` | `Agent`, `Colony`, `AgentType`, `Skill`, `StreamEvent`, `Block`, `ChatMessage`, `Usage`, `TurnOptions`, etc. |
 | `seed.ts` | If the database is empty it creates 2 skills and 3 types (Queen, Builder, Reviewer). |
-| `skills/defaults.ts` | The nine skills that ship with hive-am (`skills.seedDefaults` creates them only once); see [7.3](07-agents-types-skills-colonies.md#73-skills). |
+| `skills/defaults.ts` | The ten skills that ship with hive-am (`skills.seedDefaults` creates them only once); see [7.3](07-agents-types-skills-colonies.md#73-skills). |
 | `skills/notebook.ts` | Each agent's notebook: `agent_notebooks` table, limits, notes without duplicates, credential rejection and versions. |
 | `connections/*` | External connections (Telegram): adapter, message router, groups, silence and channel tools; see [document 14](14-external-connections.md). |
 | `models.ts` | Models available per provider; 10-minute cache. |
@@ -159,17 +187,18 @@ There are no automated test folders yet; verification is described in [document 
 | `git/repo.ts` | Git reads (status, tree, diff, content, images) with path validation; see [document 13](13-changes-explorer-git.md). |
 | `git/switch.ts` | Smart branch switch: carries local changes over, or stashes them and reapplies; leaves conflicts to the resolver. |
 | `mcp-config.ts` | `API_PORT` (`HIVE_AM_PORT` variable, 4400 by default) and the MCP configuration objects handed to each provider. |
-| `providers/spawn.ts` | `spawnLines`: launches the CLI, delivers stdout line by line, handles cancellation, errors and `PWD`. |
+| `providers/spawn.ts` | `spawnLines`: launches the CLI, delivers stdout line by line, handles cancellation (SIGTERM, then SIGKILL after a grace period), errors and `PWD`; `spawnJson`, `safeJson` and `flattenText` are shared by the runners. |
 | `providers/claude.ts`, `opencode.ts`, `kiro.ts` | One async generator per provider that produces `StreamEvent`. |
 | `providers/preamble.ts` | `withInstructions`: prepends the instructions to the message (always for OpenCode and Kiro; for Claude only when resuming a session whose instructions changed). |
-| `history/*.ts` | Reading of native transcripts and normalization to `ChatMessage[]`. |
+| `history/*.ts` | Reading of native transcripts and normalization to `ChatMessage[]`; `history/index.ts` has the `HistoryReader` registry and `lines.ts` the shared JSONL reading. |
+| `objects/exec.ts` | `execCapture`: runs a program and returns its output, code, and whether it is missing or timed out; a death by signal or by `maxBuffer` counts as a failure (used by the Docker resources). |
 | `mcp/dispatch.mjs` | Minimal stdio MCP server; it only talks to hive-am's HTTP API. It announces the tools according to `HIVE_CAPS`: `dispatch`, `channel` (includes sending files), `memory` and `skills`. |
 
 ## Frontend: what each file does
 
 | File | Responsibility |
 |---|---|
-| `app/layout.tsx` | Loads the fonts (Bricolage Grotesque, Hanken Grotesk, JetBrains Mono) and wraps everything in `<Shell>`. |
+| `app/layout.tsx` | Loads the fonts (Bricolage Grotesque, Hanken Grotesk, JetBrains Mono), wraps everything in `<Shell>` and includes an inline script that applies the saved theme and language before the first paint (no flash). |
 | `app/page.tsx` | **Colony** screen: honeycomb with colonies, relation lines, the selected agent's panel and recent delegations. |
 | `app/agents/page.tsx` | Filterable table of agents. |
 | `app/agents/[id]/page.tsx` | Agent switcher + chat + Changes tab + collapsible settings panel (configuration, notebook and sessions). |
@@ -179,11 +208,13 @@ There are no automated test folders yet; verification is described in [document 
 | `app/relations/page.tsx` | Canvas (React Flow) to see and edit which orchestrator delegates to which worker. |
 | `app/sessions/page.tsx` | List of sessions per day with a read-only transcript. |
 | `components/Shell.tsx` | Side navigation, connection status, theme switch, `HiveProvider` and `Toaster`. |
+| `components/Dialog.tsx`, `ConfirmDialog.tsx`, `Tabs.tsx`, `Primitives.tsx`, `WorkspaceHeader.tsx`, `Toast.tsx`, `combobox.ts` | The base components; see [11.4](11-frontend.md#114-shared-components). `ui.tsx` re-exports them, so screens import everything from `@/components/ui`. |
 | `components/ui.tsx` | `Hex`, `ProviderBadge`, `StatusChip`, `RoleChip`, `Drawer`, `Modal`, `Field`, `Segmented`, `ProviderPicker`, `ModelField`, `PermissionField`, `SkillPicker`, `FolderPicker`, `Toaster`… |
 | `components/agents/*` | Forms and panels of agents and colonies (`AgentForm` is the shared form and handles inheritance from the colony); `NotebookPanel` edits the notebook. |
 | `components/chat/*` | `Chat` (memoized transcript, live turn, delegation card), `ToolCall` (each tool as a readable row), `UserBubble` and `StatsBar`. |
 | `components/git/*` | The **Changes** tab: `GitExplorer` (tree, file and diff viewer, history, stashes), `GitActions` (Fetch/Pull/Push/Commit, branches), `DiffView`, `ConflictResolver`, etc. |
-| `lib/store.tsx` | Global state, WebSocket and event reducer. |
+| `lib/store.tsx` | Global state, WebSocket and event reducer, with narrow hooks (`useHiveSelector`, `useLive`…), load error and retry. |
+| `lib/hooks/*` | `usePolling`, `usePersistentState`, `useUnsavedGuard`, `useResizableWidth`, `useQueryState`; see [11.3](11-frontend.md#113-global-state-libstoretsx). |
 | `lib/git/*` | Changes tab utilities: `useGit` hook, tree, diff, conflicts, preferences and syntax highlighting (with its worker). |
 | `lib/tokens.ts`, `lib/channel.ts` | Estimated size of skills, and reading of the origin header of channel messages. |
 | `lib/i18n/*` | UI translations (English and Spanish); see [document 11](11-frontend.md#118-internationalization-i18n). |

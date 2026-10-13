@@ -128,16 +128,17 @@ Remember that, like the rest of the API, it has **no authentication** ([document
 | File | Responsibility |
 |---|---|
 | `server/src/git/repo.ts` | Reading: `gitStatus`, `gitTree`, `gitDiff`, `gitFile`, `gitImagePath`; path validation |
-| `server/src/api.ts` | The `…/git/*` routes (the `raw` one writes its own binary response) |
+| `server/src/http/routes/git.ts` | The `…/git/*` routes (the `raw` one writes its own binary response); `api.ts` is only a facade |
 | `web/lib/git/useGit.ts` | Hook: status, tree, refresh and *polling* |
 | `web/lib/git/gitTree.ts` | Builds the tree, compacts folders, filters and flattens rows |
 | `web/lib/git/diff.ts` | Unified diff parser and pairing for the side-by-side view |
-| `web/components/git/GitExplorer.tsx` | Bar, tree, preview and commit view |
+| `web/components/git/GitExplorer.tsx` | Composes the explorer: bar, side panel and the state shared between the pieces below |
+| `web/components/git/GitTabs.tsx` · `FileTree.tsx` · `FileView.tsx` · `FilePreview.tsx` · `HistoryList.tsx` | The side tabs (on the shared `Tabs`, with arrow-key navigation), the file tree (ARIA `tree` roles and keyboard: arrows to move and open or close folders, Home/End), the file viewer, the preview of a file or commit, and the history list |
 | `web/components/git/ConflictResolver.tsx` · `web/lib/git/conflicts.ts` | Conflict resolver and the analysis/application of blocks |
 | `web/components/git/CodeEditor.tsx` · `Code.tsx` · `GitSettings.tsx` · `web/lib/git/highlight.ts` · `web/lib/git/gitPrefs.ts` | Editor with highlighting, highlighted code, view settings, highlighter and preferences |
 | `web/components/git/StatusLetter.tsx` · `web/lib/useDismiss.ts` | Shared pieces: the status letter (M/A/D/R/U/!/T) and closing popovers with an outside click or Esc (also used by `HelpPopover`) |
 | `web/components/agents/useAgentSettings.tsx` · `DeleteAgentModal.tsx` | Editing and deleting an agent, shared by the chat and Colony |
-| `web/components/git/GitActions.tsx` | Fetch/Pull/Push/Commit buttons, branch menu, commit dialog, history list |
+| `web/components/git/GitActions.tsx` · `BranchMenu.tsx` · `CommitDialog.tsx` · `DiscardConfirm.tsx` | Fetch/Pull/Push/Commit buttons and notices (`useGitActions`), branch menu, commit dialog, and the confirmations before discarding changes (on `ConfirmDialog`) |
 | `server/src/git/ops.ts` | History, branches and the actions that write (commit, pull, push, fetch, switch, merge) |
 | `web/app/agents/[id]/page.tsx` | **Chat / Changes** tabs and the badge |
 
@@ -300,3 +301,19 @@ API: `GET …/git/stashes`, `…/git/stash?sha=`; `POST …/git/switch-smart`, `
 **Limits:** a reapplied stash does not keep the *stage* (everything ends up unstaged); the agents warning counts only those **working** at that moment that share the repository; files ignored by `.gitignore` do not travel with the stash.
 
 **What counts as "a change" when walking through them.** git groups into one block (*hunk*) the changes that are less than 7 lines apart, so a file with many runs of changed lines can come out with few blocks. Editors walk through individual changes, and the viewer does the same: a **change** is a **run of added/removed lines**. Also, **all diffs are computed with git's `--histogram` algorithm** (instead of the default `Myers`): it aligns lines the way JetBrains does and splits changes the same way. Example measured with a Go file: with the default algorithm there were 23 runs and 4 git blocks; with histogram there are **16** changes (JetBrains counts 16; VS Code, with another algorithm, 12). The same algorithm is used in the `+/−` counts, in the history, in the blocks that are discarded and in the panel, which shows each change with up to 3 lines of context —only unchanged lines: the context **is cut where the neighboring change starts**, so lines added or removed from another change never appear and it is clear which one the visible content belongs to— and the title with the exact lines.
+
+## 13.14 Tags, compare, search and other versions
+
+Everything here is **read-only**: the working folder is never touched. Every branch, tag or commit that comes from the browser is first resolved to a commit (`rev-parse --verify`) and refused if it looks like an option, contains `..` or is not found.
+
+- **Tags tab.** Lists the repository's tags (newest first, up to 1000, with search). Picking one shows its **Files** as they were at that tag (tree, highlighted reader, Markdown preview, pictures) and its **Changes** (the tag's commit). From there, **Create a branch here** makes a branch at the tag *without switching to it*.
+- **Compare tab.** Two pickers (*From* → *To*) of branches, tags, remote branches or a pasted commit, with a swap button. Shows how many commits one is ahead/behind, the commits in between, the changed files and their diffs; changed pictures are shown before and after.
+- **History filters.** Search by **message**, **author** or **content** (commits that added or removed that text, `git log -S`), pick a branch, a tag or *all branches*, or paste a hash to jump to it. **File history** (button in the file view) lists only the commits that touched that file, following renames, and opens that file in each commit.
+- **View at…** (file view): the same file as it was at any branch, tag or commit, with a banner to go back to the current one.
+- **Search in files.** In the Files tab, switch the filter from *Name* to *Content*: `git grep` over the working files (tracked and new, never ignored ones), up to 300 matches; clicking one opens the file at that line.
+- **Branches.** Each local branch has a delete button (`git branch -d`: git refuses one with commits that are in no other branch, and the dialog then offers *Delete anyway*, `-D`). You cannot delete the branch you are on.
+- **Keys.** `/` jumps to the filter; `Alt+1…5` switch tabs. The last file open is remembered per agent.
+
+API (GET unless noted): `…/git/refs` (branches, remotes, tags), `…/git/tags`, `…/git/tag-tree?tag=`, `…/git/tag-file?tag=&path=`, `…/git/ref-file?ref=&path=`, `…/git/raw-at?ref=&path=` (pictures, served as inert images), `…/git/compare?base=&head=`, `…/git/compare-diff?base=&head=&path=`, `…/git/grep?q=&case=`, `…/git/log?skip=&q=&by=message|author|content&ref=&path=`; POST `…/git/branch-create` `{ branch, from }`, `…/git/branch-delete` `{ branch, force }`.
+
+**Limits:** a tree is capped at 30 000 files, a tag list at 1000, a file at 1 MB, a comparison at 500 files and 100 commits. Pictures are read from git up to 20 MB. Measured on a repository with 3 200 files, 870 commits and about 700 tags, every call answers in well under half a second (a status takes about 0.4 s); repositories with hundreds of thousands of files were not measured.

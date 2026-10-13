@@ -1,31 +1,49 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Search } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api';
-import { useHive } from '@/lib/store';
+import { useHiveData } from '@/lib/store';
+import { usePolling } from '@/lib/hooks/usePolling';
+import { useQueryState } from '@/lib/hooks/useQueryState';
+import { History } from '@/components/chat/Chat';
 import { PROVIDERS, ago, shortPath } from '@/lib/meta';
 import { fmtCost, fmtTokens, totalTokens } from '@/lib/format';
 import type { ChatMessage, Provider, SessionRow } from '@/lib/types';
-import { ProviderBadge, Segmented } from '@/components/ui';
+import { Banner, EmptyState, ProviderBadge, SearchInput, Segmented } from '@/components/ui';
 import { dateLocale, useI18n } from '@/lib/i18n';
+
+const FIRST = 100, MORE = 200; // messages first loaded / added per click
 
 export default function Sessions() {
   const { t, locale } = useI18n();
-  const { agents } = useHive();
+  const { agents } = useHiveData();
   const [rows, setRows] = useState<SessionRow[] | null>(null);
   const [q, setQ] = useState('');
   const [prov, setProv] = useState<'all' | Provider>('all');
-  const [sel, setSel] = useState<SessionRow | null>(null);
+  // The open session is in the URL (?session=<id>) so a refresh or a shared link comes back to it.
+  const [selId, setSelId] = useQueryState('session', '');
+  const [loadErr, setLoadErr] = useState(false);
   const [msgs, setMsgs] = useState<ChatMessage[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [limit, setLimit] = useState(FIRST);
+  const scroller = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { api.get<SessionRow[]>('/sessions').then(setRows).catch(() => setRows([])); }, []);
+  // The list comes back at once with what is cached; rows still being read are asked about again until they are all known.
+  const pending = rows === null || rows.some((x) => x.pending);
+  usePolling(async () => { setRows(await api.get<SessionRow[]>('/sessions')); setLoadErr(false); }, 2500, { enabled: pending, onError: () => { setLoadErr(true); setRows((x) => x ?? []); } });
+  const sel = useMemo(() => (selId && rows?.find((r) => r.session_id === selId)) || null, [rows, selId]);
+  // A different session starts again from the newest messages.
+  useEffect(() => { setLimit(FIRST); }, [sel?.session_id]);
   useEffect(() => {
-    setMsgs(null); if (!sel) return;
-    api.get<{ messages: ChatMessage[] }>(`/agents/${sel.agent_id}/history?session=${encodeURIComponent(sel.session_id)}`).then((r) => setMsgs(r.messages)).catch(() => setMsgs([]));
-  }, [sel]);
+    let dead = false;
+    if (!sel) { setMsgs(null); return; }
+    api.get<{ messages: ChatMessage[]; total?: number }>(`/agents/${sel.agent_id}/history?session=${encodeURIComponent(sel.session_id)}&limit=${limit}`)
+      .then((r) => { if (dead) return; setMsgs(r.messages); setTotal(r.total ?? r.messages.length); })
+      .catch(() => !dead && setMsgs([]));
+    return () => { dead = true; };
+  }, [sel?.agent_id, sel?.session_id, limit]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Opening a session shows its end (what happened last), like a chat.
+  useEffect(() => { if (msgs && limit === FIRST && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight; }, [msgs, limit]);
 
   const list = useMemo(() => (rows ?? []).filter((r) => (prov === 'all' || r.provider === prov) && (!q || `${r.agent_name} ${r.preview} ${r.cwd}`.toLowerCase().includes(q.toLowerCase()))), [rows, q, prov]);
   const byDay = useMemo(() => {
@@ -34,53 +52,59 @@ export default function Sessions() {
     return [...g.entries()];
   }, [list, locale]);
   const agent = sel && agents.find((a) => a.id === sel.agent_id);
+  const older = msgs ? total - msgs.length : 0;
 
   return (
-    <div className="page">
-      <div className="page-head"><div><h1>{t('nav.sessions')}</h1><p>{t('sessions.subtitle')}</p></div></div>
-      <div className="row wrap" style={{ marginBottom: 16 }}>
-        <div className="search grow" style={{ maxWidth: 380 }}><Search size={16} /><input className="input" placeholder={t('sessions.searchPlaceholder')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('sessions.searchLabel')} /></div>
-        <Segmented value={prov} onChange={setProv} options={[{ id: 'all', label: t('common.all') }, ...(Object.keys(PROVIDERS) as Provider[]).map((p) => ({ id: p, label: PROVIDERS[p].short }))]} />
-      </div>
-      {rows && !rows.length ? (
-        <div className="empty"><h3>{t('sessions.empty.title')}</h3><p>{t('sessions.empty.body')}</p><Link className="btn primary" href="/agents">{t('sessions.empty.go')}</Link></div>
+    <div className="page full">
+      {loadErr && !rows?.length ? (
+        <div className="m-xl"><Banner kind="err">{t('fa.sessions.loadFailed')}</Banner></div>
+      ) : rows && !rows.length ? (
+        <div className="m-xl"><EmptyState title={t('sessions.empty.title')} body={t('sessions.empty.body')} action={<Link className="btn primary" href="/agents">{t('sessions.empty.go')}</Link>} /></div>
       ) : (
-        <div className="sess-grid">
-          <div className="card" style={{ overflow: 'hidden' }}>
-            {rows === null && <p className="muted" style={{ padding: 20 }}>{t('sessions.reading')}</p>}
-            {byDay.map(([day, items]) => (
-              <div key={day}>
-                <div className="eyebrow" style={{ padding: '12px 16px 6px', background: 'var(--surface-2)' }}>{day}</div>
-                {items.map((r) => (
-                  <button key={r.agent_id + r.session_id} className="sess" aria-current={sel?.session_id === r.session_id} onClick={() => setSel(r)}>
-                    <div className="row"><b style={{ fontFamily: 'var(--font-display)' }}>{r.agent_name}</b><ProviderBadge provider={r.provider} />{r.current && <span className="chip honey">{t('sessions.current')}</span>}{r.kind === 'delegation' && <span className="chip">{t('sessions.delegatedBy', { name: r.from_name ?? t('chat.anOrchestrator') })}</span>}<span className="grow" /><span className="muted small">{ago(r.last_seen)}</span></div>
-                    <div className="pv">{r.preview || r.task || t('sessions.emptySession')}</div>
-                    <div className="muted small mono">{shortPath(r.cwd)} · {t('sessions.messages', { count: r.message_count })}</div>
-                    <div className="sessmeta">{totalTokens(r.usage) > 0 && <span>{fmtTokens(totalTokens(r.usage))} {t('stats.tokens')}</span>}{r.usage.credits ? <span>{r.usage.credits.toFixed(2)} {t('stats.credits')}</span> : null}{r.cost !== null && <span>≈ {fmtCost(r.cost)}</span>}{r.tool_calls > 0 && <span>{r.tool_calls} {t('stats.toolCalls', { count: r.tool_calls })}</span>}{r.model && <span className="mono">{r.model.replace(/^claude-/, '')}</span>}</div>
-                  </button>
-                ))}
-              </div>
-            ))}
-            {rows && rows.length > 0 && !list.length && <p className="muted" style={{ padding: 20 }}>{t('sessions.noMatch')}</p>}
-          </div>
-          <div className="card" style={{ position: 'sticky', top: 20, minHeight: 300 }}>
-            {!sel ? <div className="empty" style={{ border: 0 }}><p>{t('sessions.select')}</p></div> : (
-              <>
-                <div className="row" style={{ padding: '14px 20px', borderBottom: '1px solid var(--line)' }}>
-                  <div className="grow"><b style={{ fontFamily: 'var(--font-display)', fontSize: 17 }}>{sel.agent_name}</b><div className="muted small mono">{sel.session_id}</div></div>
-                  {agent && <Link className="btn sm primary" href={`/agents/${agent.id}`}>{t('sessions.openAgent')}</Link>}
-                </div>
-                <div className="transcript col" style={{ gap: 16 }}>
-                  {msgs === null ? <p className="muted">{t('sessions.loading')}</p> : msgs.length === 0 ? <p className="muted">{t('sessions.noMessages')}</p> : msgs.map((m) => (
-                    <div key={m.id} className={`msg ${m.role}`}>
-                      {m.role === 'user' ? <div className="bubble">{m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join('')}</div> :
-                        m.blocks.filter((b) => b.type === 'text').map((b, i) => <div key={i} className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{(b as { text: string }).text}</ReactMarkdown></div>)}
-                    </div>
+        <div className="sk-ws sx-ws">
+          <aside className="switcher" aria-label={t('nav.sessions')}>
+            <div className="switcher-head">
+              <b className="fa-title">{t('nav.sessions')}</b>
+              <SearchInput value={q} onChange={setQ} placeholder={t('sessions.searchPlaceholder')} label={t('sessions.searchLabel')} />
+              <Segmented value={prov} onChange={setProv} options={[{ id: 'all', label: t('common.all') }, ...(Object.keys(PROVIDERS) as Provider[]).map((p) => ({ id: p, label: PROVIDERS[p].short }))]} />
+            </div>
+            <div className="switcher-list">
+              {rows === null && <p className="muted small pad-m">{t('sessions.reading')}</p>}
+              {byDay.map(([day, items]) => (
+                <div key={day}>
+                  <div className="switcher-group">{day}<span>{items.length}</span></div>
+                  {items.map((r) => (
+                    <button key={r.agent_id + r.session_id} className="sk-item" aria-current={sel?.session_id === r.session_id} onClick={() => setSelId(r.session_id)}>
+                      <div className="row gap-xs"><b className="grow">{r.agent_name}</b><ProviderBadge provider={r.provider} />{r.current && <span className="chip honey">{t('sessions.current')}</span>}</div>
+                      <span className="sk-desc">{r.preview || (r.pending ? t('sessions.counting') : r.task || t('sessions.emptySession'))}</span>
+                      <span className="sk-meta">
+                        {ago(r.last_seen)}{r.kind === 'delegation' && ` · ${t('sessions.delegatedBy', { name: r.from_name ?? t('chat.anOrchestrator') })}`}
+                        {r.pending && !r.message_count ? ' · …' : ` · ${t('sessions.messages', { count: r.message_count })}`}
+                        {totalTokens(r.usage) > 0 && ` · ${fmtTokens(totalTokens(r.usage))} ${t('stats.tokens')}`}{r.cost !== null && ` · ≈ ${fmtCost(r.cost)}`}
+                      </span>
+                    </button>
                   ))}
                 </div>
-              </>
-            )}
-          </div>
+              ))}
+              {rows && rows.length > 0 && !list.length && <p className="muted small pad-m">{t('sessions.noMatch')}</p>}
+            </div>
+          </aside>
+          {!sel ? <section className="sk-main sk-none"><p className="muted">{t('sessions.select')}</p></section> : (
+            <section className="sk-main">
+              <header className="sx-head">
+                <div className="grow"><b className="fa-title lg">{sel.agent_name}</b><div className="muted small mono ellipsis">{shortPath(sel.cwd)} · {sel.session_id}</div></div>
+                {agent && <Link className="btn sm primary" href={`/agents/${agent.id}`}>{t('sessions.openAgent')}</Link>}
+              </header>
+              <div className="transcript col sx-transcript" ref={scroller}>
+                {msgs === null ? <p className="muted">{t('sessions.loading')}</p> : msgs.length === 0 ? <p className="muted">{t('sessions.noMessages')}</p> : (
+                  <>
+                    {older > 0 && <button className="btn sm push-c" onClick={() => setLimit(limit + MORE)}>{t('sessions.older', { count: older })}</button>}
+                    <History msgs={msgs} agent={{ id: sel.agent_id, name: sel.agent_name, provider: sel.provider, role: sel.agent_role }} />
+                  </>
+                )}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>

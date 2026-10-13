@@ -23,3 +23,5 @@ export function fmtBytes(n: number): string {
 export const fmtDate = (ts: number | string) => new Date(ts).toLocaleDateString(dateLocale(), { day: '2-digit', month: '2-digit', year: 'numeric' });
 /** "06/10/2026, 10:46" (24 h). */
 export const fmtDateTime = (ts: number | string) => new Date(ts).toLocaleString(dateLocale(), { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+/** "10:46:05" (24 h). */
+export const fmtTime = (ts: number | string) => new Date(ts).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });

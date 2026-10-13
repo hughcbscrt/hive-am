@@ -21,17 +21,20 @@ Browser ── direct WebSocket ──▶ ws://<hostname>:4400/ws
 ```
 
 - `web/next.config.mjs` defines a `rewrites()` that forwards `/api/:path*` to `${HIVE_AM_API}/api/:path*` (`http://127.0.0.1:4400` by default). That is why the front end calls relative paths and there are no CORS problems in normal use.
-- The WebSocket **does not go through the proxy**: `lib/store.tsx` opens `ws://${location.hostname}:${NEXT_PUBLIC_HIVE_WS_PORT ?? 4400}/ws`.
-- The server answers `Access-Control-Allow-Origin: *` (and methods `GET,POST,PATCH,PUT,DELETE,OPTIONS`) and replies `204` to `OPTIONS`. It is meant for local use; see security in [document 12](12-operations-and-troubleshooting.md).
+- The WebSocket **does not go through the proxy**: `lib/store.tsx` opens `ws://${location.hostname}:${NEXT_PUBLIC_HIVE_WS_PORT ?? 4400}/ws` (`wss://` when the page is served over https; an empty port variable means the same host and port as the page, for a reverse proxy).
+- The server answers `Access-Control-Allow-Origin: *` (and methods `GET,POST,PATCH,PUT,DELETE,OPTIONS`) and replies `204` to `OPTIONS`. It is meant for local use; see security in [document 12](12-operations-and-troubleshooting.md). Tightening it (Host/Origin checks on every route) is still pending and documented as a `TODO(security)` in `api.ts`: it has to be proven against the Next proxy and the MCP clients first.
 
 ## 5.2 REST API conventions
 
 - All responses are JSON (`content-type: application/json`), error responses too.
 - Success: **HTTP 200** with the resulting object (creations also return 200, not 201). Some routes return `null` when there is no data (e.g. `/live` with no turn).
 - Validation error: **400** `{ "error": "message" }`. Not found: **404** `{ "error": "…" }`. Nonexistent route: **404** `{ "error": "No such route" }`. Internal failure: **500** `{ "error": "Unexpected server error" }`.
-- The body must be valid JSON; otherwise 400 `Request body is not valid JSON`.
+- The body must be valid JSON **and an object**; otherwise 400 `Request body is not valid JSON` or `Request body must be a JSON object`. A malformed `%` escape in the URL is a 400 `Malformed URL`.
+- **Body size limit** (`http/body.ts`): 2 MiB for JSON; routes that receive files (chat attachments travel as base64 inside the JSON) accept about 135 MB (5 files of 20 MB, plus the base64 overhead). Over the limit the answer is **413** `The request is too big (limit N MB)` and the connection is closed after the answer.
+- **Errors in one place** (`http/errors.ts`): handlers throw `HttpError` (400, 403, 404, 413) or a domain error; `toHttpError` turns every `DomainError` (`server/src/errors.ts`, the base of `ObjectError`, `WakeError`, `ScheduleError`, `GitOpError`, etc.) into a status by its `kind`: `invalid` 400, `forbidden` 403, `not_found` 404, `conflict` 409, `unavailable` 503. So a refused action is a 400 on every route, with the message as before. Anything else is logged and answered as 500.
+- Endpoints that act on the machine use one guard (`requireLocal`, `http/guards.ts`): a browser's `Origin` must be this machine (or the name the request was addressed to); terminals also pin the `Host` to a loopback name. Programs without an `Origin` (curl, the MCP) pass.
 - The client (`web/lib/api.ts`) exposes `api.get/post/patch/put/del`; on a non-OK status it throws `ApiError` with the server's message, which the UI shows as is in a notice.
-- The router (`api.ts`) turns `:param` into a regular-expression capture group; there are no middlewares.
+- `api.ts` is a facade over `http/`: the router (`http/router.ts`) turns `:param` into a regular-expression capture group and each domain registers its routes in `http/routes/<domain>.ts`, with the business rules that are not just HTTP in `services/` (agents, colonies, connections, notebook, schedules, providers). There are no middlewares.
 
 ## 5.3 Endpoint reference
 
@@ -52,7 +55,8 @@ Browser ── direct WebSocket ──▶ ws://<hostname>:4400/ws
 | `GET /api/agents/:id` | — | One agent. |
 | `PATCH /api/agents/:id` | Any subset of the fields above | The updated agent. If the `provider` changes, the current session is discarded. |
 | `DELETE /api/agents/:id` | — | Stops its turn in progress and deletes it. `{ ok: true }` |
-| `POST /api/agents/:id/messages` | `{ prompt }` | **Queues** the turn and answers immediately `{ accepted: true }`. The result arrives over WebSocket. |
+| `POST /api/agents/:id/messages` | `{ prompt, images? }` | **Queues** the turn and answers immediately `{ accepted: true, prompt }`. The result arrives over WebSocket. `images` (up to 5, `{ name, data }` with base64 or a data URL; PNG, JPEG, GIF or WebP, 10 MB each, checked by their bytes) are saved in the agent's inbox and a note with their paths is added to the prompt (`prompt` in the answer is the text as the agent got it). |
+| `GET /api/agents/:id/inbox?path=` | — | A file sent from the chat (thumbnail or download): only files inside that agent's inbox; pictures inline, anything else only as a download (`attachment`). |
 | `POST /api/agents/:id/stop` | — | Aborts the turn in progress. `{ stopped: bool }` |
 | `POST /api/agents/:id/new-session` | — | Stops the turn and clears the session pointer: the next message opens a new conversation. |
 | `POST /api/agents/:id/resume-session` | `{ session_id }` | Makes a previous **direct** session of the agent the current one. 400 if it is not theirs or it is a delegation one. |
@@ -197,26 +201,29 @@ Important points:
 `HiveProvider` keeps in a reducer:
 
 ```
-ready, connected,
-agents[], types[], skills[], colonies[], providers[],
+ready, error, connected,
+agents[], types[], skills[], colonies[], providers[], dispatches[],
 live: { [agentId]: LiveTurn },       // turn in progress
 finished: { [agentId]: number }      // counter of finished turns
 ```
 
 | Moment | What happens |
 |---|---|
-| Mount | `refresh()` loads agents, types, skills and colonies; providers are requested separately. |
+| Mount | `refresh()` loads agents, types, skills, colonies and the delegation log; providers are requested separately. `ready` becomes `true` only once the API has answered; if it fails, `error` holds the (translated) message and the store retries with a growing pause (2 s up to 15 s). `retry()` forces it, and the screens show an error banner with a *Retry* button instead of empty lists. |
 | WebSocket open | `refresh(['agents'])`; then, for each agent with `live: true`, `GET /live` is requested and the turn is **rebuilt** with its accumulated events. That way, reloading the page in the middle of a turn does not lose what was already shown. |
-| `agents_changed` | `refresh(['agents','colonies'])`. |
+| `agents_changed` | `refresh(['agents','colonies','connections'])` and, debounced (400 ms), a reload of `dispatches`. |
 | `turn_start` | Creates an empty `LiveTurn` for that agent. |
 | `event` | Folds the event into the `LiveTurn` (see [document 10](10-chat-and-display.md)). Ignores events with a `turnId` different from the current one. |
 | `status` | Updates the agent's status and queue. `queued` is shown as `running`. On `idle` it clears the `LiveTurn` and, if there was one, bumps `finished`; on `error` it keeps it. |
+| `turn_start` of a delegation, `status` `idle` / `error` | Debounced reload of `dispatches`, so the *Recent* feed stays current without polling. |
 | Socket close | `connected = false`; retries with exponential backoff: `min(8000, 800 · 2^n)` ms. |
 
-The connection status is shown at the bottom of the sidebar ("Connected to server" / "Server offline — retrying").
+A malformed frame is ignored (it does not break the socket handler). The connection status is shown at the bottom of the sidebar ("Connected to server" / "Server offline. Retrying…").
+
+`useHive()` keeps its usual shape, but components that run hot read narrower slices so that every streamed token does not re-render them: `useHiveSelector(select)`, `useHiveData()` (everything except `live` and `finished`), `useLive(agentId)`, `useFinished(agentId)`, `useAgent(id)` and `useHiveActions()`. The client `api.ts` throws `ApiError` (with `status`), and each method accepts a last `{ signal, timeoutMs }` argument; `isAbort(e)` recognises a cancelled call.
 
 ## 5.7 How the interface stays fresh
 
 - Changes made from this tab, or another one, arrive as `agents_changed` and force a `refresh`.
-- Screens that do not listen to events directly (e.g. *Recent delegations* in Colony) poll: `GET /api/dispatches` every 6 s.
+- *Recent delegations* in Colony no longer poll: the store holds `dispatches` and reloads them (debounced) when the WebSocket reports a change. Other screens that poll (e.g. schedules) use `usePolling`, which pauses while the tab is hidden, backs off on errors and warns once.
 - The provider list is requested once; the server caches it for 60 s.

@@ -39,12 +39,16 @@ Sin clonar el repositorio: `npx hive-am` (o `npm install -g hive-am` y luego `hi
 
 Secuencia de arranque:
 
-1. Se importa `db.ts`: abre (o crea) `~/.hive-am/hive-am.db`, crea las tablas, aplica migraciones y **normaliza el estado tras un apagón** (ver abajo).
+1. Se importa `db.ts`: abre (o crea) `~/.hive-am/hive-am.db`, ejecuta las **migraciones de esquema** pendientes (`db/migrations.ts`, versionadas con `PRAGMA user_version`; ver el [documento 4](04-almacenamiento.md)) y **normaliza el estado tras un apagón** (ver abajo).
 2. `skills.seedDefaults()` crea, una sola vez cada una, las skills que vienen con hive-am; después `seedIfEmpty()` crea el kit inicial solo si no hay tipos, agentes ni skills propias.
 3. Se crea un `http.createServer` cuyo handler es `handle()` de `api.ts`.
 4. Se monta un `WebSocketServer` en la ruta `/ws` sobre el mismo servidor HTTP.
 5. Cada conexión WebSocket se suscribe al `bus` del runtime y reenvía cada mensaje como JSON; al cerrarse se desuscribe.
-6. `server.listen(API_PORT, '127.0.0.1')` y escribe en consola `hive-am server → http://127.0.0.1:4400`.
+6. `server.listen(API_PORT, '127.0.0.1')` y escribe en consola `hive-am server → http://127.0.0.1:4400`. Si el puerto está ocupado lo dice con claridad (`is hive-am already running? (HIVE_AM_PORT changes it)`) y sale con código 1.
+
+`api.ts` es solo una fachada (unas 50 líneas, exporta `handle`): las rutas viven en `http/routes/*.ts`, un archivo por dominio, sobre `http/router.ts`; ver [5.2](05-comunicacion-back-front.md#52-convenciones-de-la-api-rest).
+
+**Cierre ordenado** (final de `index.ts`). Con `SIGINT` o `SIGTERM` el servidor deja de aceptar peticiones y corta los sockets, cierra los WebSockets, termina las terminales, detiene las conexiones de canales y cierra la base de datos (que fusiona su registro de escritura), y sale con 0. Si un paso se cuelga, sale igualmente a los **5 segundos**. **No** detiene los servidores y contenedores que se mantienen como recursos (sobreviven a hive-am por diseño) ni los turnos en curso de los agentes. Errores sueltos: un `unhandledRejection` se registra y el servidor sigue atendiendo (guarda terminales y turnos en curso); un `uncaughtException` se registra y el servidor se cierra con código 1.
 
 **Recuperación tras un apagón** (al final de `db.ts`, se ejecuta en cada arranque):
 
@@ -93,7 +97,10 @@ Cada pantalla es una ruta de `web/app/`:
 | `HIVE_AM_PORT` | `server/src/mcp-config.ts` | `4400` | Puerto del servidor (API + WebSocket). |
 | `HIVE_AM_HOME` | `server/src/db.ts` | `~/.hive-am` | Carpeta de datos (base SQLite y configuraciones MCP). |
 | `HIVE_AM_API` | `web/next.config.mjs` | `http://127.0.0.1:4400` | A dónde reenvía Next las llamadas `/api/*`. |
-| `NEXT_PUBLIC_HIVE_WS_PORT` | `web/lib/store.tsx` | `4400` | Puerto al que se conecta el WebSocket del navegador. |
+| `NEXT_PUBLIC_HIVE_WS_PORT` | `web/lib/store.tsx` | `4400` | Puerto al que se conecta el WebSocket del navegador (`wss:` si la página se sirve por https). |
+| `HIVE_AM_KILL_GRACE_MS` | `server/src/providers/spawn.ts` | `5000` | Cuánto tiempo tiene un CLI al que se pidió parar (SIGTERM) antes de matarlo con SIGKILL. |
+| `HIVE_AM_TELEGRAM_TIMEOUT_MS` | `server/src/connections/telegram.ts` | `30000` | Tiempo límite de cada llamada, subida y descarga de la API de Telegram. |
+| `HIVE_AM_WAKE_RETRY_MS` | `server/src/wake.ts` | `5000` | Espera antes de reintentar la entrega de un despertador que falló (12 intentos, luego se descarta). |
 | `NEXT_DIST_DIR` | `web/next.config.mjs` | `.next` | Carpeta de salida de Next; permite correr una segunda instancia sin pisar la primera. |
 | `HIVE_AGENT_ID`, `HIVE_AM_API` | `server/mcp/dispatch.mjs` | — | Las fija hive-am al lanzar el servidor MCP (no se configuran a mano). |
 

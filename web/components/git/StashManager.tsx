@@ -6,7 +6,7 @@ import { useI18n } from '@/lib/i18n/index';
 import { parseDiff } from '@/lib/git/diff';
 import { ago } from '@/lib/meta';
 import type { Agent, GitCommitDetail, GitDiffResult, StashDetail, StashItem } from '@/lib/types';
-import { Modal } from '@/components/ui';
+import { ConfirmDialog, Modal } from '@/components/ui';
 import { DiffView } from './DiffView';
 import { StatusLetter } from './StatusLetter';
 import type { GitActions } from './GitActions';
@@ -38,9 +38,9 @@ export function SaveStashDialog({ a, onClose }: { a: GitActions; onClose: () => 
   const go = async () => { onClose(); await a.run('stash', t('git.stash.saved'), 'stash-save', { message: msg }); };
   return (
     <Modal title={t('git.stash.save')} onClose={onClose}>
-      <p className="muted" style={{ margin: 0 }}>{t('git.stash.save.body')}</p>
+      <p className="confirm-body">{t('git.stash.save.body')}</p>
       <input className="input" autoFocus value={msg} maxLength={200} placeholder={t('git.stash.save.placeholder')} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void go(); }} aria-label={t('git.stash.save.placeholder')} />
-      <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn ghost" onClick={onClose}>{t('common.cancel')}</button><button className="btn primary" disabled={!!a.busy} onClick={() => void go()}>{t('git.stash.save')}</button></div>
+      <div className="row confirm-actions"><button className="btn ghost" onClick={onClose}>{t('common.cancel')}</button><button className="btn primary" disabled={!!a.busy} onClick={() => void go()}>{t('git.stash.save')}</button></div>
     </Modal>
   );
 }
@@ -104,14 +104,10 @@ export function StashPreview({ agent, stash, a }: { agent: Agent; stash: StashIt
       )}
       {file && <div className="gx-body">{!parsed ? <p className="gx-note">{t('git.loading')}</p> : parsed.binary ? <p className="gx-note">{t('git.diff.binary')}</p> : parsed.hunks.length === 0 ? <p className="gx-note">{t('git.diff.empty')}</p> : <DiffView parsed={parsed} layout="unified" path={file.path} cutOff={!!diff?.truncated} />}</div>}
       {confirmDrop && (
-        <Modal title={t('git.stash.drop.title')} onClose={() => setConfirmDrop(false)}>
-          <p className="muted" style={{ margin: 0 }}>{t('git.stash.drop.body', { name: stash.message || '—' })}</p>
+        <ConfirmDialog danger title={t('git.stash.drop.title')} body={t('git.stash.drop.body', { name: stash.message || '—' })} confirmLabel={t('git.stash.drop')} onClose={() => setConfirmDrop(false)}
+          onConfirm={() => { if (!busy) void a.run('stash', t('git.stash.dropped'), 'stash-drop', { sha: stash.sha }); }}>
           <p className="gx-lost">{t('git.discard.all.warn')}</p>
-          <div className="row" style={{ justifyContent: 'flex-end' }}>
-            <button className="btn ghost" onClick={() => setConfirmDrop(false)}>{t('common.cancel')}</button>
-            <button className="btn danger" disabled={busy} onClick={() => { setConfirmDrop(false); void a.run('stash', t('git.stash.dropped'), 'stash-drop', { sha: stash.sha }); }}>{t('git.stash.drop')}</button>
-          </div>
-        </Modal>
+        </ConfirmDialog>
       )}
     </section>
   );

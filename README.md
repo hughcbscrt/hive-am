@@ -34,12 +34,14 @@ have installed; it does not replace them and it never copies your conversations 
 - **Real sessions.** An agent stores only a pointer (`provider`, `session_id`, `cwd`). The transcript lives in the CLI's own store and is read back from there. After a restart every agent resumes its real session.
 - **Orchestration.** An orchestrator delegates to the workers connected to it on the Relations canvas. Every delegation runs in a fresh native session of the worker, and the rule is enforced on the server, not just requested.
 - **Colonies.** Group agents on a honeycomb map and lend them defaults: working folder, permissions, skills and a shared prompt. Each agent can opt out per field.
-- **Skills.** Nine skills ship with hive-am (all ordinary: edit or delete them). Assign them to an agent, a type or a colony, and choose per assignment whether they are **always** in the instructions or loaded **on demand** with a `skill_read` tool. Searchable picker with token weights.
+- **Skills.** Ten skills ship with hive-am (all ordinary: edit or delete them). Assign them to an agent, a type or a colony, and choose per assignment whether they are **always** in the instructions or loaded **on demand** with a `skill_read` tool. Searchable picker with token weights.
 - **Notebook.** An agent can keep a persistent notebook of what it learns (no credentials, no duplicates, every note with its source). You can read and edit it from the agent's settings.
 - **Telegram.** Link a bot to an agent: private chats, groups and topics, one shared session across all of them. In groups the agent can listen to everything and speak only when it adds something; people can mute it per thread and bring it back.
 - **Files and images.** People send documents and photos to the agent; the agent sends files back. An optional image model can describe pictures for models that cannot see them.
 - **Permissions that hold.** *Read-only*, *Edit files* and *Full access* are enforced by the CLI itself in all three providers.
 - **Changes explorer.** A Git tab per agent: file tree with highlighting, diff viewer, history, commit, pull, push and branches.
+- **Resources.** Servers, Docker containers, HTTP requests (`.http` files) and clusters that group them live in a colony as hexagons: start, stop, read logs, run requests; agents can look after them.
+- **Terminals.** A bottom panel (Ctrl+`) with real shells and object logs, reachable only from this machine.
 - **Local and private.** The server binds to `127.0.0.1`. Data lives in `~/.hive-am/`.
 
 ## Providers
@@ -117,6 +119,10 @@ checked on the server. The bot token is stored in `~/.hive-am/hive-am.db` and ne
   - `mcp/dispatch.mjs`: the `hive` MCP server: `list_agents` and `dispatch` for orchestrators, `channel_*` for connections, `notebook_*` and `skill_read`.
 - `web/`: Next.js 15 UI. Colony (honeycomb), Agents, the agent workspace (chat, changes, settings, notebook, sessions), Relations canvas, Types, Skills, Connections and Sessions.
 
+## User manual
+
+A step by step guide with screenshots, from installing hive-am to running resources and reviewing changes: **[English](docs/manual/en/README.md)** · **[Español](docs/manual/es/README.md)**.
+
 ## Documentation
 
 Full documentation in English and Spanish: **[English](docs/reference/en/README.md)** · **[Español](docs/reference/es/README.md)**.
@@ -131,6 +137,8 @@ Full documentation in English and Spanish: **[English](docs/reference/en/README.
 | Orchestration and relations | [docs/09](docs/reference/en/09-orchestration-and-relations.md) |
 | Changes explorer (git) | [docs/13](docs/reference/en/13-changes-explorer-git.md) |
 | External connections | [docs/14](docs/reference/en/14-external-connections.md) |
+| Colony resources (servers, Docker) | [docs/15](docs/reference/en/15-colony-resources.md) |
+| Terminals | [docs/16](docs/reference/en/16-terminals.md) |
 | Operation and troubleshooting | [docs/12](docs/reference/en/12-operations-and-troubleshooting.md) |
 
 ## Known limits

@@ -15,14 +15,14 @@ export const ToolsOpen = createContext<boolean | null>(null);
 
 const tilde = (p: string) => p.replace(/^\/home\/[^/]+/, '~');
 
-export function CopyBtn({ text, label }: { text: string; label?: string }) {
+export function CopyBtn({ text, label, compact = false }: { text: string; label?: string; /** icon only (the label stays as tooltip) */ compact?: boolean }) {
   const { t } = useI18n();
   label ??= t('common.copy');
   const [ok, setOk] = useState(false);
   return (
-    <button type="button" className="copybtn" aria-label={label} title={label}
+    <button type="button" className={`copybtn ${compact ? 'compact' : ''}`} aria-label={label} title={label}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard?.writeText(text).then(() => { setOk(true); setTimeout(() => setOk(false), 1200); }).catch(() => undefined); }}>
-      {ok ? <Check size={13} /> : <Copy size={13} />}{ok ? t('common.copied') : label}
+      {ok ? <Check size={13} /> : <Copy size={13} />}{compact ? null : ok ? t('common.copied') : label}
     </button>
   );
 }
@@ -75,7 +75,7 @@ export function describe(tool: Tool): Described {
     return { icon: muted ? <VolumeX size={14} /> : <Volume2 size={14} />, label: tr(muted ? 'tool.channelMute' : 'tool.channelUnmute'), summary: '', body: null };
   }
   if (mcp?.[1] === 'hive' && mcp[2] === 'dispatch')
-    return { icon: <Waypoints size={14} />, label: tr('tool.delegate'), summary: `${str(input.agent)} — ${str(input.task).slice(0, 90)}`, body: <Kv rows={[[tr('tool.k.subagent'), <b key="a">{str(input.agent)}</b>], [tr('tool.k.task'), <span key="t" className="pre-wrap">{str(input.task)}</span>]]} /> };
+    return { icon: <Waypoints size={14} />, label: tr('tool.delegate'), summary: `${str(input.agent)}: ${str(input.task).slice(0, 90)}`, body: <Kv rows={[[tr('tool.k.subagent'), <b key="a">{str(input.agent)}</b>], [tr('tool.k.task'), <span key="t" className="pre-wrap">{str(input.task)}</span>]]} /> };
   if (mcp?.[1] === 'hive') return { icon: <Waypoints size={14} />, label: tr('tool.roster'), summary: '', body: null };
 
   if (['bash', 'shell', 'executebash', 'execute', 'run', 'runcommand', 'command'].includes(n) || (input.command && n.includes('bash'))) {

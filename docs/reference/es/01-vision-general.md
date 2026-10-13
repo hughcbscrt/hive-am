@@ -74,13 +74,13 @@ flowchart LR
 | Capa | Archivos | Responsabilidad |
 |---|---|---|
 | Presentación | `web/` | Páginas, formularios, chat, panal, lienzo de relaciones |
-| API | `server/src/api.ts` | Validación, rutas REST, orquestación de las demás capas |
+| API | `server/src/api.ts` → `http/`, `services/` | `api.ts` es una fachada; las rutas, la validación, las guardas y los errores viven en `http/`, las reglas de dominio en `services/` |
 | Tiempo real | `server/src/index.ts`, `runtime.ts` (`bus`) | Difunde eventos por WebSocket |
 | Ejecución | `server/src/runtime.ts`, `instructions.ts` | Cola por agente, sesiones y delegación; composición de instrucciones y herramientas de cada agente |
 | Proveedores | `server/src/providers/` | Construye el comando de cada CLI y traduce su salida a eventos comunes |
 | Historial | `server/src/history/` | Lee las conversaciones guardadas por cada CLI |
 | Datos | `server/src/db.ts` | Esquema SQLite, migraciones, acceso a datos |
-| Herramientas MCP | `server/mcp/dispatch.mjs` | Servidor `hive`: `list_agents` y `dispatch` (orquestadores), `channel_reply`, `channel_send_file` y `channel_mute` (conexiones), `notebook_*` (cuaderno) y `skill_read` (skills a demanda) |
+| Herramientas MCP | `server/mcp/dispatch.mjs` | Servidor `hive`: `list_agents` y `dispatch` (orquestadores), `channel_reply`, `channel_send_file`, `channel_react` y `channel_mute` (conexiones), `notebook_*` (cuaderno) y `skill_read` (skills a demanda) |
 
 ## Glosario
 

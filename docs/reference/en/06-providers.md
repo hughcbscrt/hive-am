@@ -4,8 +4,8 @@ A **provider** is a coding-agent CLI installed on your machine. hive-am uses no 
 
 There are exactly three providers (`Provider = 'claude' | 'opencode' | 'kiro'`), registered in two places:
 
-- `server/src/providers/index.ts`: the `runners` table (provider → generator function).
-- `server/src/api.ts`: the `PROVIDERS` table (provider → binary and name for install detection).
+- `server/src/providers/index.ts`: the `providers` registry (provider → `ProviderAdapter`, an `id` and a `run(o)` generator), plus `runners`, the same adapters as plain functions.
+- `server/src/services/providers.ts`: the `PROVIDERS` table (provider → binary and name for install detection).
 
 ## 6.1 The runner contract
 
@@ -32,10 +32,10 @@ A runner must: build the arguments, launch the CLI with `spawnLines`, and **tran
   > **Why `PWD`:** Node inherits `PWD` from the hive-am server; OpenCode trusts `PWD` over the real `cwd` and was recording sessions in the server's folder. Setting it explicitly fixes this for all three providers.
 - Delivers **stdout line by line** (`readline`), ignoring empty lines.
 - `stdin`: if text is given, it writes it and closes; otherwise it closes stdin immediately.
-- Cancellation: when the signal aborts it sends `SIGTERM` to the process.
+- Cancellation: when the signal aborts it sends `SIGTERM` to the process, and if it is still alive after a grace period (5 s, `HIVE_AM_KILL_GRACE_MS`) it sends `SIGKILL`.
 - It ends on `exit`, not on `close`: some CLIs (OpenCode) launch a background service that inherits the stdout pipe and would make `close` never happen. After `exit` it waits 250 ms to drain the pipe and then destroys it.
 - If the process exits with a code ≠ 0 and was not cancelled, it throws an `Error` with the code and the last 600 characters of stderr. The runtime turns it into an `error` event.
-- `safeJson(line)` parses without throwing exceptions.
+- `safeJson(line)` parses without throwing exceptions. `spawnJson` is `spawnLines` plus `safeJson` (lines that are not JSON are skipped) and `flattenText` turns a tool result (string, list of blocks or other JSON) into text; the three runners share them.
 
 ## 6.3 Claude Code (`providers/claude.ts`)
 
@@ -181,8 +181,8 @@ Models outside those families have no estimated cost. Estimates are marked with 
 
 1. **Types:** add the value to `Provider` in `server/src/types.ts` and `web/lib/types.ts`.
 2. **Runner:** create `server/src/providers/<name>.ts` with a generator `(o: TurnOptions) => AsyncGenerator<StreamEvent>` using `spawnLines`. Set `cwd` and remember to emit `session` as soon as you know the id.
-3. **Registration:** add it to `runners` (`providers/index.ts`) and to `PROVIDERS` (`api.ts`).
-4. **History:** create a reader in `server/src/history/<name>.ts` that returns `ChatMessage[]` and link it in `history/index.ts`.
+3. **Registration:** add it to `providers` and `runners` (`providers/index.ts`) and to `PROVIDERS` (`services/providers.ts`).
+4. **History:** create a reader in `server/src/history/<name>.ts` that returns `ChatMessage[]` and register it in `historyReaders` (`history/index.ts`).
 5. **Models:** add the branch in `models.ts`.
 6. **UI:** add name, color and description in `web/lib/meta.ts` (`PROVIDERS`) and the `--p-<name>` color variable in `globals.css` (light and dark).
 7. **Instructions:** if the CLI has no system-prompt flag, use `withInstructions`; if it has one, pass them on every turn.
