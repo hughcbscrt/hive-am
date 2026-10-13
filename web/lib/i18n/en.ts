@@ -118,8 +118,11 @@ export const en = {
 
   // ---- model ----
   "model.loading": "Loading the models this CLI offers…",
-  "model.pick": "Pick one, or type any model id. Leave empty to use the CLI’s default.",
-  "model.none": "Could not list models. Type a model id, or leave empty for the CLI’s default.",
+  "model.pick": "Pick a model, or type any model id to use one that is not listed.",
+  "model.none": "Could not list models. Open the selector and type a model id, or keep the CLI’s default.",
+  "model.search": "Search, or type a model id",
+  "model.custom": "Use “{id}”",
+  "model.cliDefault.hint": "the CLI chooses",
   "model.cliDefault": "CLI default",
 
   // ---- field ----

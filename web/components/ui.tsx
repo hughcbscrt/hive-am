@@ -1,6 +1,7 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import { Check, ChevronLeft, File, Folder, Maximize2, Minimize2, Search, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, File, Folder, Loader2, Maximize2, Minimize2, Search, X } from 'lucide-react';
+import { useDismiss } from '@/lib/useDismiss';
 import { api } from '@/lib/api';
 import { PROVIDERS, initials, permissions, providerBlurb } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n';
@@ -112,15 +113,70 @@ export function ProviderPicker({ value, onChange, providers }: { value: Provider
   );
 }
 
+/**
+ * The model of an agent: a selector. It shows the one in use (or "CLI default"); opening it lists what the CLI offers, filtered as you type,
+ * and a model the list does not have can still be used by typing its id.
+ */
 export function ModelField({ provider, value, onChange }: { provider: Provider; value: string; onChange: (v: string) => void }) {
-  const [models, setModels] = useState<ModelInfo[] | null>(null);
-  useEffect(() => { setModels(null); api.get<ModelInfo[]>(`/providers/${provider}/models`).then(setModels).catch(() => setModels([])); }, [provider]);
   const { t } = useI18n();
-  const id = `models-${provider}`;
+  const [models, setModels] = useState<ModelInfo[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [hi, setHi] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  const search = useRef<HTMLInputElement>(null);
+  const listEl = useRef<HTMLUListElement>(null);
+  useEffect(() => { setModels(null); api.get<ModelInfo[]>(`/providers/${provider}/models`).then(setModels).catch(() => setModels([])); }, [provider]);
+  useDismiss(open, box, () => { setOpen(false); setQ(''); });
+  useEffect(() => { if (open) requestAnimationFrame(() => search.current?.focus()); }, [open]);
+  useEffect(() => { setHi(0); }, [q, open]);
+  useEffect(() => { listEl.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [hi]);
+
+  const needle = q.trim().toLowerCase();
+  const list = (models ?? []).filter((m) => !needle || `${m.label} ${m.id}`.toLowerCase().includes(needle));
+  const typed = q.trim();
+  const custom = typed && !(models ?? []).some((m) => m.id.toLowerCase() === typed.toLowerCase());
+  type Opt = { id: string; label: string; hint?: string; kind?: 'default' | 'custom' };
+  const opts: Opt[] = [
+    ...(!needle ? [{ id: '', label: t('model.cliDefault'), hint: t('model.cliDefault.hint'), kind: 'default' as const }] : []),
+    ...list.map((m) => ({ id: m.id, label: m.label || m.id, hint: m.label && m.label !== m.id ? m.id : undefined })),
+    ...(custom ? [{ id: typed, label: t('model.custom', { id: typed }), kind: 'custom' as const }] : []),
+  ];
+  const choose = (o: Opt) => { onChange(o.id); setOpen(false); setQ(''); };
+  const current = value ? (models ?? []).find((m) => m.id === value) : undefined;
+
   return (
     <Field label={t('field.model')} hint={models === null ? t('model.loading') : models.length ? t('model.pick') : t('model.none')}>
-      <input className="input" list={id} value={value} onChange={(e) => onChange(e.target.value)} placeholder={t('model.cliDefault')} spellCheck={false} />
-      <datalist id={id}>{models?.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</datalist>
+      <div className="sg mdl" ref={box}>
+        <button type="button" className={`input mdl-btn ${open ? 'open' : ''}`} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          <span className="mdl-cur">{value ? <><b>{current?.label || value}</b>{current && current.label !== value && <i>{value}</i>}</> : <span className="muted">{t('model.cliDefault')}</span>}</span>
+          {models === null ? <Loader2 size={14} className="spin" aria-hidden /> : <ChevronDown size={15} aria-hidden />}
+        </button>
+        {open && (
+          <div className="sg-list mdl-pop">
+            <div className="mdl-search"><Search size={14} aria-hidden /><input ref={search} value={q} placeholder={t('model.search')} aria-label={t('model.search')} autoComplete="off" spellCheck={false}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') { e.preventDefault(); setHi((h) => Math.min(opts.length - 1, h + 1)); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); setHi((h) => Math.max(0, h - 1)); }
+                else if (e.key === 'Enter') { e.preventDefault(); if (opts[hi]) choose(opts[hi]); }
+                else if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); setQ(''); }
+              }} /></div>
+            <ul ref={listEl} role="listbox" className="mdl-opts">
+              {models === null && <li className="sg-empty">{t('model.loading')}</li>}
+              {models !== null && opts.length === 0 && <li className="sg-empty">{t('model.none')}</li>}
+              {opts.map((o, i) => (
+                <li key={`${o.kind ?? 'm'}:${o.id}`} role="option" aria-selected={i === hi}>
+                  <button type="button" className={`sg-opt ${i === hi ? 'hi' : ''} ${o.kind ?? ''}`} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setHi(i)} onClick={() => choose(o)}>
+                    <span className="nm">{o.label}</span>{o.hint && <span className="hint">{o.hint}</span>}
+                    {o.id === value && o.kind !== 'custom' && <Check size={14} className="mdl-ok" aria-hidden />}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </Field>
   );
 }

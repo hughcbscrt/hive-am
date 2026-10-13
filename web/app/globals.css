@@ -1275,3 +1275,8 @@ body:has(.scrim) .ap-card.pinned { z-index: 39; }
 .cmp-img.file { width: auto; max-width: 220px; height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 28px 0 9px; font-size: 12px; } .cmp-img.file b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .cmp-img.file i { font-style: normal; color: var(--muted); flex: none; } .cmp-img.file button { top: 7px; }
 .bubble-imgs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; } .bubble-imgs:first-child { margin-top: 0; }
 .bubble-imgs img { max-width: 260px; max-height: 200px; border-radius: 10px; display: block; border: 1px solid var(--line); }
+
+.mdl-btn { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; cursor: pointer; min-height: 38px; } .mdl-btn.open { border-color: var(--honey); box-shadow: 0 0 0 3px var(--honey-soft); }
+.mdl-cur { display: flex; align-items: baseline; gap: 8px; min-width: 0; overflow: hidden; } .mdl-cur b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .mdl-cur i { font-style: normal; font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mdl-pop { padding: 0; max-height: none; overflow: hidden; } .mdl-search { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); color: var(--muted); } .mdl-search input { flex: 1; border: 0; outline: 0; background: transparent; color: var(--ink); font: inherit; min-width: 0; }
+.mdl-opts { margin: 0; padding: 4px; list-style: none; max-height: 260px; overflow-y: auto; } .mdl-ok { color: var(--honey); flex: none; align-self: center; } .sg-opt.custom .nm { font-weight: 500; }

@@ -116,8 +116,11 @@ export const es: Record<DictKey, string> = {
 
   // ---- model ----
   "model.loading": "Cargando los modelos que ofrece este CLI…",
-  "model.pick": "Elige uno o escribe cualquier id de modelo. Déjalo vacío para usar el predeterminado del CLI.",
-  "model.none": "No se pudieron listar los modelos. Escribe un id de modelo o déjalo vacío para usar el predeterminado del CLI.",
+  "model.pick": "Elige un modelo, o escribe el id de uno que no aparezca en la lista.",
+  "model.none": "No se pudieron listar los modelos. Abre el selector y escribe un id de modelo, o deja el predeterminado del CLI.",
+  "model.search": "Busca, o escribe el id de un modelo",
+  "model.custom": "Usar «{id}»",
+  "model.cliDefault.hint": "lo elige la CLI",
   "model.cliDefault": "Predeterminado del CLI",
 
   // ---- field ----
