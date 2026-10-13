@@ -7,7 +7,7 @@ import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
 import type { DockerConfig, HttpScan, ObjectView } from '@/lib/types';
 import { Modal, useToast } from '@/components/ui';
-import { ObjectAgents } from './ObjectAgents';
+import { MANAGEABLE } from './ManagerField';
 import { ObjectFields, draftFrom, toConfig, useDraft } from './ObjectForm';
 
 /** The settings of an object, in its own screen: fields, a bar that says whether something is unsaved, and delete. */
@@ -32,7 +32,8 @@ export function ObjectConfig({ object: o }: { object: ObjectView }) {
     setBusy(true); setErr('');
     try {
       await api.patch(`/objects/${o.id}`, { name: d.name.trim(), colony_id: d.colony_id || null, config: toConfig(d) });
-      await refresh(['objects']);
+      if (d.manager !== base.manager && MANAGEABLE.includes(o.kind)) await api.put(`/objects/${o.id}/manager`, { agent_id: d.manager || null });
+      await refresh(['objects', 'agents']);
       if (restart) await api.post(`/objects/${o.id}/action`, { action: 'restart' }).catch((e) => toast(e instanceof Error ? e.message : '', 'err'));
       toast(t('obj.saved'));
     } catch (e) { setErr(e instanceof Error ? e.message : t('edit.saveFailed')); } finally { setBusy(false); }
@@ -46,7 +47,7 @@ export function ObjectConfig({ object: o }: { object: ObjectView }) {
   return (
     <div className="oc">
       <div className="oc-body">
-        <div className="oc-form"><ObjectFields objectId={o.id} d={d} set={set} setD={setD} scan={scan} error={err} />{restartable && o.kind !== 'cluster' && <div className="of" style={{ marginTop: 14 }}><ObjectAgents object={o} /></div>}</div>
+        <div className="oc-form"><ObjectFields objectId={o.id} d={d} set={set} setD={setD} scan={scan} error={err} /></div>
       </div>
       <div className="savebar oc-bar">
         <span className="muted small grow">{dirty ? t('ow.cfg.dirty') : t('ow.cfg.saved')}{dirty && restartable ? ` · ${live ? t('ow.cfg.appliesRunning') : t('ow.cfg.applies')}` : ''}</span>

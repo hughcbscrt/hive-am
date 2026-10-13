@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS colony_objects (
   kind TEXT NOT NULL, name TEXT NOT NULL UNIQUE COLLATE NOCASE, config TEXT NOT NULL,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
 );`);
-// Agents linked to an object by hand, on top of the ones of its own colony.
+// The agent chosen to look after an object (one per object; the table keeps its first version's shape).
 db.exec(`CREATE TABLE IF NOT EXISTS object_agents (
   object_id TEXT NOT NULL REFERENCES colony_objects(id) ON DELETE CASCADE,
   agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -83,17 +83,16 @@ export const objectsStore = {
     db.prepare('UPDATE colony_objects SET name=?, colony_id=?, config=?, updated_at=? WHERE id=?').run(name, colony, JSON.stringify(config), Date.now(), id);
     return objectsStore.get(id)!;
   },
-  /** The agents linked by hand to each object (object id → agent ids). */
-  links(): Map<string, string[]> {
-    const m = new Map<string, string[]>();
-    for (const r of db.prepare('SELECT object_id, agent_id FROM object_agents').all() as { object_id: string; agent_id: string }[]) (m.get(r.object_id) ?? m.set(r.object_id, []).get(r.object_id)!).push(r.agent_id);
+  /** The agent chosen to look after each object (object id → agent id). */
+  managers(): Map<string, string> {
+    const m = new Map<string, string>();
+    for (const r of db.prepare('SELECT object_id, agent_id FROM object_agents').all() as { object_id: string; agent_id: string }[]) if (!m.has(r.object_id)) m.set(r.object_id, r.agent_id);
     return m;
   },
-  isLinked: (objectId: string, agentId: string) => !!db.prepare('SELECT 1 FROM object_agents WHERE object_id=? AND agent_id=?').get(objectId, agentId),
-  setAgents(id: string, agentIds: string[]) {
+  setManager(id: string, agentId: string | null) {
     db.transaction(() => {
       db.prepare('DELETE FROM object_agents WHERE object_id=?').run(id);
-      for (const a of new Set(agentIds)) db.prepare('INSERT OR IGNORE INTO object_agents (object_id, agent_id) VALUES (?,?)').run(id, a);
+      if (agentId) db.prepare('INSERT INTO object_agents (object_id, agent_id) VALUES (?,?)').run(id, agentId);
     })();
   },
   /** Takes an object out of every cluster that groups it. */

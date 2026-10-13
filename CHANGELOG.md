@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ## [Unreleased]
 
 ### Added
-- Resources: **link an agent to a server, Docker or compose resource by hand** (Settings → *Agents that look after it*), from any colony; an agent without the "Colony resources" skill gets it when linked.
+- Resources: a server, Docker or cluster resource has **one manager agent**, chosen by searching: in the resource's form (creating and editing), from its card on the colony map (*Add manager agent*) and from the agent's form (*Resources it looks after*, which takes several). With a manager only that agent looks after it (any colony); with none, the agents of its colony do. An agent without the "Colony resources" skill gets it when chosen.
 - Database resources: the SQL editor **suggests** tables, schemas, columns (by table or alias) and keywords, and has a **Format** button (Alt+Shift+F); saved queries can be **renamed, replaced and deleted** from the History tab; the schema tab's reload / collapse-all buttons no longer stretch; password fields have an **eye** to show what is typed.
 - Database objects: **driver properties** (a table of the options the Node driver of the engine really takes — `charset`, `application_name`, `search_path`, `appName`, `instanceName`, `foreign_keys`, `timeout`… — each with its description in English and Spanish and the right control, and none that could override what hive-am decides), **SSL files** (CA, client certificate and key) with a clear error when one is missing, and a **connection URL** that fills the form (`postgresql://…?sslmode=require`, `mysql://`, `mssql://`, `sqlite:///`). The creation drawer is redesigned: engine tiles, URL, connection with its test, safety and an *Advanced* section; the name can stay empty. `GET /api/object-db/props`.
 - **Database objects** (MySQL / MariaDB, PostgreSQL, SQLite and SQL Server): create one with a connection that can be tested before saving (the password stays on the server), see its state (version and latency), write and run queries in an editor with the file explorer's themes (Ctrl/⌘+Enter, a selection runs alone), browse databases, tables, views and columns, copy or download a result as CSV/JSON, save queries and keep a history. A result is cut at 1000 rows without reading the rest, a slow query is stopped (SQLite runs in a process of its own that is killed at the timeout), and by default only reads are accepted — checked in the text and, where the engine allows it, by the connection itself. It has its own card on the colony map, settings and tests (`scripts/test-object-database.ts`, with real servers). Needs `mysql2`, `pg`, `pg-cursor` and `mssql`.
@@ -41,6 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Tags in the git explorer: a Tags tab lists the repository's tags; each one can be browsed read-only (its files as they were at that tag, with Markdown preview, and the changes of its commit). The working folder is never touched.
 
 ### Changed
+- The two example skills `concise-reports` and `careful-reviewer` are no longer created, and are removed on start where they are still as they were made.
 - A query picked from the History or the saved ones is **added at the end** of the SQL editor (selected) instead of replacing what was written; the help popover of the editor no longer goes off screen; the new-resource form says what can be added.
 - The **Objects** section is now called **Resources** (menu, titles, messages and docs; the API keeps its name, and the old `/objects` address redirects to `/resources`; the "Colony objects" skill is now "Colony resources", and so are the messages agents and the app show).
 - Opening Resources no longer flickers: it used to show the empty state, redirect to the first one and rebuild the whole screen; now it shows the first one directly.
@@ -61,6 +62,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Sessions screen: a sidebar like the Skills one, a transcript that opens on its latest 100 messages (with a button for earlier ones) and long messages folded behind "show all".
 - The sessions list no longer reads every conversation to answer: sizes and costs are cached by conversation fingerprint and filled in the background, so the list appears at once even with very long sessions.
 - Thinner scrollbars with no track, tinted with the theme colour and darker while hovered, in light and dark themes.
+
+### Fixed
+- The card of an agent or resource on the colony map floated above the settings drawer and caught the clicks meant for its buttons (so closing it needed a second click); clicking outside the drawer no longer also dismisses the card.
 
 ## [1.1.0] - 2026-10-10
 

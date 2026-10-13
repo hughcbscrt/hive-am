@@ -147,8 +147,7 @@ Registro de delegaciones: quién pidió qué a quién.
 
 `server/src/seed.ts` se ejecuta en cada arranque pero **solo actúa si no hay tipos, agentes ni skills**. Crea:
 
-- Skills: `concise-reports`, `careful-reviewer`.
-- Tipos: **Queen** (orquestador, Claude/sonnet), **Builder** (worker, Claude/sonnet), **Reviewer** (worker, OpenCode, permiso `plan`).
+- Tipos: **Queen** (orquestador, Claude/sonnet), **Builder** (worker, Claude/sonnet), **Reviewer** (worker, OpenCode, permiso `plan`). No se crean skills de ejemplo (versiones anteriores creaban `concise-reports` y `careful-reviewer`; al arrancar se eliminan donde siguen como se crearon).
 
 ### Integridad y borrados
 

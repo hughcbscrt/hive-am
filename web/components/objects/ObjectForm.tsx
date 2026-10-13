@@ -1,4 +1,5 @@
 'use client';
+import { ManagerField, MANAGEABLE } from './ManagerField';
 import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Field, FolderPicker, PathPicker, Segmented } from '@/components/ui';
@@ -14,7 +15,7 @@ import { DatabaseCards, suggestDbName } from './DatabaseCards';
 
 type Mode = NonNullable<DockerConfig['mode']> | 'template';
 export interface Draft {
-  name: string; colony_id: string; kind: ObjectKind;
+  name: string; colony_id: string; kind: ObjectKind; manager: string;
   cwd: string; start: string; stop: string; port: string; env: string;
   restart: string; maxRestarts: string; healthKind: string; healthTarget: string; healthInterval: string; healthRetries: string; healthRestart: boolean; stopTimeout: string; logMax: string;
   folder: string; defEnv: string; variables: Vars; members: string[];
@@ -32,6 +33,7 @@ export const draftFrom = (o?: ObjectView, colony?: string, kind?: ObjectKind): D
   const c = (o?.kind === 'cluster' ? o.config : {}) as Partial<ClusterConfig>;
   const q = (o?.kind === 'database' ? o.config : {}) as Partial<DatabaseConfig>;
   return {
+    manager: o?.manager_id ?? '',
     name: o?.name ?? '', colony_id: o?.colony_id ?? colony ?? '', kind: o?.kind ?? kind ?? 'server',
     cwd: s.cwd ?? '', start: s.start ?? '', stop: s.stop ?? '', port: n(s.port), env: envToText(o?.kind === 'server' ? s.env : d.env),
     restart: s.restart ?? 'no', maxRestarts: n(s.maxRestarts), healthKind: s.health?.kind ?? '', healthTarget: s.health?.target ?? '', healthInterval: n(s.health?.intervalSec), healthRetries: n(s.health?.retries), healthRestart: !!s.health?.restartWhenUnhealthy,
@@ -152,6 +154,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
             <option value="">{t('obj.noColony')}</option>{colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </Field>
+        {MANAGEABLE.includes(d.kind) && <ManagerField value={d.manager} onChange={(v) => set('manager', v)} />}
         {d.kind === 'http' && !showKind && httpFiles}
       </Card>
 

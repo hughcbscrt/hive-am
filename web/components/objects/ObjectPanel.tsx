@@ -2,13 +2,14 @@
 import { TerminalButton } from '@/components/dock/TerminalButton';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Database, ExternalLink, FileText, Loader2, Lock, Pencil, PlugZap, Play, RotateCw, Square, Unlock, UserPlus, X } from 'lucide-react';
+import { Database, ExternalLink, FileText, Loader2, Lock, Pencil, PlugZap, Play, RotateCw, Square, Unlock, UserPlus, Users, X } from 'lucide-react';
 import { AnchoredCard } from '@/components/agents/AgentCard';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { ago, shortPath } from '@/lib/meta';
 import type { ClusterConfig, DatabaseConfig, DockerConfig, HttpConfig, ObjectView, ServerConfig } from '@/lib/types';
 import { useToast } from '@/components/ui';
+import { PickSearch } from '@/components/PickSearch';
 import { useHive } from '@/lib/store';
 import { useDock } from '@/lib/dock';
 import { OBJECTS_SKILL_ID } from '@/components/agents/NewAgentDrawer';
@@ -34,12 +35,19 @@ export function objectSummary(o: ObjectView): string {
 /** The panel shown when an object of the colony map is selected: its state, start/stop/restart, and its logs. */
 export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { object: ObjectView; target: Element | null; onClose: () => void; onCreateManager: () => void }) {
   const { t } = useI18n();
-  const { agents, objects } = useHive();
+  const { agents, objects, colonies } = useHive();
   const dock = useDock();
   // A terminal where the server runs, or inside the container (a compose project has several, so it only has logs).
   const canShell = o.kind === 'server' || (o.kind === 'docker' && (o.config as DockerConfig).mode !== 'compose');
   // The agents that can act on it: the ones with the Colony resources skill in the same colony (or, with no colony, among the objects that have none).
-  const managers = agents.filter((a) => a.skill_ids.includes(OBJECTS_SKILL_ID) && ((a.colony_id ?? null) === (o.colony_id ?? null) || o.agent_ids.includes(a.id)));
+  // One chosen manager looks after it alone; with none chosen, the agents of its colony that have the skill do.
+  const managers = o.manager_id ? agents.filter((a) => a.id === o.manager_id) : agents.filter((a) => a.skill_ids.includes(OBJECTS_SKILL_ID) && (a.colony_id ?? null) === (o.colony_id ?? null));
+  const [adding, setAdding] = useState(false);
+  const { refresh } = useHive();
+  const setManager = async (agentId: string | null) => {
+    try { await api.put(`/objects/${o.id}/manager`, { agent_id: agentId }); await refresh(['objects', 'agents']); setAdding(false); }
+    catch (e) { toast(e instanceof Error ? e.message : '', 'err'); }
+  };
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const { icon: Icon, color } = KIND[o.kind];
@@ -105,9 +113,16 @@ export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { o
       </>)}
       {o.kind !== 'http' && o.kind !== 'database' && <div className="obj-managers">
         <div className="eyebrow" style={{ marginBottom: 6 }}>{t('obj.managers')}</div>
-        {managers.length ? <div className="row gap-s wrap">{managers.map((a) => <Link key={a.id} href={`/agents/${a.id}`} className="chip" title={a.permission === 'plan' ? t('obj.managers.readonly') : undefined}>{a.name}{a.permission === 'plan' ? ` · ${t('obj.managers.ro')}` : ''}</Link>)}</div>
+        {managers.length ? <div className="row gap-s wrap">{managers.map((a) => (
+          <span key={a.id} className="chip ps-chip"><Link href={`/agents/${a.id}`} title={a.permission === 'plan' ? t('obj.managers.readonly') : undefined}>{a.name}{a.permission === 'plan' ? ` · ${t('obj.managers.ro')}` : ''}</Link>
+            {o.manager_id === a.id && <button type="button" onClick={() => void setManager(null)} aria-label={t('obj.managers.remove')} title={t('obj.managers.remove')}><X size={12} /></button>}</span>))}</div>
           : <p className="muted small" style={{ margin: 0 }}>{t('obj.managers.none')}</p>}
-        <button className="btn sm" style={{ marginTop: 8 }} onClick={onCreateManager}><UserPlus size={14} />{t('obj.managers.create')}</button>
+        {o.manager_id && <p className="muted small" style={{ margin: '6px 0 0' }}>{t('obj.managers.only')}</p>}
+        <div className="row gap-s wrap" style={{ marginTop: 8 }}>
+          <button className="btn sm" onClick={onCreateManager}><UserPlus size={14} />{t('obj.managers.create')}</button>
+          <button className="btn sm" aria-pressed={adding} onClick={() => setAdding((v) => !v)}><Users size={14} />{t('obj.managers.add')}</button>
+        </div>
+        {adding && <div style={{ marginTop: 8 }}><PickSearch inline autoFocus options={agents.filter((a) => a.id !== o.manager_id).map((a) => ({ id: a.id, label: a.name, hint: colonies.find((c) => c.id === a.colony_id)?.name ?? t('common.noColony') }))} value={[]} onChange={(ids) => ids[0] && void setManager(ids[0])} placeholder={t('obj.manager.placeholder')} empty={t('obj.manager.empty')} ariaLabel={t('obj.managers.add')} /></div>}
       </div>}
      </div>
     </AnchoredCard>

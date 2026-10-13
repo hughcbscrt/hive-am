@@ -7,7 +7,7 @@ import { noteServer } from './runner.js';
 /**
  * What an agent with the "Colony resources" skill can do with objects: see them, read their logs and start / stop / restart them. Never
  * create, change or delete. The rules are enforced here, not just written in the skill:
- *  - only the objects of the agent's own colony (or the ones with no colony, for an agent with none), plus the ones a person linked to it by hand;
+ *  - only the objects of the agent's own colony (or the ones with no colony, for an agent with none), unless a person chose another agent to look after it (then only that one);
  *  - a read-only agent can look but not act;
  *  - an unknown or foreign object looks the same as one that does not exist.
  */
@@ -17,7 +17,8 @@ function whoAsks(from: unknown) {
   if (!mcpCaps(resolved(a)).includes('objects')) throw new ObjectError('You do not have the "Colony resources" skill.');
   return a;
 }
-const visibleTo = (a: { id: string; colony_id: string | null }) => (o: ObjectView) => (o.colony_id ?? null) === (a.colony_id ?? null) || o.agent_ids.includes(a.id);
+/** A resource with a chosen manager is for that agent only; with none, for the agents of its colony. */
+const visibleTo = (a: { id: string; colony_id: string | null }) => (o: ObjectView) => (o.manager_id ? o.manager_id === a.id : (o.colony_id ?? null) === (a.colony_id ?? null));
 
 export function agentObjects(from: unknown) {
   const a = whoAsks(from);
@@ -27,7 +28,7 @@ export function agentObjects(from: unknown) {
 function pick(from: unknown, name: unknown) {
   const a = whoAsks(from);
   const o = listObjects().filter(visibleTo(a)).find((x) => x.name.toLowerCase() === String(name ?? '').trim().toLowerCase());
-  if (!o) throw new ObjectError(`There is no resource named "${String(name ?? '')}" in your colony. Call object_list for the names.`);
+  if (!o) throw new ObjectError(`There is no resource named "${String(name ?? '')}" for you. Call object_list for the names.`);
   return { a, o };
 }
 

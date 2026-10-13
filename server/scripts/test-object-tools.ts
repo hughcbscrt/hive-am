@@ -11,7 +11,7 @@ import { agents, colonies, skills } from '../src/db.js';
 import '../src/index.js';
 import { composeInstructions, mcpCaps } from '../src/instructions.js';
 import { DEFAULT_SKILLS, OBJECTS_SKILL_ID } from '../src/skills/defaults.js';
-import { createObject, removeObject, setObjectAgents, stateOf } from '../src/objects/index.js';
+import { createObject, removeObject, setAgentObjects, setObjectManager, stateOf } from '../src/objects/index.js';
 import { objectsStore } from '../src/objects/store.js';
 
 let fail = 0;
@@ -82,16 +82,24 @@ const pl = session(plain.id, 'objects'); const pr = await pl.call('object_list')
 check(pr.err && /skill/.test(pr.text), 'an agent without the skill is refused even if it reaches the tools');
 const ghost = session('no-such-agent', 'objects'); check((await ghost.call('object_list')).err, 'and so is an unknown agent');
 
-// Linking an agent by hand: an agent of another colony, even one without the skill, can look after it (and gets the skill).
-const link = setObjectAgents(mine.id, [loner.id, plain.id]);
-check(link.skillAdded.length === 1 && link.skillAdded[0] === plain.id && agents.get(plain.id)!.skill_ids.includes(OBJECTS_SKILL_ID), 'linking an agent without the skill gives it the skill (and only it)');
-check(objectsStore.links().get(mine.id)?.length === 2, 'the links are stored');
-const lk = await l2.call('object_list');
-check(lk.text.includes('colony-job') && lk.text.includes('free-job'), 'a linked agent of another colony sees it, besides its own');
-const la = await l2.call('object_action', { name: 'colony-job', action: 'restart' });
-check(!la.err, 'and can act on it');
-setObjectAgents(mine.id, []);
-check(!(await l2.call('object_list')).text.includes('colony-job'), 'unlinking takes it away again');
+// Choosing the manager: one agent, even from another colony or without the skill (it gets the skill); the colony's agents then step aside.
+const link = setObjectManager(mine.id, plain.id);
+check(link.skillAdded && agents.get(plain.id)!.skill_ids.includes(OBJECTS_SKILL_ID), 'choosing an agent without the skill as manager gives it the skill');
+check(objectsStore.managers().get(mine.id) === plain.id, 'the manager is stored (one per resource)');
+check(!(await m.call('object_list')).text.includes('colony-job'), 'the other agents of the colony no longer see it');
+const lk = session(plain.id, 'objects'); const lkr = await lk.call('object_list');
+check(lkr.text.includes('colony-job'), 'the chosen manager sees it');
+check(!(await lk.call('object_action', { name: 'colony-job', action: 'restart' })).err, 'and can act on it');
+setObjectManager(mine.id, loner.id);
+check(!(await lk.call('object_list')).text.includes('colony-job') && (await l2.call('object_list')).text.includes('colony-job'), 'changing the manager moves it to the new one (even from another colony)');
+setAgentObjects(loner.id, []);
+check(objectsStore.managers().get(mine.id) === undefined && (await m.call('object_list')).text.includes('colony-job') && !(await l2.call('object_list')).text.includes('colony-job'), 'with none chosen it goes back to the agents of its colony');
+setAgentObjects(manager.id, [mine.id, free.id]);
+check(objectsStore.managers().get(free.id) === manager.id, 'from the agent side: the resources it looks after are set');
+setAgentObjects(manager.id, [mine.id]);
+check(objectsStore.managers().get(free.id) === undefined && objectsStore.managers().get(mine.id) === manager.id, 'and removing one sends it back to its colony');
+setObjectManager(mine.id, null);
+lk.close();
 
 const st = await m.call('object_action', { name: 'colony-job', action: 'stop' });
 check(!st.err && /stopped/.test(st.text), 'stop works');

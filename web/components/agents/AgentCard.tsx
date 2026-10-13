@@ -117,7 +117,7 @@ export function AnchoredCard({ target, width = CARD_W, pinned = false, onClose, 
     if (!pinned) return;
     window.addEventListener('scroll', place, true); window.addEventListener('resize', place);
     const ro = typeof ResizeObserver !== 'undefined' && ref.current ? new ResizeObserver(place) : null; if (ro && ref.current) ro.observe(ref.current);
-    const down = (e: PointerEvent) => { const n = e.target as Element; if (ref.current?.contains(n) || n.closest('.cell, [role="dialog"], .modal, .drawer, .menu-pop')) return; onClose?.(); };
+    const down = (e: PointerEvent) => { const n = e.target as Element; if (ref.current?.contains(n) || n.closest('.cell, [role="dialog"], .modal, .drawer, .scrim, .menu-pop')) return; onClose?.(); };
     document.addEventListener('pointerdown', down);
     return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); ro?.disconnect(); document.removeEventListener('pointerdown', down); };
   }, [pinned, place, onClose]);

@@ -6,6 +6,7 @@ import { useHive } from '@/lib/store';
 import type { ObjectKind, ObjectView } from '@/lib/types';
 import { Drawer, useToast } from '@/components/ui';
 import { ObjectFields, draftFrom, toConfig, useDraft } from './ObjectForm';
+import { MANAGEABLE } from './ManagerField';
 import { suggestDbName } from './DatabaseCards';
 
 /** Creating an object. (Changing one is done in its own screen: see ObjectWorkspace.) */
@@ -26,7 +27,8 @@ export function ObjectEditor({ presetColonyId, presetKind, onClose, onSaved }: {
       const r = d.kind === 'docker' && d.mode === 'template'
         ? await api.post<ObjectView>('/objects/from-template', { name, colony_id: d.colony_id || null, template: d.template, values: d.tplValues })
         : await api.post<ObjectView>('/objects', { name, colony_id: d.colony_id || null, kind: d.kind, config: toConfig(d) });
-      await refresh(['objects']);
+      if (d.manager && MANAGEABLE.includes(d.kind)) await api.put(`/objects/${r.id}/manager`, { agent_id: d.manager }).catch((e) => toast(e instanceof Error ? e.message : '', 'err'));
+      await refresh(['objects', 'agents']);
       toast(t('obj.created')); onSaved?.(r.id); onClose();
     } catch (e) { setErr(e instanceof Error ? e.message : t('edit.saveFailed')); setBusy(false); }
   };

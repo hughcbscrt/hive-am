@@ -8,21 +8,25 @@ import { Field, FolderPicker, ModelField, PermissionField, ProviderPicker, Segme
 import { useHive } from '@/lib/store';
 import type { Agent, AgentType, Colony, InheritField, Permission, Provider, Role, SkillLoad } from '@/lib/types';
 import { permissionLabel, shortPath } from '@/lib/meta';
+import { PickSearch } from '@/components/PickSearch';
+import { MANAGEABLE } from '@/components/objects/ManagerField';
 
 export interface AgentDraft {
   name: string; description: string; role: Role; provider: Provider; model: string;
   system_prompt: string; permission: Permission; cwd: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; worker_ids: string[]; type_id: string | null;
   colony_id: string | null; overrides: InheritField[];
+  /** The resources (servers, containers, clusters) this agent looks after: kept here, saved apart from the agent. */
+  object_ids: string[];
 }
 
 export const draftFromType = (t?: AgentType): AgentDraft => ({
   name: '', description: t?.description ?? '', role: t?.role ?? 'worker', provider: t?.provider ?? 'claude', model: t?.model ?? '',
-  system_prompt: t?.system_prompt ?? '', permission: t?.permission ?? 'acceptEdits', cwd: '', skill_ids: t?.skill_ids ?? [], skill_loads: t?.skill_loads ?? {}, worker_ids: [], type_id: t?.id ?? null, colony_id: null, overrides: [],
+  system_prompt: t?.system_prompt ?? '', permission: t?.permission ?? 'acceptEdits', cwd: '', skill_ids: t?.skill_ids ?? [], skill_loads: t?.skill_loads ?? {}, worker_ids: [], type_id: t?.id ?? null, colony_id: null, overrides: [], object_ids: [],
 });
-export const draftFromAgent = (a: Agent): AgentDraft => ({
+export const draftFromAgent = (a: Agent, objectIds: string[] = []): AgentDraft => ({
   name: a.name, description: a.description, role: a.role, provider: a.provider, model: a.model, system_prompt: a.system_prompt,
   permission: a.permission, cwd: a.cwd, skill_ids: a.skill_ids, skill_loads: a.skill_loads, worker_ids: a.worker_ids, type_id: a.type_id,
-  colony_id: a.colony_id, overrides: a.overrides,
+  colony_id: a.colony_id, overrides: a.overrides, object_ids: objectIds,
 });
 
 /** True when this field currently follows the agent's colony. */
@@ -42,7 +46,8 @@ export function AgentForm({ draft, onChange, errors, selfId, showType = true, fo
   draft: AgentDraft; onChange: (d: AgentDraft) => void; errors: ReturnType<typeof validate>; selfId?: string; showType?: boolean; focusName?: boolean;
 }) {
   const { t } = useI18n();
-  const { skills, providers, agents, types, colonies, connections } = useHive();
+  const { skills, providers, agents, types, colonies, connections, objects } = useHive();
+  const resources = useMemo(() => objects.filter((o) => MANAGEABLE.includes(o.kind)).map((o) => ({ id: o.id, label: o.name, hint: o.manager_id && o.manager_id !== selfId ? t('form.resources.taken', { name: agents.find((a) => a.id === o.manager_id)?.name ?? '' }) : colonies.find((c) => c.id === o.colony_id)?.name ?? t('common.noColony') })), [objects, agents, colonies, selfId, t]);
   const linked = useMemo(() => connections.filter((c) => c.agent_id === selfId && c.enabled), [connections, selfId]);
   const colony = colonies.find((c) => c.id === draft.colony_id);
   const inh = (f: InheritField) => follows(draft, colony, f);
@@ -89,6 +94,11 @@ export function AgentForm({ draft, onChange, errors, selfId, showType = true, fo
       <Field label={t('form.skills')} hint={t('form.skills.hint')}>
         <SkillPicker skills={skills} value={draft.skill_ids} loads={draft.skill_loads} onChange={(ids, loads) => onChange({ ...draft, skill_ids: ids, skill_loads: loads })} />
       </Field>
+      {resources.length > 0 && (
+        <Field label={t('form.resources')} hint={t('form.resources.hint')}>
+          <PickSearch multi options={resources} value={draft.object_ids} onChange={(ids) => onChange({ ...draft, object_ids: ids })} placeholder={t('form.resources.placeholder')} empty={t('form.resources.empty')} ariaLabel={t('form.resources')} />
+        </Field>
+      )}
       {draft.role === 'orchestrator' && (
         <Field label={t('form.team')} hint={t('form.team.hint')}>
           {candidates.length ? (

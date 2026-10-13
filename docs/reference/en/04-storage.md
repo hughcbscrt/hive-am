@@ -147,8 +147,7 @@ Delegation log: who asked what of whom.
 
 `server/src/seed.ts` runs on every start but **only acts if there are no types, agents or skills**. It creates:
 
-- Skills: `concise-reports`, `careful-reviewer`.
-- Types: **Queen** (orchestrator, Claude/sonnet), **Builder** (worker, Claude/sonnet), **Reviewer** (worker, OpenCode, `plan` permission).
+- Types: **Queen** (orchestrator, Claude/sonnet), **Builder** (worker, Claude/sonnet), **Reviewer** (worker, OpenCode, `plan` permission). No example skills are created (older versions made `concise-reports` and `careful-reviewer`; on start they are removed where they are still as they were made).
 
 ### Integrity and deletions
 

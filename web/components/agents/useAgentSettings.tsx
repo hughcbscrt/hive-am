@@ -15,14 +15,16 @@ import type { Agent } from '@/lib/types';
  */
 export function useAgentSettings(agent: Agent | undefined, opts: { onSaved?: () => void; onDeleted?: () => void } = {}) {
   const { t } = useI18n();
-  const { agents, colonies, refresh } = useHive();
+  const { agents, colonies, objects, refresh } = useHive();
   const toast = useToast();
-  const base = useMemo(() => (agent ? JSON.stringify(draftFromAgent(agent)) : ''), [agent]);
-  const [draft, setDraft] = useState<AgentDraft | null>(() => (agent ? draftFromAgent(agent) : null));
+  // The resources it looks after come from the resources themselves (each one has its manager).
+  const managed = useMemo(() => (agent ? objects.filter((o) => o.manager_id === agent.id).map((o) => o.id).sort() : []), [objects, agent?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const base = useMemo(() => (agent ? JSON.stringify(draftFromAgent(agent, managed)) : ''), [agent, managed]);
+  const [draft, setDraft] = useState<AgentDraft | null>(() => (agent ? draftFromAgent(agent, managed) : null));
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Follow the saved agent (another agent selected, or the server changed it).
-  useEffect(() => { setDraft(agent ? draftFromAgent(agent) : null); }, [base]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setDraft(agent ? draftFromAgent(agent, managed) : null); }, [base]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const errors = draft && agent ? validate(draft, agents, agent.id, colonies) : {};
   const dirty = !!draft && JSON.stringify(draft) !== base;
@@ -32,15 +34,16 @@ export function useAgentSettings(agent: Agent | undefined, opts: { onSaved?: () 
     if (Object.keys(errors).length) { toast(t('edit.fixFields'), 'err'); return; }
     setSaving(true);
     try {
-      const { type_id: _t, ...patch } = draft; void _t;
+      const { type_id: _t, object_ids, ...patch } = draft; void _t;
       await api.patch(`/agents/${agent.id}`, patch);
-      await refresh(['agents', 'colonies']);
+      if (JSON.stringify([...object_ids].sort()) !== JSON.stringify(managed)) await api.put(`/agents/${agent.id}/resources`, { object_ids });
+      await refresh(['agents', 'colonies', 'objects']);
       toast(t('edit.saved', { name: draft.name.trim() }));
       opts.onSaved?.();
     } catch (e) { toast(e instanceof Error ? e.message : t('edit.saveFailed'), 'err'); }
     setSaving(false);
   };
-  const discard = () => { if (agent) setDraft(draftFromAgent(agent)); };
+  const discard = () => { if (agent) setDraft(draftFromAgent(agent, managed)); };
 
   /** Delete (left), then Discard and Save. Same buttons, same order, same labels everywhere. */
   const actions = (o: { size?: 'sm'; onCancel?: () => void } = {}) => (

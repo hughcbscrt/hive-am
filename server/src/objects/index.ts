@@ -75,8 +75,8 @@ export async function refreshStates(): Promise<boolean> {
   return diff;
 }
 
-export const viewOf = (o: ObjectRow, links = objectsStore.links()): ObjectView => ({ ...maskConfig(o), state: states.get(o.id) ?? { status: 'unknown', detail: 'checking…' }, agent_ids: links.get(o.id) ?? [] });
-export const listObjects = (): ObjectView[] => { const links = objectsStore.links(); return objectsStore.list().map((o) => viewOf(o, links)); };
+export const viewOf = (o: ObjectRow, managers = objectsStore.managers()): ObjectView => ({ ...maskConfig(o), state: states.get(o.id) ?? { status: 'unknown', detail: 'checking…' }, manager_id: managers.get(o.id) ?? null });
+export const listObjects = (): ObjectView[] => { const managers = objectsStore.managers(); return objectsStore.list().map((o) => viewOf(o, managers)); };
 
 let timer: ReturnType<typeof setInterval> | undefined, busy = false;
 /** Checks the objects every few seconds and tells the interface when one changed (it fetches the list again). */
@@ -263,21 +263,35 @@ export const dbSavedUpdate = (id: string, savedId: string, p: { name?: unknown; 
   return e;
 };
 export const dbSavedRemove = (id: string, savedId: string) => { dbOf(id); if (!removeSaved(id, savedId)) throw new ObjectError('Saved query not found'); return listSaved(id); };
-/**
- * Links agents to a resource by hand (the ones of its own colony can already look after it). An agent that does not have the "Colony resources"
- * skill gets it, because without it the tools are not offered; the ids of the agents that were given the skill come back.
- */
-export function setObjectAgents(id: string, agentIds: unknown): { object: ObjectView; skillAdded: string[] } {
+/** Only these can be looked after by an agent: it starts, stops and restarts them. */
+const MANAGEABLE: string[] = ['server', 'docker', 'cluster'];
+/** An agent without the "Colony resources" skill gets it when it is made the manager of something: without it the tools are not offered. */
+function ensureSkill(agentId: string): boolean {
+  const ag = agents.get(agentId); if (!ag) throw new ObjectError('That agent no longer exists');
+  if (resolved(ag).skill_ids.includes(OBJECTS_SKILL_ID)) return false;
+  agents.setSkills(agentId, [...ag.skill_ids, OBJECTS_SKILL_ID]); return true;
+}
+/** Chooses the one agent that looks after a resource (`null` leaves it to the agents of its colony). */
+export function setObjectManager(id: string, agentId: unknown): { object: ObjectView; skillAdded: boolean } {
   const o = get(id);
-  if (!Array.isArray(agentIds)) throw new ObjectError('Choose the agents');
-  const ids = [...new Set(agentIds.map(String))];
-  const skillAdded: string[] = [];
-  for (const a of ids) {
-    const ag = agents.get(a); if (!ag) throw new ObjectError('One of the agents no longer exists');
-    if (!resolved(ag).skill_ids.includes(OBJECTS_SKILL_ID)) { agents.setSkills(a, [...ag.skill_ids, OBJECTS_SKILL_ID]); skillAdded.push(a); }
-  }
-  objectsStore.setAgents(id, ids); changed();
+  if (!MANAGEABLE.includes(o.kind)) throw new ObjectError('This kind of resource is not looked after by agents');
+  const a = agentId ? String(agentId) : null;
+  const skillAdded = a ? ensureSkill(a) : false;
+  objectsStore.setManager(id, a); changed();
   return { object: viewOf(o), skillAdded };
+}
+/** The same relation seen from the agent: the resources it looks after become exactly `objectIds` (the others go back to their colony). */
+export function setAgentObjects(agentId: string, objectIds: unknown): { skillAdded: boolean } {
+  if (!agents.get(agentId)) throw new ObjectError('That agent no longer exists');
+  if (!Array.isArray(objectIds)) throw new ObjectError('Choose the resources');
+  const want = new Set(objectIds.map(String));
+  const managers = objectsStore.managers();
+  for (const id of want) { const o = get(id); if (!MANAGEABLE.includes(o.kind)) throw new ObjectError('This kind of resource is not looked after by agents'); }
+  const skillAdded = want.size > 0 ? ensureSkill(agentId) : false;
+  for (const [oid, aid] of managers) if (aid === agentId && !want.has(oid)) objectsStore.setManager(oid, null);
+  for (const id of want) objectsStore.setManager(id, agentId);
+  changed();
+  return { skillAdded };
 }
 /** Tries a connection before it is saved: the config comes from the form; an empty password means the one already saved (of that object). */
 export async function dbTestConfig(p: { id?: unknown; config?: unknown }) {
