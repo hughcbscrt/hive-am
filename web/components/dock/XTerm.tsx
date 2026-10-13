@@ -29,6 +29,15 @@ export function XTerm({ id, visible, onEnded }: { id: string; visible: boolean; 
       api.current = { fit: resize, focus: () => term?.focus() };
       if (shown.current) { resize(); term.focus(); }                // opened while it is the tab in view: ready to type
       term.onData((d) => send({ t: 'in', d }));
+      // Copy: selecting copies (as in most terminals), Ctrl+Shift+C copies, and Ctrl+C copies instead of interrupting while text is selected.
+      const copy = () => { const sel = term?.getSelection(); if (sel) void navigator.clipboard?.writeText(sel).catch(() => { /* no permission */ }); return !!sel; };
+      term.onSelectionChange(() => { copy(); });
+      term.attachCustomKeyEventHandler((e) => {
+        if (e.type !== 'keydown' || !e.ctrlKey || e.altKey || e.metaKey) return true;
+        const k = e.key.toLowerCase();
+        if (k === 'c' && (e.shiftKey || term?.hasSelection())) { copy(); return false; }
+        return true;
+      });
       ro = new ResizeObserver(resize); ro.observe(box.current);
       mo = new MutationObserver(() => { if (term) term.options.theme = palette(); }); mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 

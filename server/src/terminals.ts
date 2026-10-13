@@ -17,6 +17,7 @@ import type { DockerConfig, ServerConfig } from './objects/model.js';
  * shows the same terminals with what they printed last. They end when the server stops.
  */
 const MAX_TERMINALS = 12, BUFFER = 256 * 1024;
+const MODE = /\x1b\[\?([0-9;]+)([hl])/g;
 export const terminalsEnabled = () => process.env.HIVE_AM_TERMINALS !== '0';
 
 type Pty = import('@homebridge/node-pty-prebuilt-multiarch').IPty;
@@ -31,7 +32,7 @@ export class TerminalError extends DomainError {}
 
 interface Term {
   id: string; title: string; cwd: string; command: string; created: number; cols: number; rows: number;
-  pty: Pty; chunks: string[]; size: number; clients: Set<WebSocket>; exit?: { code: number; signal?: number };
+  pty: Pty; chunks: string[]; size: number; /** DEC private modes the program switched on (alternate screen, mouse reporting...), kept because the trimmed buffer may have lost the sequence that set them. */ modes: Set<string>; clients: Set<WebSocket>; exit?: { code: number; signal?: number };
 }
 const terms = new Map<string, Term>();
 
@@ -79,10 +80,11 @@ export async function createTerminal(spec: TerminalSpec) {
   const { cwd, file, args, title } = plan(spec);
   const env = Object.fromEntries(Object.entries(process.env).filter(([k, v]) => v !== undefined && !k.startsWith('HIVE_AM_') && k !== 'HIVE_AGENT_ID' && k !== 'HIVE_CAPS')) as Record<string, string>;
   const pty = p.spawn(file, args, { name: 'xterm-256color', cols: 100, rows: 28, cwd, env: { ...env, TERM: 'xterm-256color', COLORTERM: 'truecolor' } });
-  const t: Term = { id: randomUUID(), title, cwd, command: [file, ...args].join(' '), created: Date.now(), cols: 100, rows: 28, pty, chunks: [], size: 0, clients: new Set() };
+  const t: Term = { id: randomUUID(), title, cwd, command: [file, ...args].join(' '), created: Date.now(), cols: 100, rows: 28, pty, chunks: [], size: 0, modes: new Set(), clients: new Set() };
   terms.set(t.id, t);
   pty.onData((d) => {
     t.chunks.push(d); t.size += d.length;
+    for (const m of d.matchAll(MODE)) for (const n of m[1].split(';')) { if (m[2] === 'h') t.modes.add(n); else t.modes.delete(n); }
     while (t.size > BUFFER && t.chunks.length > 1) t.size -= t.chunks.shift()!.length;      // the oldest output goes first
     const msg = JSON.stringify({ t: 'out', d });
     for (const c of t.clients) if (c.readyState === c.OPEN) c.send(msg);
@@ -109,7 +111,7 @@ export function attachTerminal(ws: WebSocket, id: string): void {
   if (!t) { ws.send(JSON.stringify({ t: 'gone' })); ws.close(); return; }
   t.clients.add(ws);
   ws.send(JSON.stringify({ t: 'init', title: t.title, cols: t.cols, rows: t.rows, alive: !t.exit }));
-  if (t.chunks.length) ws.send(JSON.stringify({ t: 'out', d: t.chunks.join('') }));
+  if (t.chunks.length) ws.send(JSON.stringify({ t: 'out', d: [...t.modes].map((n) => `\x1b[?${n}h`).join('') + t.chunks.join('') }));
   if (t.exit) ws.send(JSON.stringify({ t: 'exit', code: t.exit.code }));
   ws.on('message', (raw) => {
     let m: { t?: string; d?: unknown; cols?: unknown; rows?: unknown }; try { m = JSON.parse(String(raw)); } catch { return; }

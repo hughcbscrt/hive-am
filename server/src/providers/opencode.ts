@@ -1,6 +1,7 @@
 import type { Permission, StreamEvent, TurnOptions } from '../types.js';
 import { DATA_DIR } from '../db.js';
 import { join } from 'node:path';
+import { execFile } from 'node:child_process';
 
 const INBOX_ROOT = join(DATA_DIR, 'inbox');
 import { spawnJson } from './spawn.js';
@@ -28,10 +29,36 @@ export function opencodePermissions(level: Permission): Record<string, unknown> 
   };
 }
 
+/**
+ * OpenCode 1.x and 2.x take different flags (1.x has no `--standalone`, `--server` or maybe `--auto`; an unknown flag makes it print its help and exit 1).
+ * The flags `opencode run` knows are read once from its help, and only those are passed.
+ */
+let runFlags: Promise<Set<string> | null> | null = null;
+export function opencodeRunFlags(): Promise<Set<string> | null> {
+  runFlags ??= new Promise<Set<string> | null>((resolve) => {
+    execFile('opencode', ['run', '--help'], { timeout: 15_000, maxBuffer: 1 << 20 }, (_err, out, errOut) => {
+      const found = new Set(`${out}\n${errOut}`.match(/--[a-z][a-z-]*/g) ?? []);
+      if (!found.has('--format')) runFlags = null;      // no readable help: try again next turn, and pass the current flags meanwhile
+      resolve(found.has('--format') ? found : null);
+    });
+  });
+  return runFlags;
+}
+
+/** The text of an `error` event: OpenCode's message, with the provider's own when it only wraps one. */
+function opencodeErrorText(err: any): string {
+  if (!err) return '';
+  if (typeof err === 'string') return err;
+  const msg = String(err.message ?? err.data?.message ?? err.name ?? '').trim();
+  return msg || (typeof err.type === 'string' ? err.type : '');
+}
+
 /** OpenCode: `opencode run --format json`; parts arrive whole, so deltas are derived from per-part length. */
 export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> {
   const { agent } = o;
-  const args = ['run', '--format', 'json', '--thinking', '--auto'];
+  const flags = await opencodeRunFlags();
+  const has = (f: string) => !flags || flags.has(f);
+  const args = ['run', '--format', 'json', ...['--thinking', '--auto'].filter(has)];
   // Sessions created while the folder was wrong (older hive-am builds) would keep running there; start fresh instead.
   const recorded = agent.session_id ? opencodeSessionDir(agent.session_id) : null;
   const resume = agent.session_id && (!recorded || recorded === agent.cwd) ? agent.session_id : null;
@@ -50,12 +77,12 @@ export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> 
   // started with it and keeps hive connected between turns. If that server cannot start, a private one-off server is used instead.
   let access: ServerAccess | null = null;
   // Only agents answering an external chat gain enough from it (somebody is waiting for a reply and the first `channel_reply` would fail); every other agent keeps the one-off server and costs nothing between turns.
-  if (o.mcpCaps.includes('channel') && !process.env.HIVE_AM_OPENCODE_STANDALONE) {
+  if (o.mcpCaps.includes('channel') && !process.env.HIVE_AM_OPENCODE_STANDALONE && has('--server')) {
     try { access = await opencodeServer(agent.id, agent.cwd, config, o.signal); }
     catch (e) { console.warn(`[opencode] no persistent server for ${agent.name}, using a private one: ${e instanceof Error ? e.message : e}`); }
   }
   if (access) { args.splice(1, 0, '--server', access.url); env.OPENCODE_SERVER_PASSWORD = access.password; }
-  else args.splice(1, 0, '--standalone');
+  else if (has('--standalone')) args.splice(1, 0, '--standalone');      // 1.x always runs its own server
   args.push(prompt);
   // Stopping a turn must really stop the model: a client that is killed would leave the server working on, so the server goes down with it.
   if (access) o.signal.addEventListener('abort', () => stopOpencodeServer(agent.id), { once: true });
@@ -63,10 +90,13 @@ export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> 
   const seen = new Map<string, number>();
   const toolStarted = new Set<string>();
   let sawSession = false;
+  // With `--format json` a failure (quota, usage limit, blocked response) is an `error` event on stdout and the exit code is just 1, so the reason is kept here.
+  let failure = '';
 
   try {
     for await (const ev of spawnJson({ cmd: 'opencode', args, cwd: agent.cwd, env, signal: o.signal })) {
       if (ev.sessionID && !sawSession) { sawSession = true; yield { t: 'session', sessionId: ev.sessionID }; }
+      if (ev.type === 'error') { failure = opencodeErrorText(ev.error) || failure; continue; }
       const p = ev.part;
       if (!p) continue;
 
@@ -92,6 +122,16 @@ export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> 
         }
       }
     }
+    if (failure) throw new Error(failure);
+  } catch (e) {
+    if (failure && !o.signal.aborted) throw new Error(failure);      // OpenCode's own reason says more than "exited with code 1"
+    throw e;
   } finally { access?.release(); }
   yield { t: 'done', ok: true };
+}
+
+/** Compacting a conversation needs OpenCode 2.x (the version that has `--standalone`). */
+export async function opencodeCanCompact(): Promise<boolean> {
+  const flags = await opencodeRunFlags();
+  return !flags || flags.has('--standalone');
 }

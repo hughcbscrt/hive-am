@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- OpenCode 2.x: when a turn fails (for example a full conversation) the error offers **Compact conversation**. Other versions only suggest starting a new conversation.
+- Terminals: selecting text copies it, and Ctrl+Shift+C copies too (Ctrl+C only copies while text is selected).
+
+### Fixed
+
+- Minimizing the terminal panel no longer breaks the scroll of a full screen program (OpenCode, Claude Code): the terminals stay mounted, and the server remembers the screen and mouse modes a program switched on so a reload restores them.
+- A turn that failed (conversation full, provider blocked, timeout) no longer looks like it is still running: the timer stops, "Stop" goes away and the composer sends normally. The error now says what to do.
+- OpenCode failures now show their real reason ("Go usage limit exceeded", insufficient funds, blocked response) instead of "opencode exited with code 1".
+- OpenCode 1.x works again: the flags `opencode run` accepts are read from its help and unsupported ones (`--standalone`, `--server`) are not passed.
+- A new conversation no longer shows "Show earlier messages" with the count of the previous one.
+- The tokens per turn chart in the stats panel was drawn downwards.
+
 ## [1.2.0] - 2026-10-13
 
 ### Added

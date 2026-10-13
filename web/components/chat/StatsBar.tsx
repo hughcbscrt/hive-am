@@ -78,7 +78,7 @@ export function StatsBar({ agent, session }: { agent: Agent; session?: string | 
           </section>
           <section className="fa-span">
             <div className="eyebrow">{t('stats.perTurn')}</div>
-            <div className="spark" role="list">
+            <div className="tbars" role="list">
               {s.timeline.slice(-40).map((x, i) => (
                 <div key={i} className="sbar" role="listitem" title={`${x.prompt || t('stats.promptFallback')}\n${t('stats.turnLine', { tokens: fmtTokens(x.tokens), tools: x.tools, time: fmtDur(x.durationMs) })}${x.cost !== null ? ` · ${fmtCost(x.cost)}` : ''}`}>
                   <i style={{ height: `${Math.max(4, (x.tokens / maxTurn) * 100)}%` }} />
