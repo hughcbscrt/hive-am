@@ -1,12 +1,14 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Maximize2, Minus, Plus, RotateCcw, Settings2, SlidersHorizontal, Trash2, X } from 'lucide-react';
-import { useHive } from '@/lib/store';
+import { ArrowRight, Boxes, Hexagon, Maximize2, Minus, Plus, RotateCcw, Settings2, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { useHiveData } from '@/lib/store';
+import { usePersistentState } from '@/lib/hooks/usePersistentState';
 import { api } from '@/lib/api';
-import { PROVIDERS, ago, shortPath } from '@/lib/meta';
-import type { Agent, Colony, Dispatch, ObjectView } from '@/lib/types';
-import { Hex, ProviderBadge, RoleChip, StatusChip, useToast } from '@/components/ui';
+import { CLUSTER_COLOR, PROVIDERS, ago, shortPath } from '@/lib/meta';
+import type { Agent, Colony, ObjectView } from '@/lib/types';
+import { Banner, EmptyState, Hex, useToast } from '@/components/ui';
+import { Menu, MenuItem } from '@/components/Menu';
 import { NewAgentDrawer } from '@/components/agents/NewAgentDrawer';
 import { ColonyEditor } from '@/components/agents/ColonyEditor';
 import { AgentEditDrawer } from '@/components/agents/AgentEditDrawer';
@@ -43,7 +45,7 @@ const hexPoints = (cx: number, cy: number, R: number) =>
 interface Cell { agent: Agent | null; object?: ObjectView; x: number; y: number }
 interface Cluster { key: string; colony: Colony | null; cells: Cell[]; x: number; y: number; w: number; h: number }
 
-/** Queens first, then the workers they connect to, then the rest — so direct connections sit close together. */
+/** Queens first, then the workers they connect to, then the rest, so direct connections sit close together. */
 function orderMembers(members: Agent[]): Agent[] {
   const out: Agent[] = members.filter((a) => a.role === 'orchestrator');
   for (const q of [...out]) for (const id of q.worker_ids) { const w = members.find((a) => a.id === id); if (w && !out.includes(w)) out.push(w); }
@@ -91,7 +93,7 @@ function layout(agents: Agent[], colonies: Colony[], objects: ObjectView[], plac
 
 export default function Colony() {
   const { t } = useI18n();
-  const { agents, colonies, objects, ready, refresh } = useHive();
+  const { agents, colonies, objects, dispatches: feed, ready, error, retry, refresh } = useHiveData();
   const toast = useToast();
   const [sel, setSel] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -99,18 +101,13 @@ export default function Colony() {
   const [editing, setEditing] = useState<Colony | 'new' | null>(null);
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
   const [creatingObject, setCreatingObject] = useState<{ colonyId?: string } | null>(null);
-  const [feed, setFeed] = useState<Dispatch[]>([]);
-  useEffect(() => { const load = () => api.get<Dispatch[]>('/dispatches').then(setFeed).catch(() => undefined); load(); const iv = setInterval(load, 6000); return () => clearInterval(iv); }, []);
 
   // What a person dragged and how far they zoomed (both kept in this browser), and the drag in progress.
-  const [place, setPlace] = useState<Place>({});
+  const [place, savePlace] = usePersistentState<Place>('hive-colony-layout', {});
   const [drag, setDrag] = useState<{ key: string; x: number; y: number } | null>(null);
-  const [zoom, setZoomState] = useState(1);
-  useEffect(() => {
-    try { setPlace(JSON.parse(localStorage.getItem('hive-colony-layout') ?? '{}')); const z = Number(localStorage.getItem('hive-colony-zoom')); if (z >= ZOOM_MIN && z <= ZOOM_MAX) setZoomState(z); } catch { /* none */ }
-  }, []);
-  const savePlace = (p: Place) => { setPlace(p); try { localStorage.setItem('hive-colony-layout', JSON.stringify(p)); } catch { /* none */ } };
-  const setZoom = (z: number) => { const v = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100)); setZoomState(v); try { localStorage.setItem('hive-colony-zoom', String(v)); } catch { /* none */ } };
+  const [storedZoom, setStoredZoom] = usePersistentState<number>('hive-colony-zoom', 1);
+  const zoom = storedZoom >= ZOOM_MIN && storedZoom <= ZOOM_MAX ? storedZoom : 1;
+  const setZoom = (z: number) => setStoredZoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100)));
   const placed = useMemo(() => (drag ? { ...place, [drag.key]: { x: drag.x, y: drag.y } } : place), [place, drag]);
   const { clusters, width, height } = useMemo(() => layout(agents, colonies, objects, placed), [agents, colonies, objects, placed]);
   const margin = 40;
@@ -152,6 +149,13 @@ export default function Colony() {
     swallow.current = true; setTimeout(() => { swallow.current = false; }, 0);
     savePlace({ ...place, [d.key]: d.last }); setDrag(null);
   };
+  // Keyboard alternative to dragging (A12): arrows nudge the focused colony label or free hex, Shift takes bigger steps.
+  const keyMove = (e: React.KeyboardEvent, key: string, ox: number, oy: number, min = { x: 0, y: 0 }) => {
+    const d = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] } as Record<string, number[]>)[e.key];
+    if (!d || e.altKey || e.ctrlKey || e.metaKey) return;
+    e.preventDefault(); const step = e.shiftKey ? 64 : 16;
+    savePlace({ ...place, [key]: { x: Math.max(min.x, ox + d[0] * step), y: Math.max(min.y, oy + d[1] * step) } });
+  };
   const dragProps = (key: string, ox: number, oy: number, min?: { x: number; y: number }) => ({ onPointerDown: (e: React.PointerEvent<HTMLElement>) => startDrag(e, key, ox, oy, min), onPointerMove: moveDrag, onPointerUp: endDrag, onPointerCancel: endDrag });
   const pos = new Map<string, { x: number; y: number }>();
   for (const c of clusters) for (const cell of c.cells) { if (cell.agent) pos.set(cell.agent.id, { x: cell.x + margin, y: cell.y + margin }); if (cell.object) pos.set(cell.object.id, { x: cell.x + margin, y: cell.y + margin }); }
@@ -180,6 +184,15 @@ export default function Colony() {
   const objectsUp = objects.filter((o) => o.state.status === 'running').length;
   const queens = agents.filter((a) => a.role === 'orchestrator').length;
   const name = (id: string) => agents.find((a) => a.id === id)?.name ?? t('colony.removedAgent');
+  const tasksRunning = feed.filter((d) => d.status === 'running').length;
+  const stats = [
+    { id: 'agents', n: agents.length, label: t('stat.agents', { count: agents.length }), href: '/agents' },
+    { id: 'colonies', n: colonies.length, label: t('stat.colonies', { count: colonies.length }) },
+    { id: 'objects', n: objects.length, label: t('stat.objects', { count: objects.length }), href: '/resources', title: objects.length ? t('obj.running', { count: objectsUp }) : undefined },
+    { id: 'queens', n: queens, label: t('stat.orchestrators', { count: queens }), href: '/agents' },
+    { id: 'working', n: running, label: t('stat.working'), href: '/agents' },
+    { id: 'tasks', n: tasksRunning, label: t('stat.tasks'), href: '#recent' },
+  ] as { id: string; n: number; label: string; href?: string; title?: string }[];
   const selColony = selected ? colonies.find((c) => c.id === selected.colony_id) : undefined;
 
   const moveTo = async (a: Agent, colonyId: string) => {
@@ -191,32 +204,34 @@ export default function Colony() {
     <div className="page">
       <div className="page-head">
         <div><div className="row gap-s"><h1>{t('nav.colony')}</h1><HelpPopover label={t('colony.helpLabel')} title={t('colony.howTitle')}>{t('colony.howBody')}</HelpPopover></div><p>{t('colony.page.subtitle')}</p></div>
-        <div className="row">
-          <button className="btn" onClick={() => setEditing('new')}><Plus size={16} />{t('colony.newTitle')}</button>
-          <button className="btn" onClick={() => setCreatingObject({})}><Plus size={16} />{t('obj.new')}</button>
-          <button className="btn primary" onClick={() => setCreating({})}><Plus size={16} />{t('newAgent.title')}</button>
+        <div className="cx-head-actions">
+          <Menu label={t('cx.new')} icon={<Plus size={14} />}>{(close) => (<>
+            <MenuItem icon={<Hexagon size={15} />} onClick={() => { close(); setCreating({}); }}>{t('newAgent.title')}</MenuItem>
+            <MenuItem icon={<Settings2 size={15} />} onClick={() => { close(); setEditing('new'); }}>{t('colony.newTitle')}</MenuItem>
+            <MenuItem icon={<Boxes size={15} />} onClick={() => { close(); setCreatingObject({}); }}>{t('obj.new')}</MenuItem>
+          </>)}</Menu>
         </div>
       </div>
       <div className="stats">
-        <div className="card stat"><b>{agents.length}</b><span>{t('stat.agents', { count: agents.length })}</span></div>
-        <div className="card stat"><b>{colonies.length}</b><span>{t('stat.colonies', { count: colonies.length })}</span></div>
-        <div className="card stat" title={objects.length ? t('obj.running', { count: objectsUp }) : undefined}><b>{objects.length}</b><span>{t('stat.objects', { count: objects.length })}</span></div>
-        <div className="card stat"><b>{queens}</b><span>{t('stat.orchestrators', { count: queens })}</span></div>
-        <div className="card stat"><b>{running}</b><span>{t('stat.working')}</span></div>
-        <div className="card stat"><b>{feed.filter((d) => d.status === 'running').length}</b><span>{t('stat.tasks')}</span></div>
+        {stats.map((x) => {
+          const body = <><b>{x.n}</b><span>{x.label}</span></>;
+          return x.href
+            ? <Link key={x.id} href={x.href} className="card stat" title={x.title} aria-label={`${x.n} ${x.label}. ${t('cx.stat.open', { label: x.label })}`}>{body}</Link>
+            : <div key={x.id} className="card stat" title={x.title}>{body}</div>;
+        })}
       </div>
 
       <div className="colony">
         <div className="comb-wrap" ref={wrapRef}>
-          {!ready ? null : agents.length === 0 && colonies.length === 0 && objects.length === 0 ? (
-            <div className="empty" style={{ border: 0, minHeight: 520, justifyContent: 'center', margin: 'auto' }}>
-              <Hex size="lg" queen label="+" />
-              <h3>{t('colony.empty.title')}</h3>
-              <p>{t('colony.empty.body')}</p>
-              <div className="row"><button className="btn" onClick={() => setEditing('new')}><Plus size={16} />{t('colony.empty.createColony')}</button><button className="btn primary" onClick={() => setCreating({})}><Plus size={16} />{t('colony.empty.createAgent')}</button></div>
-            </div>
+          {!ready ? (
+            error
+              ? <div className="comb-skel"><Banner kind="err"><div className="row gap-s wrap"><span className="grow">{t('cx.loadFailed')} {error}</span><button className="btn sm" onClick={() => void retry()}>{t('cx.retry')}</button></div></Banner></div>
+              : <div className="comb-skel" role="status" aria-label={t('cx.loading')}><div className="skel" style={{ width: 220, height: 190 }} /><div className="row gap-l"><div className="skel" style={{ width: 150, height: 130 }} /><div className="skel" style={{ width: 150, height: 130 }} /></div></div>
+          ) : agents.length === 0 && colonies.length === 0 && objects.length === 0 ? (
+            <div className="comb-empty-wrap"><EmptyState icon={<Hex size="lg" queen label="+" />} title={t('colony.empty.title')} body={t('colony.empty.body')}
+              action={<div className="row"><button className="btn" onClick={() => setEditing('new')}><Plus size={16} />{t('colony.empty.createColony')}</button><button className="btn primary" onClick={() => setCreating({})}><Plus size={16} />{t('colony.empty.createAgent')}</button></div>} /></div>
           ) : (
-            <div style={{ width: fullW * k, height: fullH * k, flex: 'none', margin: 'auto' }}>
+            <div className="comb-box" style={{ width: fullW * k, height: fullH * k }}>
             <div className="comb" style={{ width: fullW, height: fullH, transform: `scale(${k})`, transformOrigin: '0 0', ['--w' as any]: `${W * 0.9}px`, ['--h' as any]: `${H * 0.9}px` }}>
               <svg className="links" width={fullW} height={fullH}>
                 {/* Colony outlines: every hex is stroked wide with round joins, so only the outer edge of the union survives. */}
@@ -234,11 +249,11 @@ export default function Colony() {
               {clusters.map((c) => (
                 <div key={c.key + 'l'}>
                   {c.colony ? (
-                    <button className={`colony-label draggable ${drag?.key === c.key ? 'dragging' : ''}`} style={{ left: c.x + c.w / 2 + margin, top: c.y + LABEL - 10 + margin, ['--c' as any]: c.colony.color || 'var(--honey)' }} {...dragProps(c.key, c.x, c.y)} onClick={() => { if (!swallow.current) setEditing(c.colony!); }} title={`${c.colony.cwd ? t('colony.editHover', { path: shortPath(c.colony.cwd) }) : t('colony.editHoverShort')} · ${t('colony.dragHint')}`}>
+                    <button className={`colony-label draggable ${drag?.key === c.key ? 'dragging' : ''}`} style={{ left: c.x + c.w / 2 + margin, top: c.y + LABEL - 10 + margin, ['--c' as any]: c.colony.color || 'var(--honey)' }} {...dragProps(c.key, c.x, c.y)} onKeyDown={(e) => keyMove(e, c.key, c.x, c.y)} onClick={() => { if (!swallow.current) setEditing(c.colony!); }} title={`${c.colony.cwd ? t('colony.editHover', { path: shortPath(c.colony.cwd) }) : t('colony.editHoverShort')} · ${t('colony.dragHint')} · ${t('cx.moveHint')}`}>
                       <i className="cdot" />{c.colony.name}<small>{t('colony.agentCount', { count: c.cells.filter((x) => x.agent).length })}</small><Settings2 size={13} className="muted" />
                     </button>
                   ) : colonies.length > 0 && c.cells.some((x) => x.agent) ? (
-                    <span className="colony-label" style={{ left: c.x + c.w / 2 + margin, top: c.y + LABEL - 10 + margin, ['--c' as any]: 'var(--line-strong)', boxShadow: 'none', background: 'transparent' }}><small>{t('common.noColony')}</small></span>
+                    <span className="colony-label cx-unplaced" style={{ left: c.x + c.w / 2 + margin, top: c.y + LABEL - 10 + margin }}><small>{t('common.noColony')}</small></span>
                   ) : null}
                   {c.cells.map((cell, i) => {
                     const a = cell.agent; const style = { left: cell.x + margin, top: cell.y + margin };
@@ -248,8 +263,8 @@ export default function Colony() {
                       return (
                         <button key={o.id} data-sid={o.id} className={`cell fill obj st-${o.state.status} ${o.state.status === 'running' ? 'running' : ''} ${focus && !related.has(o.id) ? 'dim' : ''} ${focus && related.has(o.id) && o.id !== focus ? 'linked' : ''} ${c.colony ? '' : 'draggable'}`} style={{ ...style, ['--c' as any]: color }} aria-pressed={sel === o.id}
                           onMouseEnter={() => setHover(o.id)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(o.id)} onBlur={() => setHover(null)}
-                          {...(c.colony ? {} : dragProps(o.id, cell.x, cell.y, { x: W / 2, y: H / 2 }))}
-                          onClick={() => { if (!swallow.current) setSel(o.id === sel ? null : o.id); }} aria-label={`${o.name}, ${t(`obj.kind.${o.kind}`)}, ${t(`obj.status.${o.state.status}`)}`} title={o.state.detail ? `${t(`obj.status.${o.state.status}`)} — ${o.state.detail}` : t(`obj.status.${o.state.status}`)}>
+                          {...(c.colony ? {} : { ...dragProps(o.id, cell.x, cell.y, { x: W / 2, y: H / 2 }), onKeyDown: (e: React.KeyboardEvent) => keyMove(e, o.id, cell.x, cell.y, { x: W / 2, y: H / 2 }) })}
+                          onClick={() => { if (!swallow.current) setSel(o.id === sel ? null : o.id); }} aria-label={`${o.name}, ${t(`obj.kind.${o.kind}`)}, ${t(`obj.status.${o.state.status}`)}`} title={o.state.detail ? `${t(`obj.status.${o.state.status}`)}: ${o.state.detail}` : t(`obj.status.${o.state.status}`)}>
                           <span className="shape" />
                           <span className="label"><Icon size={16} /><b>{o.name}</b><small>{t(`obj.status.${o.state.status}`)}</small></span>
                           <span className={`pip o-${o.state.status}`} />
@@ -266,7 +281,7 @@ export default function Colony() {
                       <button key={a.id} data-sid={a.id} className={`cell fill ${a.role === 'orchestrator' ? 'queen' : ''} ${a.status === 'running' ? 'running' : ''} ${focus && !related.has(a.id) ? 'dim' : ''} ${focus && related.has(a.id) && a.id !== focus ? 'linked' : ''} ${c.colony ? '' : 'draggable'}`}
                         onMouseEnter={() => setHover(a.id)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(a.id)} onBlur={() => setHover(null)}
                         style={{ ...style, ['--c' as any]: PROVIDERS[a.provider].color }} aria-pressed={sel === a.id}
-                        {...(c.colony ? {} : dragProps(a.id, cell.x, cell.y, { x: W / 2, y: H / 2 }))}
+                        {...(c.colony ? {} : { ...dragProps(a.id, cell.x, cell.y, { x: W / 2, y: H / 2 }), onKeyDown: (e: React.KeyboardEvent) => keyMove(e, a.id, cell.x, cell.y, { x: W / 2, y: H / 2 }), title: t('cx.moveHint') })}
                         onClick={() => { if (!swallow.current) setSel(a.id === sel ? null : a.id); }} aria-label={`${a.name}, ${t(`role.${a.role}`)}, ${PROVIDERS[a.provider].short}, ${t(`status.${a.status}`)}`}>
                         <span className="shape" />
                         <span className="label"><b>{a.name}</b><small>{PROVIDERS[a.provider].short}</small></span>
@@ -307,7 +322,7 @@ export default function Colony() {
                 {[...clusterLinks.map((l) => ({ ...l, kind: 'cluster' as const })), ...managerLinks.map((l) => ({ ...l, kind: 'manager' as const }))].filter((l) => !!focus && (l.from === focus || l.to === focus)).map((l) => {
                   const a = pos.get(l.from), b = pos.get(l.to); if (!a || !b) return null;
                   const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, r = S * 0.62;
-                  const color = l.kind === 'cluster' ? '#c0399a' : '#1f8f8f';
+                  const color = l.kind === 'cluster' ? CLUSTER_COLOR : 'var(--link-manager)';
                   return (
                     <g key={l.kind + l.from + l.to}>
                       <line x1={a.x + ux * r} y1={a.y + uy * r} x2={b.x - ux * r} y2={b.y - uy * r} stroke="var(--surface)" strokeWidth={8} strokeLinecap="round" opacity={0.9} />
@@ -349,15 +364,19 @@ export default function Colony() {
             </AnchoredCard>
           ) : null}
       </div>
-      <div className="card card-pad recent">
-            <div className="row" style={{ marginBottom: 6 }}><div className="eyebrow grow">{t('colony.recent')}</div></div>
-            {feed.length === 0 ? <p className="muted small" style={{ margin: 0 }}>{t('colony.recentEmpty')}</p> :
-              <div className="recent-grid">{feed.slice(0, 6).map((d) => (
-                <div key={d.id} className="feed-item">
-                  <i className={`dot ${d.status === 'running' ? 'run' : d.status === 'done' ? 'ok' : 'err'}`} style={{ marginTop: 7 }} />
-                  <div><b>{name(d.from_id)}</b> → <b>{name(d.to_id)}</b><div className="muted small" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.task}</div><div className="muted" style={{ fontSize: 12 }}>{ago(d.created_at)}</div></div>
-                </div>
-              ))}</div>}
+      <div className="card card-pad recent" id="recent">
+        <div className="eyebrow recent-head">{t('colony.recent')}</div>
+        {feed.length === 0 ? <p className="muted small m0">{t('colony.recentEmpty')}</p> :
+          <div className="recent-grid">{feed.slice(0, 6).map((d) => (
+            <div key={d.id} className="feed-item">
+              <i className={`dot ${d.status === 'running' ? 'run' : d.status === 'done' ? 'ok' : 'err'}`} />
+              <div>
+                <div className="feed-line">{agents.some((x) => x.id === d.from_id) ? <Link href={`/agents/${d.from_id}`} aria-label={t('cx.openAgent', { name: name(d.from_id) })}>{name(d.from_id)}</Link> : <b>{name(d.from_id)}</b>} → {agents.some((x) => x.id === d.to_id) ? <Link href={`/agents/${d.to_id}`} aria-label={t('cx.openAgent', { name: name(d.to_id) })}>{name(d.to_id)}</Link> : <b>{name(d.to_id)}</b>}</div>
+                <div className="muted small ellipsis">{d.task}</div>
+                <div className="muted feed-when">{ago(d.created_at)}</div>
+              </div>
+            </div>
+          ))}</div>}
       </div>
       {deleting && agents.find((a) => a.id === deleting) && <DeleteAgentModal agent={agents.find((a) => a.id === deleting)!} onClose={() => setDeleting(null)} onDeleted={() => setSel(null)} />}
       {creating && <NewAgentDrawer presetColonyId={creating.colonyId} presetObjectId={creating.objectId} manager={creating.manager} onClose={() => setCreating(null)} onCreated={(id) => setSel(id)} />}

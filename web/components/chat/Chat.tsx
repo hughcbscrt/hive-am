@@ -2,12 +2,13 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowUp, Brain, ChevronRight, Paperclip, Square, X, AlertTriangle, Waypoints, Coins, Layers, Timer, Hammer } from 'lucide-react';
+import { ArrowDown, ArrowUp, Brain, ChevronRight, Paperclip, Square, X, Waypoints, Coins, Layers, Timer, Hammer } from 'lucide-react';
 import { api } from '@/lib/api';
-import { useHive } from '@/lib/store';
+import { useFinished, useHiveActions, useHiveData, useLive, type LiveTurn } from '@/lib/store';
+import { usePersistentState } from '@/lib/hooks/usePersistentState';
 import { ago } from '@/lib/meta';
 import type { Agent, Block, ChatMessage } from '@/lib/types';
-import { Hex, useToast } from '@/components/ui';
+import { Banner, EmptyState, Hex, useToast } from '@/components/ui';
 import { ChangedFiles, ToolCall, ToolsOpen } from './ToolCall';
 import { UserBubble } from './UserBubble';
 import { fmtCost, fmtDur, fmtTokens, totalTokens } from '@/lib/format';
@@ -55,7 +56,7 @@ function ReplyMeta({ m }: { m: ChatMessage & { durationMs?: number } }) {
   );
 }
 
-function LiveMeta({ turn }: { turn: NonNullable<ReturnType<typeof useHive>['live'][string]> }) {
+function LiveMeta({ turn }: { turn: LiveTurn }) {
   const { t } = useI18n();
   const [, set] = useState(0);
   useEffect(() => { const i = setInterval(() => set((x) => x + 1), 500); return () => clearInterval(i); }, []);
@@ -77,7 +78,7 @@ const Md = memo(function Md({ text }: { text: string }) {
   return <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown></div>;
 });
 
-const Blocks = memo(function Blocks({ blocks, streaming }: { blocks: Block[]; streaming?: boolean }) {
+export const Blocks = memo(function Blocks({ blocks, streaming }: { blocks: Block[]; streaming?: boolean }) {
   const { t } = useI18n();
   return (
     <>
@@ -96,7 +97,7 @@ const Blocks = memo(function Blocks({ blocks, streaming }: { blocks: Block[]; st
 type Reply = ChatMessage & { durationMs?: number };
 
 /** The saved transcript. Memoised so typing in the composer never re-renders it. */
-const History = memo(function History({ msgs, agent }: { msgs: ChatMessage[]; agent: Pick<Agent, 'id' | 'name' | 'provider' | 'role'> }) {
+export const History = memo(function History({ msgs, agent }: { msgs: ChatMessage[]; agent: Pick<Agent, 'id' | 'name' | 'provider' | 'role'> }) {
   useI18n(); // re-render the relative times when the language changes
   const list = useMemo(() => coalesce(msgs), [msgs]);
   return (
@@ -119,12 +120,13 @@ interface Pic { id: string; name: string; data: string; type: string; size: numb
 const MAX_FILES = 5, MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 /** Owns the draft text, so each keystroke re-renders only this small box. */
-const Composer = memo(function Composer({ name, running, queued, readOnly, onSend, onStop, toolsOpen, onToggleTools }: {
-  name: string; running: boolean; queued: number; readOnly: boolean;
+const Composer = memo(function Composer({ agentId, name, running, queued, readOnly, onSend, onStop, toolsOpen, onToggleTools }: {
+  agentId: string; name: string; running: boolean; queued: number; readOnly: boolean;
   onSend: (prompt: string, files?: { name: string; data: string; type: string }[]) => Promise<boolean>; onStop: () => void; toolsOpen: boolean | null; onToggleTools: () => void;
 }) {
   const { t } = useI18n();
-  const [text, setText] = useState('');
+  // The draft is kept per agent (in this browser), so leaving the page or reloading does not lose a half-written message.
+  const [text, setText] = usePersistentState(`hive-am.draft.${agentId}`, '');
   const [images, setImages] = useState<Pic[]>([]);
   const [over, setOver] = useState(false);
   const toast = useToast();
@@ -154,7 +156,7 @@ const Composer = memo(function Composer({ name, running, queued, readOnly, onSen
   return (
     <div className="composer">
       {readOnly ? (
-        <div className="composer-box" style={{ justifyContent: 'space-between', alignItems: 'center' }}><span className="muted">{t('chat.readOnly')}</span></div>
+        <div className="composer-box chat-readonly"><span className="muted">{t('chat.readOnly')}</span></div>
       ) : (
         <div className={`composer-box ${over ? 'over' : ''}`} onDragOver={(e) => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); setOver(true); } }} onDragLeave={() => setOver(false)}
           onDrop={(e) => { setOver(false); const f = [...e.dataTransfer.files]; if (f.length) { e.preventDefault(); void addFiles(f); } }}>
@@ -179,7 +181,8 @@ const Composer = memo(function Composer({ name, running, queued, readOnly, onSen
 
 export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride?: string | null }) {
   const { t } = useI18n();
-  const { live, finished, clearLive, agents } = useHive();
+  const { agents } = useHiveData(); // not `live`: the stream must not re-render this through the app-wide context
+  const { clearLive } = useHiveActions();
   const toast = useToast();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -192,7 +195,15 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
   const [toolsOpen, setToolsOpen] = useState<boolean | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
-  const turn = live[agent.id];
+  const lastTop = useRef(0);
+  // A scroll that goes up only counts as the person scrolling when a gesture (touch, pointer, scrollbar drag) just happened: when a turn ends the live reply is swapped for the saved one,
+  // the content shrinks for a moment, the browser clamps scrollTop and the scroll event it fires would otherwise look like "the person scrolled away".
+  const gesture = useRef(0);
+  const touched = useCallback(() => { gesture.current = performance.now(); }, []);
+  const [away, setAway] = useState(false); // scrolled up from the newest content: shows the "latest" button
+  const release = useCallback(() => { stick.current = false; setAway(true); }, []);
+  const toBottom = useCallback(() => { const el = threadRef.current; stick.current = true; setAway(false); if (el) el.scrollTop = el.scrollHeight; }, []);
+  const turn = useLive(agent.id);
   const running = agent.status === 'running' || !!turn;
   const readOnly = sessionOverride !== undefined && sessionOverride !== agent.session_id;
 
@@ -210,9 +221,9 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
     const el = threadRef.current;
     if (el && anchor.current !== null) { el.scrollTop += el.scrollHeight - anchor.current; anchor.current = null; }
   }, [msgs]);
-  const earlier = useCallback(() => { anchor.current = threadRef.current?.scrollHeight ?? null; stick.current = false; setLimit((l) => l + PAGE * 2); }, []);
+  const earlier = useCallback(() => { anchor.current = threadRef.current?.scrollHeight ?? null; release(); setLimit((l) => l + PAGE * 2); }, [release]);
   // A finished turn is now in the CLI's own transcript: re-read it, then drop the optimistic echo.
-  const fin = finished[agent.id] ?? 0;
+  const fin = useFinished(agent.id);
   const idle = useRef(true);
   idle.current = !turn && agent.status !== 'running' && !(agent.queued ?? 0);
   // When a turn ends and nothing is left behind it, whatever is still in the outbox was sent (its text just differs in the transcript).
@@ -233,7 +244,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
 
   const send = useCallback(async (prompt: string, files: { name: string; data: string; type: string }[] = []) => {
     if (readOnly) return false;
-    setOutbox((o) => [...o, prompt]); stick.current = true;
+    setOutbox((o) => [...o, prompt]); toBottom();
     try {
       const r = await api.post<{ prompt?: string }>(`/agents/${agent.id}/messages`, { prompt, ...(files.length ? { files } : {}) });
       // With pictures the server adds a note with where it saved them: the waiting bubble shows the message as the agent got it.
@@ -241,7 +252,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
       return true;
     }
     catch (e) { setOutbox((o) => { const i = o.lastIndexOf(prompt); return i < 0 ? o : o.filter((_, j) => j !== i); }); toast(e instanceof Error ? e.message : t('chat.sendFailed'), 'err'); return false; }
-  }, [agent.id, readOnly, toast, t]);
+  }, [agent.id, readOnly, toast, t, toBottom]);
   const stop = useCallback(() => { void api.post(`/agents/${agent.id}/stop`).catch(() => undefined); }, [agent.id]);
   const toggleTools = useCallback(() => setToolsOpen((o) => (o ? false : true)), []);
 
@@ -252,13 +263,15 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
   return (
     <>
       <ToolsOpen.Provider value={toolsOpen}>
-      <div className="thread" ref={threadRef} onWheel={(e) => { if (e.deltaY < 0) stick.current = false; }} onScroll={(e) => { const el = e.currentTarget; if (el.scrollHeight - el.scrollTop - el.clientHeight < 40) stick.current = true; }}>
+      <div className="thread-wrap">
+      {/* A log, announced politely only between turns: while a reply streams it is aria-live off (a token-by-token read-out is unusable); the status line below says when it starts and ends. */}
+      <div className="thread" ref={threadRef} role="log" aria-label={t('fa.chat.log', { name: agent.name })} aria-live={turn ? 'off' : 'polite'} aria-relevant="additions" tabIndex={-1}
+        onWheel={(e) => { if (e.deltaY < 0) release(); }} onTouchStart={touched} onTouchMove={touched} onPointerDown={touched} onPointerMove={(e) => { if (e.buttons) touched(); }}
+        onKeyDown={(e) => { if (['PageUp', 'ArrowUp', 'Home'].includes(e.key) && !(e.target instanceof HTMLTextAreaElement)) release(); }}
+        onScroll={(e) => { const el = e.currentTarget; const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 40; if (atEnd) { stick.current = true; setAway(false); } else if (el.scrollTop < lastTop.current - 1 && performance.now() - gesture.current < 700) release(); lastTop.current = el.scrollTop; }}>
         <div className="thread-inner">
           {isEmpty && (
-            <div className="empty" style={{ marginTop: 40 }}>
-              <Hex agent={agent} size="lg" /><h3>{t('chat.empty.title', { name: agent.name })}</h3>
-              <p>{agent.role === 'orchestrator' ? t('chat.empty.orchestrator') : t('chat.empty.worker')}</p>
-            </div>
+            <div className="mt-l"><EmptyState icon={<Hex agent={agent} size="lg" />} title={t('chat.empty.title', { name: agent.name })} body={agent.role === 'orchestrator' ? t('chat.empty.orchestrator') : t('chat.empty.worker')} /></div>
           )}
           {total > msgs.length && <button type="button" className="btn sm chat-earlier" onClick={earlier}>{t('chat.earlier', { n: total - msgs.length })}</button>}
           <History msgs={msgs} agent={agent} />
@@ -279,7 +292,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
                 {!turn.error && <span className="typing" aria-label={t('common.working')}><i /><i /><i /></span>}
                 <LiveMeta turn={turn} />
                 {turn.error && (
-                  <div className="banner err"><AlertTriangle size={16} /><div className="grow">{translateServerError(turn.error)}</div><button className="btn sm" onClick={() => clearLive(agent.id)}>{t('common.dismiss')}</button></div>
+                  <Banner kind="err" onDismiss={() => clearLive(agent.id)}>{translateServerError(turn.error)}</Banner>
                 )}
               </div>
             </>
@@ -287,8 +300,11 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
           {waiting.map((p, i) => <UserBubble key={`${i}:${p}`} agentId={agent.id} text={p} badge={turn ? t('chat.queuedBadge') : undefined} />)}
         </div>
       </div>
+      {away && <button type="button" className="btn sm chat-jump" onClick={toBottom}><ArrowDown size={14} aria-hidden />{t('fa.chat.jump')}</button>}
+      </div>
       </ToolsOpen.Provider>
-      <Composer name={agent.name} running={running} queued={agent.queued ?? 0} readOnly={readOnly} onSend={send} onStop={stop} toolsOpen={toolsOpen} onToggleTools={toggleTools} />
+      <span className="chat-sr" role="status">{turn ? t('fa.chat.working', { name: agent.name }) : fin ? t('fa.chat.done', { name: agent.name }) : ''}</span>
+      <Composer agentId={agent.id} name={agent.name} running={running} queued={agent.queued ?? 0} readOnly={readOnly} onSend={send} onStop={stop} toolsOpen={toolsOpen} onToggleTools={toggleTools} />
     </>
   );
 }

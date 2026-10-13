@@ -1,51 +1,37 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Search } from 'lucide-react';
 import { api } from '@/lib/api';
-import { useHive } from '@/lib/store';
+import { useHiveData } from '@/lib/store';
+import { usePolling } from '@/lib/hooks/usePolling';
+import { useQueryState } from '@/lib/hooks/useQueryState';
+import { History } from '@/components/chat/Chat';
 import { PROVIDERS, ago, shortPath } from '@/lib/meta';
 import { fmtCost, fmtTokens, totalTokens } from '@/lib/format';
 import type { ChatMessage, Provider, SessionRow } from '@/lib/types';
-import { ProviderBadge, Segmented } from '@/components/ui';
+import { Banner, EmptyState, ProviderBadge, SearchInput, Segmented } from '@/components/ui';
 import { dateLocale, useI18n } from '@/lib/i18n';
 
-const FIRST = 100, MORE = 200, LONG = 1600; // messages first loaded / added per click; characters before a message is folded
-
-/** A long message (a pasted log, a whole file) is folded so one of them cannot push the rest of the conversation out of view. */
-function Folded({ children, text }: { children: React.ReactNode; text: string }) {
-  const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  if (text.length <= LONG) return <>{children}</>;
-  return (
-    <div className={`sx-fold ${open ? 'open' : ''}`}>
-      <div className="sx-fold-body">{children}</div>
-      <button className="btn ghost sm" onClick={() => setOpen(!open)}>{open ? t('sessions.showLess') : t('sessions.showMore', { count: Math.round(text.length / 1000) })}</button>
-    </div>
-  );
-}
+const FIRST = 100, MORE = 200; // messages first loaded / added per click
 
 export default function Sessions() {
   const { t, locale } = useI18n();
-  const { agents } = useHive();
+  const { agents } = useHiveData();
   const [rows, setRows] = useState<SessionRow[] | null>(null);
   const [q, setQ] = useState('');
   const [prov, setProv] = useState<'all' | Provider>('all');
-  const [sel, setSel] = useState<SessionRow | null>(null);
+  // The open session is in the URL (?session=<id>) so a refresh or a shared link comes back to it.
+  const [selId, setSelId] = useQueryState('session', '');
+  const [loadErr, setLoadErr] = useState(false);
   const [msgs, setMsgs] = useState<ChatMessage[] | null>(null);
   const [total, setTotal] = useState(0);
   const [limit, setLimit] = useState(FIRST);
   const scroller = useRef<HTMLDivElement>(null);
 
   // The list comes back at once with what is cached; rows still being read are asked about again until they are all known.
-  useEffect(() => {
-    let dead = false, timer: ReturnType<typeof setTimeout>;
-    const load = () => api.get<SessionRow[]>('/sessions').then((r) => { if (dead) return; setRows(r); if (r.some((x) => x.pending)) timer = setTimeout(load, 2500); }).catch(() => !dead && setRows((x) => x ?? []));
-    load();
-    return () => { dead = true; clearTimeout(timer); };
-  }, []);
+  const pending = rows === null || rows.some((x) => x.pending);
+  usePolling(async () => { setRows(await api.get<SessionRow[]>('/sessions')); setLoadErr(false); }, 2500, { enabled: pending, onError: () => { setLoadErr(true); setRows((x) => x ?? []); } });
+  const sel = useMemo(() => (selId && rows?.find((r) => r.session_id === selId)) || null, [rows, selId]);
   // A different session starts again from the newest messages.
   useEffect(() => { setLimit(FIRST); }, [sel?.session_id]);
   useEffect(() => {
@@ -70,24 +56,26 @@ export default function Sessions() {
 
   return (
     <div className="page full">
-      {rows && !rows.length ? (
-        <div className="empty" style={{ margin: 36 }}><h3>{t('sessions.empty.title')}</h3><p>{t('sessions.empty.body')}</p><Link className="btn primary" href="/agents">{t('sessions.empty.go')}</Link></div>
+      {loadErr && !rows?.length ? (
+        <div className="m-xl"><Banner kind="err">{t('fa.sessions.loadFailed')}</Banner></div>
+      ) : rows && !rows.length ? (
+        <div className="m-xl"><EmptyState title={t('sessions.empty.title')} body={t('sessions.empty.body')} action={<Link className="btn primary" href="/agents">{t('sessions.empty.go')}</Link>} /></div>
       ) : (
         <div className="sk-ws sx-ws">
           <aside className="switcher" aria-label={t('nav.sessions')}>
             <div className="switcher-head">
-              <b style={{ fontFamily: 'var(--font-display)', fontSize: 16 }}>{t('nav.sessions')}</b>
-              <div className="search"><Search size={15} /><input className="input" placeholder={t('sessions.searchPlaceholder')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('sessions.searchLabel')} /></div>
+              <b className="fa-title">{t('nav.sessions')}</b>
+              <SearchInput value={q} onChange={setQ} placeholder={t('sessions.searchPlaceholder')} label={t('sessions.searchLabel')} />
               <Segmented value={prov} onChange={setProv} options={[{ id: 'all', label: t('common.all') }, ...(Object.keys(PROVIDERS) as Provider[]).map((p) => ({ id: p, label: PROVIDERS[p].short }))]} />
             </div>
             <div className="switcher-list">
-              {rows === null && <p className="muted small" style={{ padding: 16 }}>{t('sessions.reading')}</p>}
+              {rows === null && <p className="muted small pad-m">{t('sessions.reading')}</p>}
               {byDay.map(([day, items]) => (
                 <div key={day}>
                   <div className="switcher-group">{day}<span>{items.length}</span></div>
                   {items.map((r) => (
-                    <button key={r.agent_id + r.session_id} className="sk-item" aria-current={sel?.session_id === r.session_id} onClick={() => setSel(r)}>
-                      <div className="row" style={{ gap: 6 }}><b className="grow">{r.agent_name}</b><ProviderBadge provider={r.provider} />{r.current && <span className="chip honey">{t('sessions.current')}</span>}</div>
+                    <button key={r.agent_id + r.session_id} className="sk-item" aria-current={sel?.session_id === r.session_id} onClick={() => setSelId(r.session_id)}>
+                      <div className="row gap-xs"><b className="grow">{r.agent_name}</b><ProviderBadge provider={r.provider} />{r.current && <span className="chip honey">{t('sessions.current')}</span>}</div>
                       <span className="sk-desc">{r.preview || (r.pending ? t('sessions.counting') : r.task || t('sessions.emptySession'))}</span>
                       <span className="sk-meta">
                         {ago(r.last_seen)}{r.kind === 'delegation' && ` · ${t('sessions.delegatedBy', { name: r.from_name ?? t('chat.anOrchestrator') })}`}
@@ -98,28 +86,20 @@ export default function Sessions() {
                   ))}
                 </div>
               ))}
-              {rows && rows.length > 0 && !list.length && <p className="muted small" style={{ padding: 16 }}>{t('sessions.noMatch')}</p>}
+              {rows && rows.length > 0 && !list.length && <p className="muted small pad-m">{t('sessions.noMatch')}</p>}
             </div>
           </aside>
           {!sel ? <section className="sk-main sk-none"><p className="muted">{t('sessions.select')}</p></section> : (
             <section className="sk-main">
               <header className="sx-head">
-                <div className="grow" style={{ minWidth: 0 }}><b style={{ fontFamily: 'var(--font-display)', fontSize: 17 }}>{sel.agent_name}</b><div className="muted small mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shortPath(sel.cwd)} · {sel.session_id}</div></div>
+                <div className="grow"><b className="fa-title lg">{sel.agent_name}</b><div className="muted small mono ellipsis">{shortPath(sel.cwd)} · {sel.session_id}</div></div>
                 {agent && <Link className="btn sm primary" href={`/agents/${agent.id}`}>{t('sessions.openAgent')}</Link>}
               </header>
-              <div className="transcript col sx-transcript" ref={scroller} style={{ gap: 16 }}>
+              <div className="transcript col sx-transcript" ref={scroller}>
                 {msgs === null ? <p className="muted">{t('sessions.loading')}</p> : msgs.length === 0 ? <p className="muted">{t('sessions.noMessages')}</p> : (
                   <>
-                    {older > 0 && <button className="btn sm" style={{ alignSelf: 'center' }} onClick={() => setLimit(limit + MORE)}>{t('sessions.older', { count: older })}</button>}
-                    {msgs.map((m) => {
-                      const text = m.role === 'user' ? m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join('') : '';
-                      return (
-                        <div key={m.id} className={`msg ${m.role}`}>
-                          {m.role === 'user' ? <Folded text={text}><div className="bubble">{text}</div></Folded> :
-                            m.blocks.filter((b) => b.type === 'text').map((b, i) => { const x = (b as { text: string }).text; return <Folded key={i} text={x}><div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{x}</ReactMarkdown></div></Folded>; })}
-                        </div>
-                      );
-                    })}
+                    {older > 0 && <button className="btn sm push-c" onClick={() => setLimit(limit + MORE)}>{t('sessions.older', { count: older })}</button>}
+                    <History msgs={msgs} agent={{ id: sel.agent_id, name: sel.agent_name, provider: sel.provider, role: sel.agent_role }} />
                   </>
                 )}
               </div>

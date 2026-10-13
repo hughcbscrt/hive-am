@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDismiss } from '@/lib/useDismiss';
+import { useCombobox } from '@/components/ui';
 
 export interface Opt { value: string; label?: string; hint?: string }
 
@@ -22,11 +23,12 @@ export function Suggest({ value, onChange, options, placeholder, mono = false, a
     return list.slice(0, 60);
   }, [options, value]);
   useEffect(() => { setHi(0); }, [value, open]);
+  const cb = useCombobox(open && (shown.length > 0 || !!empty), hi, shown.length);
   const pick = (o: Opt) => { onChange(o.value); setOpen(false); };
 
   return (
     <div className="sg" ref={box}>
-      <input className={`input ${mono ? 'mono' : ''}`} value={value} placeholder={placeholder} aria-label={ariaLabel} autoComplete="off" spellCheck={false}
+      <input className={`input ${mono ? 'mono' : ''}`} value={value} placeholder={placeholder} aria-label={ariaLabel} autoComplete="off" spellCheck={false} {...cb.input}
         onFocus={() => { if (!open) { setOpen(true); onOpen?.(); } }} onClick={() => setOpen(true)}
         onChange={(e) => { onChange(e.target.value); setOpen(true); }}
         onKeyDown={(e) => {
@@ -36,11 +38,11 @@ export function Suggest({ value, onChange, options, placeholder, mono = false, a
           else if (e.key === 'Escape' && open) { e.stopPropagation(); setOpen(false); }
         }} />
       {open && (shown.length > 0 || empty) && (
-        <ul className="sg-list" role="listbox">
-          {shown.length === 0 && <li className="sg-empty">{empty}</li>}
+        <ul className="sg-list" {...cb.listProps}>
+          {shown.length === 0 && <li className="sg-empty" role="presentation">{empty}</li>}
           {shown.map((o, i) => (
-            <li key={o.value} role="option" aria-selected={i === hi}>
-              <button type="button" className={`sg-opt ${i === hi ? 'hi' : ''}`} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setHi(i)} onClick={() => pick(o)}>
+            <li key={o.value} {...cb.optionProps(i)}>
+              <button type="button" tabIndex={-1} className={`sg-opt ${i === hi ? 'hi' : ''}`} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setHi(i)} onClick={() => pick(o)}>
                 <span className={`nm ${mono ? 'mono' : ''}`}>{o.label ?? o.value}</span>{o.hint && <span className="hint">{o.hint}</span>}
               </button>
             </li>

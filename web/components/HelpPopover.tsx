@@ -17,7 +17,7 @@ export function HelpPopover({ label, title, children, size = 'md', align = 'star
 
   return (
     <span className={`help ${size === 'sm' ? 'sm' : ''} ${align === 'end' ? 'end' : ''}`} ref={root}>
-      <button ref={button} type="button" className="help-btn" aria-label={label} title={label} aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)}>
+      <button ref={button} type="button" className="help-btn" aria-label={label} title={label} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen((o) => !o)}>
         <CircleHelp size={size === 'sm' ? 15 : 18} />
       </button>
       {open && (

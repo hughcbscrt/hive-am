@@ -29,3 +29,8 @@ export function ago(ts: number | null | undefined): string {
 
 export const shortPath = (p: string) => p.replace(/^\/home\/[^/]+/, '~');
 export const initials = (n: string) => n.split(/[\s_-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
+
+/** Cluster resources and the cluster link kind. `--cluster` is defined in globals.css (with a dark variant); the fallback keeps it working before that. */
+export const CLUSTER_COLOR = 'var(--cluster, #c0399a)';
+/** One palette for anything that needs distinguishable series colours (colony swatches, relation lines, log panes). Hex on purpose: users store them. */
+export const SERIES_COLORS = ['#2f8f5b', '#d4663f', '#2f5bea', '#7a4de0', '#c0399a', '#0f8f9e', '#9a7400', '#c2412d'];

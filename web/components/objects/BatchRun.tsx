@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { parseRows } from '@/lib/dataRows';
 import type { HttpFile, HttpRun } from '@/lib/types';
-import { Modal } from '@/components/ui';
+import { CheckRow, Modal } from '@/components/ui';
 import { HelpPopover } from '@/components/HelpPopover';
 
 interface Cell { status?: number; ok: boolean; tests: string; error?: string }
@@ -65,7 +65,7 @@ export function BatchRun({ objectId, file, env, onClose, onDone }: { objectId: s
         </div>
         <div className="row gap-s wrap">
           <label className="btn sm"><Upload size={14} />{t('hw2.batch.file')}<input type="file" accept=".csv,.json,.txt,text/csv,application/json" hidden onChange={(e) => load(e.target.files?.[0])} /></label>
-          <label className="row gap-s small"><input type="checkbox" checked={stopOnFail} onChange={(e) => setStopOnFail(e.target.checked)} />{t('hw2.batch.stopRow')}</label>
+          <CheckRow checked={stopOnFail} onChange={setStopOnFail} label={t('hw2.batch.stopRow')} />
           <span className="grow" />
           {parsed && <span className="muted small">{t('hw2.batch.rows', { rows: parsed.rows.length, cols: parsed.columns.join(', ') })}</span>}
           {running ? <button className="btn" onClick={() => { stop.current = true; }}><Square size={14} />{t('hw2.batch.stop')}</button> : <button className="btn primary" disabled={!parsed || !parsed.rows.length} onClick={() => void start()}><Play size={14} />{t('hw2.batch.run')}</button>}

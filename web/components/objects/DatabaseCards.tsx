@@ -3,7 +3,7 @@ import { PasswordInput } from '@/components/PasswordInput';
 import { useState } from 'react';
 import { CheckCircle2, ChevronRight, Database as DbIcon, Link2, Loader2, PlugZap, XCircle } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Field, PathPicker, Segmented } from '@/components/ui';
+import { CheckRow, Field, PathPicker, Segmented } from '@/components/ui';
 import { useI18n } from '@/lib/i18n/index';
 import { useDriverProps } from '@/lib/useDriverProps';
 import type { DbEngine } from '@/lib/types';
@@ -78,10 +78,9 @@ export function DatabaseCards({ d, set, setD, objectId, creating = false }: {
   </>);
 
   const ssl = file ? null : (<>
-    <label className="row gap-s small"><input type="checkbox" checked={d.dbSsl} onChange={(e) => set('dbSsl', e.target.checked)} />{t('db.ssl')}</label>
+    <CheckRow checked={d.dbSsl} onChange={(v) => set('dbSsl', v)} label={t('db.ssl')} />
     {d.dbSsl && (<>
-      <label className="row gap-s small"><input type="checkbox" checked={d.dbTrust} onChange={(e) => set('dbTrust', e.target.checked)} />{t('db.trust')}</label>
-      <p className="muted small" style={{ margin: '-4px 0 0' }}>{d.dbTrust ? t('db.trust.on') : t('db.trust.off')}</p>
+      <CheckRow checked={d.dbTrust} onChange={(v) => set('dbTrust', v)} label={t('db.trust')} hint={d.dbTrust ? t('db.trust.on') : t('db.trust.off')} />
       {SSL_FILES.filter((k) => cat?.[d.engine].some((p) => p.name === k)).map((k) => {
         const def = cat![d.engine].find((p) => p.name === k)!;
         return <PathPicker key={k} mode="file" exts={['pem', 'crt', 'cer', 'key']} value={d.dbProps[k] ?? ''} onChange={(v) => set('dbProps', { ...d.dbProps, [k]: v })} label={t(SSL_LABEL[k])} hint={locale === 'es' ? def.es : def.desc} placeholder={def.placeholder} />;
@@ -93,8 +92,7 @@ export function DatabaseCards({ d, set, setD, objectId, creating = false }: {
   const driver = (<DriverProps engine={d.engine} value={d.dbProps} onChange={(v) => set('dbProps', v)} groups={['session', 'network', 'advanced']} />);
 
   const safety = (<>
-    <label className="row gap-s small"><input type="checkbox" checked={d.dbReadOnly} onChange={(e) => set('dbReadOnly', e.target.checked)} />{t('db.readonly')}</label>
-    <p className="muted small" style={{ margin: '-4px 0 0' }}>{d.dbReadOnly ? t('db.readonly.on') : t('db.readonly.off')}</p>
+    <CheckRow checked={d.dbReadOnly} onChange={(v) => set('dbReadOnly', v)} label={t('db.readonly')} hint={d.dbReadOnly ? t('db.readonly.on') : t('db.readonly.off')} />
     <div className="of-grid2">
       <Field label={t('db.timeout')} hint={t('db.timeout.hint')}>{text('dbTimeout', { placeholder: '30' })}</Field>
       <Field label={t('db.maxRows')} hint={t('db.maxRows.hint')}>{text('dbMaxRows', { placeholder: '1000' })}</Field>

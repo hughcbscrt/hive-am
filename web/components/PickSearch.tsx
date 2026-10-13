@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useDismiss } from '@/lib/useDismiss';
+import { useCombobox } from './combobox';
 
 export interface PickOption { id: string; label: string; hint?: string }
 
@@ -27,6 +28,8 @@ export function PickSearch({ options, value, onChange, multi = false, inline = f
   const pick = (o: PickOption) => { onChange(multi ? [...value, o.id] : [o.id]); setQ(''); setOpen(multi); if (multi) input.current?.focus(); };
   const drop = (id: string) => { onChange(value.filter((x) => x !== id)); requestAnimationFrame(() => input.current?.focus()); };
   const single = !multi && chosen.length > 0;
+  const listed = open && !single && (shown.length > 0 || !!empty);
+  const combo = useCombobox(listed, hi, shown.length);
 
   return (
     <div className={`sg ps ${inline ? 'ps-inline' : ''}`} ref={box}>
@@ -34,7 +37,7 @@ export function PickSearch({ options, value, onChange, multi = false, inline = f
         {chosen.map((o) => (
           <span key={o.id} className="chip ps-chip">{o.label}<button type="button" onClick={(e) => { e.stopPropagation(); drop(o.id); }} aria-label={`× ${o.label}`}><X size={12} /></button></span>
         ))}
-        {!single && <input ref={input} className="ps-input" value={q} placeholder={chosen.length ? '' : placeholder} aria-label={ariaLabel} autoComplete="off" spellCheck={false} autoFocus={autoFocus}
+        {!single && <input ref={input} className="ps-input" value={q} placeholder={chosen.length ? '' : placeholder} aria-label={ariaLabel} autoComplete="off" spellCheck={false} autoFocus={autoFocus} {...combo.input}
           onFocus={() => setOpen(true)} onChange={(e) => { setQ(e.target.value); setOpen(true); }}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setHi((h) => Math.min(shown.length - 1, h + 1)); }
@@ -44,11 +47,11 @@ export function PickSearch({ options, value, onChange, multi = false, inline = f
             else if (e.key === 'Backspace' && !q && chosen.length) drop(chosen[chosen.length - 1].id);
           }} />}
       </div>
-      {open && !single && (shown.length > 0 || empty) && (
-        <ul className="sg-list" role="listbox">
+      {listed && (
+        <ul className="sg-list" {...combo.listProps}>
           {shown.length === 0 && <li className="sg-empty">{empty}</li>}
           {shown.map((o, i) => (
-            <li key={o.id} role="option" aria-selected={i === hi}>
+            <li key={o.id} {...combo.optionProps(i)}>
               <button type="button" className={`sg-opt ${i === hi ? 'hi' : ''}`} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setHi(i)} onClick={() => pick(o)}>
                 <span className="nm">{o.label}</span>{o.hint && <span className="hint">{o.hint}</span>}
               </button>

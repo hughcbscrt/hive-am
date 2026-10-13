@@ -1,11 +1,11 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
-import { Check } from 'lucide-react';
 import { useI18n, translate as tr } from '@/lib/i18n/index';
 import { fmtNum } from '@/lib/format';
 import { Field, FolderPicker, ModelField, PermissionField, ProviderPicker, Segmented, SkillPicker } from '@/components/ui';
-import { useHive } from '@/lib/store';
+import { useHiveData } from '@/lib/store';
+import { MemberPick } from './MemberPick';
 import type { Agent, AgentType, Colony, InheritField, Permission, Provider, Role, SkillLoad } from '@/lib/types';
 import { permissionLabel, shortPath } from '@/lib/meta';
 import { PickSearch } from '@/components/PickSearch';
@@ -41,12 +41,12 @@ export function validate(d: AgentDraft, agents: Agent[], selfId?: string, coloni
   return e;
 }
 
-/** One form for creating and editing — the same fields wherever an agent is configured. */
+/** One form for creating and editing: the same fields wherever an agent is configured. */
 export function AgentForm({ draft, onChange, errors, selfId, showType = true, focusName = false }: {
   draft: AgentDraft; onChange: (d: AgentDraft) => void; errors: ReturnType<typeof validate>; selfId?: string; showType?: boolean; focusName?: boolean;
 }) {
   const { t } = useI18n();
-  const { skills, providers, agents, types, colonies, connections, objects } = useHive();
+  const { skills, providers, agents, types, colonies, connections, objects } = useHiveData();
   const resources = useMemo(() => objects.filter((o) => MANAGEABLE.includes(o.kind)).map((o) => ({ id: o.id, label: o.name, hint: o.manager_id && o.manager_id !== selfId ? t('form.resources.taken', { name: agents.find((a) => a.id === o.manager_id)?.name ?? '' }) : colonies.find((c) => c.id === o.colony_id)?.name ?? t('common.noColony') })), [objects, agents, colonies, selfId, t]);
   const linked = useMemo(() => connections.filter((c) => c.agent_id === selfId && c.enabled), [connections, selfId]);
   const colony = colonies.find((c) => c.id === draft.colony_id);
@@ -59,7 +59,7 @@ export function AgentForm({ draft, onChange, errors, selfId, showType = true, fo
   return (
     <>
       <Field label={t('form.name')} error={errors.name} hint={t('form.name.hint')}>
-        <input className="input" value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder={t('form.name.placeholder')} autoFocus={focusName} />
+        <input className="input" value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder={t('form.name.placeholder')} data-autofocus={focusName ? '' : undefined} />
       </Field>
       <Field label={t('form.purpose')} hint={t('form.purpose.hint')}>
         <input className="input" value={draft.description} onChange={(e) => set('description', e.target.value)} placeholder={t('form.purpose.placeholder')} />
@@ -68,7 +68,7 @@ export function AgentForm({ draft, onChange, errors, selfId, showType = true, fo
         <Segmented value={draft.role} onChange={(v) => set('role', v)} options={[{ id: 'worker', label: t('role.worker') }, { id: 'orchestrator', label: t('role.orchestrator') }]} />
         <span className="hint">{draft.role === 'orchestrator' ? t('form.role.orchestratorHint') : t('form.role.workerHint')}</span>
       </Field>
-      {showType && type && <p className="hint" style={{ margin: 0 }}>{t('form.basedOn', { name: type.name })}</p>}
+      {showType && type && <p className="hint m0">{t('form.basedOn', { name: type.name })}</p>}
       <Field label={t('form.colony')} hint={t('form.colony.hint')}>
         <select className="select" value={draft.colony_id ?? ''} onChange={(e) => onChange({ ...draft, colony_id: e.target.value || null, overrides: [] })}>
           <option value="">{t('common.noColony')}</option>
@@ -79,7 +79,7 @@ export function AgentForm({ draft, onChange, errors, selfId, showType = true, fo
       <ModelField provider={draft.provider} value={draft.model} onChange={(v) => set('model', v)} />
       {colony && colony.inherit.permission && <InheritRow colony={colony} on={inh('permission')} onChange={(v) => toggle('permission', v)} label={t('inherit.permissions')} value={permissionLabel(colony.permission)} />}
       {!inh('permission') && <PermissionField value={draft.permission} onChange={(v) => set('permission', v)} locked={linked.length ? ['plan'] : []} />}
-      {linked.length > 0 && <p className="hint" style={{ margin: 0 }}><b>{t('form.connections')}:</b> {t('form.connections.hint', { names: linked.map((c) => c.name).join(', ') })}</p>}
+      {linked.length > 0 && <p className="hint m0"><b>{t('form.connections')}:</b> {t('form.connections.hint', { names: linked.map((c) => c.name).join(', ') })}</p>}
       {colony && colony.inherit.cwd && colony.cwd && <InheritRow colony={colony} on={inh('cwd')} onChange={(v) => toggle('cwd', v)} label={t('field.folder')} value={shortPath(colony.cwd)} mono />}
       {!(inh('cwd') && colony?.cwd) && <FolderPicker value={draft.cwd} onChange={(v) => set('cwd', v)} error={errors.cwd} />}
       {colony && colony.inherit.prompt && colony.system_prompt.trim() && (
@@ -102,16 +102,7 @@ export function AgentForm({ draft, onChange, errors, selfId, showType = true, fo
       {draft.role === 'orchestrator' && (
         <Field label={t('form.team')} hint={t('form.team.hint')}>
           {candidates.length ? (
-            <div className="skillpick">
-              {candidates.map((w) => {
-                const on = draft.worker_ids.includes(w.id);
-                return (
-                  <button key={w.id} type="button" className="skillrow" aria-pressed={on} onClick={() => set('worker_ids', on ? draft.worker_ids.filter((x) => x !== w.id) : [...draft.worker_ids, w.id])}>
-                    <span className="check">{on && <Check size={13} strokeWidth={3} />}</span><span><b style={{ fontWeight: 600 }}>{w.name}</b><span className="hint" style={{ display: 'block' }}>{w.description || w.provider}</span></span>
-                  </button>
-                );
-              })}
-            </div>
+            <MemberPick items={candidates.map((w) => ({ id: w.id, name: w.name, note: w.description || w.provider }))} value={draft.worker_ids} onChange={(ids) => set('worker_ids', ids)} />
           ) : <p className="hint">{t('form.team.empty')}</p>}
         </Field>
       )}
@@ -126,7 +117,7 @@ function InheritRow({ colony, on, onChange, label, value, note, mono }: { colony
     <label className={`inherit-row ${on ? 'on' : ''}`}>
       <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
       <span className="grow">
-        <b>{label} <span className="muted" style={{ fontWeight: 500 }}>{t('inherit.from')}</span> <i className="cdot" style={{ background: colony.color || 'var(--honey)' }} />{colony.name}</b>
+        <b>{label} <span className="muted fw-500">{t('inherit.from')}</span> <i className="cdot" style={{ background: colony.color || 'var(--honey)' }} />{colony.name}</b>
         <span className={`inh-val ${mono ? 'mono' : ''}`}>{value || '—'}</span>
         {note && <span className="hint">{note}</span>}
       </span>

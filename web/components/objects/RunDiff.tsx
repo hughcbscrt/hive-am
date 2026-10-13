@@ -1,7 +1,7 @@
 'use client';
 import { useMemo } from 'react';
 import { useI18n } from '@/lib/i18n/index';
-import { fmtBytes } from '@/lib/format';
+import { fmtBytes, fmtTime } from '@/lib/format';
 import type { HttpHistoryEntry } from '@/lib/types';
 
 type Op = { t: ' ' | '+' | '-'; s: string };
@@ -38,8 +38,8 @@ export function RunDiff({ before, after }: { before: HttpHistoryEntry; after: Ht
   return (
     <div className="rd">
       <div className="rd-head">
-        <div><span className="muted small">{t('hw2.diff.before')} · {new Date(before.at).toLocaleTimeString()}</span><div className="mono">{stat(before)}</div></div>
-        <div><span className="muted small">{t('hw2.diff.after')} · {new Date(after.at).toLocaleTimeString()}</span><div className="mono">{stat(after)}</div></div>
+        <div><span className="muted small">{t('hw2.diff.before')} · {fmtTime(before.at)}</span><div className="mono">{stat(before)}</div></div>
+        <div><span className="muted small">{t('hw2.diff.after')} · {fmtTime(after.at)}</span><div className="mono">{stat(after)}</div></div>
       </div>
       {hchanges.length > 0 && (<><div className="eyebrow">{t('http.headers')}</div><div className="rd-hdrs mono small">{hchanges.map((k) => <div key={k}><b>{k}</b>: {hb[k] !== undefined && <span className="rd-del">{hb[k]}</span>} {ha[k] !== undefined && <span className="rd-add">{ha[k]}</span>}</div>)}</div></>)}
       <div className="eyebrow" style={{ marginTop: 10 }}>{t('hw2.diff.body')} · {changed === 0 ? t('hw2.diff.same') : t('hw2.diff.lines', { count: changed })}</div>

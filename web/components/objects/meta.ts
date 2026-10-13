@@ -1,4 +1,5 @@
 import { Boxes, Container, Database, Globe, Server, type LucideIcon } from 'lucide-react';
+import { CLUSTER_COLOR } from '@/lib/meta';
 import type { ObjectKind, ObjectStatus } from '@/lib/types';
 
 export const KIND: Record<ObjectKind, { color: string; icon: LucideIcon }> = {
@@ -6,7 +7,7 @@ export const KIND: Record<ObjectKind, { color: string; icon: LucideIcon }> = {
   docker: { color: '#2496ed', icon: Container },
   http: { color: '#7a4de0', icon: Globe },
   database: { color: '#d9822b', icon: Database },
-  cluster: { color: '#c0399a', icon: Boxes },
+  cluster: { color: CLUSTER_COLOR, icon: Boxes },
 };
 export const STATUS_TONE: Record<ObjectStatus, 'ok' | 'warn' | 'err' | 'off'> = { running: 'ok', ready: 'ok', starting: 'warn', error: 'err', stopped: 'off', unknown: 'off' };
 

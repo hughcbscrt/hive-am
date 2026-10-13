@@ -2,7 +2,7 @@
 import { ManagerField, MANAGEABLE } from './ManagerField';
 import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { Field, FolderPicker, PathPicker, Segmented } from '@/components/ui';
+import { CheckRow, Field, FolderPicker, PathPicker, Segmented } from '@/components/ui';
 import { useComposeServices, useDockerLists } from '@/lib/useDocker';
 import { Suggest } from './Suggest';
 import { TemplatePicker } from './TemplatePicker';
@@ -95,13 +95,13 @@ function ServicePicker({ file, project, services, onServices, onProject }: { fil
   return (
     <>
       <Field label={t('obj.f.services')} hint={t('dk.services.hint')}>
-        {!file ? <p className="muted small" style={{ margin: 0 }}>{t('dk.services.pickFile')}</p>
-          : loading ? <p className="muted small" style={{ margin: 0 }}>{t('dk.services.loading')}</p>
-          : err ? <p className="gx-note err" style={{ margin: 0 }}>{err}</p>
-          : info && info.services.length === 0 ? <p className="muted small" style={{ margin: 0 }}>{t('dk.services.none')}</p>
+        {!file ? <p className="muted small res-m0">{t('dk.services.pickFile')}</p>
+          : loading ? <p className="muted small res-m0">{t('dk.services.loading')}</p>
+          : err ? <p className="gx-note err res-m0">{err}</p>
+          : info && info.services.length === 0 ? <p className="muted small res-m0">{t('dk.services.none')}</p>
           : info ? (<>
             <div className="chips">{info.services.map((sv) => <button key={sv} type="button" className={`chip-pick ${picked.has(sv) ? 'on' : ''}`} aria-pressed={picked.has(sv)} onClick={() => toggle(sv)}>{sv}</button>)}</div>
-            {info.source === 'file' && <p className="muted small" style={{ margin: '6px 0 0' }}>{t('dk.services.file')}</p>}
+            {info.source === 'file' && <p className="muted small res-mt6">{t('dk.services.file')}</p>}
           </>) : null}
       </Field>
       <Field label={t('obj.f.project')} hint={t('dk.project.hint')}>
@@ -124,7 +124,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
   const text = (k: keyof Draft, props: { placeholder?: string; mono?: boolean; type?: string } = {}) => (
     <input className={`input ${props.mono ? 'mono' : ''}`} type={props.type} value={d[k] as string} placeholder={props.placeholder} onChange={(e) => set(k, e.target.value as never)} />
   );
-  const dockerNote = docker.error ? <p className="muted small" style={{ margin: '4px 0 0' }}>{t('dk.unavailable', { error: docker.error })}</p> : null;
+  const dockerNote = docker.error ? <p className="muted small res-mt4">{t('dk.unavailable', { error: docker.error })}</p> : null;
   const refresh = <button type="button" className="btn ghost icon sm" onClick={docker.reload} aria-label={t('dk.refresh')} title={t('dk.refresh')}><RefreshCw size={14} /></button>;
   const fileEnvs = scan ? Object.keys(scan.fileVars).filter((e) => e !== '$shared') : undefined;
   // In the settings of an existing object these live in the one General card (its variables have their own tab); creating one, in cards of their own.
@@ -165,7 +165,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
         <Card title={t('of.members')} hint={t('obj.f.members.hint')}>
           {(() => {
             const pool = objects.filter((o) => (o.kind === 'server' || o.kind === 'docker') && (o.colony_id ?? '') === d.colony_id);
-            if (!pool.length) return <p className="muted small" style={{ margin: 0 }}>{t('obj.f.members.none')}</p>;
+            if (!pool.length) return <p className="muted small res-m0">{t('obj.f.members.none')}</p>;
             const toggle = (id: string) => set('members', d.members.includes(id) ? d.members.filter((x) => x !== id) : [...d.members, id]);
             return (<div className="omembers">{pool.map((o) => { const { icon: Icon, color } = KIND[o.kind]; const at = d.members.indexOf(o.id); return (
               <label key={o.id} className="omember"><input type="checkbox" checked={at >= 0} onChange={() => toggle(o.id)} /><Icon size={15} style={{ color }} /><span className="nm">{o.name}</span>{at >= 0 && <span className="ord">{at + 1}</span>}</label>); })}</div>);
@@ -183,16 +183,16 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
           <Field label={t('obj.sup.restart')} hint={t('obj.sup.restart.hint')}>
             <div className="row gap-s"><select className="select" value={d.restart} onChange={(e) => set('restart', e.target.value)}>
               <option value="no">{t('obj.sup.restart.no')}</option><option value="on-failure">{t('obj.sup.restart.fail')}</option><option value="always">{t('obj.sup.restart.always')}</option></select>
-              {d.restart !== 'no' && <input className="input" style={{ maxWidth: 130 }} value={d.maxRestarts} placeholder={t('obj.sup.max')} onChange={(e) => set('maxRestarts', e.target.value)} title={t('obj.sup.max.hint')} aria-label={t('obj.sup.max')} />}</div>
+              {d.restart !== 'no' && <input className="input res-mw130" value={d.maxRestarts} placeholder={t('obj.sup.max')} onChange={(e) => set('maxRestarts', e.target.value)} title={t('obj.sup.max.hint')} aria-label={t('obj.sup.max')} />}</div>
           </Field>
           <Field label={t('obj.sup.health')} hint={t('obj.sup.health.hint')}>
-            <div className="row gap-s"><select className="select" style={{ maxWidth: 170 }} value={d.healthKind} onChange={(e) => set('healthKind', e.target.value)}>
+            <div className="row gap-s"><select className="select res-mw170" value={d.healthKind} onChange={(e) => set('healthKind', e.target.value)}>
               <option value="">{t('obj.sup.health.none')}</option><option value="http">HTTP</option><option value="tcp">{t('obj.sup.health.tcp')}</option><option value="command">{t('obj.sup.health.command')}</option></select>
               {d.healthKind && <input className="input mono grow" value={d.healthTarget} onChange={(e) => set('healthTarget', e.target.value)} placeholder={d.healthKind === 'http' ? 'http://127.0.0.1:3000/health' : d.healthKind === 'tcp' ? '3000' : 'curl -fs localhost:3000'} aria-label={t('obj.sup.health')} />}</div>
-            {d.healthKind && (<div className="row gap-s wrap" style={{ marginTop: 8 }}>
-              <input className="input" style={{ maxWidth: 150 }} value={d.healthInterval} onChange={(e) => set('healthInterval', e.target.value)} placeholder={t('obj.sup.interval')} aria-label={t('obj.sup.interval')} />
-              <input className="input" style={{ maxWidth: 130 }} value={d.healthRetries} onChange={(e) => set('healthRetries', e.target.value)} placeholder={t('obj.sup.retries')} aria-label={t('obj.sup.retries')} />
-              <label className="row gap-s small"><input type="checkbox" checked={d.healthRestart} onChange={(e) => set('healthRestart', e.target.checked)} />{t('obj.sup.healthRestart')}</label></div>)}
+            {d.healthKind && (<div className="row gap-s wrap res-mt8">
+              <input className="input res-mw150" value={d.healthInterval} onChange={(e) => set('healthInterval', e.target.value)} placeholder={t('obj.sup.interval')} aria-label={t('obj.sup.interval')} />
+              <input className="input res-mw130" value={d.healthRetries} onChange={(e) => set('healthRetries', e.target.value)} placeholder={t('obj.sup.retries')} aria-label={t('obj.sup.retries')} />
+              <CheckRow checked={d.healthRestart} onChange={(v) => set('healthRestart', v)} label={t('obj.sup.healthRestart')} /></div>)}
           </Field>
           <div className="of-grid2">
             <Field label={t('obj.sup.stopTimeout')} hint={t('obj.sup.stopTimeout.hint')}>{text('stopTimeout', { placeholder: '8' })}</Field>

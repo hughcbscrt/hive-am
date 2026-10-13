@@ -4,7 +4,8 @@ import { Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui';
 import { draftFromAgent, validate, type AgentDraft } from './AgentForm';
 import { DeleteAgentModal } from './DeleteAgentModal';
-import { useHive } from '@/lib/store';
+import { useHiveData } from '@/lib/store';
+import { useUnsavedGuard } from '@/lib/hooks/useUnsavedGuard';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import type { Agent } from '@/lib/types';
@@ -15,7 +16,7 @@ import type { Agent } from '@/lib/types';
  */
 export function useAgentSettings(agent: Agent | undefined, opts: { onSaved?: () => void; onDeleted?: () => void } = {}) {
   const { t } = useI18n();
-  const { agents, colonies, objects, refresh } = useHive();
+  const { agents, colonies, objects, refresh } = useHiveData();
   const toast = useToast();
   // The resources it looks after come from the resources themselves (each one has its manager).
   const managed = useMemo(() => (agent ? objects.filter((o) => o.manager_id === agent.id).map((o) => o.id).sort() : []), [objects, agent?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -28,6 +29,7 @@ export function useAgentSettings(agent: Agent | undefined, opts: { onSaved?: () 
 
   const errors = draft && agent ? validate(draft, agents, agent.id, colonies) : {};
   const dirty = !!draft && JSON.stringify(draft) !== base;
+  useUnsavedGuard(dirty);
 
   const save = async () => {
     if (!draft || !agent) return;
@@ -48,7 +50,7 @@ export function useAgentSettings(agent: Agent | undefined, opts: { onSaved?: () 
   /** Delete (left), then Discard and Save. Same buttons, same order, same labels everywhere. */
   const actions = (o: { size?: 'sm'; onCancel?: () => void } = {}) => (
     <>
-      <button className={`btn danger ${o.size ?? ''}`} style={{ marginRight: 'auto' }} onClick={() => setConfirmDelete(true)}><Trash2 size={o.size ? 14 : 15} />{t('agent.delete')}</button>
+      <button className={`btn danger push-r ${o.size ?? ''}`} onClick={() => setConfirmDelete(true)}><Trash2 size={o.size ? 14 : 15} />{t('agent.delete')}</button>
       {o.onCancel
         ? <button className={`btn ghost ${o.size ?? ''}`} onClick={o.onCancel}>{t('common.cancel')}</button>
         : <button className={`btn ghost ${o.size ?? ''}`} disabled={!dirty} onClick={discard}>{t('common.discard')}</button>}

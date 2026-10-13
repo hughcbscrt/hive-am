@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { useHive } from '@/lib/store';
+import { useAgent, useHiveSelector, useLive } from '@/lib/store';
 import { useI18n } from '@/lib/i18n/index';
 import { PROVIDERS, ago, permissionLabel, shortPath } from '@/lib/meta';
 import { activity } from '@/lib/activity';
@@ -67,18 +67,18 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 /** What an agent card says (shared by the hover preview and the card that stays open after a click). */
 export function AgentDetails({ agent: a, hideColony = false }: { agent: Agent; hideColony?: boolean }) {
   const { t } = useI18n();
-  const { agents, colonies, live } = useHive();
+  const agents = useHiveSelector((s) => s.agents), colonies = useHiveSelector((s) => s.colonies);
   const col = colonies.find((c) => c.id === a.colony_id);
-  const act = activity(live[a.id]);
+  const act = activity(useLive(a.id));
   const workers = a.worker_ids.map((id) => agents.find((x) => x.id === id)?.name).filter(Boolean) as string[];
   const bosses = agents.filter((q) => q.role === 'orchestrator' && q.worker_ids.includes(a.id)).map((q) => q.name);
   const list = (names: string[]) => (names.length > 4 ? `${names.slice(0, 4).join(', ')} ${t('hover.more', { count: names.length - 4 })}` : names.join(', '));
   return (<>
     <div className="ap-head">
       <Hex agent={a} />
-      <div className="grow" style={{ minWidth: 0 }}>
+      <div className="grow">
         <b className="ap-name">{a.name}</b>
-        <div className="row gap-s wrap" style={{ marginTop: 4 }}><RoleChip role={a.role} /><StatusChip status={a.status} /></div>
+        <div className="row gap-s wrap mt-s"><RoleChip role={a.role} /><StatusChip status={a.status} /></div>
       </div>
     </div>
     <p className={`ap-desc ${a.description ? '' : 'muted'}`}>{a.description || t('switcher.noDescription')}</p>
@@ -128,8 +128,7 @@ export function AnchoredCard({ target, width = CARD_W, pinned = false, onClose, 
 }
 
 function AgentCard({ anchor }: { anchor: Anchor }) {
-  const { agents } = useHive();
-  const a = agents.find((x) => x.id === anchor.id);
+  const a = useAgent(anchor.id);
   if (!a) return null;
   return <AnchoredCard target={anchor.rect}><AgentDetails agent={a} /></AnchoredCard>;
 }

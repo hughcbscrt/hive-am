@@ -67,20 +67,20 @@ export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { o
   const members = o.kind === 'cluster' ? (o.config as ClusterConfig).members.map((id) => objects.find((x) => x.id === id)).filter((x): x is ObjectView => !!x) : [];
   return (
     <AnchoredCard target={target} pinned width={380} label={o.name} onClose={onClose}>
-     <div className="col obj-panel" style={{ gap: 12 }}>
+     <div className="col obj-panel res-gap12">
       <div className="ap-corner row gap-s"><Link className="btn ghost icon sm" href={`/resources/${o.id}?tab=config`} aria-label={t('obj.act.edit')} title={t('obj.act.edit')}><Pencil size={15} /></Link><button className="btn ghost icon sm" onClick={onClose} aria-label={t('common.close')} title={`${t('common.close')} (Esc)`}><X size={16} /></button></div>
-      <div className="row gap-l" style={{ paddingRight: 70 }}>
+      <div className="row gap-l res-pr70">
         <span className="obj-ico" style={{ ['--c' as never]: color }}><Icon size={22} /></span>
-        <div className="grow" style={{ minWidth: 0 }}>
-          <h2 style={{ fontSize: 20, overflowWrap: 'anywhere' }}>{o.name}</h2>
-          <div className="row gap-s wrap" style={{ marginTop: 4 }}>
+        <div className="grow res-minw0">
+          <h2 className="res-h2">{o.name}</h2>
+          <div className="row gap-s wrap res-mt4">
             <span className={`ostatus ${STATUS_TONE[st]}`}><StatusDot status={st} />{t(`obj.status.${st}`)}</span>
             <span className="muted small">{t(`obj.kind.${o.kind}`)}</span>
           </div>
         </div>
       </div>
       {(o.state.detail || o.state.since) && (
-        <p className="muted small" style={{ margin: 0 }}>{[detailText(t, o.state.detail), o.state.since && live ? t('obj.since', { time: ago(o.state.since) }) : '', o.state.pid ? t('obj.pid', { pid: o.state.pid }) : ''].filter(Boolean).join(' · ')}</p>
+        <p className="muted small res-m0">{[detailText(t, o.state.detail), o.state.since && live ? t('obj.since', { time: ago(o.state.since) }) : '', o.state.pid ? t('obj.pid', { pid: o.state.pid }) : ''].filter(Boolean).join(' · ')}</p>
       )}
       <Link className="btn primary" href={`/resources/${o.id}`}><ExternalLink size={15} />{t('obj.open')}</Link>
       {o.kind !== 'cluster' && <div className="mono small obj-cmd" title={objectSummary(o)}>{objectSummary(o)}</div>}
@@ -99,30 +99,30 @@ export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { o
         </div>
         {o.kind === 'cluster' && (
           <div>
-            <div className="eyebrow" style={{ marginBottom: 6 }}>{t('obj.members')}</div>
-            {members.length ? <div className="col" style={{ gap: 4 }}>{members.map((m, i) => (
-              <div key={m.id} className="row gap-s small"><span className="ord">{i + 1}</span><StatusDot status={m.state.status} /><b className="grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</b><span className="muted">{t(`obj.status.${m.state.status}`)}</span></div>))}</div>
-              : <p className="muted small" style={{ margin: 0 }}>{t('obj.members.empty')}</p>}
+            <div className="eyebrow res-mb6">{t('obj.members')}</div>
+            {members.length ? <div className="col res-gap4">{members.map((m, i) => (
+              <div key={m.id} className="row gap-s small"><span className="ord">{i + 1}</span><StatusDot status={m.state.status} /><b className="grow ellipsis">{m.name}</b><span className="muted">{t(`obj.status.${m.state.status}`)}</span></div>))}</div>
+              : <p className="muted small res-m0">{t('obj.members.empty')}</p>}
           </div>
         )}
         <div className="row gap-s wrap">
           {canShell && <TerminalButton spec={{ objectId: o.id }} label={o.kind === 'server' ? t('dock.here') : t('dock.shell')} />}
           <button className="btn sm" onClick={() => dock.openLogs(o.id, o.name)}><FileText size={14} />{t('dock.logs')}</button>
         </div>
-        <div><div className="eyebrow" style={{ marginBottom: 6 }}>{t('obj.logs')}</div><LogView id={o.id} /></div>
+        <div><div className="eyebrow res-mb6">{t('obj.logs')}</div><LogView id={o.id} /></div>
       </>)}
       {o.kind !== 'http' && o.kind !== 'database' && <div className="obj-managers">
-        <div className="eyebrow" style={{ marginBottom: 6 }}>{t('obj.managers')}</div>
+        <div className="eyebrow res-mb6">{t('obj.managers')}</div>
         {managers.length ? <div className="row gap-s wrap">{managers.map((a) => (
           <span key={a.id} className="chip ps-chip"><Link href={`/agents/${a.id}`} title={a.permission === 'plan' ? t('obj.managers.readonly') : undefined}>{a.name}{a.permission === 'plan' ? ` · ${t('obj.managers.ro')}` : ''}</Link>
             {o.manager_id === a.id && <button type="button" onClick={() => void setManager(null)} aria-label={t('obj.managers.remove')} title={t('obj.managers.remove')}><X size={12} /></button>}</span>))}</div>
-          : <p className="muted small" style={{ margin: 0 }}>{t('obj.managers.none')}</p>}
-        {o.manager_id && <p className="muted small" style={{ margin: '6px 0 0' }}>{t('obj.managers.only')}</p>}
-        <div className="row gap-s wrap" style={{ marginTop: 8 }}>
+          : <p className="muted small res-m0">{t('obj.managers.none')}</p>}
+        {o.manager_id && <p className="muted small res-mt6">{t('obj.managers.only')}</p>}
+        <div className="row gap-s wrap res-mt8">
           <button className="btn sm" onClick={onCreateManager}><UserPlus size={14} />{t('obj.managers.create')}</button>
           <button className="btn sm" aria-pressed={adding} onClick={() => setAdding((v) => !v)}><Users size={14} />{t('obj.managers.add')}</button>
         </div>
-        {adding && <div style={{ marginTop: 8 }}><PickSearch inline autoFocus options={agents.filter((a) => a.id !== o.manager_id).map((a) => ({ id: a.id, label: a.name, hint: colonies.find((c) => c.id === a.colony_id)?.name ?? t('common.noColony') }))} value={[]} onChange={(ids) => ids[0] && void setManager(ids[0])} placeholder={t('obj.manager.placeholder')} empty={t('obj.manager.empty')} ariaLabel={t('obj.managers.add')} /></div>}
+        {adding && <div className="res-mt8"><PickSearch inline autoFocus options={agents.filter((a) => a.id !== o.manager_id).map((a) => ({ id: a.id, label: a.name, hint: colonies.find((c) => c.id === a.colony_id)?.name ?? t('common.noColony') }))} value={[]} onChange={(ids) => ids[0] && void setManager(ids[0])} placeholder={t('obj.manager.placeholder')} empty={t('obj.manager.empty')} ariaLabel={t('obj.managers.add')} /></div>}
       </div>}
      </div>
     </AnchoredCard>

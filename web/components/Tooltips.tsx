@@ -74,7 +74,7 @@ export function Tooltips() {
 
   if (!tip) return null;
   return (
-    <div ref={box} className="tooltip" role="tooltip" data-below={pos?.below ? '1' : undefined} style={pos ? { left: pos.left, top: pos.top } : { left: 0, top: 0, visibility: 'hidden' }}>
+    <div ref={box} className="tooltip" role="tooltip" data-live data-below={pos?.below ? '1' : undefined} style={pos ? { left: pos.left, top: pos.top } : { left: 0, top: 0, visibility: 'hidden' }}>
       {tip.text}
     </div>
   );

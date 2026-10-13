@@ -4,10 +4,12 @@ import { useAgentSettings } from '@/components/agents/useAgentSettings';
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, History, Maximize2, Minimize2, RotateCcw, SlidersHorizontal, Waypoints } from 'lucide-react';
-import { useHive } from '@/lib/store';
+import { History, RotateCcw, SlidersHorizontal, Waypoints } from 'lucide-react';
+import { useAgent, useHiveData } from '@/lib/store';
 import { api } from '@/lib/api';
-import { ago, shortPath } from '@/lib/meta';
+import { ago, shortPath, PROVIDERS } from '@/lib/meta';
+import { usePersistentState } from '@/lib/hooks/usePersistentState';
+import { useQueryState } from '@/lib/hooks/useQueryState';
 import { Chat } from '@/components/chat/Chat';
 import { StatsBar } from '@/components/chat/StatsBar';
 import { AgentSwitcher } from '@/components/agents/AgentSwitcher';
@@ -15,13 +17,12 @@ import { GitExplorer } from '@/components/git/GitExplorer';
 import { useGit } from '@/lib/git/useGit';
 import { AgentForm } from '@/components/agents/AgentForm';
 import { NotebookPanel } from '@/components/agents/NotebookPanel';
-import { Hex, Modal, ProviderBadge, RoleChip, StatusChip, useToast } from '@/components/ui';
+import { Banner, ConfirmDialog, Drawer, EmptyState, Hex, ProviderBadge, RoleChip, StatusChip, TabPanel, Tabs, WorkspaceHeader, useToast, type HeaderAction } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
 
 interface Sess { session_id: string; first_seen: number; last_seen: number; kind: 'direct' | 'delegation'; from_name: string | null; task: string | null }
-
-const CFG_MIN = 340, CFG_DEFAULT = 400;
-const maxCfg = () => Math.max(CFG_MIN, window.innerWidth - 80);
+type CfgTab = 'config' | 'notebook' | 'sessions';
+const CFG_TABS: CfgTab[] = ['config', 'notebook', 'sessions'];
 
 export default function AgentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -31,70 +32,74 @@ export default function AgentPage({ params }: { params: Promise<{ id: string }> 
 
 function Workspace({ id }: { id: string }) {
   const { t } = useI18n();
-  const { agent: find, agents, colonies, ready, refresh } = useHive();
-  const agent = find(id);
+  const { ready, error, retry, refresh } = useHiveData();
+  const agent = useAgent(id);
   const router = useRouter();
   const toast = useToast();
-  const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<'config' | 'notebook' | 'sessions'>('config');
+  // The settings drawer is open only while the URL says so (?tab=config|notebook|sessions): a modal never opens by itself from a saved preference.
+  const [qtab, setQtab] = useQueryState('tab', '');
+  const [lastTab, setLastTab] = useState<CfgTab>('config');
+  const tab: CfgTab = (CFG_TABS as string[]).includes(qtab) ? (qtab as CfgTab) : lastTab;
+  const open = qtab !== '';
+  const [askClose, setAskClose] = useState(false);
   const [sessions, setSessions] = useState<Sess[]>([]);
   const [viewing, setViewing] = useState<string | undefined>(undefined);
   const [confirm, setConfirm] = useState<'new' | null>(null);
   const [view, setView] = useState<'chat' | 'changes'>('chat');
-  const [swCollapsed, setSwCollapsed] = useState(false);
-  useEffect(() => { try { setSwCollapsed(localStorage.getItem('hive-switcher-collapsed') === '1'); } catch { /* ignore */ } }, []);
-  const toggleSwitcher = () => setSwCollapsed((c) => { try { localStorage.setItem('hive-switcher-collapsed', c ? '0' : '1'); } catch { /* ignore */ } return !c; });
+  const [swCollapsedN, setSwCollapsed] = usePersistentState<number>('hive-switcher-collapsed', 0);
+  const swCollapsed = swCollapsedN === 1;
+  const toggleSwitcher = () => setSwCollapsed(swCollapsed ? 0 : 1);
   // Always loaded (cheap) so the tab can show how many files changed; the file tree loads when the tab opens.
   const git = useGit(agent, view === 'changes');
   const changedCount = git.status && git.status.isRepo ? git.status.changes.length : 0;
 
-  useEffect(() => { try { setOpen(localStorage.getItem('hive-cfg-open') === '1'); } catch { /* ignore */ } }, []);
-  const [cfgW, setCfgW] = useState(CFG_DEFAULT);
-  useEffect(() => { try { const w = Number(localStorage.getItem('hive-cfg-width')); if (w >= CFG_MIN) setCfgW(Math.min(w, maxCfg())); } catch { /* ignore */ } }, []);
-  const saveCfgW = (w: number) => { try { localStorage.setItem('hive-cfg-width', String(Math.round(w))); } catch { /* ignore */ } };
-  const cfgWide = cfgW > CFG_DEFAULT + 40;
-  const toggleCfgW = () => { const w = cfgWide ? CFG_DEFAULT : Math.min(maxCfg(), Math.round(window.innerWidth / 2)); setCfgW(w); saveCfgW(w); };
-  const dragCfg = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const el = e.currentTarget; el.setPointerCapture(e.pointerId);
-    let w = cfgW;
-    const move = (ev: PointerEvent) => { w = Math.min(maxCfg(), Math.max(CFG_MIN, window.innerWidth - ev.clientX)); setCfgW(w); };
-    const up = () => { el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); saveCfgW(w); };
-    el.addEventListener('pointermove', move); el.addEventListener('pointerup', up);
-  };
-  const toggle = (v: boolean, tb?: 'config' | 'notebook' | 'sessions') => { setOpen(v); if (tb) setTab(tb); try { localStorage.setItem('hive-cfg-open', v ? '1' : '0'); } catch { /* ignore */ } };
-
+  const setOpen = (v: boolean, tb?: CfgTab) => { const next = tb ?? tab; setLastTab(next); setQtab(v ? next : ''); };
   const settings = useAgentSettings(agent, { onDeleted: () => router.push('/agents') });
-  const { draft, setDraft, errors, dirty, saving } = settings;
+  const { draft, setDraft, errors, dirty } = settings;
+  // Closing with edits (X, Escape, scrim, Hide) asks first.
+  const closeCfg = () => { if (dirty) setAskClose(true); else setOpen(false); };
   useEffect(() => { if (open && tab === 'sessions') api.get<Sess[]>(`/agents/${id}/sessions`).then(setSessions).catch(() => undefined); }, [open, tab, id, agent?.session_id]);
 
-
   if (!agent) return (
-    <div className={`ws ${swCollapsed ? 'sw-collapsed' : ''}`}><AgentSwitcher activeId={id} collapsed={swCollapsed} onToggle={toggleSwitcher} /><div className="page">{ready ? <div className="empty"><h3>{t('agent.missing.title')}</h3><p>{t('agent.missing.body')}</p><Link className="btn" href="/agents">{t('agent.missing.back')}</Link></div> : null}</div></div>
+    <div className={`ws ${swCollapsed ? 'sw-collapsed' : ''}`}><AgentSwitcher activeId={id} collapsed={swCollapsed} onToggle={toggleSwitcher} />
+      <div className="page">
+        {!ready && error ? <Banner kind="err"><span>{error}</span> <button type="button" className="btn sm" onClick={() => void retry()}>{t('fa.retry')}</button></Banner>
+          : ready ? <EmptyState title={t('agent.missing.title')} body={t('agent.missing.body')} action={<Link className="btn" href="/agents">{t('agent.missing.back')}</Link>} /> : null}
+      </div>
+    </div>
   );
 
   const resume = async (sid: string) => { await api.post(`/agents/${id}/resume-session`, { session_id: sid }); setViewing(undefined); toast(t('agent.resumed')); };
   const direct = sessions.filter((s) => s.kind !== 'delegation');
   const delegated = sessions.filter((s) => s.kind === 'delegation');
+  const viewingDelegation = sessions.find((s) => s.session_id === viewing)?.kind === 'delegation';
+  const actions: HeaderAction[] = [
+    ...(viewing ? [
+      { id: 'make-current', label: t('agent.makeCurrent'), onClick: () => void resume(viewing).catch((e) => toast(e instanceof Error ? e.message : String(e), 'err')), disabled: viewingDelegation },
+      { id: 'back-current', label: t('agent.backToCurrent'), onClick: () => setViewing(undefined) },
+    ] : []),
+    { id: 'new-conv', label: t('agent.newConversation'), icon: <RotateCcw size={14} />, onClick: () => setConfirm('new'), disabled: !agent.session_id || agent.status === 'running' },
+  ];
 
   return (
-    <div className={`ws ${open ? 'with-config' : ''} ${swCollapsed ? 'sw-collapsed' : ''}`} style={{ '--cfg': `${cfgW}px` } as React.CSSProperties}>
+    <div className={`ws ${swCollapsed ? 'sw-collapsed' : ''}`}>
       <AgentSwitcher activeId={id} collapsed={swCollapsed} onToggle={toggleSwitcher} />
       <section className="ws-chat">
-        <header className="ws-head">
-          <Link href="/" className="btn ghost icon" aria-label={t('agent.backToColony')}><ArrowLeft size={18} /></Link>
-          <Hex agent={agent} />
-          <div className="grow"><h1>{agent.name}</h1><div className="row gap-s wrap" style={{ marginTop: 3 }}><RoleChip role={agent.role} /><ProviderBadge provider={agent.provider} /><span className="muted small">{agent.model || t('model.cliDefault')}</span><StatusChip status={agent.status} /></div></div>
-          <div className="seg" role="group" aria-label={t('git.tab.label')}>
-            <button type="button" aria-pressed={view === 'chat'} onClick={() => setView('chat')}>{t('git.tab.chat')}</button>
-            <button type="button" aria-pressed={view === 'changes'} onClick={() => setView('changes')}>{t('git.tab.changes')}{changedCount > 0 && <span className="tabcount">{changedCount}</span>}</button>
-          </div>
-          {viewing && <button className="btn primary sm" onClick={() => resume(viewing)} disabled={sessions.find((s) => s.session_id === viewing)?.kind === 'delegation'}>{t('agent.makeCurrent')}</button>}
-          {viewing && <button className="btn sm" onClick={() => setViewing(undefined)}>{t('agent.backToCurrent')}</button>}
-          <TerminalButton spec={{ agentId: id }} title={t('dock.agent')} />
-          <button className="btn sm" onClick={() => setConfirm('new')} disabled={!agent.session_id || agent.status === 'running'}><RotateCcw size={14} />{t('agent.newConversation')}</button>
-          <button className={`btn sm ${open ? 'primary' : ''}`} onClick={() => toggle(!open)} aria-expanded={open} aria-label={t('colony.agentSettings')}><SlidersHorizontal size={14} />{t('agent.settings')}{dirty && <i className="dot run" title={t('agent.unsaved')} />}</button>
-        </header>
+        <WorkspaceHeader
+          back={{ href: '/', label: t('agent.backToColony') }}
+          avatar={<Hex agent={agent} />}
+          title={agent.name}
+          meta={<><RoleChip role={agent.role} /><ProviderBadge provider={agent.provider} /><span className="small">{agent.model || t('model.cliDefault')}</span><StatusChip status={agent.status} /></>}
+          actions={actions}
+          primary={<>
+            <div className="seg" role="group" aria-label={t('git.tab.label')}>
+              <button type="button" aria-pressed={view === 'chat'} onClick={() => setView('chat')}>{t('git.tab.chat')}</button>
+              <button type="button" aria-pressed={view === 'changes'} onClick={() => setView('changes')}>{t('git.tab.changes')}{changedCount > 0 && <span className="tabcount">{changedCount}</span>}</button>
+            </div>
+            <TerminalButton spec={{ agentId: id }} title={t('dock.agent')} />
+            <button type="button" className={`btn sm ${open ? 'primary' : ''}`} onClick={() => (open ? closeCfg() : setOpen(true))} aria-expanded={open} aria-label={t('colony.agentSettings')}><SlidersHorizontal size={14} />{t('agent.settings')}{dirty && <i className="dot run" title={t('agent.unsaved')} />}</button>
+          </>}
+        />
         {/* The chat stays mounted (just hidden) so a half-written message and the scroll position survive a visit to Changes. */}
         <div className="chat-pane" hidden={view !== 'chat'}>
           <StatsBar agent={agent} session={viewing} />
@@ -104,60 +109,57 @@ function Workspace({ id }: { id: string }) {
       </section>
 
       {open && (
-        <aside className="ws-side">
-          <div className="ws-grip" onPointerDown={dragCfg} onDoubleClick={toggleCfgW} role="separator" aria-orientation="vertical" aria-label={t('drawer.resize')} title={t('drawer.resize')} />
-          <div className="tabs" role="tablist" style={{ padding: '0 12px', position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 2 }}>
-            <button className="tab" role="tab" aria-selected={tab === 'config'} onClick={() => setTab('config')}>{t('agent.tab.config')}</button>
-            <button className="tab" role="tab" aria-selected={tab === 'notebook'} onClick={() => setTab('notebook')}>{t('agent.tab.notebook')}</button>
-            <button className="tab" role="tab" aria-selected={tab === 'sessions'} onClick={() => setTab('sessions')}>{t('nav.sessions')}</button>
-            <button className="btn ghost icon sm" style={{ marginLeft: 'auto', alignSelf: 'center' }} onClick={toggleCfgW} aria-label={cfgWide ? t('drawer.shrink') : t('drawer.expand')} title={cfgWide ? t('drawer.shrink') : t('drawer.expand')}>{cfgWide ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
-            <button className="btn ghost sm" style={{ alignSelf: 'center' }} onClick={() => toggle(false)}>{t('common.hide')}</button>
-          </div>
-          {tab === 'config' && draft && (
+        <Drawer title={agent.name} subtitle={`${t(`role.${agent.role}`)} · ${PROVIDERS[agent.provider].label}`} onClose={closeCfg}
+          footer={tab === 'config' && draft ? (
             <>
-              <div className="pane"><AgentForm draft={draft} onChange={setDraft} errors={errors} selfId={id} />
-              </div>
-              <div className="savebar col">
-                <span className="muted small">{dirty ? t('agent.unsavedChanges') : t('agent.allSaved')}{dirty && agent.status === 'running' ? ` ${t('agent.appliesNextTurn')}` : ''}</span>
-                <div className="row">{settings.actions({ size: 'sm' })}</div>
-              </div>
+              <span className="muted small grow">{dirty ? t('agent.unsavedChanges') : t('agent.allSaved')}{dirty && agent.status === 'running' ? ` ${t('agent.appliesNextTurn')}` : ''}</span>
+              {settings.actions({ size: 'sm' })}
             </>
-          )}
-          {tab === 'notebook' && <NotebookPanel agent={agent} />}
-          {tab === 'sessions' && (
+          ) : undefined}>
+          <div className="agent-config">
+            <Tabs idPrefix="cfg" label={t('fa.cfg.tabs')} value={tab} onChange={(v) => setOpen(true, v as CfgTab)}
+              tabs={[{ id: 'config', label: t('agent.tab.config') }, { id: 'notebook', label: t('agent.tab.notebook') }, { id: 'sessions', label: t('nav.sessions') }]} />
+          <TabPanel id="config" value={tab} idPrefix="cfg">
+            {draft && (
+              <>
+                <div className="pane"><AgentForm draft={draft} onChange={setDraft} errors={errors} selfId={id} /></div>
+              </>
+            )}
+          </TabPanel>
+          <TabPanel id="notebook" value={tab} idPrefix="cfg"><NotebookPanel agent={agent} /></TabPanel>
+          <TabPanel id="sessions" value={tab} idPrefix="cfg">
             <div className="pane">
-              <p className="hint" style={{ margin: 0 }}>{t('agent.sessions.intro', { path: shortPath(agent.effective.cwd) })}</p>
+              <p className="hint m0">{t('agent.sessions.intro', { path: shortPath(agent.effective.cwd) })}</p>
               <div className="eyebrow">{t('agent.sessions.conversations')}</div>
-              {direct.length === 0 ? <div className="empty" style={{ padding: 24 }}><History size={22} /><p>{t('agent.sessions.empty')}</p></div> : direct.map((s) => {
+              {direct.length === 0 ? <EmptyState compact icon={<History size={22} />} title={t('agent.sessions.empty')} /> : direct.map((s) => {
                 const current = s.session_id === agent.session_id;
                 return (
-                  <div key={s.session_id} className="card card-pad col" style={{ gap: 8, borderColor: viewing === s.session_id ? 'var(--honey)' : undefined }}>
+                  <div key={s.session_id} className={`card card-pad col fa-sess ${viewing === s.session_id ? 'on' : ''}`}>
                     <div className="row"><span className="mono grow">{s.session_id.slice(0, 18)}…</span>{current && <span className="chip honey">{t('sessions.current')}</span>}</div>
                     <span className="muted small">{t('agent.sessions.started', { started: ago(s.first_seen), last: ago(s.last_seen) })}</span>
-                    <div className="row gap-s"><button className="btn sm" onClick={() => setViewing(current ? undefined : s.session_id)}>{viewing === s.session_id ? t('agent.sessions.viewing') : t('agent.sessions.read')}</button>{!current && <button className="btn sm" onClick={() => resume(s.session_id)}>{t('agent.sessions.resume')}</button>}</div>
+                    <div className="row gap-s"><button className="btn sm" onClick={() => { setViewing(current ? undefined : s.session_id); setOpen(false); }}>{viewing === s.session_id ? t('agent.sessions.viewing') : t('agent.sessions.read')}</button>{!current && <button className="btn sm" onClick={() => resume(s.session_id).then(() => setOpen(false)).catch((e) => toast(e instanceof Error ? e.message : String(e), 'err'))}>{t('agent.sessions.resume')}</button>}</div>
                   </div>
                 );
               })}
-              {delegated.length > 0 && <div className="eyebrow" style={{ marginTop: 6 }}>{t('agent.sessions.delegated')}</div>}
+              {delegated.length > 0 && <div className="eyebrow mt-s">{t('agent.sessions.delegated')}</div>}
               {delegated.map((s) => (
-                <div key={s.session_id} className="card card-pad col" style={{ gap: 8, borderColor: viewing === s.session_id ? 'var(--honey)' : undefined }}>
+                <div key={s.session_id} className={`card card-pad col fa-sess ${viewing === s.session_id ? 'on' : ''}`}>
                   <div className="row gap-s"><Waypoints size={14} className="muted" /><b className="grow">{t('agent.sessions.from', { name: s.from_name ?? t('chat.anOrchestrator') })}</b><span className="muted small">{ago(s.last_seen)}</span></div>
-                  {s.task && <span className="small" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{s.task}</span>}
-                  <div className="row gap-s"><button className="btn sm" onClick={() => setViewing(viewing === s.session_id ? undefined : s.session_id)}>{viewing === s.session_id ? t('agent.sessions.viewing') : t('agent.sessions.read')}</button></div>
+                  {s.task && <span className="small fa-clamp3">{s.task}</span>}
+                  <div className="row gap-s"><button className="btn sm" onClick={() => { setViewing(viewing === s.session_id ? undefined : s.session_id); setOpen(false); }}>{viewing === s.session_id ? t('agent.sessions.viewing') : t('agent.sessions.read')}</button></div>
                 </div>
               ))}
             </div>
-          )}
-        </aside>
+          </TabPanel>
+          </div>
+        </Drawer>
       )}
 
       {settings.deleteModal}
+      {askClose && <ConfirmDialog danger title={t('fa.unsaved.title')} body={t('fa.unsaved.body')} confirmLabel={t('fa.unsaved.discard')} cancelLabel={t('fa.unsaved.keep')} onClose={() => setAskClose(false)} onConfirm={() => { settings.discard(); setOpen(false); }} />}
       {confirm === 'new' && (
-        <Modal title={t('agent.newConvTitle')} onClose={() => setConfirm(null)}>
-          <p style={{ margin: 0 }} className="muted">{t('agent.newConvBody')}</p>
-          <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn ghost" onClick={() => setConfirm(null)}>{t('common.cancel')}</button>
-            <button className="btn primary" onClick={async () => { await api.post(`/agents/${id}/new-session`); await refresh(['agents']); setConfirm(null); toast(t('agent.newConvStarted')); }}>{t('agent.newConvStart')}</button></div>
-        </Modal>
+        <ConfirmDialog title={t('agent.newConvTitle')} body={t('agent.newConvBody')} confirmLabel={t('agent.newConvStart')} onClose={() => setConfirm(null)}
+          onConfirm={async () => { await api.post(`/agents/${id}/new-session`); await refresh(['agents']); toast(t('agent.newConvStarted')); }} />
       )}
     </div>
   );

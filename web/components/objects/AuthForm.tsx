@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useI18n } from '@/lib/i18n/index';
 import { getRequestHeader, setRequestHeader } from '@/lib/httpText';
 import { editHttpSource, readHttpSource } from '@/lib/httpFiles';
-import { useToast } from '@/components/ui';
+import { CheckRow, useToast } from '@/components/ui';
 import { HelpPopover } from '@/components/HelpPopover';
 
 type Kind = 'none' | 'bearer' | 'basic' | 'apikey';
@@ -55,7 +55,7 @@ export function AuthForm({ objectId, file, lines, onSaved }: { objectId: string;
         {kind === 'bearer' && <input className="input mono" value={token} placeholder="{{token}}" onChange={(e) => setToken(e.target.value)} aria-label="Token" />}
         {kind === 'basic' && <div className="row gap-s"><input className="input mono" style={{ flex: 1 }} value={user} placeholder="{{user}}" onChange={(e) => setUser(e.target.value)} aria-label={t('hw2.auth.user')} /><input className="input mono" style={{ flex: 1 }} value={pass} placeholder="{{passwd}}" onChange={(e) => setPass(e.target.value)} aria-label={t('hw2.auth.pass')} /></div>}
         {kind === 'apikey' && <div className="row gap-s"><input className="input mono" style={{ flex: 1 }} value={keyName} onChange={(e) => setKeyName(e.target.value)} aria-label={t('hw2.auth.header')} /><input className="input mono" style={{ flex: 2 }} value={keyValue} placeholder="{{apiKey}}" onChange={(e) => setKeyValue(e.target.value)} aria-label={t('hw.session.value')} /></div>}
-        {lines.length > 1 && <label className="row gap-s small"><input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />{t('hw2.auth.all', { count: lines.length })}</label>}
+        {lines.length > 1 && <CheckRow checked={all} onChange={setAll} label={t('hw2.auth.all', { count: lines.length })} />}
         <div className="row gap-s"><button className="btn primary" disabled={busy} onClick={() => void apply()}>{t('hw2.auth.apply')}</button></div>
         {err && <p className="gx-note err" style={{ margin: 0 }}>{err}</p>}
       </div>

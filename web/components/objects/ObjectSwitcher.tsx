@@ -1,13 +1,14 @@
 'use client';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { PanelLeftClose, PanelLeftOpen, Plus, Search } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { useI18n } from '@/lib/i18n/index';
 import type { ObjectView } from '@/lib/types';
 import { KIND, detailText } from './meta';
 import { StatusDot } from './ObjectPanel';
 import { ObjectEditor } from './ObjectEditor';
+import { SearchInput } from '@/components/ui';
 
 /** The list of objects at the left of the Objects screen, grouped by colony, like the agents' list. It folds to icons. */
 export function ObjectSwitcher({ activeId, collapsed = false, onToggle }: { activeId?: string; collapsed?: boolean; onToggle?: () => void }) {
@@ -38,7 +39,7 @@ export function ObjectSwitcher({ activeId, collapsed = false, onToggle }: { acti
             <div key={g.key} className="mini-group">
               <div className="mini-sep" title={`${g.name} · ${g.items.length}`} style={g.color ? { ['--c' as never]: g.color } : undefined} />
               {g.items.map((o) => { const { icon: Icon, color } = KIND[o.kind]; return (
-                <Link key={o.id} href={`/resources/${o.id}`} className="sw-item mini" aria-current={o.id === activeId ? 'page' : undefined} aria-label={o.name} title={`${o.name} — ${t(`obj.status.${o.state.status}`)}`}>
+                <Link key={o.id} href={`/resources/${o.id}`} className="sw-item mini" aria-current={o.id === activeId ? 'page' : undefined} aria-label={o.name} title={`${o.name}: ${t(`obj.status.${o.state.status}`)}`}>
                   <span className="sw-av"><span className="obj-ico sm" style={{ ['--c' as never]: color }}><Icon size={17} /></span><StatusDot status={o.state.status} className="sw-dot" /></span>
                 </Link>); })}
             </div>
@@ -51,12 +52,12 @@ export function ObjectSwitcher({ activeId, collapsed = false, onToggle }: { acti
   return (
     <aside className="switcher" aria-label={t('nav.objects')}>
       <div className="switcher-head">
-        <div className="row"><b style={{ fontFamily: 'var(--font-display)', fontSize: 16 }} className="grow">{t('nav.objects')}</b>{toggleBtn}
+        <div className="row"><b className="grow sw-title">{t('nav.objects')}</b>{toggleBtn}
           <button className="btn ghost icon sm" onClick={() => setCreating(true)} aria-label={t('obj.new')} title={t('obj.new')}><Plus size={16} /></button></div>
-        <div className="search"><Search size={15} /><input className="input" placeholder={t('ow.find')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('ow.find')} /></div>
+        <SearchInput value={q} onChange={setQ} placeholder={t('ow.find')} label={t('ow.find')} />
       </div>
       <div className="switcher-list">
-        {groups.length === 0 && <p className="muted small" style={{ padding: 16 }}>{q ? t('ow.noMatch', { query: q }) : t('ow.empty.body')}</p>}
+        {groups.length === 0 && <p className="muted small sw-none">{q ? t('ow.noMatch', { query: q }) : t('ow.empty.body')}</p>}
         {groups.map((g) => (
           <div key={g.key}>
             <div className="switcher-group">{g.color && <i className="cdot" style={{ background: g.color }} />}{g.name}<span>{g.items.length}</span></div>

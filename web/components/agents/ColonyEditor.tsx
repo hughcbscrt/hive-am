@@ -1,15 +1,17 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
-import { Check, Trash2 } from 'lucide-react';
-import { Drawer, Field, FolderPicker, Modal, PermissionField, SkillPicker, useToast } from '@/components/ui';
-import { useHive } from '@/lib/store';
+import { Trash2 } from 'lucide-react';
+import { Banner, CheckRow, ConfirmDialog, Drawer, Field, FolderPicker, Modal, PermissionField, SkillPicker, useToast } from '@/components/ui';
+import { useHiveData } from '@/lib/store';
+import { useUnsavedGuard } from '@/lib/hooks/useUnsavedGuard';
+import { MemberPick } from './MemberPick';
 import { api } from '@/lib/api';
-import { permissionLabel, shortPath } from '@/lib/meta';
+import { SERIES_COLORS, permissionLabel, shortPath } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n/index';
 import type { Colony, InheritField, InheritFlags, Permission, SkillLoad } from '@/lib/types';
 
-export const COLONY_COLORS = ['#2f8f5b', '#d4663f', '#2f5bea', '#7a4de0', '#c0399a', '#0f8f9e', '#9a7400', '#c2412d'];
+export const COLONY_COLORS = SERIES_COLORS;
 
 interface Draft { name: string; color: string; cwd: string; permission: Permission; system_prompt: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; agent_ids: string[]; inherit: InheritFlags }
 
@@ -17,7 +19,7 @@ const FIELD_IDS: InheritField[] = ['cwd', 'permission', 'skills', 'prompt'];
 
 export function ColonyEditor({ colony, onClose }: { colony?: Colony; onClose: () => void }) {
   const { t } = useI18n();
-  const { agents, skills, colonies, refresh } = useHive();
+  const { agents, skills, colonies, refresh } = useHiveData();
   const toast = useToast();
   const [d, setD] = useState<Draft>(() => colony ? {
     name: colony.name, color: colony.color, cwd: colony.cwd, permission: colony.permission, system_prompt: colony.system_prompt,
@@ -26,6 +28,11 @@ export function ColonyEditor({ colony, onClose }: { colony?: Colony; onClose: ()
     name: '', color: COLONY_COLORS[colonies.length % COLONY_COLORS.length], cwd: '', permission: 'acceptEdits', system_prompt: '', skill_ids: [], skill_loads: {}, agent_ids: [],
     inherit: { cwd: true, permission: true, skills: true, prompt: true },
   });
+  const initial = useMemo(() => JSON.stringify(d), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = JSON.stringify(d) !== initial;
+  useUnsavedGuard(dirty);
+  const [askClose, setAskClose] = useState(false);
+  const close = () => { if (dirty) setAskClose(true); else onClose(); };
   const [err, setErr] = useState('');
   const [asking, setAsking] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -51,9 +58,9 @@ export function ColonyEditor({ colony, onClose }: { colony?: Colony; onClose: ()
 
   return (
     <>
-      <Drawer title={colony ? t('colony.editTitle', { name: colony.name }) : t('colony.newTitle')} subtitle={t('colony.subtitle')} onClose={onClose}
-        footer={<>{colony && <button className="btn danger" style={{ marginRight: 'auto' }} onClick={() => setConfirmDel(true)}><Trash2 size={15} />{t('common.delete')}</button>}<button className="btn ghost" onClick={onClose}>{t('common.cancel')}</button><button className="btn primary" onClick={requestSave}>{colony ? t('colony.save') : t('colony.create')}</button></>}>
-        <Field label={t('form.name')} error={err}><input className="input" value={d.name} onChange={(e) => set('name', e.target.value)} placeholder={t('colony.name.placeholder')} autoFocus /></Field>
+      <Drawer title={colony ? t('colony.editTitle', { name: colony.name }) : t('colony.newTitle')} subtitle={t('colony.subtitle')} onClose={close}
+        footer={<>{colony && <button className="btn danger push-r" onClick={() => setConfirmDel(true)}><Trash2 size={15} />{t('common.delete')}</button>}<button className="btn ghost" onClick={close}>{t('common.cancel')}</button><button className="btn primary" onClick={requestSave}>{colony ? t('colony.save') : t('colony.create')}</button></>}>
+        <Field label={t('form.name')} error={err}><input className="input" value={d.name} onChange={(e) => set('name', e.target.value)} placeholder={t('colony.name.placeholder')} data-autofocus /></Field>
         <Field label={t('colony.color')}>
           <div className="swatches">
             {COLONY_COLORS.map((c) => <button key={c} type="button" className="swatch" style={{ '--c': c } as any} aria-pressed={d.color.toLowerCase() === c} aria-label={t('colony.colorOption', { color: c })} onClick={() => set('color', c)} />)}
@@ -72,17 +79,10 @@ export function ColonyEditor({ colony, onClose }: { colony?: Colony; onClose: ()
         <Field label={t('form.skills')}><SkillPicker skills={skills} value={d.skill_ids} loads={d.skill_loads} onChange={(ids, loads) => setD({ ...d, skill_ids: ids, skill_loads: loads })} /></Field>
         <Field label={t('colony.members')} hint={t('colony.members.hint')}>
           {agents.length === 0 ? <p className="hint">{t('colony.members.empty')}</p> : (
-            <div className="skillpick">
-              {agents.map((a) => {
-                const on = d.agent_ids.includes(a.id); const other = a.colony_id && a.colony_id !== colony?.id ? colonies.find((c) => c.id === a.colony_id) : null;
-                return (
-                  <button key={a.id} type="button" className="skillrow" aria-pressed={on} onClick={() => set('agent_ids', on ? d.agent_ids.filter((x) => x !== a.id) : [...d.agent_ids, a.id])}>
-                    <span className="check">{on && <Check size={13} strokeWidth={3} />}</span>
-                    <span><b style={{ fontWeight: 600 }}>{a.name}</b><span className="hint" style={{ display: 'block' }}>{other ? t('colony.currentlyIn', { name: other.name }) : a.description || t(`role.${a.role}`)}</span></span>
-                  </button>
-                );
-              })}
-            </div>
+            <MemberPick value={d.agent_ids} onChange={(ids) => set('agent_ids', ids)} items={agents.map((a) => {
+              const other = a.colony_id && a.colony_id !== colony?.id ? colonies.find((c) => c.id === a.colony_id) : null;
+              return { id: a.id, name: a.name, note: other ? t('colony.currentlyIn', { name: other.name }) : a.description || t(`role.${a.role}`) };
+            })} />
           )}
         </Field>
       </Drawer>
@@ -90,12 +90,10 @@ export function ColonyEditor({ colony, onClose }: { colony?: Colony; onClose: ()
       {asking && (
         <InheritAsk draft={d} colony={colony} members={agents.filter((a) => d.agent_ids.includes(a.id))} busy={busy} onBack={() => setAsking(false)} onConfirm={save} />
       )}
+      {askClose && <ConfirmDialog danger title={t('fa.unsaved.title')} body={t('fa.unsaved.body')} confirmLabel={t('fa.unsaved.discard')} cancelLabel={t('fa.unsaved.keep')} onClose={() => setAskClose(false)} onConfirm={onClose} />}
       {confirmDel && colony && (
-        <Modal title={t('colony.deleteTitle', { name: colony.name })} onClose={() => setConfirmDel(false)}>
-          <p style={{ margin: 0 }} className="muted">{t('colony.deleteBody', { count: colony.agent_ids.length })}</p>
-          <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn ghost" onClick={() => setConfirmDel(false)}>{t('colony.keep')}</button>
-            <button className="btn danger" onClick={async () => { await api.del(`/colonies/${colony.id}`); await refresh(['agents', 'colonies']); toast(t('colony.deleted')); onClose(); }}>{t('colony.delete')}</button></div>
-        </Modal>
+        <ConfirmDialog title={t('colony.deleteTitle', { name: colony.name })} body={t('colony.deleteBody', { count: colony.agent_ids.length })} danger confirmLabel={t('colony.delete')} cancelLabel={t('colony.keep')} onClose={() => setConfirmDel(false)}
+          onConfirm={async () => { await api.del(`/colonies/${colony.id}`); await refresh(['agents', 'colonies']); toast(t('colony.deleted')); onClose(); }} />
       )}
     </>
   );
@@ -112,18 +110,16 @@ function InheritAsk({ draft, colony, members, busy, onBack, onConfirm }: { draft
   const folderChanges = useMemo(() => flags.cwd && draft.cwd && members.filter((m) => !m.overrides.includes('cwd') && m.effective.cwd !== draft.cwd).length, [flags.cwd, draft.cwd, members]);
   return (
     <Modal title={t('inheritAsk.title')} onClose={onBack}>
-      <p style={{ margin: 0 }} className="muted small">{t('inheritAsk.intro')}</p>
-      <div className="col" style={{ gap: 8 }}>
+      <p className="muted small m0">{t('inheritAsk.intro')}</p>
+      <div className="col gap-s">
         {FIELD_IDS.map((id) => (
-          <label key={id} className={`checkrow ${hasValue[id] ? '' : 'off'}`}>
-            <input type="checkbox" disabled={!hasValue[id]} checked={flags[id]} onChange={(e) => setFlags((f) => ({ ...f, [id]: e.target.checked }))} />
-            <span><b>{t(`inheritAsk.field.${id}`)}{id === 'cwd' && draft.cwd ? <span className="muted mono" style={{ fontWeight: 400 }}> · {shortPath(draft.cwd)}</span> : null}{id === 'permission' ? <span className="muted" style={{ fontWeight: 400 }}> · {permissionLabel(draft.permission)}</span> : null}</b>
-              <span className="hint">{hasValue[id] ? t(`inheritAsk.hint.${id}`) : t(`inheritAsk.empty.${id}`)}</span></span>
-          </label>
+          <CheckRow key={id} disabled={!hasValue[id]} checked={flags[id]} onChange={(v) => setFlags((f) => ({ ...f, [id]: v }))}
+            label={<>{t(`inheritAsk.field.${id}`)}{id === 'cwd' && draft.cwd ? <span className="muted mono fw-400"> · {shortPath(draft.cwd)}</span> : null}{id === 'permission' ? <span className="muted fw-400"> · {permissionLabel(draft.permission)}</span> : null}</>}
+            hint={hasValue[id] ? t(`inheritAsk.hint.${id}`) : t(`inheritAsk.empty.${id}`)} />
         ))}
       </div>
-      {folderChanges ? <div className="banner honey small">{t('inheritAsk.folderMoves', { count: Number(folderChanges) })}</div> : null}
-      <div className="row" style={{ justifyContent: 'flex-end' }}>
+      {folderChanges ? <Banner kind="honey">{t('inheritAsk.folderMoves', { count: Number(folderChanges) })}</Banner> : null}
+      <div className="row push-end">
         <button className="btn ghost" onClick={onBack}>{t('common.back')}</button>
         <button className="btn primary" disabled={busy} onClick={() => onConfirm(flags)}>{busy ? t('common.saving') : colony ? t('colony.save') : t('colony.create')}</button>
       </div>

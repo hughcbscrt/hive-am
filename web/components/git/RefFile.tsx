@@ -9,7 +9,7 @@ import { IMAGE_RE, MARKDOWN_RE } from '@/lib/git/kinds';
 import type { Agent, GitFileResult } from '@/lib/types';
 import { Segmented } from '@/components/ui';
 import { CopyBtn } from '@/components/chat/ToolCall';
-import { FileView } from './GitExplorer';
+import { FileView } from './FileView';
 
 /** A file as it was at a branch, tag or commit: highlighted text, Markdown preview, or the picture. Read-only; nothing is checked out. */
 export function RefFile({ agent, gitRef, path, toolbar = true }: { agent: Agent; gitRef: string; path: string; toolbar?: boolean }) {

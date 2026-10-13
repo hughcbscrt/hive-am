@@ -34,12 +34,17 @@ function Nav() {
   const { t } = useI18n();
   const { agents, types, skills, connections, objects, connected } = useHive();
   const dock = useDock();
-  const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
-  useEffect(() => { try { const saved = localStorage.getItem('hive-theme') as 'light' | 'dark' | null; if (saved) { setTheme(saved); document.documentElement.dataset.theme = saved; } } catch { /* ignore */ } }, []);
+  // The inline script in layout.tsx already applied the theme (saved or the system's); this only follows it.
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const el = document.documentElement, read = () => setDark(el.dataset.theme === 'dark');
+    read();
+    const mo = new MutationObserver(read); mo.observe(el, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => mo.disconnect();
+  }, []);
   const flip = () => {
-    const dark = theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
     const next = dark ? 'light' : 'dark';
-    setTheme(next); document.documentElement.dataset.theme = next;
+    document.documentElement.dataset.theme = next;
     try { localStorage.setItem('hive-theme', next); } catch { /* ignore */ }
   };
   const running = agents.filter((a) => a.status === 'running').length;
@@ -65,7 +70,7 @@ function Nav() {
       <div className="rail-foot">
         <button type="button" className="nav" onClick={dock.toggle} aria-pressed={dock.open} title={`${t('dock.nav')} (Ctrl+\`)`}><SquareTerminal size={18} /><span className="t">{t('dock.nav')}</span>{dock.tabs.length > 0 && <span className="count">{dock.tabs.length}</span>}</button>
         <div className="conn"><i className={`dot ${connected ? 'ok' : 'err'}`} />{connected ? t('nav.connected') : t('nav.offline')}</div>
-        <button type="button" className="nav" onClick={flip}>{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}<span className="t">{t('nav.switchTheme')}</span></button>
+        <button type="button" className="nav" onClick={flip} aria-pressed={dark}>{dark ? <Sun size={18} /> : <Moon size={18} />}<span className="t">{t('nav.switchTheme')}</span></button>
       </div>
     </nav>
   );

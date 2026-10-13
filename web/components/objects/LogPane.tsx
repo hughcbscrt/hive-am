@@ -3,11 +3,11 @@ import { Fragment, memo, useDeferredValue, useEffect, useMemo, useRef, useState 
 import { ArrowDownToLine, Copy, Download, Eraser, Pause, Play, Search, WrapText, ZoomIn, ZoomOut } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/index';
 import { useLogStream } from '@/lib/useLogStream';
+import { SERIES_COLORS as COLORS } from '@/lib/meta';
 
 const SHOWN = 2000;
 const CHUNK = 50;       // rows drawn; the rest is kept (and downloaded) but not drawn
 const LEVEL_ERR = /\b(error|fatal|exception|panic|fail(ed|ure)?|traceback)\b/i, LEVEL_WARN = /\b(warn(ing)?|deprecated)\b/i;
-const COLORS = ['#0f8f9e', '#c0399a', '#7a4de0', '#d4663f', '#2f8f5b', '#9a7400', '#2f5bea', '#c2412d'];
 
 /**
  * The logs of an object on a whole screen: search (highlighting, or only the lines that match), follow the end, wrap, text size, pause,

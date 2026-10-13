@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
 import type { DockerConfig, HttpScan, ObjectView } from '@/lib/types';
-import { Modal, useToast } from '@/components/ui';
+import { ConfirmDialog, useToast } from '@/components/ui';
 import { MANAGEABLE } from './ManagerField';
 import { ObjectFields, draftFrom, toConfig, useDraft } from './ObjectForm';
 
@@ -39,9 +39,7 @@ export function ObjectConfig({ object: o }: { object: ObjectView }) {
     } catch (e) { setErr(e instanceof Error ? e.message : t('edit.saveFailed')); } finally { setBusy(false); }
   };
   const del = async () => {
-    setBusy(true);
-    try { await api.del(`/objects/${o.id}`); await refresh(['objects']); toast(t('obj.deleted')); router.push('/resources'); }
-    catch (e) { setErr(e instanceof Error ? e.message : ''); setConfirmDel(false); setBusy(false); }
+    await api.del(`/objects/${o.id}`); await refresh(['objects']); toast(t('obj.deleted')); router.push('/resources');
   };
 
   return (
@@ -57,10 +55,8 @@ export function ObjectConfig({ object: o }: { object: ObjectView }) {
         <button className="btn primary" disabled={!dirty || busy} onClick={() => void save()}>{t('ow.cfg.save')}</button>
       </div>
       {confirmDel && (
-        <Modal title={t('obj.delete.title', { name: o.name })} onClose={() => setConfirmDel(false)}>
-          <p style={{ margin: 0 }} className="muted">{o.kind === 'server' ? t('obj.delete.server') : o.kind === 'docker' ? t(`obj.delete.${(o.config as DockerConfig).mode}`) : t(`obj.delete.${o.kind}`)}</p>
-          <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn ghost" onClick={() => setConfirmDel(false)}>{t('common.cancel')}</button><button className="btn danger" disabled={busy} onClick={() => void del()}>{t('obj.delete')}</button></div>
-        </Modal>
+        <ConfirmDialog title={t('obj.delete.title', { name: o.name })} confirmLabel={t('obj.delete')} danger onConfirm={del} onClose={() => setConfirmDel(false)}
+          body={o.kind === 'server' ? t('obj.delete.server') : o.kind === 'docker' ? t(`obj.delete.${(o.config as DockerConfig).mode}`) : t(`obj.delete.${o.kind}`)} />
       )}
     </div>
   );

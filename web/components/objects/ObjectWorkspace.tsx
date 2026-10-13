@@ -1,19 +1,18 @@
 'use client';
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Hammer, Info, Loader2, MoreHorizontal, Play, PlugZap, RefreshCcw, RotateCw, Square } from 'lucide-react';
+import { Hammer, Info, Loader2, Play, PlugZap, RefreshCcw, RotateCw, Square } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
 import type { ClusterConfig, DatabaseConfig, DockerConfig, ObjectView } from '@/lib/types';
-import { useToast } from '@/components/ui';
+import { Banner, ConfirmDialog, EmptyState, TabPanel, Tabs, WorkspaceHeader, useToast, type HeaderAction } from '@/components/ui';
+import { useQueryState } from '@/lib/hooks/useQueryState';
 import { KIND, STATUS_TONE, detailText } from './meta';
 import { StatusDot } from './ObjectPanel';
 import { ObjectSwitcher } from './ObjectSwitcher';
 import { ObjectSummary } from './ObjectSummary';
 import { ObjectConfig } from './ObjectConfig';
 import { LogPane } from './LogPane';
-import { Menu, MenuItem, MenuSep } from '@/components/Menu';
 import { ServiceDetail } from './ServiceDetail';
 import { TerminalButton } from '@/components/dock/TerminalButton';
 import { HttpWorkspace } from './HttpWorkspace';
@@ -23,10 +22,10 @@ import { DbWorkspace } from './DbWorkspace';
 type Tab = 'summary' | 'logs' | 'config' | 'requests' | 'history' | 'vars' | 'query' | 'schema';
 const tabsOf = (o: ObjectView): Tab[] => (o.kind === 'http' ? ['requests', 'history', 'vars', 'config'] : o.kind === 'database' ? ['query', 'schema', 'history', 'config'] : ['summary', 'logs', 'config']);
 
-/** One object on a whole screen, like an agent: the list at the left, and its tabs (summary, logs, settings — or requests and variables). */
+/** One object on a whole screen, like an agent: the list at the left, and its tabs (summary, logs, settings, or requests and variables). */
 export function ObjectWorkspace({ id }: { id?: string }) {
   const { t } = useI18n();
-  const { objects, ready, objects: all } = useHive();
+  const { objects, ready, objects: all, error, retry } = useHive();
   const o = id ? objects.find((x) => x.id === id) : undefined;
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => { try { setCollapsed(localStorage.getItem('hive-obj-switcher-collapsed') === '1'); } catch { /* none */ } }, []);
@@ -35,12 +34,16 @@ export function ObjectWorkspace({ id }: { id?: string }) {
   return (
     <div className={`ws ${collapsed ? 'sw-collapsed' : ''}`}>
       <ObjectSwitcher activeId={id} collapsed={collapsed} onToggle={toggle} />
-      {!id && !ready ? (
+      {!ready && error ? (
+        <section className="ws-chat"><div className="ow-pad"><Banner kind="err">
+          <div className="row gap-s wrap"><span className="grow">{error}</span><button className="btn sm" onClick={() => void retry()}>{t('rs.retry')}</button></div>
+        </Banner></div></section>
+      ) : !id && !ready ? (
         <section className="ws-chat" />
       ) : !id ? (
-        <section className="ws-chat"><div className="empty" style={{ margin: 40 }}><h3>{all.length ? t('ow.pick') : t('ow.empty.title')}</h3>{!all.length && <p>{t('ow.empty.body')}</p>}</div></section>
+        <section className="ws-chat"><div className="ow-pad"><EmptyState title={all.length ? t('ow.pick') : t('ow.empty.title')} body={!all.length ? t('ow.empty.body') : undefined} /></div></section>
       ) : !o ? (
-        <section className="ws-chat"><div className="empty" style={{ margin: 40 }}>{ready ? <h3>{t('ow.gone')}</h3> : <p>{t('git.loading')}</p>}</div></section>
+        <section className="ws-chat"><div className="ow-pad">{ready ? <EmptyState title={t('ow.gone')} /> : <EmptyState title={t('git.loading')} />}</div></section>
       ) : <Screen key={o.id} object={o} />}
     </div>
   );
@@ -50,12 +53,13 @@ function Screen({ object: o }: { object: ObjectView }) {
   const { t } = useI18n();
   const toast = useToast();
   const tabs = tabsOf(o);
-  const [tab, setTab] = useState<Tab>(tabs[0]);
+  // The tab lives in the URL (`?tab=config`: the colony map links to the settings); an unknown one falls back to the first.
+  const [rawTab, setTab] = useQueryState('tab', tabs[0]);
+  const tab = (tabs as string[]).includes(rawTab) ? (rawTab as Tab) : tabs[0];
   const [logFilter, setLogFilter] = useState('');
   const [inspecting, setInspecting] = useState(false);
+  const [recreating, setRecreating] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  // `?tab=config` opens that tab (the colony map links to the settings).
-  useEffect(() => { const w = new URLSearchParams(window.location.search).get('tab') as Tab | null; if (w && tabs.includes(w)) setTab(w); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const { icon: Icon, color } = KIND[o.kind];
   const st = o.state.status, live = st === 'running' || st === 'starting';
   const act = async (action: 'start' | 'stop' | 'restart' | 'recreate' | 'rebuild') => {
@@ -75,48 +79,55 @@ function Screen({ object: o }: { object: ObjectView }) {
   const memberNames = members.map((id) => objects.find((x) => x.id === id)?.name ?? '').filter(Boolean);
   const canShell = o.kind === 'server' || (o.kind === 'docker' && (o.config as DockerConfig).mode !== 'compose');
 
+  const docker = o.kind === 'docker' ? (o.config as DockerConfig) : null;
+  const actions: HeaderAction[] = [];
+  if (o.kind !== 'http' && o.kind !== 'database') {
+    actions.push({ id: 'stop', label: t(cluster ? 'obj.act.stopAll' : 'obj.act.stop'), icon: <Square size={14} />, disabled: !!busy || (!live && st !== 'error'), onClick: () => void act('stop') });
+    actions.push({ id: 'restart', label: t(cluster ? 'obj.act.restartAll' : 'obj.act.restart'), icon: <RotateCw size={14} />, disabled: !!busy, onClick: () => void act('restart') });
+  }
+  if (docker && docker.mode === 'container') actions.push({ id: 'inspect', label: t('svc.inspect'), icon: <Info size={14} />, onClick: () => setInspecting(true) });
+  if (docker && docker.mode !== 'existing') actions.push({ id: 'recreate', label: t('obj.act.recreate'), icon: <RefreshCcw size={14} />, danger: true, hint: t('svc.recreate.hint'), disabled: !!busy, onClick: () => setRecreating(true) });
+  if (docker && docker.mode === 'compose') actions.push({ id: 'rebuild', label: t('obj.act.rebuild'), icon: <Hammer size={14} />, hint: t('svc.rebuild.hint'), disabled: !!busy, onClick: () => void act('rebuild') });
+  const primary = (<>
+    {o.kind === 'database' && (
+      <button className="btn sm" disabled={!!busy} onClick={() => void testDb()}>{busy === 'test' ? <Loader2 size={14} className="spin" /> : <PlugZap size={14} />}{t('db.test')}</button>
+    )}
+    {o.kind !== 'http' && o.kind !== 'database' && (
+      <button className="btn primary sm" disabled={!!busy || (cluster ? st === 'running' : live)} onClick={() => void act('start')}><Play size={14} />{t(cluster ? 'obj.act.startAll' : 'obj.act.start')}</button>
+    )}
+    {canShell && <TerminalButton spec={{ objectId: o.id }} title={o.kind === 'server' ? t('dock.here') : t('dock.shell')} />}
+  </>);
+
   return (
     <section className="ws-chat">
-      <header className="ws-head">
-        <Link href="/" className="btn ghost icon" aria-label={t('ow.back')} title={t('ow.back')}><ArrowLeft size={18} /></Link>
-        <span className="obj-ico" style={{ ['--c' as never]: color }}><Icon size={22} /></span>
-        <div className="grow" style={{ minWidth: 0 }}>
-          <h1 style={{ overflowWrap: 'anywhere' }}>{o.name}</h1>
-          <div className="row gap-s wrap" style={{ marginTop: 3 }}>
-            <span className={`ostatus ${STATUS_TONE[st]}`}><StatusDot status={st} />{t(`obj.status.${st}`)}</span>
-            <span className="muted small">{t(`obj.kind.${o.kind}`)}</span>
-            {o.state.detail && <span className="muted small">· {detailText(t, o.state.detail)}</span>}
-          </div>
-        </div>
-        {o.kind === 'database' && (
-          <button className="btn sm" disabled={!!busy} onClick={() => void testDb()}>{busy === 'test' ? <Loader2 size={14} className="spin" /> : <PlugZap size={14} />}{t('db.test')}</button>
-        )}
-        {o.kind !== 'http' && o.kind !== 'database' && (<>
-          <button className="btn primary sm" disabled={!!busy || (cluster ? st === 'running' : live)} onClick={() => void act('start')}><Play size={14} />{t(cluster ? 'obj.act.startAll' : 'obj.act.start')}</button>
-          <button className="btn sm" disabled={!!busy || (!live && st !== 'error')} onClick={() => void act('stop')}><Square size={14} />{t(cluster ? 'obj.act.stopAll' : 'obj.act.stop')}</button>
-          <button className="btn sm" disabled={!!busy} onClick={() => void act('restart')}><RotateCw size={14} />{t(cluster ? 'obj.act.restartAll' : 'obj.act.restart')}</button>
-        </>)}
-        {o.kind === 'docker' && (o.config as DockerConfig).mode !== 'existing' && (
-          <Menu label={t('svc.more')} icon={<MoreHorizontal size={14} />}>{(close) => (<>
-            {(o.config as DockerConfig).mode === 'container' && <><MenuItem icon={<Info size={15} />} onClick={() => { close(); setInspecting(true); }}>{t('svc.inspect')}</MenuItem><MenuSep /></>}
-            <MenuItem icon={<RefreshCcw size={15} />} danger hint={t('svc.recreate.hint')} onClick={() => { close(); void act('recreate'); }}>{t('obj.act.recreate')}</MenuItem>
-            {(o.config as DockerConfig).mode === 'compose' && <MenuItem icon={<Hammer size={15} />} hint={t('svc.rebuild.hint')} onClick={() => { close(); void act('rebuild'); }}>{t('obj.act.rebuild')}</MenuItem>}
-          </>)}</Menu>
-        )}
-        {canShell && <TerminalButton spec={{ objectId: o.id }} title={o.kind === 'server' ? t('dock.here') : t('dock.shell')} />}
-      </header>
-      <div className="tabs ow-tabs" role="tablist">
-        {tabs.map((x) => <button key={x} className="tab" role="tab" aria-selected={tab === x} onClick={() => { if (x === 'logs') setLogFilter(''); setTab(x); }}>{t(`ow.tab.${x}`)}</button>)}
-      </div>
+      <WorkspaceHeader
+        back={{ href: '/', label: t('ow.back') }}
+        avatar={<span className="obj-ico" style={{ ['--c' as never]: color }}><Icon size={22} /></span>}
+        title={o.name}
+        meta={<>
+          <span className={`ostatus ${STATUS_TONE[st]}`}><StatusDot status={st} />{t(`obj.status.${st}`)}</span>
+          <span>{t(`obj.kind.${o.kind}`)}</span>
+          {o.state.detail && <span>{detailText(t, o.state.detail)}</span>}
+        </>}
+        primary={primary}
+        actions={actions}
+      />
+      <Tabs idPrefix="ow" label={t('rs.tabs')} value={tab} onChange={(x) => { if (x === 'logs') setLogFilter(''); setTab(x); }} tabs={tabs.map((x) => ({ id: x, label: t(`ow.tab.${x}`) }))} />
       <div className={`ow-body ${tab === 'logs' || tab === 'requests' || tab === 'history' || tab === 'query' || tab === 'schema' ? 'full' : ''}`}>
-        {tab === 'summary' && <ObjectSummary object={o} onSeeLogs={(filter) => { setLogFilter(filter ?? ''); setTab('logs'); }} />}
-        {tab === 'logs' && <LogPane key={logFilter} id={o.id} members={cluster ? memberNames : undefined} initialFilter={logFilter || undefined} />}
-        {tab === 'config' && <ObjectConfig object={o} />}
-        {o.kind === 'database' && (tab === 'query' || tab === 'schema' || tab === 'history') && <DbWorkspace object={o} pane={tab} onPane={setTab} />}
-        {o.kind === 'http' && (tab === 'requests' || tab === 'history') && <HttpWorkspace object={o} pane={tab} onOpenVars={() => setTab('vars')} onGoRequests={() => setTab('requests')} />}
-        {tab === 'vars' && <HttpVars object={o} />}
+        <TabPanel id={tab} value={tab} idPrefix="ow">
+          {tab === 'summary' && <ObjectSummary object={o} onSeeLogs={(filter) => { setLogFilter(filter ?? ''); setTab('logs'); }} />}
+          {tab === 'logs' && <LogPane key={logFilter} id={o.id} members={cluster ? memberNames : undefined} initialFilter={logFilter || undefined} />}
+          {tab === 'config' && <ObjectConfig object={o} />}
+          {o.kind === 'database' && (tab === 'query' || tab === 'schema' || tab === 'history') && <DbWorkspace object={o} pane={tab} onPane={setTab} />}
+          {o.kind === 'http' && (tab === 'requests' || tab === 'history') && <HttpWorkspace object={o} pane={tab} onOpenVars={() => setTab('vars')} onGoRequests={() => setTab('requests')} />}
+          {tab === 'vars' && <HttpVars object={o} />}
+        </TabPanel>
       </div>
       {inspecting && <ServiceDetail objectId={o.id} title={o.name} onClose={() => setInspecting(false)} />}
+      {recreating && (
+        <ConfirmDialog title={t('rs.recreate.title', { name: o.name })} body={t('svc.recreate.hint')} confirmLabel={t('obj.act.recreate')} danger
+          onConfirm={() => act('recreate')} onClose={() => setRecreating(false)} />
+      )}
     </section>
   );
 }

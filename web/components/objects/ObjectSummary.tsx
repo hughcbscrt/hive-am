@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { usePolling } from '@/lib/hooks/usePolling';
 import { useI18n } from '@/lib/i18n/index';
 import { useLogStream } from '@/lib/useLogStream';
 import { ago, shortPath } from '@/lib/meta';
@@ -52,7 +53,7 @@ export function ObjectSummary({ object: o, onSeeLogs }: { object: ObjectView; on
   const { t } = useI18n();
   const { stats, cpu, mem, live, reload } = useStats(o);
   const [, tick] = useState(0);
-  useEffect(() => { if (!live) return; const id = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(id); }, [live]);
+  usePolling(() => tick((x) => x + 1), 1000, { enabled: live, immediate: false });
   const { text } = useLogStream(o.id, { max: 40_000, pollMs: 2000 });
   const lastLines = useMemo(() => (text ?? '').split('\n').filter((l) => l.trim()).slice(-14).join('\n'), [text]);
   const info = stats?.info ?? {};
