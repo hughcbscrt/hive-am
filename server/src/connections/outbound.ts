@@ -5,6 +5,7 @@ import { DATA_DIR, resolved } from '../db.js';
 import type { Agent } from '../types.js';
 import { inboxDir } from './files.js';
 import type { FileKind } from './types.js';
+import { DomainError } from '../errors.js';
 
 /**
  * Files an agent sends back to a chat. The agent names a path; hive-am checks it before anything leaves this machine, so
@@ -24,7 +25,7 @@ const KINDS: Record<string, [FileKind, string]> = {
 };
 
 export interface Sendable { path: string; name: string; size: number; kind: FileKind; mime: string }
-export class SendError extends Error {}
+export class SendError extends DomainError {}
 
 const inside = (child: string, root: string) => child === root || child.startsWith(root.endsWith(sep) ? root : root + sep);
 const real = (p: string) => { try { return realpathSync(p); } catch { return null; } };

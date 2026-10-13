@@ -1,17 +1,16 @@
-import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
+import { execCapture } from './exec.js';
 import { ObjectError } from './model.js';
 
 /**
  * What Docker knows, to suggest in the forms: the containers on this machine, the images, and the services of a compose file. Read-only;
  * when Docker is not available the lists are empty and say why.
  */
-const run = (args: string[], o: { cwd?: string; timeout?: number } = {}) => new Promise<{ out: string; err: string; code: number }>((resolve) => {
-  execFile('docker', args, { cwd: o.cwd, timeout: o.timeout ?? 15_000, maxBuffer: 8 * 1024 * 1024, encoding: 'utf8', env: { ...process.env, DOCKER_CLI_HINTS: 'false' } }, (e: any, stdout, stderr) => {
-    resolve({ out: String(stdout ?? ''), err: e?.code === 'ENOENT' ? 'Docker is not installed or not in the PATH' : String(stderr ?? ''), code: e ? (typeof e.code === 'number' ? e.code : 1) : 0 });
-  });
-});
+const run = async (args: string[], o: { cwd?: string; timeout?: number } = {}) => {
+  const r = await execCapture('docker', args, { cwd: o.cwd, timeout: o.timeout ?? 15_000, env: { ...process.env, DOCKER_CLI_HINTS: 'false' } });
+  return { out: r.out, err: r.missing ? 'Docker is not installed or not in the PATH' : r.err, code: r.code };
+};
 const lines = (out: string): any[] => out.trim().split('\n').flatMap((l) => { try { return [JSON.parse(l)]; } catch { return []; } });
 
 export interface ContainerInfo { id: string; name: string; image: string; state: string; status: string; ports: string; /** Created by hive-am for one of its objects. */ managed: boolean }

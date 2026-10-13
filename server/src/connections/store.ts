@@ -1,51 +1,27 @@
 import { randomUUID } from 'node:crypto';
 import { db } from '../db.js';
+import { parseJson } from '../db/json.js';
 import type { AllowedUser, Connection, ChannelKind, SavedFile, Target, Thread } from './types.js';
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS connections (
-  id TEXT PRIMARY KEY, kind TEXT NOT NULL, name TEXT NOT NULL UNIQUE,
-  agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
-  config TEXT NOT NULL DEFAULT '{}', allowed TEXT NOT NULL DEFAULT '[]',
-  enabled INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL
-);
--- Known threads: where to send a reply and when it was last active. The conversation itself is the agent's one session.
-CREATE TABLE IF NOT EXISTS threads (
-  id TEXT PRIMARY KEY, connection_id TEXT NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
-  external_key TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', target TEXT NOT NULL, last_user TEXT,
-  created_at INTEGER NOT NULL, last_activity INTEGER NOT NULL,
-  UNIQUE (connection_id, external_key)
-);
-CREATE TABLE IF NOT EXISTS thread_messages (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
-  direction TEXT NOT NULL, external_id TEXT NOT NULL, user_id TEXT, user_name TEXT,
-  text TEXT NOT NULL, ts INTEGER NOT NULL,
-  UNIQUE (thread_id, direction, external_id)
-);
-CREATE TABLE IF NOT EXISTS connection_cursor (
-  connection_id TEXT PRIMARY KEY REFERENCES connections(id) ON DELETE CASCADE, value TEXT NOT NULL
-);
-`);
-
-// Columns added after the first release.
-for (const col of ['muted INTEGER NOT NULL DEFAULT 0', 'seen_id INTEGER NOT NULL DEFAULT 0']) {
-  try { db.exec(`ALTER TABLE threads ADD COLUMN ${col}`); } catch { /* already there */ }
-}
-try { db.exec('ALTER TABLE thread_messages ADD COLUMN files TEXT'); } catch { /* already there */ }
+// The tables (connections, threads, thread_messages, connection_cursor) are created by db/migrations.ts.
 
 const now = () => Date.now();
-const json = <T>(s: string, fallback: T): T => { try { return JSON.parse(s) as T; } catch { return fallback; } };
 
-const connRow = (r: any): Connection => ({
+// Rows as SQLite returns them (JSON columns are text, flags are 0/1).
+interface ConnectionDbRow { id: string; kind: string; name: string; agent_id: string | null; config: string; allowed: string; enabled: number; created_at: number }
+type ThreadDbRow = Omit<Thread, 'target' | 'muted' | 'seen_id'> & { target: string; muted: number | null; seen_id: number | null };
+export interface ThreadMessageRow { id: number; thread_id: string; direction: 'in' | 'out'; external_id: string; user_id: string | null; user_name: string | null; text: string; ts: number; files: string | null }
+
+const connRow = (r: ConnectionDbRow): Connection => ({
   id: r.id, kind: r.kind as ChannelKind, name: r.name, agent_id: r.agent_id,
-  config: json(r.config, {}), allowed: json<AllowedUser[]>(r.allowed, []), enabled: !!r.enabled, created_at: r.created_at,
+  config: parseJson(r.config, {}, `connection ${r.id} config`), allowed: parseJson<AllowedUser[]>(r.allowed, [], `connection ${r.id} allowed`), enabled: !!r.enabled, created_at: r.created_at,
 });
-const threadRow = (r: any): Thread => ({ ...r, target: json<Target>(r.target, { chat: '' }), muted: !!r.muted, seen_id: r.seen_id ?? 0 });
+const threadRow = (r: ThreadDbRow): Thread => ({ ...r, target: parseJson<Target>(r.target, { chat: '' }, `thread ${r.id} target`), muted: !!r.muted, seen_id: r.seen_id ?? 0 });
 
 export const connections = {
-  list: () => (db.prepare('SELECT * FROM connections ORDER BY name').all() as any[]).map(connRow),
-  get(id: string) { const r = db.prepare('SELECT * FROM connections WHERE id=?').get(id); return r ? connRow(r) : undefined; },
-  forAgent: (agentId: string) => (db.prepare('SELECT * FROM connections WHERE agent_id=? AND enabled=1').all(agentId) as any[]).map(connRow),
+  list: () => (db.prepare('SELECT * FROM connections ORDER BY name').all() as ConnectionDbRow[]).map(connRow),
+  get(id: string) { const r = db.prepare('SELECT * FROM connections WHERE id=?').get(id) as ConnectionDbRow | undefined; return r ? connRow(r) : undefined; },
+  forAgent: (agentId: string) => (db.prepare('SELECT * FROM connections WHERE agent_id=? AND enabled=1').all(agentId) as ConnectionDbRow[]).map(connRow),
   create(p: { kind: ChannelKind; name: string; agent_id?: string | null; config?: Record<string, any>; allowed?: AllowedUser[]; enabled?: boolean }): Connection {
     const id = randomUUID();
     db.prepare('INSERT INTO connections (id,kind,name,agent_id,config,allowed,enabled,created_at) VALUES (?,?,?,?,?,?,?,?)')
@@ -63,8 +39,8 @@ export const connections = {
 };
 
 export const threads = {
-  get(id: string) { const r = db.prepare('SELECT * FROM threads WHERE id=?').get(id); return r ? threadRow(r) : undefined; },
-  forConnection: (connectionId: string) => (db.prepare('SELECT * FROM threads WHERE connection_id=? ORDER BY last_activity DESC').all(connectionId) as any[]).map(threadRow),
+  get(id: string) { const r = db.prepare('SELECT * FROM threads WHERE id=?').get(id) as ThreadDbRow | undefined; return r ? threadRow(r) : undefined; },
+  forConnection: (connectionId: string) => (db.prepare('SELECT * FROM threads WHERE connection_id=? ORDER BY last_activity DESC').all(connectionId) as ThreadDbRow[]).map(threadRow),
   /** Finds the thread for an external key or creates it; always refreshes the reply target and activity. */
   touch(connectionId: string, externalKey: string, info: { title: string; target: Target; user: string }): Thread {
     const t = now();
@@ -97,9 +73,9 @@ export const threadMessages = {
   lastId: (threadId: string) => (db.prepare('SELECT MAX(id) AS m FROM thread_messages WHERE thread_id=?').get(threadId) as { m: number | null }).m ?? 0,
   /** Messages people wrote that the agent has not been shown yet (after `afterId`, before `beforeId`), oldest first. */
   unseen: (threadId: string, afterId: number, beforeId: number, limit = 30) =>
-    (db.prepare(`SELECT * FROM (SELECT * FROM thread_messages WHERE thread_id=? AND direction='in' AND id>? AND id<? ORDER BY id DESC LIMIT ?) ORDER BY id`).all(threadId, afterId, beforeId, limit) as any[]),
+    (db.prepare(`SELECT * FROM (SELECT * FROM thread_messages WHERE thread_id=? AND direction='in' AND id>? AND id<? ORDER BY id DESC LIMIT ?) ORDER BY id`).all(threadId, afterId, beforeId, limit) as ThreadMessageRow[]),
   recent: (threadId: string, limit = 30) =>
-    (db.prepare('SELECT * FROM (SELECT * FROM thread_messages WHERE thread_id=? ORDER BY id DESC LIMIT ?) ORDER BY id').all(threadId, limit) as any[]),
+    (db.prepare('SELECT * FROM (SELECT * FROM thread_messages WHERE thread_id=? ORDER BY id DESC LIMIT ?) ORDER BY id').all(threadId, limit) as ThreadMessageRow[]),
 };
 
 export const cursors = {

@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { findRepo, gitEnv, hasHead, isPathError, parseNumstat, PathError, repoState, safePath, type Repo } from './repo.js';
+import { DomainError } from '../errors.js';
 
 /**
  * Git actions for the explorer: history (reads) and commit / pull / push / fetch / branches (writes).
@@ -8,7 +9,7 @@ import { findRepo, gitEnv, hasHead, isPathError, parseNumstat, PathError, repoSt
  * paths after `--`, branch names validated), never `--force`, and no command that can prompt for credentials.
  */
 export { isPathError };
-export class GitOpError extends Error {}
+export class GitOpError extends DomainError {}
 
 const LOCAL_TIMEOUT = 30_000;
 const NET_TIMEOUT = 120_000;

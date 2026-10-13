@@ -1,0 +1,25 @@
+import { types } from '../../db.js';
+import { spawnFromType } from '../../services/agents.js';
+import { body } from '../body.js';
+import { bad, notFound } from '../errors.js';
+import { route } from '../router.js';
+import { isProvider } from '../../services/providers.js';
+import { requireName, text, validateAgentInput } from '../validate.js';
+
+route('GET', '/api/types', () => types.list());
+route('POST', '/api/types', async ({ req }) => {
+  const p = await body(req);
+  const name = requireName(p.name);
+  if (!isProvider(p.provider)) throw bad('Pick a provider');
+  try { return types.create({ ...p, name } as Parameters<typeof types.create>[0]); } catch { throw bad(`A type named "${text(p.name)}" already exists`); }
+});
+route('PATCH', '/api/types/:id', async ({ req, params }) => {
+  const t = types.update(params[0], await body(req)); if (!t) throw notFound('Type not found'); return t;
+});
+route('DELETE', '/api/types/:id', ({ params }) => { if (!types.remove(params[0])) throw notFound('Type not found'); return { ok: true }; });
+route('POST', '/api/types/:id/spawn', async ({ req, params }) => {
+  const t = types.get(params[0]); if (!t) throw notFound('Type not found');
+  const p = await body(req);
+  validateAgentInput({ name: p.name, cwd: p.cwd, colony_id: p.colony_id });
+  return spawnFromType(t, p as Parameters<typeof spawnFromType>[1]);
+});

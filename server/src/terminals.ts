@@ -3,16 +3,16 @@ import { existsSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname } from 'node:path';
 import { homedir } from 'node:os';
-import type { IncomingMessage } from 'node:http';
 import type { WebSocket } from 'ws';
 import { agents, resolved } from './db.js';
+import { DomainError } from './errors.js';
 import { objectsStore } from './objects/store.js';
 import { containerName } from './objects/docker.js';
 import type { DockerConfig, ServerConfig } from './objects/model.js';
 
 /**
  * Terminals: real shells (a pseudo-terminal each) that the interface shows in its bottom panel. They are the user's own shell on their own
- * machine, so they are as powerful as that: the server only serves them to pages and programs of this machine (see `isLocalRequest`) and
+ * machine, so they are as powerful as that: the server only serves them to pages and programs of this machine (see `isLocalRequest` in http/guards.ts) and
  * `HIVE_AM_TERMINALS=0` turns them off. A terminal lives in the server, not in the page: reloading the page, or opening another one,
  * shows the same terminals with what they printed last. They end when the server stops.
  */
@@ -27,7 +27,7 @@ async function ptyLib() {
   return lib;
 }
 
-export class TerminalError extends Error {}
+export class TerminalError extends DomainError {}
 
 interface Term {
   id: string; title: string; cwd: string; command: string; created: number; cols: number; rows: number;
@@ -36,16 +36,6 @@ interface Term {
 const terms = new Map<string, Term>();
 
 export const listTerminals = () => [...terms.values()].map((t) => ({ id: t.id, title: t.title, cwd: t.cwd, command: t.command, created: t.created, alive: !t.exit, exitCode: t.exit?.code ?? null }));
-
-/** Only a page or a program of this machine may reach a terminal: the host must be a loopback name (a page that reached us through another name — DNS rebinding — is refused) and a browser's origin must be one too. */
-export function isLocalRequest(req: IncomingMessage): boolean {
-  const loop = (h: string) => ['localhost', '127.0.0.1', '[::1]', '::1'].includes(h.replace(/:\d+$/, '').toLowerCase());
-  const host = String(req.headers.host ?? '');
-  if (!loop(host)) return false;
-  const origin = req.headers.origin;
-  if (origin) { try { if (!loop(new URL(origin).hostname === '::1' ? '[::1]' : new URL(origin).hostname)) return false; } catch { return false; } }
-  return true;
-}
 
 export interface TerminalSpec { cwd?: unknown; title?: unknown; objectId?: unknown; agentId?: unknown; /** A service of a compose object: the shell opens inside its container. */ service?: unknown }
 
@@ -122,7 +112,7 @@ export function attachTerminal(ws: WebSocket, id: string): void {
   if (t.chunks.length) ws.send(JSON.stringify({ t: 'out', d: t.chunks.join('') }));
   if (t.exit) ws.send(JSON.stringify({ t: 'exit', code: t.exit.code }));
   ws.on('message', (raw) => {
-    let m: any; try { m = JSON.parse(String(raw)); } catch { return; }
+    let m: { t?: string; d?: unknown; cols?: unknown; rows?: unknown }; try { m = JSON.parse(String(raw)); } catch { return; }
     if (t.exit) return;
     if (m.t === 'in' && typeof m.d === 'string' && m.d.length < 100_000) t.pty.write(m.d);
     else if (m.t === 'resize') {

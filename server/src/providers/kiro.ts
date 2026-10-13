@@ -1,5 +1,5 @@
 import type { StreamEvent, TurnOptions } from '../types.js';
-import { spawnLines, safeJson } from './spawn.js';
+import { spawnJson } from './spawn.js';
 import { withInstructions } from './preamble.js';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -41,9 +41,7 @@ export async function* runKiro(o: TurnOptions): AsyncGenerator<StreamEvent> {
   let sawSession = false;
   const open = new Set<string>();
 
-  for await (const line of spawnLines({ cmd: 'kiro-cli', args, cwd: agent.cwd, signal: o.signal })) {
-    const ev = safeJson(line);
-    if (!ev) continue;
+  for await (const ev of spawnJson({ cmd: 'kiro-cli', args, cwd: agent.cwd, signal: o.signal })) {
     const d = ev.data ?? {};
     if (d.sessionId && !sawSession) { sawSession = true; yield { t: 'session', sessionId: d.sessionId }; }
 

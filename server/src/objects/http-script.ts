@@ -1,3 +1,4 @@
+import { DomainError } from '../errors.js';
 /**
  * The response handlers of a .http file (`> {% … %}`, the IntelliJ / VS Code REST client format), run safely. They are little scripts
  * that read the answer and keep values for the next requests (`client.global.set("token", response.body.token)`) or check it
@@ -9,7 +10,7 @@
  * `process`, no loops, no access to prototypes. Something outside of that is reported ("not supported") instead of being run, and a script
  * is limited in how much it may compute.
  */
-export class ScriptError extends Error {}
+export class ScriptError extends DomainError {}
 
 export interface ScriptResponse { status: number; headers: Record<string, string>; body: unknown; text: string; contentType: string; /** How long the answer took, in ms (`response.time`). */ time?: number }
 export interface ScriptTest { name: string; passed: boolean; message?: string }

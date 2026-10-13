@@ -1,7 +1,7 @@
-import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { containerName } from './docker.js';
+import { execCapture } from './exec.js';
 import { ObjectError, type DockerConfig, type ObjectRow } from './model.js';
 import { readSaved } from './runner.js';
 
@@ -20,9 +20,10 @@ export interface ObjectStats {
   services?: ServiceStat[];
 }
 
-const run = (file: string, args: string[], o: { cwd?: string; timeout?: number } = {}) => new Promise<{ out: string; code: number }>((resolve) => {
-  execFile(file, args, { cwd: o.cwd, timeout: o.timeout ?? 15_000, maxBuffer: 8 * 1024 * 1024, encoding: 'utf8' }, (e: any, stdout) => resolve({ out: String(stdout ?? ''), code: e ? (typeof e.code === 'number' ? e.code : 1) : 0 }));
-});
+const run = async (file: string, args: string[], o: { cwd?: string; timeout?: number } = {}) => {
+  const r = await execCapture(file, args, { cwd: o.cwd, timeout: o.timeout });
+  return { out: r.out, code: r.code };
+};
 
 const UNITS: Record<string, number> = { b: 1, kb: 1e3, mb: 1e6, gb: 1e9, tb: 1e12, kib: 1024, mib: 1024 ** 2, gib: 1024 ** 3, tib: 1024 ** 4 };
 /** "12.5MiB" → bytes. */

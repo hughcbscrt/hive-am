@@ -1,17 +1,12 @@
 import { db } from '../db.js';
+import { DomainError } from '../errors.js';
 
 /**
  * An agent's notebook: Markdown it keeps for itself across conversations (see the «Notebook» default skill).
  * Lives in its own table so it never travels with the agent list. Every change bumps `version`; `seen` is the version the
  * agent's live conversation already contains, so the runtime knows when it must be re-sent (e.g. after the user edits it).
  */
-db.exec(`
-CREATE TABLE IF NOT EXISTS agent_notebooks (
-  agent_id TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
-  content TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 0, seen INTEGER NOT NULL DEFAULT 0,
-  updated_at INTEGER NOT NULL DEFAULT 0, updated_by TEXT NOT NULL DEFAULT ''
-);
-`);
+// The table (agent_notebooks) is created by db/migrations.ts.
 
 /** It is prompt overhead on every turn, so it has a hard cap. */
 export const NOTEBOOK_MAX = 8000;
@@ -19,7 +14,7 @@ const NOTE_MAX = 500;
 const SECTION_MAX = 60;
 
 export interface Notebook { content: string; version: number; seen: number; updated_at: number; updated_by: string }
-export class NotebookError extends Error {}
+export class NotebookError extends DomainError {}
 
 /** What looks like a credential. Notes are copied into every future prompt, so these are refused outright. */
 const SECRETS: [RegExp, string][] = [

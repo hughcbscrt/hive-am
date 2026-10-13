@@ -1,22 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { colonies, db } from '../db.js';
+import { parseJson } from '../db/json.js';
 import { ObjectError, kindOf, type DatabaseConfig, type HttpConfig, parseConfig, parseName, isKind, type ClusterConfig, type ObjectKind, type ObjectRow } from './model.js';
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS colony_objects (
-  id TEXT PRIMARY KEY, colony_id TEXT REFERENCES colonies(id) ON DELETE SET NULL,
-  kind TEXT NOT NULL, name TEXT NOT NULL UNIQUE COLLATE NOCASE, config TEXT NOT NULL,
-  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-);`);
-// The agent chosen to look after an object (one per object; the table keeps its first version's shape).
-db.exec(`CREATE TABLE IF NOT EXISTS object_agents (
-  object_id TEXT NOT NULL REFERENCES colony_objects(id) ON DELETE CASCADE,
-  agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-  PRIMARY KEY (object_id, agent_id)
-);`);
-
-// The first name of a cluster was `boss`.
-db.exec("UPDATE colony_objects SET kind='cluster' WHERE kind='boss'");
+// The tables (colony_objects, object_agents) are created by db/migrations.ts.
 
 /** The secret values of an HTTP object stay on the server: what the interface receives has them empty (and `set` says there is one). */
 export function maskConfig(o: ObjectRow): ObjectRow {
@@ -38,7 +25,9 @@ function keepPassword(old: DatabaseConfig, incoming: Record<string, unknown>) {
   if ((incoming.password === undefined || incoming.password === '') && old.password && incoming.engine === old.engine) incoming.password = old.password;
 }
 
-const row = (r: any): ObjectRow => ({ ...r, config: JSON.parse(r.config) });
+type ObjectDbRow = Omit<ObjectRow, 'config'> & { config: string };
+// A damaged config must not take the whole list down: it reads as empty (a cluster as one without members) until the person saves it again.
+const row = (r: ObjectDbRow): ObjectRow => ({ ...r, config: parseJson(r.config, r.kind === 'cluster' ? { members: [] } : {}, `resource ${r.id} config`) as ObjectRow['config'] });
 
 /** A cluster groups servers and containers of its own colony; nothing else, and not itself. */
 function checkMembers(kind: string, colony: string | null, config: unknown, selfId?: string) {
@@ -52,9 +41,9 @@ function checkMembers(kind: string, colony: string | null, config: unknown, self
 }
 
 export const objectsStore = {
-  list: () => (db.prepare('SELECT * FROM colony_objects ORDER BY name').all() as any[]).map(row),
-  get(id: string) { const r = db.prepare('SELECT * FROM colony_objects WHERE id=?').get(id); return r ? row(r) : undefined; },
-  byName(name: string) { const r = db.prepare('SELECT * FROM colony_objects WHERE name=?').get(name); return r ? row(r) : undefined; },
+  list: () => (db.prepare('SELECT * FROM colony_objects ORDER BY name').all() as ObjectDbRow[]).map(row),
+  get(id: string) { const r = db.prepare('SELECT * FROM colony_objects WHERE id=?').get(id) as ObjectDbRow | undefined; return r ? row(r) : undefined; },
+  byName(name: string) { const r = db.prepare('SELECT * FROM colony_objects WHERE name=?').get(name) as ObjectDbRow | undefined; return r ? row(r) : undefined; },
   create(input: { name: unknown; kind: unknown; colony_id?: unknown; config: unknown }): ObjectRow {
     const p = { ...input, kind: kindOf(input.kind) };
     if (!isKind(p.kind)) throw new ObjectError('Unknown kind of resource');
@@ -79,8 +68,10 @@ export const objectsStore = {
     if (colony && !colonies.get(colony)) throw new ObjectError('That colony no longer exists');
     checkMembers(cur.kind, colony, config, id);
     // Moving an object to another colony takes it out of the clusters it was grouped by.
-    if (colony !== cur.colony_id) objectsStore.ungroup(id);
-    db.prepare('UPDATE colony_objects SET name=?, colony_id=?, config=?, updated_at=? WHERE id=?').run(name, colony, JSON.stringify(config), Date.now(), id);
+    db.transaction(() => {
+      if (colony !== cur.colony_id) objectsStore.ungroup(id);
+      db.prepare('UPDATE colony_objects SET name=?, colony_id=?, config=?, updated_at=? WHERE id=?').run(name, colony, JSON.stringify(config), Date.now(), id);
+    })();
     return objectsStore.get(id)!;
   },
   /** The agent chosen to look after each object (object id → agent id). */
@@ -101,5 +92,5 @@ export const objectsStore = {
       db.prepare('UPDATE colony_objects SET config=?, updated_at=? WHERE id=?').run(JSON.stringify({ members: (b.config as ClusterConfig).members.filter((m) => m !== id) }), Date.now(), b.id);
     }
   },
-  remove(id: string) { objectsStore.ungroup(id); return db.prepare('DELETE FROM colony_objects WHERE id=?').run(id).changes > 0; },
+  remove(id: string) { return db.transaction(() => { objectsStore.ungroup(id); return db.prepare('DELETE FROM colony_objects WHERE id=?').run(id).changes > 0; })(); },
 };

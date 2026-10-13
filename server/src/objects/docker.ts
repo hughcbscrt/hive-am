@@ -1,7 +1,7 @@
-import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { execCapture } from './exec.js';
 import { ObjectError, splitArgs, type DockerConfig, type ObjectState } from './model.js';
 
 /**
@@ -13,14 +13,11 @@ const TIMEOUT = 60_000;
 const DOCKER_ENV = { ...process.env, DOCKER_CLI_HINTS: 'false' };
 
 interface Out { out: string; err: string; code: number }
-function dk(args: string[], o: { cwd?: string; timeout?: number } = {}): Promise<Out> {
-  return new Promise((resolve, reject) => {
-    execFile('docker', args, { cwd: o.cwd, timeout: o.timeout ?? TIMEOUT, maxBuffer: 16 * 1024 * 1024, env: DOCKER_ENV, encoding: 'utf8' }, (e: any, stdout, stderr) => {
-      if (e && e.code === 'ENOENT') return reject(new ObjectError('Docker is not installed or not in the PATH'));
-      if (e && e.killed) return reject(new ObjectError(`docker ${args[0]} took too long`));
-      resolve({ out: String(stdout ?? ''), err: String(stderr ?? ''), code: typeof e?.code === 'number' ? e.code : 0 });
-    });
-  });
+async function dk(args: string[], o: { cwd?: string; timeout?: number } = {}): Promise<Out> {
+  const r = await execCapture('docker', args, { cwd: o.cwd, timeout: o.timeout ?? TIMEOUT, maxBuffer: 16 * 1024 * 1024, env: DOCKER_ENV });
+  if (r.missing) throw new ObjectError('Docker is not installed or not in the PATH');
+  if (r.timedOut) throw new ObjectError(`docker ${args[0]} took too long`);
+  return r;
 }
 const fail = (r: Out, what: string) => new ObjectError(`${what}: ${(r.err || r.out).trim().split('\n').slice(-3).join(' ').slice(0, 400) || `docker exited with ${r.code}`}`);
 

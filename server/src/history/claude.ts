@@ -1,15 +1,18 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Block, ChatMessage } from '../types.js';
 import { estimateCost } from '../pricing.js';
+import { flattenText } from '../providers/spawn.js';
+import { stripInstructions } from '../providers/preamble.js';
+import { jsonLines } from './lines.js';
 
 const ROOT = join(homedir(), '.claude', 'projects');
 /** Claude encodes the project path by replacing both "/" and "." with "-". */
 const encode = (cwd: string) => cwd.replace(/[/.]/g, '-');
 
 /** An instructions update sent in front of a message (see providers/preamble.ts) is not part of what the user wrote. */
-const stripPreamble = (x: string) => x.replace(/^<instructions[^>]*>[\s\S]*?<\/instructions>\s*/, '');
+const stripPreamble = stripInstructions;
 
 export function claudeFile(cwd: string, sessionId: string): string | null {
   if (!/^[\w-]+$/.test(sessionId)) return null;
@@ -50,9 +53,7 @@ function parseClaude(file: string): ChatMessage[] {
   const toolBlocks = new Map<string, Extract<Block, { type: 'tool' }>>();
   const toolStart = new Map<string, number>();
 
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
-    if (!line) continue;
-    let e: any; try { e = JSON.parse(line); } catch { continue; }
+  for (const e of jsonLines(file)) {
     if (e.isSidechain || e.isMeta || (e.type !== 'user' && e.type !== 'assistant')) continue;
     const m = e.message; if (!m) continue;
     const ts = e.timestamp ? Date.parse(e.timestamp) : null;
@@ -68,7 +69,7 @@ function parseClaude(file: string): ChatMessage[] {
           if (b.type === 'tool_result') {
             const t = toolBlocks.get(b.tool_use_id);
             if (t) {
-              t.output = flat(b.content); t.error = !!b.is_error;
+              t.output = flattenText(b.content); t.error = !!b.is_error;
               const st = toolStart.get(b.tool_use_id); if (st && ts) t.durationMs = Math.max(0, ts - st);
             }
           } else if (b.type === 'text' && b.text) { const t = stripPreamble(b.text); if (t) text.push({ type: 'text', text: t }); }
@@ -107,10 +108,4 @@ function parseClaude(file: string): ChatMessage[] {
 export function claudeMeta(file: string) {
   const st = statSync(file);
   return { mtime: st.mtimeMs, size: st.size };
-}
-
-function flat(c: unknown): string {
-  if (typeof c === 'string') return c;
-  if (Array.isArray(c)) return c.map((x: any) => (typeof x === 'string' ? x : x?.text ?? '')).join('\n');
-  return c == null ? '' : JSON.stringify(c);
 }

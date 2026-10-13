@@ -3,8 +3,9 @@
  * object is a container (or a compose project) that hive-am starts, stops and reads the logs of.
  */
 import { parseProps } from './driver-props.js';
+import { DomainError } from '../errors.js';
 
-export class ObjectError extends Error {}
+export class ObjectError extends DomainError {}
 
 export type ObjectKind = 'server' | 'docker' | 'http' | 'database' | 'cluster';
 /** `ready` is for objects that are not run but used (HTTP requests): their files are there and can be used. */

@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 
+const KILL_GRACE_MS = Number(process.env.HIVE_AM_KILL_GRACE_MS) || 5000;
+
 export interface SpawnOpts {
   cmd: string;
   args: string[];
@@ -18,7 +20,14 @@ export async function* spawnLines(o: SpawnOpts): AsyncGenerator<string> {
     env: { ...process.env, PWD: o.cwd, ...o.env },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
-  const kill = () => { if (!child.killed) child.kill('SIGTERM'); };
+  // SIGTERM first; a CLI that ignores it (busy inside a tool) is cut off after a grace period so a stopped turn never leaves a process behind.
+  let hardKill: ReturnType<typeof setTimeout> | undefined;
+  const kill = () => {
+    if (child.exitCode !== null || child.signalCode !== null) return;
+    if (!child.killed) child.kill('SIGTERM');
+    hardKill ??= setTimeout(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); }, KILL_GRACE_MS);
+    hardKill.unref?.();
+  };
   o.signal.addEventListener('abort', kill, { once: true });
 
   let stderr = '';
@@ -27,9 +36,10 @@ export async function* spawnLines(o: SpawnOpts): AsyncGenerator<string> {
     child.on('error', (e) => { stderr += String(e); res(-1); });
     // 'exit' (not 'close'): a daemon the CLI forks (e.g. opencode's background service) can keep
     // inheriting our stdout pipe forever, so 'close' would never fire. Drain briefly, then cut the pipe.
-    child.on('exit', (c) => { setTimeout(() => child.stdout.destroy(), 250); res(c); });
+    child.on('exit', (c) => { if (hardKill) clearTimeout(hardKill); setTimeout(() => child.stdout.destroy(), 250); res(c); });
   });
 
+  child.stdin.on('error', () => { /* the CLI quit before reading its prompt: its exit code tells why */ });
   if (o.stdin !== undefined) child.stdin.end(o.stdin); else child.stdin.end();
 
   try {
@@ -44,4 +54,16 @@ export async function* spawnLines(o: SpawnOpts): AsyncGenerator<string> {
 
 export function safeJson(line: string): any | null {
   try { return JSON.parse(line); } catch { return null; }
+}
+
+/** The JSON objects a CLI prints, one per line; lines that are not JSON (banners, warnings) are skipped. */
+export async function* spawnJson(o: SpawnOpts): AsyncGenerator<any> {
+  for await (const line of spawnLines(o)) { const ev = safeJson(line); if (ev) yield ev; }
+}
+
+/** The text of a tool result, which CLIs send as a string, a list of blocks or any other JSON. */
+export function flattenText(c: unknown): string {
+  if (typeof c === 'string') return c;
+  if (Array.isArray(c)) return c.map((x: any) => (typeof x === 'string' ? x : x?.text ?? '')).join('\n');
+  return c == null ? '' : JSON.stringify(c);
 }

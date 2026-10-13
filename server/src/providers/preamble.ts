@@ -8,3 +8,6 @@ export function withInstructions(prompt: string, instructions: string, resumed: 
   if (refresh) return `<instructions update="true">\nYour configuration changed since the last message. These instructions replace any earlier ones; use them from now on.\n\n${instructions}\n</instructions>\n\n${prompt}`;
   return prompt;
 }
+
+/** Takes the instructions block off the front of a user message read back from a CLI's own history: it is ours, not what the person wrote. */
+export const stripInstructions = (text: string): string => text.replace(/^<instructions[^>]*>[\s\S]*?<\/instructions>\s*/, '');

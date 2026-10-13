@@ -1,7 +1,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { StreamEvent, TurnOptions } from '../types.js';
-import { spawnLines, safeJson } from './spawn.js';
+import { flattenText, spawnJson } from './spawn.js';
 import { DATA_DIR } from '../db.js';
 import { dispatchMcpConfig } from '../mcp-config.js';
 import { existsSync } from 'node:fs';
@@ -36,10 +36,7 @@ export async function* runClaude(o: TurnOptions): AsyncGenerator<StreamEvent> {
   let streamedText = false;
   let sawSession = false;
 
-  for await (const line of spawnLines({ cmd: 'claude', args, cwd: agent.cwd, stdin: prompt, signal: o.signal })) {
-    const ev = safeJson(line);
-    if (!ev) continue;
-
+  for await (const ev of spawnJson({ cmd: 'claude', args, cwd: agent.cwd, stdin: prompt, signal: o.signal })) {
     if (ev.session_id && !sawSession) { sawSession = true; yield { t: 'session', sessionId: ev.session_id }; }
 
     if (ev.type === 'stream_event') {
@@ -57,7 +54,7 @@ export async function* runClaude(o: TurnOptions): AsyncGenerator<StreamEvent> {
     } else if (ev.type === 'user') {
       const content = ev.message?.content;
       if (Array.isArray(content)) for (const b of content) {
-        if (b.type === 'tool_result') yield { t: 'tool_result', id: b.tool_use_id, output: flatten(b.content), error: !!b.is_error };
+        if (b.type === 'tool_result') yield { t: 'tool_result', id: b.tool_use_id, output: flattenText(b.content), error: !!b.is_error };
       }
     } else if (ev.type === 'result') {
       const u = ev.usage;
@@ -72,10 +69,4 @@ export async function* runClaude(o: TurnOptions): AsyncGenerator<StreamEvent> {
     }
   }
   yield { t: 'done', ok: true };
-}
-
-function flatten(c: unknown): string {
-  if (typeof c === 'string') return c;
-  if (Array.isArray(c)) return c.map((x: any) => (typeof x === 'string' ? x : x?.text ?? '')).join('\n');
-  return c == null ? '' : JSON.stringify(c);
 }

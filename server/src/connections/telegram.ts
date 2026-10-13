@@ -16,6 +16,13 @@ class TelegramError extends Error {
   constructor(msg: string, public code: number, public retryAfter?: number) { super(msg); }
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const CALL_TIMEOUT_MS = Number(process.env.HIVE_AM_TELEGRAM_TIMEOUT_MS) || 30_000;      // a Bot API call that does not answer in this long is a dead connection (a half-open socket never errors by itself)
+const POLL_SLACK_MS = 15_000;        // on top of the long-poll wait Telegram is told about
+const UPLOAD_TIMEOUT_MS = 120_000;
+const DOWNLOAD_TIMEOUT_MS = 60_000;
+/** Aborts when `signal` does or when `ms` pass, whichever comes first. */
+const within = (ms: number, signal?: AbortSignal) => (signal ? AbortSignal.any([signal, AbortSignal.timeout(ms)]) : AbortSignal.timeout(ms));
+const timedOut = (e: unknown) => e instanceof Error && e.name === 'TimeoutError';
 
 /** The files of a Telegram message: photos (the biggest size), documents, audio, voice notes, videos and GIFs. Stickers are ignored. */
 function attachmentsOf(msg: any): Attachment[] {
@@ -57,7 +64,10 @@ export class TelegramAdapter implements ChannelAdapter {
   private get base() { return `${(this.conn.config.api_base as string) || 'https://api.telegram.org'}/bot${this.conn.config.token}`; }
 
   private async call<T = any>(method: string, body: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
-    const res = await fetch(`${this.base}/${method}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal });
+    const wait = method === 'getUpdates' ? Number(body.timeout ?? 0) * 1000 + POLL_SLACK_MS : CALL_TIMEOUT_MS;
+    let res: Response;
+    try { res = await fetch(`${this.base}/${method}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: within(wait, signal) }); }
+    catch (e) { throw timedOut(e) ? new TelegramError(`Telegram ${method} did not answer in time`, 0) : e; }
     const j: any = await res.json().catch(() => ({}));
     if (!j.ok) throw new TelegramError(j.description ?? `Telegram ${method} failed (${res.status})`, j.error_code ?? res.status, j.parameters?.retry_after);
     return j.result as T;
@@ -179,7 +189,9 @@ export class TelegramAdapter implements ChannelAdapter {
 
   /** Telegram methods that take a file are multipart, not JSON. */
   private async upload(method: string, form: FormData): Promise<any> {
-    const res = await fetch(`${this.base}/${method}`, { method: 'POST', body: form });
+    let res: Response;
+    try { res = await fetch(`${this.base}/${method}`, { method: 'POST', body: form, signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS) }); }
+    catch (e) { throw timedOut(e) ? new TelegramError(`Telegram ${method} did not answer in time`, 0) : e; }
     const j: any = await res.json().catch(() => ({}));
     if (!j.ok) throw new TelegramError(j.description ?? `Telegram ${method} failed (${res.status})`, j.error_code ?? res.status, j.parameters?.retry_after);
     return j.result;
@@ -212,7 +224,7 @@ export class TelegramAdapter implements ChannelAdapter {
     if (!info.file_path) throw new Error('Telegram gave no path for the file');
     if ((info.file_size ?? 0) > MAX_FILE_BYTES) throw new Error('too big (limit 20 MB)');
     const base = (this.conn.config.api_base as string) || 'https://api.telegram.org';
-    const res = await fetch(`${base}/file/bot${this.conn.config.token}/${info.file_path}`, { signal: this.abort.signal });
+    const res = await fetch(`${base}/file/bot${this.conn.config.token}/${info.file_path}`, { signal: within(DOWNLOAD_TIMEOUT_MS, this.abort.signal) });
     if (!res.ok) throw new Error(`download failed (${res.status})`);
     const buf = Buffer.from(await res.arrayBuffer());
     if (buf.length > MAX_FILE_BYTES) throw new Error('too big (limit 20 MB)');

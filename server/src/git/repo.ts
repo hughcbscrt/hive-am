@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { open, readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { extname, isAbsolute, normalize, resolve, sep } from 'node:path';
+import { DomainError } from '../errors.js';
 
 /**
  * Read-only git access for the explorer (writes live in gitops.ts). Everything here only *reads*: no command writes to the repository,
@@ -240,7 +241,7 @@ export async function gitList(cwd: string, rel: string): Promise<{ path: string;
   return { path: rel.replace(/\/+$/, ''), entries: entries.slice(0, MAX_LISTED), truncated: entries.length > MAX_LISTED };
 }
 
-export class PathError extends Error {}
+export class PathError extends DomainError {}
 export const isPathError = (e: unknown): e is PathError => e instanceof PathError;
 
 /** Repo-relative path → absolute path, guaranteed to be inside the agent's own folder (symlinks resolved). */
