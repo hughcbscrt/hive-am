@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-13
+
 ### Added
 
 - OpenCode 2.x: when a turn fails (for example a full conversation) the error offers **Compact conversation**. Other versions only suggest starting a new conversation.
@@ -147,7 +149,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/hughcbscrt/hive-am/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/hughcbscrt/hive-am/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/hughcbscrt/hive-am/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/hughcbscrt/hive-am/releases/tag/v1.0.0
