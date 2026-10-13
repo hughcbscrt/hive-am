@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-10-13
+
 ### Fixed
 
 - OpenCode 1.x: the conversation is now read from its `message` and `part` tables, so the history no longer empties after sending a message.
@@ -153,7 +155,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.2.2...HEAD
+[1.2.2]: https://github.com/hughcbscrt/hive-am/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/hughcbscrt/hive-am/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/hughcbscrt/hive-am/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/hughcbscrt/hive-am/compare/v1.0.0...v1.1.0
