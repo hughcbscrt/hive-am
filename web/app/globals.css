@@ -414,7 +414,7 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .toolrow { display: grid; grid-template-columns: minmax(80px, 1.1fr) 1.4fr auto 48px; gap: 10px; align-items: center; font-size: var(--fs-hint); padding: 3px 0; }
 .toolrow .tn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .toolrow .tbar { height: 8px; background: var(--bg-deep); border-radius: 99px; overflow: hidden; } .toolrow .tbar i { display: block; height: 100%; background: var(--honey); border-radius: 99px; }
 .toolrow .tc { font-weight: 600; font-variant-numeric: tabular-nums; } .toolrow .td { text-align: right; font-variant-numeric: tabular-nums; }
-.spark { display: flex; align-items: flex-end; gap: 3px; height: 64px; margin-top: 8px; } .sbar { flex: 1; max-width: 22px; height: 100%; display: flex; align-items: flex-end; } .sbar i { width: 100%; background: color-mix(in srgb, var(--p-claude) 75%, var(--honey)); border-radius: 3px 3px 0 0; }
+.tbars { display: flex; align-items: flex-end; gap: 3px; height: 64px; margin-top: 8px; } .sbar { flex: 1; max-width: 22px; height: 100%; display: flex; align-items: flex-end; } .sbar i { width: 100%; background: color-mix(in srgb, var(--p-claude) 75%, var(--honey)); border-radius: 3px 3px 0 0; }
 .sbar:hover i { background: var(--ink); }
 .sessmeta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--fs-small); color: var(--muted); font-weight: 500; }
 @media (max-width: 1100px) { .statspanel { grid-template-columns: 1fr; } }

@@ -3,6 +3,8 @@ import { basename, extname, sep } from 'node:path';
 import { agents, resolved } from '../../db.js';
 import { inboxDir, saveUploads } from '../../connections/files.js';
 import { uploadsBlock } from '../../connections/prompt.js';
+import { compactOpencodeSession } from '../../providers/opencode-server.js';
+import { opencodeCanCompact } from '../../providers/opencode.js';
 import { readHistory } from '../../history/index.js';
 import { liveTurn, notifyAgentsChanged, queueDepth, sendTurn, stopAgent } from '../../runtime.js';
 import { sessionStats } from '../../stats.js';
@@ -46,6 +48,19 @@ route('GET', '/api/agents/:id/inbox', ({ params, url, res }) => {
     ...(image ? {} : { 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(shown)}` }),
   });
   createReadStream(abs).pipe(res);
+});
+// Compacting a conversation: only OpenCode 2.x can. `GET` says whether this agent can, `POST` does it and answers when it is done.
+route('GET', '/api/agents/:id/compact', async ({ params }) => {
+  const a = agentOrFail(params[0]);
+  return { supported: a.provider === 'opencode' && !!a.session_id && await opencodeCanCompact() };
+});
+route('POST', '/api/agents/:id/compact', async ({ params }) => {
+  const a = agentOrFail(params[0]);
+  if (a.provider !== 'opencode' || !a.session_id || !(await opencodeCanCompact())) throw bad('This conversation cannot be compacted');
+  if (liveTurn(a.id)) throw bad('Wait for the agent to finish before compacting');
+  try { await compactOpencodeSession(resolved(a).cwd, a.session_id, new AbortController().signal); }
+  catch (e) { throw bad(e instanceof Error ? e.message : 'The compaction failed'); }
+  return { ok: true };
 });
 route('POST', '/api/agents/:id/stop', ({ params }) => ({ stopped: stopAgent(params[0]) }));
 route('POST', '/api/agents/:id/new-session', ({ params }) => {

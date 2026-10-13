@@ -9,7 +9,7 @@ import { XTerm } from './XTerm';
 
 const tabDomId = (key: string) => `dock-tab-${key}`;
 
-/** The bottom panel: terminals and object logs in tabs, resizable by its top edge, opened with Ctrl+`. */
+/** The bottom panel: terminals and object logs in tabs, resizable by its top edge, opened with Ctrl+`. Hiding it keeps the terminals mounted, so a full screen app keeps its modes and scroll. */
 export function TerminalDock() {
   const { t } = useI18n();
   const d = useDock();
@@ -33,10 +33,9 @@ export function TerminalDock() {
     if (n === null || !keys.length) return;
     e.preventDefault(); d.setActive(keys[n]); requestAnimationFrame(() => document.getElementById(tabDomId(keys[n!]))?.focus());
   };
-  if (!d.open) return null;
   const lastCwd = [...d.tabs].reverse().find((x) => x.kind === 'term')?.cwd;
   return (
-    <section className="dock" style={{ height: d.height }} aria-label={t('dock.title')}>
+    <section className="dock" style={{ height: d.height, display: d.open ? undefined : 'none' }} aria-hidden={!d.open} aria-label={t('dock.title')}>
       <div className="dock-grip" onPointerDown={(e) => { drag.current = { y: e.clientY, h: d.height }; document.body.style.userSelect = 'none'; e.preventDefault(); }} role="separator" aria-orientation="horizontal" />
       <div className="dock-bar">
         <div className="dock-tabs" role="tablist" aria-label={t('dock.title')} onKeyDown={tabKey}>
@@ -66,7 +65,7 @@ export function TerminalDock() {
         {d.enabled && !d.tabs.length && !d.error && <p className="gx-note">{t('dock.empty')}</p>}
         {d.tabs.map((x) => (
           <div key={x.key} id={`${tabDomId(x.key)}-panel`} role="tabpanel" aria-labelledby={tabDomId(x.key)} className="dock-pane" hidden={d.active !== x.key}>
-            {x.kind === 'term' ? <XTerm id={x.id} visible={d.active === x.key} onEnded={(code) => d.markEnded(x.key, code)} /> : <div className="dock-logpane"><LogView id={x.objectId} height="100%" /></div>}
+            {x.kind === 'term' ? <XTerm id={x.id} visible={d.open && d.active === x.key} onEnded={(code) => d.markEnded(x.key, code)} /> : d.open && <div className="dock-logpane"><LogView id={x.objectId} height="100%" /></div>}
           </div>
         ))}
       </div>

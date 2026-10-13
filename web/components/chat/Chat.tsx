@@ -56,14 +56,37 @@ function ReplyMeta({ m }: { m: ChatMessage & { durationMs?: number } }) {
   );
 }
 
+/** What to do about a failed turn. OpenCode 2.x can compact the conversation; any other version or provider can only start a new one. */
+const USAGE_LIMIT = /usage limit|quota|insufficient|rate.?limit|too many requests|credits/i;
+function FailedHint({ agent, error, onDone }: { agent: Agent; error: string; onDone: () => void }) {
+  const { t } = useI18n(); const toast = useToast();
+  const [can, setCan] = useState(false); const [busy, setBusy] = useState(false);
+  useEffect(() => { if (agent.provider !== 'opencode') return; let live = true; api.get<{ supported: boolean }>(`/agents/${agent.id}/compact`).then((r) => { if (live) setCan(r.supported); }).catch(() => {}); return () => { live = false; }; }, [agent.id, agent.provider]);
+  const compact = async () => {
+    setBusy(true);
+    try { await api.post(`/agents/${agent.id}/compact`); toast(t('chat.compacted'), 'ok'); onDone(); }
+    catch (e) { toast(t('chat.compactFailed', { reason: e instanceof Error ? e.message : String(e) }), 'err'); }
+    finally { setBusy(false); }
+  };
+  const limit = USAGE_LIMIT.test(error);      // a limit of the account: compacting does not help, another model might
+  return (
+    <>
+      <br /><span className="muted">{t(limit ? 'chat.failedHintLimit' : can ? 'chat.failedHintCompact' : 'chat.failedHint')}</span>
+      {can && !limit && <><br /><button type="button" className="btn sm" disabled={busy} onClick={() => void compact()}>{busy ? t('chat.compacting') : t('chat.compact')}</button></>}
+    </>
+  );
+}
+
 function LiveMeta({ turn }: { turn: LiveTurn }) {
   const { t } = useI18n();
   const [, set] = useState(0);
-  useEffect(() => { const i = setInterval(() => set((x) => x + 1), 500); return () => clearInterval(i); }, []);
+  const failed = !!turn.error;
+  useEffect(() => { if (failed) return; const i = setInterval(() => set((x) => x + 1), 500); return () => clearInterval(i); }, [failed]);
+  const stopped = useRef(0); if (failed && !stopped.current) stopped.current = Date.now();      // a failed turn keeps the time it had when it failed
   const u = turn.usage; const tools = turn.blocks.filter((b) => b.type === 'tool').length;
   return (
     <div className="replymeta live">
-      <span><Timer size={12} />{fmtDur(Date.now() - turn.startedAt)}</span>
+      <span><Timer size={12} />{fmtDur((failed ? stopped.current : Date.now()) - turn.startedAt)}</span>
       {tools > 0 && <span><Hammer size={12} />{t('chat.tools', { count: tools })}</span>}
       {u && (u.output ?? 0) > 0 && <span><Layers size={12} />{t('chat.inOut', { in: fmtTokens((u.input ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0)), out: fmtTokens(u.output ?? 0) })}</span>}
       {u?.contextPct !== undefined && <span>{t('chat.contextPct', { pct: u.contextPct.toFixed(1) })}</span>}
@@ -204,12 +227,12 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
   const release = useCallback(() => { stick.current = false; setAway(true); }, []);
   const toBottom = useCallback(() => { const el = threadRef.current; stick.current = true; setAway(false); if (el) el.scrollTop = el.scrollHeight; }, []);
   const turn = useLive(agent.id);
-  const running = agent.status === 'running' || !!turn;
+  const running = agent.status === 'running' || (!!turn && !turn.error);
   const readOnly = sessionOverride !== undefined && sessionOverride !== agent.session_id;
 
   const load = useCallback(() => {
     const sid = readOnly ? sessionOverride : agent.session_id;
-    if (!sid) { setMsgs([]); setLoaded(true); return Promise.resolve(); }
+    if (!sid) { setMsgs([]); setTotal(0); setLoaded(true); return Promise.resolve(); }
     return api.get<{ messages: ChatMessage[]; total?: number }>(`/agents/${agent.id}/history?session=${encodeURIComponent(sid)}&limit=${limit}`)
       .then((r) => { setMsgs(r.messages); setTotal(r.total ?? r.messages.length); setLoaded(true); }).catch((e) => { toast(e.message, 'err'); setLoaded(true); });
   }, [agent.id, agent.session_id, readOnly, sessionOverride, toast, limit]);
@@ -292,7 +315,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
                 {!turn.error && <span className="typing" aria-label={t('common.working')}><i /><i /><i /></span>}
                 <LiveMeta turn={turn} />
                 {turn.error && (
-                  <Banner kind="err" onDismiss={() => clearLive(agent.id)}>{translateServerError(turn.error)}</Banner>
+                  <Banner kind="err" onDismiss={() => clearLive(agent.id)}>{translateServerError(turn.error)}<FailedHint agent={agent} error={turn.error} onDone={() => clearLive(agent.id)} /></Banner>
                 )}
               </div>
             </>

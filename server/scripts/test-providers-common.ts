@@ -2,7 +2,7 @@
 //   HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-providers-common.ts
 import './_guard.js';
 process.env.HIVE_AM_KILL_GRACE_MS = '200';
-import { mkdtempSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const { spawnJson, spawnLines, flattenText } = await import('../src/providers/spawn.js');
@@ -64,6 +64,21 @@ writeFileSync(f, '{"a":1}\n\n{"b":\n{"c":3}\n{"d"');
 check(JSON.stringify([...jsonLines(f)]) === '[{"a":1},{"c":3}]', 'jsonLines skips damaged and partial lines');
 check(Object.keys(historyReaders).sort().join() === 'claude,kiro,opencode', 'there is a reader for every provider');
 check(readHistory({ provider: 'kiro', cwd: dir, session_id: null }).length === 0 && readHistory({ provider: 'kiro', cwd: dir, session_id: 'not-a-uuid' }).length === 0, 'an unknown session reads as empty');
+
+// OpenCode: its failure comes as an `error` event with exit code 1, and the reason (not "exited with code 1") is what the turn reports; flags the CLI lacks are not passed
+const fakeBin = join(dir, 'bin'); mkdirSync(fakeBin);
+const fake = (body: string) => { const f = join(fakeBin, 'opencode'); writeFileSync(f, `#!/bin/sh\n${body}\n`); chmodSync(f, 0o755); };
+fake(`if [ "$2" = "--help" ]; then echo '  --format choice'; echo '  --thinking'; exit 0; fi
+echo "$@" > "${dir}/args.txt"
+echo '{"type":"error","sessionID":"ses_x","error":{"type":"provider.quota","message":"Go usage limit exceeded"}}'; exit 1`);
+process.env.PATH = `${fakeBin}:${process.env.PATH}`;
+const { runOpencode } = await import('../src/providers/opencode.js');
+const agent = { id: 'a', name: 'a', provider: 'opencode', model: '', permission: 'bypassPermissions', cwd: dir, session_id: null } as any;
+let reason = '';
+try { await collect(runOpencode({ agent, prompt: 'hi', instructions: '', mcpCaps: [], signal: ac().signal })); } catch (e) { reason = e instanceof Error ? e.message : String(e); }
+check(reason === 'Go usage limit exceeded', 'an OpenCode error event is the reason of the failed turn');
+const passed = readFileSync(join(dir, 'args.txt'), 'utf8');
+check(passed.includes('--thinking') && !passed.includes('--standalone') && !passed.includes('--auto'), 'flags the installed OpenCode lacks are not passed');
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

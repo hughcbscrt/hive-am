@@ -133,3 +133,39 @@ export async function opencodeServer(agentId: string, cwd: string, config: unkno
   catch (e) { release(); if (servers.get(agentId) === s) stopOpencodeServer(agentId); throw e; }
   return { url: s.url, password: s.password, release };
 }
+
+/**
+ * Compacts a session (OpenCode 2.x): the model summarizes the conversation so it fits again. OpenCode only admits the request and the
+ * work happens inside a running server, so a short-lived one stays up until the compaction finishes. Throws `Error` with OpenCode's own message when it fails.
+ */
+export async function compactOpencodeSession(cwd: string, sessionId: string, signal: AbortSignal): Promise<void> {
+  const password = randomBytes(18).toString('base64url');
+  const proc = spawn('opencode', ['serve', '--hostname', '127.0.0.1', '--port', '0'], { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PWD: cwd, OPENCODE_SERVER_PASSWORD: password } });
+  try {
+    const url = await new Promise<string>((resolve, reject) => {
+      let out = '';
+      const timer = setTimeout(() => reject(new Error('opencode serve did not start in time')), START_TIMEOUT_MS);
+      const onData = (d: Buffer) => { out = (out + d).slice(-2000); const m = /listening on (http:\/\/\S+)/i.exec(out); if (m) { clearTimeout(timer); resolve(m[1].replace(/\/$/, '')); } };
+      proc.stdout!.on('data', onData); proc.stderr!.on('data', onData);
+      proc.on('error', (e) => { clearTimeout(timer); reject(e); });
+      proc.on('exit', (c) => { clearTimeout(timer); reject(new Error(`opencode serve exited with code ${c}`)); });
+    });
+    const base = `${url}/api/session/${encodeURIComponent(sessionId)}`;
+    const headers = { ...auth(password), 'content-type': 'application/json' };
+    const admit = await fetch(`${base}/compact`, { method: 'POST', headers, body: '{}', signal });
+    if (!admit.ok) throw new Error(`OpenCode refused to compact the conversation (${admit.status})`);
+    const id: string = ((await admit.json()) as any)?.data?.id;
+    const until = Date.now() + 10 * 60_000;
+    while (Date.now() < until && !signal.aborted) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const r = await fetch(`${base}/message/${id}`, { headers, signal });
+      if (!r.ok) continue;
+      const m: any = ((await r.json()) as any)?.data;
+      if (m?.status === 'completed') return;
+      if (m?.status === 'failed') throw new Error(String(m.error?.message ?? 'The compaction failed'));
+    }
+    throw new Error(signal.aborted ? 'Compaction cancelled' : 'The compaction took too long');
+  } finally {
+    if (!proc.killed) proc.kill('SIGTERM');
+  }
+}
