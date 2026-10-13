@@ -2,7 +2,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowUp, Brain, ChevronRight, Square, AlertTriangle, Waypoints, Coins, Layers, Timer, Hammer } from 'lucide-react';
+import { ArrowUp, Brain, ChevronRight, ImagePlus, Square, X, AlertTriangle, Waypoints, Coins, Layers, Timer, Hammer } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useHive } from '@/lib/store';
 import { ago } from '@/lib/meta';
@@ -96,13 +96,13 @@ const Blocks = memo(function Blocks({ blocks, streaming }: { blocks: Block[]; st
 type Reply = ChatMessage & { durationMs?: number };
 
 /** The saved transcript. Memoised so typing in the composer never re-renders it. */
-const History = memo(function History({ msgs, agent }: { msgs: ChatMessage[]; agent: Pick<Agent, 'name' | 'provider' | 'role'> }) {
+const History = memo(function History({ msgs, agent }: { msgs: ChatMessage[]; agent: Pick<Agent, 'id' | 'name' | 'provider' | 'role'> }) {
   useI18n(); // re-render the relative times when the language changes
   const list = useMemo(() => coalesce(msgs), [msgs]);
   return (
     <>
       {list.map((m: Reply) => m.role === 'user' ? (
-        <UserBubble key={m.id} text={m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join('')} />
+        <UserBubble key={m.id} agentId={agent.id} text={m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join('')} />
       ) : (
         <div key={m.id} className="msg assistant">
           <div className="who"><Hex agent={agent} size="sm" />{agent.name}<span className="stamp">{m.ts ? ago(m.ts) : ''}</span></div>
@@ -112,33 +112,65 @@ const History = memo(function History({ msgs, agent }: { msgs: ChatMessage[]; ag
       ))}
     </>
   );
-}, (a, b) => a.msgs === b.msgs && a.agent.name === b.agent.name && a.agent.provider === b.agent.provider && a.agent.role === b.agent.role);
+}, (a, b) => a.msgs === b.msgs && a.agent.id === b.agent.id && a.agent.name === b.agent.name && a.agent.provider === b.agent.provider && a.agent.role === b.agent.role);
+
+interface Pic { id: string; name: string; data: string }
+const MAX_PICS = 5, MAX_PIC_BYTES = 10 * 1024 * 1024;
 
 /** Owns the draft text, so each keystroke re-renders only this small box. */
 const Composer = memo(function Composer({ name, running, queued, readOnly, onSend, onStop, toolsOpen, onToggleTools }: {
   name: string; running: boolean; queued: number; readOnly: boolean;
-  onSend: (prompt: string) => Promise<boolean>; onStop: () => void; toolsOpen: boolean | null; onToggleTools: () => void;
+  onSend: (prompt: string, images?: { name: string; data: string }[]) => Promise<boolean>; onStop: () => void; toolsOpen: boolean | null; onToggleTools: () => void;
 }) {
   const { t } = useI18n();
   const [text, setText] = useState('');
+  const [images, setImages] = useState<Pic[]>([]);
+  const [over, setOver] = useState(false);
+  const toast = useToast();
   const ref = useRef<HTMLTextAreaElement>(null);
+  const pick = useRef<HTMLInputElement>(null);
   const grow = () => { const el = ref.current; if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 200) + 'px'; } };
+  // Pictures come from paste (Ctrl+V, or ⌘+V on a Mac), from dropping them on the box, or from the clip button.
+  const addFiles = async (files: File[]) => {
+    const pics = files.filter((f) => /^image\/(png|jpeg|gif|webp)$/.test(f.type));
+    if (files.length && !pics.length) { toast(t('chat.img.type'), 'err'); return; }
+    if (images.length + pics.length > MAX_PICS) { toast(t('chat.img.max', { n: MAX_PICS }), 'err'); }
+    const room = pics.slice(0, Math.max(0, MAX_PICS - images.length));
+    const ok = room.filter((f) => f.size <= MAX_PIC_BYTES);
+    if (ok.length < room.length) toast(t('chat.img.big', { mb: MAX_PIC_BYTES / 1024 / 1024 }), 'err');
+    const read = await Promise.all(ok.map((f, i) => new Promise<Pic>((res, rej) => { const r = new FileReader(); r.onload = () => res({ id: `${Date.now()}-${i}`, name: f.name && f.name !== 'image.png' ? f.name : `pasted-${i + 1}`, data: String(r.result) }); r.onerror = () => rej(r.error); r.readAsDataURL(f); })));
+    setImages((x) => [...x, ...read]);
+  };
+  const onPaste = (e: React.ClipboardEvent) => {
+    const files = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
+    if (!files.length || e.clipboardData.getData('text/plain').trim()) return;   // text in the clipboard pastes as text
+    e.preventDefault(); void addFiles(files);
+  };
   const send = async () => {
-    const prompt = text.trim(); if (!prompt) return;
-    setText(''); requestAnimationFrame(grow);
-    if (!(await onSend(prompt))) { setText(prompt); requestAnimationFrame(grow); }
+    const prompt = text.trim(); if (!prompt && !images.length) return;
+    const sending = images;
+    setText(''); setImages([]); requestAnimationFrame(grow);
+    if (!(await onSend(prompt, sending.map(({ name, data }) => ({ name, data }))))) { setText(prompt); setImages(sending); requestAnimationFrame(grow); }
   };
   return (
     <div className="composer">
       {readOnly ? (
         <div className="composer-box" style={{ justifyContent: 'space-between', alignItems: 'center' }}><span className="muted">{t('chat.readOnly')}</span></div>
       ) : (
-        <div className="composer-box">
-          <textarea ref={ref} rows={1} value={text} placeholder={running ? t('chat.queuePlaceholder') : t('chat.placeholder', { name })} aria-label={t('chat.messageLabel')}
+        <div className={`composer-box ${over ? 'over' : ''}`} onDragOver={(e) => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); setOver(true); } }} onDragLeave={() => setOver(false)}
+          onDrop={(e) => { setOver(false); const f = [...e.dataTransfer.files]; if (f.length) { e.preventDefault(); void addFiles(f); } }}>
+          {images.length > 0 && (
+            <div className="cmp-imgs">{images.map((p) => (
+              <span key={p.id} className="cmp-img"><img src={p.data} alt={p.name} /><button type="button" onClick={() => setImages((x) => x.filter((y) => y.id !== p.id))} aria-label={t('chat.img.remove', { name: p.name })} title={t('chat.img.remove', { name: p.name })}><X size={12} /></button></span>))}
+            </div>
+          )}
+          <input ref={pick} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
+          <button type="button" className="btn ghost icon" onClick={() => pick.current?.click()} aria-label={t('chat.img.attach')} title={t('chat.img.attach')}><ImagePlus size={18} /></button>
+          <textarea ref={ref} rows={1} onPaste={onPaste} value={text} placeholder={running ? t('chat.queuePlaceholder') : t('chat.placeholder', { name })} aria-label={t('chat.messageLabel')}
             onChange={(e) => { setText(e.target.value); grow(); }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
           {running && <button className="btn" onClick={onStop} aria-label={t('chat.stop')}><Square size={14} fill="currentColor" />{t('chat.stop')}</button>}
-          <button className="btn primary icon" onClick={() => void send()} disabled={!text.trim()} aria-label={t('chat.send')}><ArrowUp size={18} /></button>
+          <button className="btn primary icon" onClick={() => void send()} disabled={!text.trim() && !images.length} aria-label={t('chat.send')}><ArrowUp size={18} /></button>
         </div>
       )}
       <div className="composer-meta"><span>{t('chat.keys')}</span><button type="button" className="linkbtn" onClick={onToggleTools}>{toolsOpen ? t('chat.collapseTools') : t('chat.expandTools')}</button>{queued > 0 && <span>{t('queue.count', { count: queued })}</span>}</div>
@@ -200,10 +232,15 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
     return () => ro.disconnect();
   }, [loaded, agent.id]);
 
-  const send = useCallback(async (prompt: string) => {
+  const send = useCallback(async (prompt: string, images: { name: string; data: string }[] = []) => {
     if (readOnly) return false;
     setOutbox((o) => [...o, prompt]); stick.current = true;
-    try { await api.post(`/agents/${agent.id}/messages`, { prompt }); return true; }
+    try {
+      const r = await api.post<{ prompt?: string }>(`/agents/${agent.id}/messages`, { prompt, ...(images.length ? { images } : {}) });
+      // With pictures the server adds a note with where it saved them: the waiting bubble shows the message as the agent got it.
+      if (r.prompt && r.prompt !== prompt) setOutbox((o) => { const i = o.lastIndexOf(prompt); return i < 0 ? o : o.map((x, j) => (j === i ? r.prompt! : x)); });
+      return true;
+    }
     catch (e) { setOutbox((o) => { const i = o.lastIndexOf(prompt); return i < 0 ? o : o.filter((_, j) => j !== i); }); toast(e instanceof Error ? e.message : t('chat.sendFailed'), 'err'); return false; }
   }, [agent.id, readOnly, toast, t]);
   const stop = useCallback(() => { void api.post(`/agents/${agent.id}/stop`).catch(() => undefined); }, [agent.id]);
@@ -235,7 +272,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
                   <span className="hint">{t('chat.delegatedNote')}</span>
                 </div>
               ) : !msgs.some((m) => m.role === 'user' && m.blocks.some((b) => b.type === 'text' && b.text.trim() === turn.prompt.trim())) && (
-                <UserBubble text={turn.prompt} />
+                <UserBubble text={turn.prompt} agentId={agent.id} />
               )}
               <div className="msg assistant">
                 <div className="who"><Hex agent={agent} size="sm" />{agent.name}</div>
@@ -248,7 +285,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
               </div>
             </>
           )}
-          {waiting.map((p, i) => <UserBubble key={`${i}:${p}`} text={p} badge={turn ? t('chat.queuedBadge') : undefined} />)}
+          {waiting.map((p, i) => <UserBubble key={`${i}:${p}`} agentId={agent.id} text={p} badge={turn ? t('chat.queuedBadge') : undefined} />)}
         </div>
       </div>
       </ToolsOpen.Provider>

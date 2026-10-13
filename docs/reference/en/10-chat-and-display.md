@@ -166,6 +166,8 @@ Clicking expands a panel with:
 
 ## 10.6 Text box (`Composer`)
 
+**Pictures.** Paste a picture with **Ctrl+V** (⌘V on a Mac), drop it on the box or use the clip button: it shows as a preview with an × (up to 5, PNG / JPEG / GIF / WebP, 10 MB each; if the clipboard also has text, the text is what is pasted). On send, the server saves them in the agent's inbox (the same folder as the files that arrive from Telegram or Slack) and adds a note with their paths to the message, so the agent opens them with its file tools; the bubble shows them as thumbnails.
+
 - It is an **isolated, memoized** component that keeps its own text: typing does not re-render the history (in a test with 12 messages ≈2 ms per keystroke was measured in development mode).
 - **Enter** sends; **Shift+Enter** inserts a line break; it does not send during IME composition. It grows automatically up to 200 px.
 - While the agent is working, the placeholder changes to "Queue a follow-up…": the message is **queued** (see [document 9](09-orchestration-and-relations.md#94-per-agent-queue)); the **Stop** button appears.

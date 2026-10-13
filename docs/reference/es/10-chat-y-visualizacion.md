@@ -166,6 +166,8 @@ Al hacer clic se despliega un panel con:
 
 ## 10.6 Caja de texto (`Composer`)
 
+**Imágenes.** Pega una imagen con **Ctrl+V** (⌘V en Mac), suéltala sobre la caja o usa el botón del clip: aparece como vista previa con una × (hasta 5, PNG / JPEG / GIF / WebP, 10 MB cada una; si el portapapeles también trae texto, se pega el texto). Al enviar, el servidor las guarda en el buzón del agente (la misma carpeta de los archivos que llegan por Telegram o Slack) y añade al mensaje una nota con sus rutas, para que el agente las abra con sus herramientas de archivos; la burbuja las muestra como miniaturas.
+
 - Es un componente **aislado y memoizado** que guarda su propio texto: escribir no vuelve a renderizar el historial (en una prueba con 12 mensajes se midieron ≈2 ms por tecla en modo desarrollo).
 - **Enter** envía; **Shift+Enter** inserta salto de línea; no envía durante composición IME. Crece automáticamente hasta 200 px.
 - Mientras el agente trabaja, el marcador cambia a "Queue a follow-up…": el mensaje se **encola** (ver [documento 9](09-orquestacion-y-relaciones.md#94-cola-por-agente)); aparece el botón **Stop**.

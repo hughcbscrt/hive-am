@@ -1,9 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readdirSync, statSync, existsSync } from 'node:fs';
+import { readdirSync, statSync, existsSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, extname, join, resolve, sep } from 'node:path';
+import { inboxDir, saveUploads } from './connections/files.js';
+import { uploadsBlock } from './connections/prompt.js';
 import { agents, colonies, db, dispatches, resolved, skills, types } from './db.js';
 import { ChannelError, SendError, channelMute, channelReply, channelSendFile, connectionStatus, startConnection, stopConnection, testConnection } from './connections/manager.js';
 import { mergeConfig, publicConnection } from './connections/public.js';
@@ -128,10 +130,26 @@ route('DELETE', '/api/agents/:id', ({ params }) => {
 });
 route('POST', '/api/agents/:id/messages', async ({ req, params }) => {
   const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');
-  const { prompt } = await body(req);
-  if (!String(prompt ?? '').trim()) throw bad('Message is empty');
-  void sendTurn(a.id, String(prompt)).catch((e) => console.error('[turn]', e));
-  return { accepted: true };
+  const { prompt, images } = await body(req);
+  let text = String(prompt ?? '');
+  const hasImages = Array.isArray(images) && images.length > 0;
+  if (!text.trim() && !hasImages) throw bad('Message is empty');
+  if (hasImages) {
+    try { const saved = saveUploads(a.id, images); text = `${text.trim() || '(no text)'}${uploadsBlock(saved)}`; }
+    catch (e) { throw bad(e instanceof Error ? e.message : 'The pictures could not be saved'); }
+  }
+  void sendTurn(a.id, text).catch((e) => console.error('[turn]', e));
+  return { accepted: true, prompt: text };
+});
+// A picture that was sent from the chat, for its thumbnail: only from this agent's inbox, only as an inert image.
+route('GET', '/api/agents/:id/inbox', ({ params, url, res }) => {
+  const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');
+  let root: string, abs: string;
+  try { root = realpathSync(inboxDir(a.id)); abs = realpathSync(qpath(url)); } catch (e) { if (e instanceof HttpError) throw e; throw notFound('File not found'); }
+  const type = ({ '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' } as Record<string, string>)[extname(abs).toLowerCase()];
+  if (!type || !abs.startsWith(root + sep)) throw notFound('File not found');
+  res.writeHead(200, { 'content-type': type, 'content-length': statSync(abs).size, 'cache-control': 'private, max-age=3600', 'x-content-type-options': 'nosniff', 'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'" });
+  createReadStream(abs).pipe(res);
 });
 route('POST', '/api/agents/:id/stop', ({ params }) => ({ stopped: stopAgent(params[0]) }));
 route('POST', '/api/agents/:id/new-session', ({ params }) => {

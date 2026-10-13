@@ -52,7 +52,8 @@ Browser ── direct WebSocket ──▶ ws://<hostname>:4400/ws
 | `GET /api/agents/:id` | — | One agent. |
 | `PATCH /api/agents/:id` | Any subset of the fields above | The updated agent. If the `provider` changes, the current session is discarded. |
 | `DELETE /api/agents/:id` | — | Stops its turn in progress and deletes it. `{ ok: true }` |
-| `POST /api/agents/:id/messages` | `{ prompt }` | **Queues** the turn and answers immediately `{ accepted: true }`. The result arrives over WebSocket. |
+| `POST /api/agents/:id/messages` | `{ prompt, images? }` | **Queues** the turn and answers immediately `{ accepted: true, prompt }`. The result arrives over WebSocket. `images` (up to 5, `{ name, data }` with base64 or a data URL; PNG, JPEG, GIF or WebP, 10 MB each, checked by their bytes) are saved in the agent's inbox and a note with their paths is added to the prompt (`prompt` in the answer is the text as the agent got it). |
+| `GET /api/agents/:id/inbox?path=` | — | A picture sent from the chat (for its thumbnail): only files inside that agent's inbox, only as an inert image. |
 | `POST /api/agents/:id/stop` | — | Aborts the turn in progress. `{ stopped: bool }` |
 | `POST /api/agents/:id/new-session` | — | Stops the turn and clears the session pointer: the next message opens a new conversation. |
 | `POST /api/agents/:id/resume-session` | `{ session_id }` | Makes a previous **direct** session of the agent the current one. 400 if it is not theirs or it is a delegation one. |

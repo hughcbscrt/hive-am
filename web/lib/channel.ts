@@ -24,3 +24,14 @@ export function parseChannelPrompt(text: string): ChannelMessage | null {
   });
   return { platform: m[1], place: m[2], thread: m[3], from: m[4], body, files, overheard: /Addressed: no/.test(m[5]), muted: /Muted: yes/.test(m[5]), context: ctx.join(CONTEXT) };
 }
+
+/** A message typed in the app with pictures: the text, then the note with where they were saved (see `uploadsBlock` in server/src/connections/prompt.ts). */
+export function parseUploads(text: string): { body: string; files: { path: string; name: string; detail: string }[] } | null {
+  const at = text.indexOf(FILES);
+  if (at < 0) return null;
+  const files = text.slice(at + FILES.length).split('\n').flatMap((l) => {
+    const f = /^- (.+) \(([^()]*)\)$/.exec(l);
+    return f ? [{ path: f[1], name: f[1].replace(/^.*[\\/]/, '').replace(/^web-\d+-\d+-/, ''), detail: f[2] }] : [];
+  });
+  return files.length ? { body: text.slice(0, at), files } : null;
+}
