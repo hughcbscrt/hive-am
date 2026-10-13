@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Minimal MCP stdio server for hive-am agents. Tool groups come from HIVE_CAPS:
 //   dispatch → list_agents, dispatch (orchestrators with a team)
-//   channel  → channel_reply, channel_send_file, channel_mute (agents linked to Telegram/Slack)
+//   channel  → channel_reply, channel_send_file, channel_react, channel_mute (agents linked to Telegram/Slack)
 //   wake     → wake_me, wake_when_done, schedule_create, schedule_list, schedule_cancel (agents with the Wake-ups skill: to be woken later in the same place)
 //   objects  → object_list, object_logs, object_action (agents with the Colony objects skill: the servers and containers of their colony)
 // It only talks to the hive-am HTTP API; all rules (assignments, queueing) live there.
@@ -99,6 +99,17 @@ const allTools = [
         caption: { type: 'string', description: 'Optional short text shown with the file.' },
       },
       required: ['path'],
+      additionalProperties: false,
+    },
+  },
+  {
+    cap: 'channel',
+    name: 'channel_react',
+    description: 'React with ONE emoji to the message you are handling (a thumbs-up to say "got it", a heart to say thanks). It is lighter than a reply and counts as your answer when nothing else needs saying. Each platform allows only some emoji (on Telegram a fixed list: 👍 👎 ❤ 🔥 👏 🎉 🙏 👌 👀 💯 🤔 😁 😢 ✍ 🫡 …); an emoji that is not allowed is refused and the error lists the ones you can use. Follow the "Chat channels" skill for when to react.',
+    inputSchema: {
+      type: 'object',
+      properties: { emoji: { type: 'string', description: 'A single emoji, e.g. 👍.' } },
+      required: ['emoji'],
       additionalProperties: false,
     },
   },
@@ -263,6 +274,15 @@ async function call(name, args) {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? `channel_send_file failed (${r.status})`);
     return `Sent ${j.name} (${j.kind}).`;
+  }
+  if (name === 'channel_react') {
+    const r = await fetch(`${API}/api/channel/react`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: FROM, emoji: args.emoji }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `channel_react failed (${r.status})`);
+    return `Reacted with ${j.emoji}.`;
   }
   if (name === 'channel_mute') {
     const r = await fetch(`${API}/api/channel/mute`, {

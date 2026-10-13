@@ -80,7 +80,7 @@ flowchart LR
 | Providers | `server/src/providers/` | Builds each CLI's command and translates its output into common events |
 | History | `server/src/history/` | Reads the conversations stored by each CLI |
 | Data | `server/src/db.ts` | SQLite schema, migrations, data access |
-| MCP tools | `server/mcp/dispatch.mjs` | The `hive` server: `list_agents` and `dispatch` (orchestrators), `channel_reply`, `channel_send_file` and `channel_mute` (connections), `notebook_*` (notebook) and `skill_read` (on-demand skills) |
+| MCP tools | `server/mcp/dispatch.mjs` | The `hive` server: `list_agents` and `dispatch` (orchestrators), `channel_reply`, `channel_send_file`, `channel_react` and `channel_mute` (connections), `notebook_*` (notebook) and `skill_read` (on-demand skills) |
 
 ## Glossary
 

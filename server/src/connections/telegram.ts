@@ -5,6 +5,8 @@ import { cursors } from './store.js';
 import type { AdapterStatus, Attachment, ChannelAdapter, Connection, Inbound, Target } from './types.js';
 
 const MAX_PART = 3500;          // Telegram allows 4096; leave room for the HTML tags added after splitting
+/** The emoji Telegram lets a bot put on a message (Bot API `ReactionTypeEmoji`), without the rude ones (🖕 🤬 💩 🤮 😡). */
+export const TELEGRAM_REACTIONS = ['👍', '👎', '❤', '🔥', '🥰', '👏', '😁', '🤔', '🤯', '😱', '😢', '🎉', '🤩', '🙏', '👌', '🕊', '🤡', '🥱', '🥴', '😍', '🐳', '❤‍🔥', '🌚', '🌭', '💯', '🤣', '⚡', '🍌', '🏆', '💔', '🤨', '😐', '🍓', '🍾', '💋', '😈', '😴', '😭', '🤓', '👻', '👨‍💻', '👀', '🎃', '🙈', '😇', '😨', '🤝', '✍', '🤗', '🫡', '🎅', '🎄', '☃', '💅', '🤪', '🗿', '🆒', '💘', '🙉', '🦄', '😘', '💊', '🙊', '😎', '👾', '🤷', '🤷‍♂', '🤷‍♀'] as const;
 const TYPING_EVERY_MS = 4500;   // «typing…» lasts ~5 s
 const TYPING_MAX_MS = 20 * 60_000;   // safety net: never pulse for longer than this, whatever happens to the turn
 const MIN_GAP_MS = 350;         // stay well under Telegram's ~1 message/second per chat
@@ -216,6 +218,20 @@ export class TelegramAdapter implements ChannelAdapter {
     if (buf.length > MAX_FILE_BYTES) throw new Error('too big (limit 20 MB)');
     writeFileSync(dest, buf);
     return buf.length;
+  }
+
+  /** What a bot may react with on Telegram (the fixed list of the Bot API, minus the rude ones). A group can narrow it further. */
+  readonly reactions = TELEGRAM_REACTIONS;
+  async react(to: Target, ref: string, emoji: string): Promise<void> {
+    const wanted = emoji.replace(/\uFE0F/g, '').trim();
+    const emo = TELEGRAM_REACTIONS.find((r) => r.replace(/\uFE0F/g, '') === wanted);
+    if (!emo) throw new Error(`Telegram does not allow “${emoji}” as a reaction. The ones you can use: ${TELEGRAM_REACTIONS.join(' ')}`);
+    if (!ref) throw new Error('There is no message to react to.');
+    try { await this.call('setMessageReaction', { chat_id: to.chat, message_id: Number(ref), reaction: [{ type: 'emoji', emoji: emo }] }); }
+    catch (e) {
+      if (e instanceof TelegramError && /REACTION_INVALID|reaction/i.test(e.message)) throw new Error(`This chat does not accept ${emo} as a reaction (a group can limit them). Try another one, or answer with text.`);
+      throw e;
+    }
   }
 
   async send(to: Target, text: string): Promise<{ externalId: string }> {

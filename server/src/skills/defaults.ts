@@ -14,6 +14,19 @@ export const WAKEUPS_SKILL_ID = 'default-wakeups';
 /** Running the servers and containers of the colony. Its tools (`object_list`, `object_action`, `object_logs`) exist only for agents that have this skill. */
 export const OBJECTS_SKILL_ID = 'default-objects';
 
+/**
+ * How to react to messages in a chat. It is part of the "Chat channels" skill; agents that already had that skill get it added once
+ * (see `migrateChannelSkill`). Telegram's list is the one in `connections/telegram.ts` (`TELEGRAM_REACTIONS`): keep them in step.
+ */
+export const REACTIONS_SECTION = `## Reactions
+- \`channel_react\` puts ONE emoji on the message you are handling. It is lighter than a reply and counts as your answer when there is nothing to add. A new reaction replaces the previous one on that message.
+- React instead of writing when a text would only be noise: 👍 or 🫡 for "understood, on it", 🙏 or ❤ for thanks, 🎉 when someone shares good news, 👀 for "I am looking at it", 👌 for "done" when nothing more needs saying.
+- Do not react instead of answering a question or a request that needs a result: say it with \`channel_reply\`. You can react first (👀) and answer when you finish.
+- Do not react to every message, do not react to chatter nobody aimed at you (in a group with \`Addressed: no\` stay silent), and never use an emoji that could read as mocking, sarcastic or as a judgement of a person.
+- **Each platform allows only some emoji.** On Telegram a bot can use only this list: 👍 👎 ❤ 🔥 🥰 👏 😁 🤔 🤯 😱 😢 🎉 🤩 🙏 👌 🕊 🤡 🥱 🥴 😍 🐳 ❤‍🔥 🌚 🌭 💯 🤣 ⚡ 🍌 🏆 💔 🤨 😐 🍓 🍾 💋 😈 😴 😭 🤓 👻 👨‍💻 👀 🎃 🙈 😇 😨 🤝 ✍ 🤗 🫡 🎅 🎄 ☃ 💅 🤪 🗿 🆒 💘 🙉 🦄 😘 💊 🙊 😎 👾 🤷. The ones that fit work best: 👍 🙏 ❤ 🎉 👀 🫡 👌 🔥 💯. Common ones that are NOT allowed there: ✅ ❌ ✔ 😀 😊 😂 🚀 ⭐ (use 👌 or 👍 instead of ✅, 😁 or 🤣 instead of 😂). Stick to those if you are not sure about another platform.
+- If the tool refuses the emoji (a platform, or a group that limited its reactions), it says so and lists what you can use: pick another one, or answer with text if the message needs an answer. Do not retry the same emoji.
+`;
+
 export const DEFAULT_SKILLS: DefaultSkill[] = [
   {
     slug: 'notebook',
@@ -82,6 +95,7 @@ Only things that will still help in a *future* conversation and that you could n
 - A message can carry a \`[hive:context]\` block with earlier messages of the thread you were not shown. Use it, but do not answer each of them.
 - Be consistent. State as fact only what you checked in the files or tools, or said earlier in this conversation; if you are not sure, say so or check first. Do not contradict what you said before without saying what changed, and if you spot that an earlier message of yours was wrong, correct it openly.
 
+${REACTIONS_SECTION}
 ## Keeping quiet
 If someone tells you to be quiet, to stop answering or not to reply anymore, call \`channel_mute\` with \`muted: true\` (optionally say one short goodbye first). It only mutes that thread. While muted you are woken only when someone mentions you, replies to you or uses a command (the header then says \`Muted: yes\`). If they ask you to talk again, call it with \`muted: false\` and carry on. If you are called while muted but not asked to resume, answer that message and stay muted.
 

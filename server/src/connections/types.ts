@@ -52,6 +52,9 @@ export interface ChannelAdapter {
   /** Progress cue for the message being handled: «typing…» / a reaction. `ref` is the message: a chat keeps its cue until every message that asked for it is done. */
   busy(to: Target, state: 'working' | 'done' | 'failed', ref?: string): Promise<void>;
   status(): AdapterStatus;
+  /** The emoji this platform lets a bot react with (a fixed set on Telegram), and how to put one on a message. `react` throws with a readable reason when it cannot. */
+  readonly reactions?: readonly string[];
+  react?(to: Target, ref: string, emoji: string): Promise<void>;
   /** Sends a file (checked beforehand by outbound.ts) to a chat. */
   sendFile?(to: Target, file: { path: string; name: string; kind: FileKind; mime: string }, caption?: string): Promise<{ externalId: string }>;
   /** Downloads one attachment to `dest` and returns its size in bytes; throws when it is too big or gone. */
@@ -102,6 +105,8 @@ export interface Origin {
   /** Mention this person at the start of the first reply (scheduled messages asked for in a group). */
   mention?: { id: string; name: string };
   mentioned?: boolean;
+  /** Platform id of the message being handled: what `channel_react` reacts to. */
+  messageId?: string;
   /** Reasoning effort this connection asks for (`low`/`medium`/`high`); unset keeps each CLI's own default. */
   effort?: string;
 }

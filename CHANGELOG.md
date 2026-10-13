@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ## [Unreleased]
 
 ### Added
+- Connections: agents can **react to messages** with an emoji (`channel_react`) instead of writing, only with the emoji the platform allows (on Telegram its fixed list; the tool lists the valid ones when one is refused). The "Chat channels" skill explains when to react and which emoji to use; existing libraries get the section added once.
 - Agents, types and connections: the **model** field is now a selector: it shows the model in use (or "CLI default"), opens a searchable list of what the CLI offers and still accepts any model id typed by hand.
 - Chat: **attach any file** (not only pictures): paste, drop or use the clip; up to 5 per message, 20 MB each, saved in the agent's inbox and shown as a chip that downloads.
 - Chat: **send pictures to an agent** by pasting them (Ctrl+V, ⌘V on a Mac), dropping them on the text box or with a clip button; they show as previews, are saved in the agent's inbox and appear as thumbnails in the conversation (up to 5 per message; PNG, JPEG, GIF, WebP).

@@ -49,7 +49,7 @@ The `hive` MCP server (`server/mcp/dispatch.mjs`) announces tools according to t
 | Capability | Tools | Who has it |
 |---|---|---|
 | `dispatch` | `list_agents`, `dispatch` | Orchestrators with at least one subagent |
-| `channel` | `channel_reply`, `channel_send_file`, `channel_mute` | Agents with at least one **active** connection |
+| `channel` | `channel_reply`, `channel_send_file`, `channel_react`, `channel_mute` | Agents with at least one **active** connection |
 | `memory` | `notebook_read`, `notebook_add`, `notebook_rewrite` | Agents with the Notebook skill ([7.3.2](07-agents-types-skills-colonies.md#732-the-agents-notebook)) |
 | `skills` | `skill_read` | Agents with some *on-demand* skill ([7.3.3](07-agents-types-skills-colonies.md#733-on-demand-loading)) |
 
@@ -109,6 +109,7 @@ Connection configuration (`config`, no migration):
 - **Addressed message (`Addressed: yes`):** `@bot` mention, name/alias, reply to a bot message or command. It is delivered instantly, with a queue notice and the "typing" indicator.
 - **Undirected chat (`Addressed: no`, `open` only):** it is saved and the chat is awaited to **pause for 4 s** (a burst is a single turn); if the agent is busy it is retried up to 5 times and, if it is still busy, it stays as context for the next turn. There is no queue notice or "typing", and ending without replying is a normal result (no notice is given and its text is not sent). A failure of that turn is only logged, not posted in the group.
 - **Pending context:** the thread's messages the agent did not get to see (chat saved while it was silent or waiting) go in the next message, after a `[hive:context]` line (up to 30, 500 characters each). The count is kept with `threads.seen_id`. In the chat they are shown folded under the bubble.
+- **Reactions (`channel_react`):** the agent can put ONE emoji on the message it is handling (a 👍 for "understood", a 🙏 for thanks) instead of writing; it counts as its answer. Each platform allows only some: an adapter declares `reactions` and implements `react`. On Telegram it is the fixed list of the Bot API (`TELEGRAM_REACTIONS`, without the rude ones; ✅ or 😂 are not in it), a heart written as ❤️ is sent as ❤, and a group that limited its reactions answers with a readable error. The tool refuses what is not allowed and lists the valid ones. The "Chat channels" skill has a *Reactions* section (when to react, which emoji, what not to do); a library that already had the skill gets the section added once, without touching what the person wrote.
 - **Silence per thread (`threads.muted`):** if someone asks it to be quiet, the agent calls `channel_mute({ muted: true })`; with `/mute` the same happens without going through the agent. It only affects **that thread** (the group or that topic). While muted, undirected chat does not wake it (it is only saved); a mention, an alias, a reply to its message or a command do wake it, with `Muted: yes` in the header. To bring it back, just ask it so (`channel_mute({ muted: false })`) or use `/unmute`. It can also be changed from the connection's panel.
 - **Consistency:** the agent's instructions (`composeInstructions`) ask it to speak only if it adds something, to state as fact only what was verified in files/tools or said earlier in the conversation, not to contradict itself without explaining what changed and to openly correct its own mistake. All threads share a single session, so what it said in another thread it remembers.
 - **Telegram privacy:** by default a bot **does not see** group messages that do not mention it (privacy mode). In `open` mode it must be disabled in @BotFather (`/setprivacy` → Disable) and the bot added again to each group; the connection detects it (`getMe.can_read_all_group_messages`) and shows the warning in its status.
@@ -226,6 +227,7 @@ All under `/api`, local origin only.
 | `PATCH /connections/:id/threads/:threadId` | `{ muted }`: silences or reactivates a thread |
 | `POST /channel/reply` | Used by the `hive` MCP (`channel_reply`) |
 | `POST /channel/send-file` | Used by the `hive` MCP (`channel_send_file`): `{ from, path, caption? }` |
+| `POST /channel/react` | Used by the `hive` MCP (`channel_react`): `{ from, emoji }` puts an emoji on the message being handled; the platform's adapter validates it (`adapter.react`) |
 | `POST /channel/mute` | Used by the `hive` MCP (`channel_mute`): `{ from, muted }` on the thread being attended |
 
 **Tokens are never returned:** instead of the value, the API sends `{ set: true, hint: "••••1234" }`. Validation errors (`400`) cover: unknown type, repeated name, missing token, nonexistent agent and agent in `plan` mode.
@@ -247,6 +249,7 @@ Scripts in `server/scripts/` (they use a temporary data folder and real agents):
 | `sim-groups.ts <provider> [model]` | Groups against a fake platform: chat from an unauthorized group ignored, notice with the chat id, undirected chat (a burst = one `Addressed: no` turn, without reply), mention by alias, request for silence (`channel_mute`), effective silence (no new turn), speaking again and `/mute` · `/unmute`. |
 | `test-rate.ts` | The sliding-window limit on wake-ups (no model). |
 | `test-addressing.ts` / `sim-chatter.ts <provider> [model]` | Who a group message is for, with phrases of real chats (no model); a group where two people talk and the agent stays out except when called, for a mistake or for a danger. |
+| `test-reactions.ts` | Reactions: what Telegram allows (and the readable errors), and the *Reactions* section of the Chat channels skill, including the one-time addition to an existing library (no model, no network). |
 | `test-watch.ts` / `sim-watch.ts <provider> [model]` | `wake_when_done`: the watcher sees a process end, a marker file appear or the time run out and refuses bad input (no model); the agent launches a background job, watches it and reports on its own, after an immediate notice. |
 | `test-format.ts` | Text going to Telegram: emoji selector for bare emoji, mention links, and that a mention does not trip the secrets filter. No model. |
 | `test-cron.ts` / `test-schedules.ts` | Cron parsing, next runs across time zones and daylight saving; schedule validation, limits, de-duplication, skipped missed runs and pausing. No model. |

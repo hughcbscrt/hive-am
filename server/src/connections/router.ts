@@ -170,7 +170,7 @@ async function deliver(conn: Connection, adapter: ChannelAdapter, thread: Thread
   const unseen = threadMessages.unseen(thread.id, fresh.seen_id, msgId).map((r) => ({ name: r.user_name ?? r.user_id ?? '?', text: r.text as string, files: r.files ? JSON.parse(r.files) : undefined }));
   threads.markSeen(thread.id, msgId);
 
-  const origin: Origin = { connectionId: conn.id, threadId: thread.id, externalKey: m.externalKey, platform: conn.kind, place: m.place, userName: m.userName, userId: m.userId, group: !!m.group, mention: m.mention, addressed, replied: false, effort: EFFORTS.includes(conn.config.effort) ? conn.config.effort : undefined };
+  const origin: Origin = { connectionId: conn.id, threadId: thread.id, externalKey: m.externalKey, platform: conn.kind, place: m.place, userName: m.userName, userId: m.userId, group: !!m.group, mention: m.mention, addressed, replied: false, messageId: m.externalId, effort: EFFORTS.includes(conn.config.effort) ? conn.config.effort : undefined };
   if (addressed) await adapter.busy(m.target, 'working', m.externalId).catch(() => undefined);
   const startedAt = Date.now();
   let res = await sendTurn(agent.id, channelPrompt(conn.kind, m, { addressed, muted: fresh.muted, unseen }), 'user', undefined, undefined, origin);

@@ -100,6 +100,23 @@ export async function channelReply(agentId: string, text: string): Promise<{ sen
   return { sent: true, parts: 1 };
 }
 
+/** `channel_react`: puts an emoji on the message the agent is handling. What counts as a valid emoji depends on the platform (see `ChannelAdapter.reactions`). */
+export async function channelReact(agentId: string, emoji: unknown): Promise<{ reacted: boolean; emoji: string }> {
+  if (!agents.get(agentId)) throw new ChannelError('Unknown agent');
+  const e = String(emoji ?? '').trim();
+  if (!e || e.length > 16) throw new ChannelError('Give one emoji');
+  const origin = liveOrigin(agentId);
+  if (!origin?.messageId) throw new ChannelError('No channel message is being handled right now, so there is nothing to react to.');
+  const adapter = running.get(origin.connectionId);
+  if (!adapter?.react) throw new ChannelError('This connection cannot react to messages. Answer with channel_reply instead.');
+  const thread = threads.get(origin.threadId);
+  if (!thread) throw new ChannelError('The thread no longer exists.');
+  try { await adapter.react(thread.target, origin.messageId, e); }
+  catch (err) { throw new ChannelError(err instanceof Error ? err.message : 'The reaction failed'); }
+  origin.replied = true;   // a reaction can be the whole answer ("ok", "thanks")
+  return { reacted: true, emoji: e };
+}
+
 /** `channel_send_file`: sends a file from the agent's working folder (or inbox) to the thread of the message it is handling. */
 export async function channelSendFile(agentId: string, path: string, caption?: string): Promise<{ sent: boolean; name: string; kind: string }> {
   const agent = agents.get(agentId);

@@ -8,7 +8,7 @@ import { dropStarterSkills, seedIfEmpty } from './seed.js';
 import { API_PORT } from './mcp-config.js';
 import './connections/index.js';
 import { startAll } from './connections/manager.js';
-import { migrateChannelSkill } from './connections/channel-skill.js';
+import { addReactionsToChannelSkill, migrateChannelSkill } from './connections/channel-skill.js';
 import { armWakeups } from './wake.js';
 import { armSchedules } from './schedules.js';
 import { armWatches } from './watch.js';
@@ -21,6 +21,7 @@ db.prepare("UPDATE skills SET name='Colony resources' WHERE id='default-objects'
 seedIfEmpty();
 dropStarterSkills();
 migrateChannelSkill();
+addReactionsToChannelSkill();
 armWakeups();
 armSchedules();
 armWatches();

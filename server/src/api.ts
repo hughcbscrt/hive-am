@@ -7,7 +7,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { inboxDir, saveUploads } from './connections/files.js';
 import { uploadsBlock } from './connections/prompt.js';
 import { agents, colonies, db, dispatches, resolved, skills, types } from './db.js';
-import { ChannelError, SendError, channelMute, channelReply, channelSendFile, connectionStatus, startConnection, stopConnection, testConnection } from './connections/manager.js';
+import { ChannelError, SendError, channelMute, channelReact, channelReply, channelSendFile, connectionStatus, startConnection, stopConnection, testConnection } from './connections/manager.js';
 import { mergeConfig, publicConnection } from './connections/public.js';
 import { channelPermissionError } from './connections/rules.js';
 import { validVision } from './connections/vision.js';
@@ -587,6 +587,11 @@ route('POST', '/api/channel/send-file', async ({ req }) => {
   const { from, path, caption } = await body(req);
   try { return await channelSendFile(String(from ?? ''), String(path ?? ''), caption === undefined ? undefined : String(caption)); }
   catch (e) { if (e instanceof ChannelError || e instanceof SendError) throw bad(e.message); throw e; }
+});
+route('POST', '/api/channel/react', async ({ req }) => {
+  const { from, emoji } = await body(req);
+  try { return await channelReact(String(from ?? ''), emoji); }
+  catch (e) { if (e instanceof ChannelError) throw bad(e.message); throw e; }
 });
 route('POST', '/api/channel/mute', async ({ req }) => {
   const { from, muted } = await body(req);
