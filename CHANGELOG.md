@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- OpenCode 1.x: the conversation is now read from its `message` and `part` tables, so the history no longer empties after sending a message.
+
 ## [1.2.1] - 2026-10-13
 
 ### Added
