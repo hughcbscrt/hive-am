@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readdirSync, statSync, existsSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, extname, join, resolve, sep } from 'node:path';
+import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { inboxDir, saveUploads } from './connections/files.js';
 import { uploadsBlock } from './connections/prompt.js';
 import { agents, colonies, db, dispatches, resolved, skills, types } from './db.js';
@@ -130,25 +130,30 @@ route('DELETE', '/api/agents/:id', ({ params }) => {
 });
 route('POST', '/api/agents/:id/messages', async ({ req, params }) => {
   const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');
-  const { prompt, images } = await body(req);
+  const { prompt, files, images } = await body(req);   // `images` is the name this field had at first
   let text = String(prompt ?? '');
-  const hasImages = Array.isArray(images) && images.length > 0;
-  if (!text.trim() && !hasImages) throw bad('Message is empty');
-  if (hasImages) {
-    try { const saved = saveUploads(a.id, images); text = `${text.trim() || '(no text)'}${uploadsBlock(saved)}`; }
-    catch (e) { throw bad(e instanceof Error ? e.message : 'The pictures could not be saved'); }
+  const sent = files ?? images, hasFiles = Array.isArray(sent) && sent.length > 0;
+  if (!text.trim() && !hasFiles) throw bad('Message is empty');
+  if (hasFiles) {
+    try { const saved = saveUploads(a.id, sent); text = `${text.trim() || '(no text)'}${uploadsBlock(saved)}`; }
+    catch (e) { throw bad(e instanceof Error ? e.message : 'The files could not be saved'); }
   }
   void sendTurn(a.id, text).catch((e) => console.error('[turn]', e));
   return { accepted: true, prompt: text };
 });
-// A picture that was sent from the chat, for its thumbnail: only from this agent's inbox, only as an inert image.
+// A file that was sent from the chat, for its thumbnail or download: only from this agent's inbox; pictures inline, anything else only as a download.
 route('GET', '/api/agents/:id/inbox', ({ params, url, res }) => {
   const a = agents.get(params[0]); if (!a) throw notFound('Agent not found');
   let root: string, abs: string;
   try { root = realpathSync(inboxDir(a.id)); abs = realpathSync(qpath(url)); } catch (e) { if (e instanceof HttpError) throw e; throw notFound('File not found'); }
-  const type = ({ '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' } as Record<string, string>)[extname(abs).toLowerCase()];
-  if (!type || !abs.startsWith(root + sep)) throw notFound('File not found');
-  res.writeHead(200, { 'content-type': type, 'content-length': statSync(abs).size, 'cache-control': 'private, max-age=3600', 'x-content-type-options': 'nosniff', 'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'" });
+  if (!abs.startsWith(root + sep) || !statSync(abs).isFile()) throw notFound('File not found');
+  const image = ({ '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' } as Record<string, string>)[extname(abs).toLowerCase()];
+  const shown = basename(abs).replace(/^(?:web-)?\d+-\d+-/, '');
+  res.writeHead(200, {
+    'content-type': image ?? 'application/octet-stream', 'content-length': statSync(abs).size, 'cache-control': 'private, max-age=3600', 'x-content-type-options': 'nosniff',
+    'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'",
+    ...(image ? {} : { 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(shown)}` }),
+  });
   createReadStream(abs).pipe(res);
 });
 route('POST', '/api/agents/:id/stop', ({ params }) => ({ stopped: stopAgent(params[0]) }));

@@ -12,9 +12,12 @@ export function UserBubble({ text, badge, agentId }: { text: string; badge?: str
       <div className={`msg user${badge ? ' queued' : ''}`}>
         <div className="bubble">
           {up.body.trim() && up.body.trim() !== '(no text)' && <div>{up.body.trim()}</div>}
-          <div className="bubble-imgs">{up.files.map((f) => agentId
-            ? <a key={f.path} href={`/api/agents/${agentId}/inbox?path=${encodeURIComponent(f.path)}`} target="_blank" rel="noreferrer" title={f.name}><img src={`/api/agents/${agentId}/inbox?path=${encodeURIComponent(f.path)}`} alt={f.name} loading="lazy" /></a>
-            : <span key={f.path} className="chfile" title={f.path}><Paperclip size={11} aria-hidden />{f.name}</span>)}</div>
+          <div className="bubble-imgs">{up.files.map((f) => {
+            const href = agentId ? `/api/agents/${agentId}/inbox?path=${encodeURIComponent(f.path)}` : undefined;
+            return agentId && /\.(png|jpe?g|gif|webp)$/i.test(f.path)
+              ? <a key={f.path} href={href} target="_blank" rel="noreferrer" title={f.name}><img src={href} alt={f.name} loading="lazy" /></a>
+              : <a key={f.path} className="chfile" href={href} download={f.name} title={f.path}><Paperclip size={11} aria-hidden />{f.name}<i>{f.detail.split(', ').pop()}</i></a>;
+          })}</div>
         </div>
         {badge && <span className="queued-tag"><Clock size={11} aria-hidden />{badge}</span>}
       </div>

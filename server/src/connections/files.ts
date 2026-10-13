@@ -51,9 +51,9 @@ export async function saveAttachments(agentId: string, adapter: ChannelAdapter, 
   return out;
 }
 
-/** Pictures pasted or dropped into the chat of the app: what is allowed, and the extension each kind is saved with. */
-export const UPLOAD_MAX_IMAGES = 5;
-export const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+/** Files pasted, dropped or attached in the chat of the app: what is allowed, and the extension each kind of picture is saved with. */
+export const UPLOAD_MAX_FILES = 5;
+export const UPLOAD_MAX_BYTES = MAX_FILE_BYTES;
 const IMAGE_EXT: Record<string, string> = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif', 'image/webp': '.webp' };
 /** The kind of picture these bytes really are (what the browser said is not trusted). */
 function sniffImage(b: Buffer): string | undefined {
@@ -63,24 +63,27 @@ function sniffImage(b: Buffer): string | undefined {
   if (b.length > 12 && b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
   return undefined;
 }
-/** Saves the pictures that came with a message typed in the app (base64 in the request) in the agent's inbox, like the ones that arrive from a channel. */
+/**
+ * Saves the files that came with a message typed in the app (base64 in the request) in the agent's inbox, like the ones that arrive from a channel.
+ * Pictures are recognised by their bytes and named after them; anything else is kept as it is called (safe name, never run).
+ */
 export function saveUploads(agentId: string, items: unknown): SavedFile[] {
   if (!Array.isArray(items) || !items.length) return [];
-  if (items.length > UPLOAD_MAX_IMAGES) throw new Error(`At most ${UPLOAD_MAX_IMAGES} pictures per message`);
+  if (items.length > UPLOAD_MAX_FILES) throw new Error(`At most ${UPLOAD_MAX_FILES} files per message`);
   const stamp = Date.now(), dir = join(inboxDir(agentId), new Date().toISOString().slice(0, 10));
   const out: SavedFile[] = [];
   for (const [i, it] of items.entries()) {
     const raw = typeof it?.data === 'string' ? it.data.replace(/^data:[^,]*,/, '') : '';
     const bytes = Buffer.from(raw, 'base64');
-    if (!bytes.length) throw new Error('A picture is empty');
-    if (bytes.length > UPLOAD_MAX_BYTES) throw new Error(`A picture is too big (limit ${mb(UPLOAD_MAX_BYTES)})`);
+    if (!bytes.length) throw new Error('A file is empty');
+    if (bytes.length > UPLOAD_MAX_BYTES) throw new Error(`A file is too big (limit ${mb(UPLOAD_MAX_BYTES)})`);
     const mime = sniffImage(bytes);
-    if (!mime) throw new Error('Only PNG, JPEG, GIF and WebP pictures can be sent');
-    const stem = safeName(String(it?.name ?? 'image')).replace(/\.[^.]*$/, '') || 'image';
+    const given = safeName(String(it?.name ?? 'file'));
+    const name = mime ? `${given.replace(/\.[^.]*$/, '') || 'image'}${IMAGE_EXT[mime]}` : given;
     mkdirSync(dir, { recursive: true });
-    const path = join(dir, `web-${stamp}-${i + 1}-${stem}${IMAGE_EXT[mime]}`);
+    const path = join(dir, `web-${stamp}-${i + 1}-${name}`);
     writeFileSync(path, bytes);
-    out.push({ path, name: `${stem}${IMAGE_EXT[mime]}`, kind: 'image', mime, size: bytes.length });
+    out.push({ path, name, kind: mime ? 'image' : 'document', mime: mime ?? (typeof it?.type === 'string' && /^[\w.+-]+\/[\w.+-]+$/.test(it.type) ? it.type : undefined), size: bytes.length });
   }
   return out;
 }

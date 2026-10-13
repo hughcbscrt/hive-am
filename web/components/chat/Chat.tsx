@@ -2,7 +2,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowUp, Brain, ChevronRight, ImagePlus, Square, X, AlertTriangle, Waypoints, Coins, Layers, Timer, Hammer } from 'lucide-react';
+import { ArrowUp, Brain, ChevronRight, Paperclip, Square, X, AlertTriangle, Waypoints, Coins, Layers, Timer, Hammer } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useHive } from '@/lib/store';
 import { ago } from '@/lib/meta';
@@ -114,13 +114,14 @@ const History = memo(function History({ msgs, agent }: { msgs: ChatMessage[]; ag
   );
 }, (a, b) => a.msgs === b.msgs && a.agent.id === b.agent.id && a.agent.name === b.agent.name && a.agent.provider === b.agent.provider && a.agent.role === b.agent.role);
 
-interface Pic { id: string; name: string; data: string }
-const MAX_PICS = 5, MAX_PIC_BYTES = 10 * 1024 * 1024;
+const fileSize = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+interface Pic { id: string; name: string; data: string; type: string; size: number }
+const MAX_FILES = 5, MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 /** Owns the draft text, so each keystroke re-renders only this small box. */
 const Composer = memo(function Composer({ name, running, queued, readOnly, onSend, onStop, toolsOpen, onToggleTools }: {
   name: string; running: boolean; queued: number; readOnly: boolean;
-  onSend: (prompt: string, images?: { name: string; data: string }[]) => Promise<boolean>; onStop: () => void; toolsOpen: boolean | null; onToggleTools: () => void;
+  onSend: (prompt: string, files?: { name: string; data: string; type: string }[]) => Promise<boolean>; onStop: () => void; toolsOpen: boolean | null; onToggleTools: () => void;
 }) {
   const { t } = useI18n();
   const [text, setText] = useState('');
@@ -130,19 +131,17 @@ const Composer = memo(function Composer({ name, running, queued, readOnly, onSen
   const ref = useRef<HTMLTextAreaElement>(null);
   const pick = useRef<HTMLInputElement>(null);
   const grow = () => { const el = ref.current; if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 200) + 'px'; } };
-  // Pictures come from paste (Ctrl+V, or ⌘+V on a Mac), from dropping them on the box, or from the clip button.
+  // Files come from paste (Ctrl+V, or ⌘+V on a Mac: pictures and copied files), from dropping them on the box, or from the clip button.
   const addFiles = async (files: File[]) => {
-    const pics = files.filter((f) => /^image\/(png|jpeg|gif|webp)$/.test(f.type));
-    if (files.length && !pics.length) { toast(t('chat.img.type'), 'err'); return; }
-    if (images.length + pics.length > MAX_PICS) { toast(t('chat.img.max', { n: MAX_PICS }), 'err'); }
-    const room = pics.slice(0, Math.max(0, MAX_PICS - images.length));
-    const ok = room.filter((f) => f.size <= MAX_PIC_BYTES);
-    if (ok.length < room.length) toast(t('chat.img.big', { mb: MAX_PIC_BYTES / 1024 / 1024 }), 'err');
-    const read = await Promise.all(ok.map((f, i) => new Promise<Pic>((res, rej) => { const r = new FileReader(); r.onload = () => res({ id: `${Date.now()}-${i}`, name: f.name && f.name !== 'image.png' ? f.name : `pasted-${i + 1}`, data: String(r.result) }); r.onerror = () => rej(r.error); r.readAsDataURL(f); })));
+    const room = files.slice(0, Math.max(0, MAX_FILES - images.length));
+    if (room.length < files.length) toast(t('chat.img.max', { n: MAX_FILES }), 'err');
+    const ok = room.filter((f) => f.size <= MAX_FILE_BYTES && f.size > 0);
+    if (ok.length < room.length) toast(t('chat.img.big', { mb: MAX_FILE_BYTES / 1024 / 1024 }), 'err');
+    const read = await Promise.all(ok.map((f, i) => new Promise<Pic>((res, rej) => { const r = new FileReader(); r.onload = () => res({ id: `${Date.now()}-${i}`, name: f.name && f.name !== 'image.png' ? f.name : `pasted-${i + 1}.png`, data: String(r.result), type: f.type, size: f.size }); r.onerror = () => rej(r.error); r.readAsDataURL(f); })));
     setImages((x) => [...x, ...read]);
   };
   const onPaste = (e: React.ClipboardEvent) => {
-    const files = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
+    const files = [...e.clipboardData.files];
     if (!files.length || e.clipboardData.getData('text/plain').trim()) return;   // text in the clipboard pastes as text
     e.preventDefault(); void addFiles(files);
   };
@@ -150,7 +149,7 @@ const Composer = memo(function Composer({ name, running, queued, readOnly, onSen
     const prompt = text.trim(); if (!prompt && !images.length) return;
     const sending = images;
     setText(''); setImages([]); requestAnimationFrame(grow);
-    if (!(await onSend(prompt, sending.map(({ name, data }) => ({ name, data }))))) { setText(prompt); setImages(sending); requestAnimationFrame(grow); }
+    if (!(await onSend(prompt, sending.map(({ name, data, type }) => ({ name, data, type }))))) { setText(prompt); setImages(sending); requestAnimationFrame(grow); }
   };
   return (
     <div className="composer">
@@ -161,11 +160,11 @@ const Composer = memo(function Composer({ name, running, queued, readOnly, onSen
           onDrop={(e) => { setOver(false); const f = [...e.dataTransfer.files]; if (f.length) { e.preventDefault(); void addFiles(f); } }}>
           {images.length > 0 && (
             <div className="cmp-imgs">{images.map((p) => (
-              <span key={p.id} className="cmp-img"><img src={p.data} alt={p.name} /><button type="button" onClick={() => setImages((x) => x.filter((y) => y.id !== p.id))} aria-label={t('chat.img.remove', { name: p.name })} title={t('chat.img.remove', { name: p.name })}><X size={12} /></button></span>))}
+              <span key={p.id} className={`cmp-img${p.type.startsWith('image/') ? '' : ' file'}`} title={p.name}>{p.type.startsWith('image/') ? <img src={p.data} alt={p.name} /> : <><Paperclip size={14} aria-hidden /><b>{p.name}</b><i>{fileSize(p.size)}</i></>}<button type="button" onClick={() => setImages((x) => x.filter((y) => y.id !== p.id))} aria-label={t('chat.img.remove', { name: p.name })} title={t('chat.img.remove', { name: p.name })}><X size={12} /></button></span>))}
             </div>
           )}
-          <input ref={pick} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
-          <button type="button" className="btn ghost icon" onClick={() => pick.current?.click()} aria-label={t('chat.img.attach')} title={t('chat.img.attach')}><ImagePlus size={18} /></button>
+          <input ref={pick} type="file" multiple hidden onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
+          <button type="button" className="btn ghost icon" onClick={() => pick.current?.click()} aria-label={t('chat.img.attach')} title={t('chat.img.attach')}><Paperclip size={18} /></button>
           <textarea ref={ref} rows={1} onPaste={onPaste} value={text} placeholder={running ? t('chat.queuePlaceholder') : t('chat.placeholder', { name })} aria-label={t('chat.messageLabel')}
             onChange={(e) => { setText(e.target.value); grow(); }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
@@ -232,11 +231,11 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
     return () => ro.disconnect();
   }, [loaded, agent.id]);
 
-  const send = useCallback(async (prompt: string, images: { name: string; data: string }[] = []) => {
+  const send = useCallback(async (prompt: string, files: { name: string; data: string; type: string }[] = []) => {
     if (readOnly) return false;
     setOutbox((o) => [...o, prompt]); stick.current = true;
     try {
-      const r = await api.post<{ prompt?: string }>(`/agents/${agent.id}/messages`, { prompt, ...(images.length ? { images } : {}) });
+      const r = await api.post<{ prompt?: string }>(`/agents/${agent.id}/messages`, { prompt, ...(files.length ? { files } : {}) });
       // With pictures the server adds a note with where it saved them: the waiting bubble shows the message as the agent got it.
       if (r.prompt && r.prompt !== prompt) setOutbox((o) => { const i = o.lastIndexOf(prompt); return i < 0 ? o : o.map((x, j) => (j === i ? r.prompt! : x)); });
       return true;

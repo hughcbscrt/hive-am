@@ -53,7 +53,7 @@ Navegador ── WebSocket directo ──▶ ws://<hostname>:4400/ws
 | `PATCH /api/agents/:id` | Cualquier subconjunto de los campos anteriores | El agente actualizado. Si cambia el `provider`, se descarta la sesión actual. |
 | `DELETE /api/agents/:id` | — | Detiene su turno en curso y lo elimina. `{ ok: true }` |
 | `POST /api/agents/:id/messages` | `{ prompt, images? }` | **Encola** el turno y responde de inmediato `{ accepted: true, prompt }`. El resultado llega por WebSocket. | `images` (hasta 5, `{ name, data }` en base64 o data URL; PNG, JPEG, GIF o WebP, 10 MB cada una, verificadas por sus bytes) se guardan en el buzón del agente y se añade al prompt una nota con sus rutas (`prompt` en la respuesta es el texto como lo recibió el agente). |
-| `GET /api/agents/:id/inbox?path=` | — | Una imagen enviada desde el chat (para su miniatura): solo archivos dentro del buzón de ese agente, solo como imagen inerte. |
+| `GET /api/agents/:id/inbox?path=` | — | Un archivo enviado desde el chat (miniatura o descarga): solo archivos dentro del buzón de ese agente; las imágenes en línea, lo demás solo como descarga (`attachment`). |
 | `POST /api/agents/:id/stop` | — | Aborta el turno en curso. `{ stopped: bool }` |
 | `POST /api/agents/:id/new-session` | — | Detiene el turno y borra el puntero de sesión: el siguiente mensaje abre una conversación nueva. |
 | `POST /api/agents/:id/resume-session` | `{ session_id }` | Hace actual una sesión **directa** anterior del agente. 400 si no es suya o es de delegación. |

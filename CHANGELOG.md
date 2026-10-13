@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ## [Unreleased]
 
 ### Added
+- Chat: **attach any file** (not only pictures): paste, drop or use the clip; up to 5 per message, 20 MB each, saved in the agent's inbox and shown as a chip that downloads.
 - Chat: **send pictures to an agent** by pasting them (Ctrl+V, ⌘V on a Mac), dropping them on the text box or with a clip button; they show as previews, are saved in the agent's inbox and appear as thumbnails in the conversation (up to 5 per message; PNG, JPEG, GIF, WebP).
 - Colony map: **drag** a colony (by its name) or a free agent / resource to place it where you want (kept in this browser, with a button to put everything back), and **zoom** (− / +, Ctrl/⌘ + wheel).
 - Resources: a server, Docker or cluster resource has **one manager agent**, chosen by searching: in the resource's form (creating and editing), from its card on the colony map (*Add manager agent*) and from the agent's form (*Resources it looks after*, which takes several). With a manager only that agent looks after it (any colony); with none, the agents of its colony do. An agent without the "Colony resources" skill gets it when chosen.

@@ -166,7 +166,7 @@ Al hacer clic se despliega un panel con:
 
 ## 10.6 Caja de texto (`Composer`)
 
-**Imágenes.** Pega una imagen con **Ctrl+V** (⌘V en Mac), suéltala sobre la caja o usa el botón del clip: aparece como vista previa con una × (hasta 5, PNG / JPEG / GIF / WebP, 10 MB cada una; si el portapapeles también trae texto, se pega el texto). Al enviar, el servidor las guarda en el buzón del agente (la misma carpeta de los archivos que llegan por Telegram o Slack) y añade al mensaje una nota con sus rutas, para que el agente las abra con sus herramientas de archivos; la burbuja las muestra como miniaturas.
+**Archivos e imágenes.** Pega una imagen o un archivo copiado con **Ctrl+V** (⌘V en Mac), suelta cualquier archivo sobre la caja o usa el botón del clip: cada uno aparece como vista previa (imágenes) o etiqueta (otros archivos) con una × (hasta 5 por mensaje, 20 MB cada uno; si el portapapeles también trae texto, se pega el texto). Al enviar, el servidor los guarda en el buzón del agente (la misma carpeta de los archivos que llegan por Telegram o Slack) y añade al mensaje una nota con sus rutas, para que el agente los abra con sus herramientas de archivos. Las imágenes se reconocen por sus bytes; cualquier otro archivo conserva su nombre (saneado) y nunca se ejecuta. La burbuja muestra las imágenes como miniaturas y los demás archivos como una etiqueta que descarga.
 
 - Es un componente **aislado y memoizado** que guarda su propio texto: escribir no vuelve a renderizar el historial (en una prueba con 12 mensajes se midieron ≈2 ms por tecla en modo desarrollo).
 - **Enter** envía; **Shift+Enter** inserta salto de línea; no envía durante composición IME. Crece automáticamente hasta 200 px.

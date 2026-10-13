@@ -1272,5 +1272,6 @@ body:has(.scrim) .ap-card.pinned { z-index: 39; }
 .cmp-img { position: relative; width: 72px; height: 72px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line-strong); background: var(--surface-2); }
 .cmp-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cmp-img button { position: absolute; top: 3px; right: 3px; display: grid; place-items: center; width: 20px; height: 20px; border: 0; border-radius: 99px; background: rgba(0,0,0,.6); color: #fff; cursor: pointer; padding: 0; }
+.cmp-img.file { width: auto; max-width: 220px; height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 28px 0 9px; font-size: 12px; } .cmp-img.file b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .cmp-img.file i { font-style: normal; color: var(--muted); flex: none; } .cmp-img.file button { top: 7px; }
 .bubble-imgs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; } .bubble-imgs:first-child { margin-top: 0; }
 .bubble-imgs img { max-width: 260px; max-height: 200px; border-radius: 10px; display: block; border: 1px solid var(--line); }
