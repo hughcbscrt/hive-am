@@ -1,4 +1,4 @@
-import { agents } from '../db.js';
+import { agents, resolved } from '../db.js';
 import { mcpCaps } from '../instructions.js';
 import { objectAction, objectLogs, listObjects } from './index.js';
 import { ObjectError, type ObjectView } from './model.js';
@@ -7,26 +7,26 @@ import { noteServer } from './runner.js';
 /**
  * What an agent with the "Colony resources" skill can do with objects: see them, read their logs and start / stop / restart them. Never
  * create, change or delete. The rules are enforced here, not just written in the skill:
- *  - only the objects of the agent's own colony (or the ones with no colony, for an agent with none);
+ *  - only the objects of the agent's own colony (or the ones with no colony, for an agent with none), plus the ones a person linked to it by hand;
  *  - a read-only agent can look but not act;
  *  - an unknown or foreign object looks the same as one that does not exist.
  */
 function whoAsks(from: unknown) {
   const a = typeof from === 'string' ? agents.get(from) : undefined;
   if (!a) throw new ObjectError('Unknown agent');
-  if (!mcpCaps(a).includes('objects')) throw new ObjectError('You do not have the "Colony resources" skill.');
+  if (!mcpCaps(resolved(a)).includes('objects')) throw new ObjectError('You do not have the "Colony resources" skill.');
   return a;
 }
-const visibleTo = (colonyId: string | null) => (o: ObjectView) => (o.colony_id ?? null) === (colonyId ?? null);
+const visibleTo = (a: { id: string; colony_id: string | null }) => (o: ObjectView) => (o.colony_id ?? null) === (a.colony_id ?? null) || o.agent_ids.includes(a.id);
 
 export function agentObjects(from: unknown) {
   const a = whoAsks(from);
-  return listObjects().filter(visibleTo(a.colony_id)).map((o) => ({ name: o.name, kind: o.kind, status: o.state.status, detail: o.state.detail ?? null, since: o.state.since ?? null }));
+  return listObjects().filter(visibleTo(a)).map((o) => ({ name: o.name, kind: o.kind, status: o.state.status, detail: o.state.detail ?? null, since: o.state.since ?? null }));
 }
 
 function pick(from: unknown, name: unknown) {
   const a = whoAsks(from);
-  const o = listObjects().filter(visibleTo(a.colony_id)).find((x) => x.name.toLowerCase() === String(name ?? '').trim().toLowerCase());
+  const o = listObjects().filter(visibleTo(a)).find((x) => x.name.toLowerCase() === String(name ?? '').trim().toLowerCase());
   if (!o) throw new ObjectError(`There is no resource named "${String(name ?? '')}" in your colony. Call object_list for the names.`);
   return { a, o };
 }

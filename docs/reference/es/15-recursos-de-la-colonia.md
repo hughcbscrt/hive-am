@@ -126,6 +126,8 @@ API: `GET /api/docker/containers`, `GET /api/docker/images`, `GET /api/docker/co
 
 Un agente con la skill **Colony resources** (`default-objects`, una de las skills que vienen con hive-am) recibe tres herramientas: `object_list`, `object_logs` y `object_action` (iniciar, detener, reiniciar). Para crear uno, elige un recurso en el mapa y pulsa **Crear un agente administrador** en su panel: abre el formulario de agente nuevo con la skill, la colonia y el permiso *Editar archivos* ya puestos (la misma skill se puede agregar a cualquier agente desde el selector de skills). El panel muestra quién cuida cada recurso.
 
+**Vincular un agente a mano.** Los agentes de la colonia de un recurso pueden cuidarlo, pero cualquier agente existente se puede vincular desde **Configuración → Agentes que lo cuidan** del recurso (un servidor, un contenedor Docker o un proyecto compose). Si el agente no tiene la skill, al vincularlo la recibe. Se guarda al instante (no con la barra de configuración); desde entonces el agente ve ese recurso en `object_list` aunque sea de otra colonia. API: `PUT /api/objects/:id/agents` con `{ agent_ids }` (solo desde la app local; devuelve `skillAdded`, los agentes a los que se les dio la skill).
+
 Las reglas las aplica el servidor, no solo las escribe la skill:
 
 - Un agente ve solo los recursos de **su propia colonia**; uno sin colonia ve los que no tienen. El recurso de otra colonia se ve como si no existiera.

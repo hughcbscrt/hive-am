@@ -126,6 +126,8 @@ API: `GET /api/docker/containers`, `GET /api/docker/images`, `GET /api/docker/co
 
 An agent with the **Colony resources** skill (`default-objects`, one of the skills that ship with hive-am) gets three tools: `object_list`, `object_logs` and `object_action` (start, stop, restart). To make one, select an resource on the map and press **Create a manager agent** in its panel: it opens the new-agent form with the skill, the colony and *Edit files* permission already set (the same skill can be added to any agent from the skill picker). The panel lists who looks after each resource.
 
+**Linking an agent by hand.** The agents of a resource's own colony can look after it, but any existing agent can be linked from the resource's **Settings → Agents that look after it** (a server, a Docker container or a compose project). Linking an agent that lacks the skill gives it the skill. It is saved right away (not with the settings bar); the agent then sees that resource in `object_list` even if it belongs to another colony. API: `PUT /api/objects/:id/agents` with `{ agent_ids }` (local app only; it returns `skillAdded`, the agents that were given the skill).
+
 The rules are enforced by the server, not just written in the skill:
 
 - An agent sees only the resources of **its own colony**; one with no colony sees the resources that have none. Another colony's resource looks like one that does not exist.

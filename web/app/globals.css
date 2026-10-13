@@ -1246,3 +1246,5 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .pw-eye:hover { color: var(--ink); background: var(--honey-soft); }
 .dbs-tools { display: flex; align-items: center; gap: 4px; } .dbs-tools .search { flex: 1; min-width: 0; } .dbs-tools .btn { flex: none; }
 .db-ed .se { flex: 1; min-height: 0; display: flex; } .db-ed .se .ce { height: 100%; }
+
+.oa-row { padding: 6px 4px; border-radius: 8px; cursor: pointer; align-items: center; } .oa-row:hover { background: var(--honey-soft); } .oa-row input:disabled { cursor: default; }

@@ -39,7 +39,7 @@ export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { o
   // A terminal where the server runs, or inside the container (a compose project has several, so it only has logs).
   const canShell = o.kind === 'server' || (o.kind === 'docker' && (o.config as DockerConfig).mode !== 'compose');
   // The agents that can act on it: the ones with the Colony resources skill in the same colony (or, with no colony, among the objects that have none).
-  const managers = agents.filter((a) => a.skill_ids.includes(OBJECTS_SKILL_ID) && (a.colony_id ?? null) === (o.colony_id ?? null));
+  const managers = agents.filter((a) => a.skill_ids.includes(OBJECTS_SKILL_ID) && ((a.colony_id ?? null) === (o.colony_id ?? null) || o.agent_ids.includes(a.id)));
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const { icon: Icon, color } = KIND[o.kind];

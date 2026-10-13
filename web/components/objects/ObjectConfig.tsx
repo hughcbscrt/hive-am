@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
 import type { DockerConfig, HttpScan, ObjectView } from '@/lib/types';
 import { Modal, useToast } from '@/components/ui';
+import { ObjectAgents } from './ObjectAgents';
 import { ObjectFields, draftFrom, toConfig, useDraft } from './ObjectForm';
 
 /** The settings of an object, in its own screen: fields, a bar that says whether something is unsaved, and delete. */
@@ -45,7 +46,7 @@ export function ObjectConfig({ object: o }: { object: ObjectView }) {
   return (
     <div className="oc">
       <div className="oc-body">
-        <div className="oc-form"><ObjectFields objectId={o.id} d={d} set={set} setD={setD} scan={scan} error={err} /></div>
+        <div className="oc-form"><ObjectFields objectId={o.id} d={d} set={set} setD={setD} scan={scan} error={err} />{restartable && o.kind !== 'cluster' && <div className="of" style={{ marginTop: 14 }}><ObjectAgents object={o} /></div>}</div>
       </div>
       <div className="savebar oc-bar">
         <span className="muted small grow">{dirty ? t('ow.cfg.dirty') : t('ow.cfg.saved')}{dirty && restartable ? ` · ${live ? t('ow.cfg.appliesRunning') : t('ow.cfg.applies')}` : ''}</span>

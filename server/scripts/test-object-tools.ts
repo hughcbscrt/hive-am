@@ -11,7 +11,7 @@ import { agents, colonies, skills } from '../src/db.js';
 import '../src/index.js';
 import { composeInstructions, mcpCaps } from '../src/instructions.js';
 import { DEFAULT_SKILLS, OBJECTS_SKILL_ID } from '../src/skills/defaults.js';
-import { createObject, removeObject, stateOf } from '../src/objects/index.js';
+import { createObject, removeObject, setObjectAgents, stateOf } from '../src/objects/index.js';
 import { objectsStore } from '../src/objects/store.js';
 
 let fail = 0;
@@ -81,6 +81,17 @@ check((await stateOf(objectsStore.get(mine.id)!)).status === 'running', 'and the
 const pl = session(plain.id, 'objects'); const pr = await pl.call('object_list');
 check(pr.err && /skill/.test(pr.text), 'an agent without the skill is refused even if it reaches the tools');
 const ghost = session('no-such-agent', 'objects'); check((await ghost.call('object_list')).err, 'and so is an unknown agent');
+
+// Linking an agent by hand: an agent of another colony, even one without the skill, can look after it (and gets the skill).
+const link = setObjectAgents(mine.id, [loner.id, plain.id]);
+check(link.skillAdded.length === 1 && link.skillAdded[0] === plain.id && agents.get(plain.id)!.skill_ids.includes(OBJECTS_SKILL_ID), 'linking an agent without the skill gives it the skill (and only it)');
+check(objectsStore.links().get(mine.id)?.length === 2, 'the links are stored');
+const lk = await l2.call('object_list');
+check(lk.text.includes('colony-job') && lk.text.includes('free-job'), 'a linked agent of another colony sees it, besides its own');
+const la = await l2.call('object_action', { name: 'colony-job', action: 'restart' });
+check(!la.err, 'and can act on it');
+setObjectAgents(mine.id, []);
+check(!(await l2.call('object_list')).text.includes('colony-job'), 'unlinking takes it away again');
 
 const st = await m.call('object_action', { name: 'colony-job', action: 'stop' });
 check(!st.err && /stopped/.test(st.text), 'stop works');

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DATA_DIR } from '../db.js';
+import { DATA_DIR, agents, resolved } from '../db.js';
+import { OBJECTS_SKILL_ID } from '../skills/defaults.js';
 import { bus } from '../runtime.js';
 import { renderTemplate, listTemplates } from './templates.js';
 import { composeServiceAction, inspectDocker, recreateDocker, type DockerAction, dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
@@ -74,8 +75,8 @@ export async function refreshStates(): Promise<boolean> {
   return diff;
 }
 
-export const viewOf = (o: ObjectRow): ObjectView => ({ ...maskConfig(o), state: states.get(o.id) ?? { status: 'unknown', detail: 'checking…' } });
-export const listObjects = (): ObjectView[] => objectsStore.list().map(viewOf);
+export const viewOf = (o: ObjectRow, links = objectsStore.links()): ObjectView => ({ ...maskConfig(o), state: states.get(o.id) ?? { status: 'unknown', detail: 'checking…' }, agent_ids: links.get(o.id) ?? [] });
+export const listObjects = (): ObjectView[] => { const links = objectsStore.links(); return objectsStore.list().map((o) => viewOf(o, links)); };
 
 let timer: ReturnType<typeof setInterval> | undefined, busy = false;
 /** Checks the objects every few seconds and tells the interface when one changed (it fetches the list again). */
@@ -262,6 +263,22 @@ export const dbSavedUpdate = (id: string, savedId: string, p: { name?: unknown; 
   return e;
 };
 export const dbSavedRemove = (id: string, savedId: string) => { dbOf(id); if (!removeSaved(id, savedId)) throw new ObjectError('Saved query not found'); return listSaved(id); };
+/**
+ * Links agents to a resource by hand (the ones of its own colony can already look after it). An agent that does not have the "Colony resources"
+ * skill gets it, because without it the tools are not offered; the ids of the agents that were given the skill come back.
+ */
+export function setObjectAgents(id: string, agentIds: unknown): { object: ObjectView; skillAdded: string[] } {
+  const o = get(id);
+  if (!Array.isArray(agentIds)) throw new ObjectError('Choose the agents');
+  const ids = [...new Set(agentIds.map(String))];
+  const skillAdded: string[] = [];
+  for (const a of ids) {
+    const ag = agents.get(a); if (!ag) throw new ObjectError('One of the agents no longer exists');
+    if (!resolved(ag).skill_ids.includes(OBJECTS_SKILL_ID)) { agents.setSkills(a, [...ag.skill_ids, OBJECTS_SKILL_ID]); skillAdded.push(a); }
+  }
+  objectsStore.setAgents(id, ids); changed();
+  return { object: viewOf(o), skillAdded };
+}
 /** Tries a connection before it is saved: the config comes from the form; an empty password means the one already saved (of that object). */
 export async function dbTestConfig(p: { id?: unknown; config?: unknown }) {
   const raw: Record<string, unknown> = { ...((p.config ?? {}) as Record<string, unknown>) };

@@ -93,7 +93,8 @@ export interface ClusterConfig { members: string[] }
 
 export interface ObjectRow { id: string; colony_id: string | null; kind: ObjectKind; name: string; config: ServerConfig | DockerConfig | HttpConfig | DatabaseConfig | ClusterConfig; created_at: number; updated_at: number }
 export interface ObjectState { status: ObjectStatus; /** Why, in a few words (an exit code, "unhealthy", "docker is not available"…). */ detail?: string; pid?: number; since?: number }
-export type ObjectView = ObjectRow & { state: ObjectState };
+/** `agent_ids`: the agents a person linked to it by hand (besides the ones of its own colony) that can look after it. */
+export type ObjectView = ObjectRow & { state: ObjectState; agent_ids: string[] };
 
 export const NAME_MAX = 60;
 const ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
