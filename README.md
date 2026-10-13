@@ -119,6 +119,10 @@ checked on the server. The bot token is stored in `~/.hive-am/hive-am.db` and ne
   - `mcp/dispatch.mjs`: the `hive` MCP server: `list_agents` and `dispatch` for orchestrators, `channel_*` for connections, `notebook_*` and `skill_read`.
 - `web/`: Next.js 15 UI. Colony (honeycomb), Agents, the agent workspace (chat, changes, settings, notebook, sessions), Relations canvas, Types, Skills, Connections and Sessions.
 
+## User manual
+
+A step by step guide with screenshots, from installing hive-am to running resources and reviewing changes: **[English](docs/manual/en/README.md)** · **[Español](docs/manual/es/README.md)**.
+
 ## Documentation
 
 Full documentation in English and Spanish: **[English](docs/reference/en/README.md)** · **[Español](docs/reference/es/README.md)**.

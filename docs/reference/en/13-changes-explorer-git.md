@@ -128,16 +128,17 @@ Remember that, like the rest of the API, it has **no authentication** ([document
 | File | Responsibility |
 |---|---|
 | `server/src/git/repo.ts` | Reading: `gitStatus`, `gitTree`, `gitDiff`, `gitFile`, `gitImagePath`; path validation |
-| `server/src/api.ts` | The `…/git/*` routes (the `raw` one writes its own binary response) |
+| `server/src/http/routes/git.ts` | The `…/git/*` routes (the `raw` one writes its own binary response); `api.ts` is only a facade |
 | `web/lib/git/useGit.ts` | Hook: status, tree, refresh and *polling* |
 | `web/lib/git/gitTree.ts` | Builds the tree, compacts folders, filters and flattens rows |
 | `web/lib/git/diff.ts` | Unified diff parser and pairing for the side-by-side view |
-| `web/components/git/GitExplorer.tsx` | Bar, tree, preview and commit view |
+| `web/components/git/GitExplorer.tsx` | Composes the explorer: bar, side panel and the state shared between the pieces below |
+| `web/components/git/GitTabs.tsx` · `FileTree.tsx` · `FileView.tsx` · `FilePreview.tsx` · `HistoryList.tsx` | The side tabs (on the shared `Tabs`, with arrow-key navigation), the file tree (ARIA `tree` roles and keyboard: arrows to move and open or close folders, Home/End), the file viewer, the preview of a file or commit, and the history list |
 | `web/components/git/ConflictResolver.tsx` · `web/lib/git/conflicts.ts` | Conflict resolver and the analysis/application of blocks |
 | `web/components/git/CodeEditor.tsx` · `Code.tsx` · `GitSettings.tsx` · `web/lib/git/highlight.ts` · `web/lib/git/gitPrefs.ts` | Editor with highlighting, highlighted code, view settings, highlighter and preferences |
 | `web/components/git/StatusLetter.tsx` · `web/lib/useDismiss.ts` | Shared pieces: the status letter (M/A/D/R/U/!/T) and closing popovers with an outside click or Esc (also used by `HelpPopover`) |
 | `web/components/agents/useAgentSettings.tsx` · `DeleteAgentModal.tsx` | Editing and deleting an agent, shared by the chat and Colony |
-| `web/components/git/GitActions.tsx` | Fetch/Pull/Push/Commit buttons, branch menu, commit dialog, history list |
+| `web/components/git/GitActions.tsx` · `BranchMenu.tsx` · `CommitDialog.tsx` · `DiscardConfirm.tsx` | Fetch/Pull/Push/Commit buttons and notices (`useGitActions`), branch menu, commit dialog, and the confirmations before discarding changes (on `ConfirmDialog`) |
 | `server/src/git/ops.ts` | History, branches and the actions that write (commit, pull, push, fetch, switch, merge) |
 | `web/app/agents/[id]/page.tsx` | **Chat / Changes** tabs and the badge |
 

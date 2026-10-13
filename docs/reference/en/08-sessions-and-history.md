@@ -71,7 +71,7 @@ Intended effect: the direct chat with a worker contains only what you and it tal
 readHistory(agent: { provider, cwd, session_id }, sessionId = agent.session_id): ChatMessage[]
 ```
 
-It dispatches by provider, **catches any error** (logs it and returns `[]`) and returns `[]` if there is no session.
+It dispatches by provider through the `historyReaders` registry (each provider is a `HistoryReader` with `read` and `sig`, a cheap fingerprint of the conversation), **catches any error** (logs it and returns `[]`) and returns `[]` if there is no session.
 
 ### Normalized format
 
@@ -157,5 +157,5 @@ The Sessions screen shows **only sessions managed by hive-am**, not every one th
 ## 8.8 Considerations
 
 - `GET /api/sessions` and `GET /api/agents/:id/stats` **read the full history** on every call; with very long sessions it can be slow. There is no cache.
-- The readers are tolerant: invalid lines are ignored; missing files return an empty list.
+- The readers are tolerant: invalid lines are ignored (the JSONL ones share `jsonLines`, in `history/lines.ts`); missing files return an empty list.
 - The CLIs' on-disk formats are not stable contracts; if they change with an update, the corresponding reader is the only point to adjust.

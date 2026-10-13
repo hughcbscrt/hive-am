@@ -173,19 +173,22 @@ Clicking expands a panel with:
 - While the agent is working, the placeholder changes to "Queue a follow-up…": the message is **queued** (see [document 9](09-orchestration-and-relations.md#94-per-agent-queue)); the **Stop** button appears.
 - When reading a session that is not the current one, the box is replaced by a read-only notice, and the header offers "Make this conversation current" (direct sessions only) and "Back to current".
 - Below it, "N queued" is shown if there are queued messages.
+- **Draft per agent:** what you have typed and not sent is kept in the browser (`hive-am.draft.<agentId>`), so switching agent or reloading does not lose it; it is cleared on send.
 
 ## 10.7 Scroll behavior
 
 The view stays anchored to the bottom **as long as you do not move away**:
 
 - A `ResizeObserver` on the content re-anchors to the bottom when something grows (markdown, tools, tables).
-- Turning the wheel up **unanchors**; getting back within 40 px of the bottom **re-anchors**; sending a message re-anchors.
+- Anything that moves you up **unanchors**: the wheel, a touch drag, scrolling up, or the PageUp / ArrowUp / Home keys. Getting back within 40 px of the bottom **re-anchors**; sending a message re-anchors.
+- While unanchored, a **Latest** (go to the end) button appears over the conversation; it jumps to the bottom and re-anchors.
+- The conversation is a `role="log"` region with a label: new messages are announced politely to screen readers (not word by word while a turn streams).
 - `scroll-behavior: smooth` is not used (it caused the view not to reach the bottom).
 
 ## 10.8 Empty state and notices
 
 - No conversation: a "Say hello to *name*" card with different text for an orchestrator (describe a goal) and a worker (give a task).
-- Transient notices use *toasts* (`useToast`): success in black for 3 s, error in red for 6 s.
+- Transient notices use *toasts* (`useToast`): errors in red are announced as alerts (`role="alert"`) and last longer (7 s plus the length of the text, up to 15 s); other notices last 3.5 s plus the length, up to 8 s. They have a close button, pause while the pointer is over them or they have focus, an identical notice is not repeated, and at most 5 show at once.
 - API errors are shown with the server's exact message.
 
 ## 10.9 Number formatting (`lib/format.ts`)

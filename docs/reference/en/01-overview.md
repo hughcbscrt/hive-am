@@ -74,7 +74,7 @@ flowchart LR
 | Layer | Files | Responsibility |
 |---|---|---|
 | Presentation | `web/` | Pages, forms, chat, honeycomb, relations canvas |
-| API | `server/src/api.ts` | Validation, REST routes, orchestration of the other layers |
+| API | `server/src/api.ts` → `http/`, `services/` | `api.ts` is a facade; routes, validation, guards and errors live in `http/`, domain rules in `services/` |
 | Real time | `server/src/index.ts`, `runtime.ts` (`bus`) | Broadcasts events over WebSocket |
 | Execution | `server/src/runtime.ts`, `instructions.ts` | Per-agent queue, sessions and delegation; composition of each agent's instructions and tools |
 | Providers | `server/src/providers/` | Builds each CLI's command and translates its output into common events |

@@ -4,7 +4,7 @@
 
 ## 15.0 La pantalla de Recursos
 
-**Recursos** en el riel izquierdo abre una pantalla armada como la de un agente: la lista de recursos a la izquierda (agrupados por colonia, con un punto de estado, con buscador y que se contrae a iconos; **+** crea uno) y el recurso elegido a la derecha, con una cabecera (estado y Iniciar / Detener / Reiniciar, *Terminal aquí* donde aplica) y pestañas. En el mapa de la Colonia, elegir un hexágono sigue mostrando la tarjeta chica, ahora con **Abrir panel** (y el lápiz lleva a su configuración).
+**Recursos** en el riel izquierdo abre una pantalla armada como la de un agente: la lista de recursos a la izquierda (agrupados por colonia, con un punto de estado, con buscador y que se contrae a iconos; **+** crea uno) y el recurso elegido a la derecha, con una cabecera (estado y Iniciar / Detener / Reiniciar, *Terminal aquí* donde aplica) y pestañas (la pestaña abierta está en la URL, `?tab=`, así que un enlace la abre). Recrear un recurso, vaciar un historial HTTP y olvidar una sesión HTTP piden confirmación antes. En el mapa de la Colonia, elegir un hexágono sigue mostrando la tarjeta chica, ahora con **Abrir panel** (y el lápiz lleva a su configuración).
 
 | Tipo | Pestañas |
 |---|---|

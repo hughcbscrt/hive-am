@@ -128,16 +128,17 @@ Recuerda que, como el resto de la API, **no tiene autenticación** ([documento 1
 | Archivo | Responsabilidad |
 |---|---|
 | `server/src/git/repo.ts` | Lectura: `gitStatus`, `gitTree`, `gitDiff`, `gitFile`, `gitImagePath`; validación de rutas |
-| `server/src/api.ts` | Las rutas `…/git/*` (la de `raw` escribe su propia respuesta binaria) |
+| `server/src/http/routes/git.ts` | Las rutas `…/git/*` (la de `raw` escribe su propia respuesta binaria); `api.ts` es solo una fachada |
 | `web/lib/git/useGit.ts` | Hook: estado, árbol, refresco y *polling* |
 | `web/lib/git/gitTree.ts` | Construye el árbol, compacta carpetas, filtra y aplana filas |
 | `web/lib/git/diff.ts` | Parser de diff unificado y emparejado para la vista lado a lado |
-| `web/components/git/GitExplorer.tsx` | Barra, árbol, vista previa y vista de un commit |
+| `web/components/git/GitExplorer.tsx` | Compone el explorador: barra, panel lateral y el estado que comparten las piezas de abajo |
+| `web/components/git/GitTabs.tsx` · `FileTree.tsx` · `FileView.tsx` · `FilePreview.tsx` · `HistoryList.tsx` | Las pestañas laterales (sobre el `Tabs` compartido, con flechas), el árbol de archivos (roles ARIA `tree` y teclado: flechas para moverse y abrir o cerrar carpetas, Inicio/Fin), el visor de archivo, la vista previa de un archivo o commit y la lista del historial |
 | `web/components/git/ConflictResolver.tsx` · `web/lib/git/conflicts.ts` | Resolvedor de conflictos y el análisis/aplicación de bloques |
 | `web/components/git/CodeEditor.tsx` · `Code.tsx` · `GitSettings.tsx` · `web/lib/git/highlight.ts` · `web/lib/git/gitPrefs.ts` | Editor con resaltado, código resaltado, ajustes de vista, resaltador y preferencias |
 | `web/components/git/StatusLetter.tsx` · `web/lib/useDismiss.ts` | Piezas compartidas: la letra de estado (M/A/D/R/U/!/T) y el cierre de popovers con clic fuera o Esc (también lo usa `HelpPopover`) |
 | `web/components/agents/useAgentSettings.tsx` · `DeleteAgentModal.tsx` | Edición y borrado de un agente, compartidos por el chat y Colonia |
-| `web/components/git/GitActions.tsx` | Botones Fetch/Pull/Push/Commit, menú de ramas, diálogo de commit, lista del historial |
+| `web/components/git/GitActions.tsx` · `BranchMenu.tsx` · `CommitDialog.tsx` · `DiscardConfirm.tsx` | Botones Fetch/Pull/Push/Commit y avisos (`useGitActions`), menú de ramas, diálogo de commit y las confirmaciones antes de descartar cambios (sobre `ConfirmDialog`) |
 | `server/src/git/ops.ts` | Historial, ramas y acciones que escriben (commit, pull, push, fetch, switch, merge) |
 | `web/app/agents/[id]/page.tsx` | Pestañas **Chat / Cambios** y la insignia |
 

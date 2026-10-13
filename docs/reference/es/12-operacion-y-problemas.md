@@ -22,7 +22,7 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 
 - Restringir `Access-Control-Allow-Origin` al origen de la web (`http://localhost:4401`) y rechazar otros `Origin`.
 - Token de acceso compartido entre Next (proxy) y el servidor.
-- Verificar el encabezado `Host` para evitar *DNS rebinding*.
+- Verificar el encabezado `Host` para evitar *DNS rebinding*. (La primera y esta son el `TODO(security)` pendiente en `server/src/api.ts`: hay que demostrar que no rompen el proxy de Next ni a los clientes MCP antes de aplicarlas. Lo que sí existe es una guarda única para los endpoints que actúan sobre la máquina, `requireLocal` en `http/guards.ts`.)
 
 ## 12.2 Limitaciones conocidas
 
@@ -55,7 +55,9 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
 | Barra lateral dice "Server offline — retrying" | El servidor no está corriendo, o está en otro puerto | `npm run dev` / revisar `HIVE_AM_PORT` y `NEXT_PUBLIC_HIVE_WS_PORT` |
-| `EADDRINUSE` al arrancar el servidor | Ya hay otra instancia en el puerto | Detenerla (`lsof -ti :4400`) o usar otro `HIVE_AM_PORT` |
+| `EADDRINUSE` al arrancar el servidor | Ya hay otra instancia en el puerto | El servidor dice `port N is already in use: is hive-am already running?` y sale con código 1. Detén la otra (`lsof -ti :4400`) o usa otro `HIVE_AM_PORT` |
+| Una petición responde **413** `The request is too big` | El cuerpo supera el límite: 2 MiB para JSON, unos 135 MB para adjuntos del chat | Envía menos texto; para archivos, respeta 5 por mensaje y 20 MB cada uno ([documento 5](05-comunicacion-back-front.md#52-convenciones-de-la-api-rest)) |
+| La interfaz muestra un aviso de que no pudo cargar, con *Reintentar*, en lugar de las listas | La API no respondió (arrancando, detenida o en otro puerto) | Arranca el servidor; la interfaz reintenta sola con una pausa creciente, o pulsa *Reintentar* |
 | Cambié código del backend y no se nota | Servidor iniciado sin `tsx watch` | Reiniciarlo (`npm run dev` recarga solo) |
 | "Internal Server Error" en Next / error de módulo `_document` o `_app` | Carpeta `.next` corrupta o compartida entre dos servidores de desarrollo | Detener `next dev`, borrar `web/.next` y reiniciar. Para una segunda instancia usar `NEXT_DIST_DIR` |
 | El proveedor sale "not found" | El binario no está en el `PATH` del servidor | Instalar el CLI o arrancar el servidor desde un entorno donde `claude`/`opencode`/`kiro-cli` estén accesibles |
@@ -107,11 +109,23 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
    El proveedor (`claude`, `opencode`, `kiro`) es el primer argumento; todas terminan con `ALL PASSED` o `N FAILED`.
 7. **Delegación:** crear un orquestador (Claude u OpenCode), conectarle un worker y pedirle que delegue; comprobar la fila en `GET /api/dispatches`, la sesión de delegación en `GET /api/agents/<worker>/sessions` y que el chat directo del worker no cambió.
 
+**Scripts de prueba que no necesitan modelo** (`server/scripts/test-*.ts`, 21 en total: direccionamiento, cron, formato, núcleo HTTP, scripts HTTP, migraciones, recursos y sus tipos, supervisión, herramientas y base de datos, código común de proveedores, límite de frecuencia, reacciones, recuperación del runtime, schedules, timeouts de Telegram, terminales, subidas, watch, ciclo de vida de las conexiones). No gastan tokens, pero crean y borran datos, así que se niegan a correr si `HIVE_AM_HOME` no apunta a una carpeta temporal. Usa con `HIVE_AM_PORT` un puerto distinto de 4400 (ese es el de tu instancia):
+
+```bash
+cd server
+H=$(mktemp -d); HIVE_AM_HOME=$H HIVE_AM_PORT=4440 npx tsx scripts/test-migrations.ts; rm -rf $H
+# test-watch.ts necesita intervalos cortos:
+H=$(mktemp -d); HIVE_AM_HOME=$H HIVE_AM_PORT=4441 HIVE_AM_WATCH_POLL_MS=300 HIVE_AM_WAKE_MS_PER_MINUTE=1500 npx tsx scripts/test-watch.ts; rm -rf $H
+```
+
+Cada uno imprime `PASS` / `FAIL` por comprobación y termina con `ALL PASSED` (o sale con un código de error). `HIVE_AM_WATCH_POLL_MS` (cada cuánto se revisa un proceso o archivo vigilado) y `HIVE_AM_WAKE_MS_PER_MINUTE` (cuánto dura un "minuto" de despertador) solo los lee `test-watch.ts`. Ejecuta `sim-*.ts`, `bench-*.ts` y `fake-telegram.ts` solo a propósito: usan agentes reales o una plataforma simulada.
+
 ## 12.5 Mantenimiento de datos
 
 - **Respaldo:** copia `~/.hive-am/` completo con el servidor detenido (por el modo WAL, también existen `hive-am.db-wal` y `-shm`).
 - **Restablecer todo:** detener el servidor y borrar `~/.hive-am/`. Se recrea con el seed. Las conversaciones **no** se pierden: están en los almacenes de los CLIs.
-- **Migraciones:** son aditivas y automáticas al arrancar (`ALTER TABLE … ADD COLUMN`). Una base creada con cualquier versión anterior del proyecto se actualiza sola.
+- **Migraciones:** son aditivas, idempotentes y automáticas al arrancar, versionadas con `PRAGMA user_version` (`server/src/db/migrations.ts`, cada una en su propia transacción). Una base creada con cualquier versión anterior del proyecto se actualiza sola sin perder filas. Para cambiar el esquema, añade una migración al final; nunca edites una ya publicada.
+- **Detener:** `Ctrl+C` / `SIGTERM` cierra la base de datos limpiamente (fusiona el WAL). Los servidores y contenedores que se mantienen como recursos siguen corriendo.
 - **Cambiar de lugar los datos:** variable `HIVE_AM_HOME`.
 
 ## 12.6 Control de versiones

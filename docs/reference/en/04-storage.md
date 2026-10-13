@@ -18,7 +18,8 @@ hive-am keeps data in **five** places. Understanding which one holds what is key
 - Location: `$HIVE_AM_HOME/hive-am.db` (`~/.hive-am/` by default).
 - Pragmas: `journal_mode = WAL` and `foreign_keys = ON`. With WAL, `hive-am.db-wal` and `hive-am.db-shm` also appear; that is normal.
 - Identifiers are text UUID v4. Dates are Unix milliseconds (`Date.now()`).
-- The schema is created with `CREATE TABLE IF NOT EXISTS` when `db.ts` is imported, and then **light migrations** are applied (`ALTER TABLE … ADD COLUMN` if the column is missing). Those migrations always run, also on new databases, which is why some columns do not appear in the initial `CREATE TABLE`.
+- **The schema is versioned.** It lives in one place, `server/src/db/migrations.ts`: a list of migrations that are only ever appended. `PRAGMA user_version` records how many a database has gone through; on opening, the missing ones run, each inside a transaction together with the version bump. They are additive and idempotent (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN` only when the column is absent), so a database from any earlier build opens without losing a row. Version 1 is the **baseline**: every `CREATE TABLE` and `ALTER TABLE` that used to be spread over the modules (it is a no-op where things already exist, which is why some columns do not appear in the first `CREATE TABLE`). Version 2 is the **renames**: resources of kind `boss` become `cluster` and the skill that ships with hive-am follows the rename of Objects to Resources (unless you already renamed it). The modules no longer create tables when they are imported.
+- Access: `db.ts` caches its prepared statements, and creating or updating an agent, a type or a colony (with their skills and members) is **atomic**, one transaction. JSON columns are read with `db/json.ts` (`parseJson`): a damaged value gives a default and a one-time warning in the log instead of an error in the request.
 
 ### Relationship diagram
 
@@ -193,8 +194,23 @@ View preferences only; if they are deleted, the UI works the same.
 | `hive-locale` | `en` \| `es` | `lib/i18n`: UI language (never reflected in the URL) |
 | `hive-git-view` | JSON `{ theme, whitespace, tabSize }` | `lib/git/gitPrefs.ts`: theme, visible whitespace and tab size of the code viewer |
 | `hive-switcher-collapsed` | `1` \| `0` | `agents/[id]/page.tsx`: whether the side agent list is collapsed |
+| `hive-cfg-width` | number (px) | `agents/[id]/page.tsx`: width of the agent's settings panel (dragged, via `useResizableWidth`) |
+| `hive-am.drawerWidth` | number (px) | `Dialog.tsx` (`Drawer`): width of the side drawers (dragged, via `useResizableWidth`) |
+| `hive-obj-switcher-collapsed` | `1` \| `0` | `ObjectWorkspace.tsx`: whether the resources list is collapsed |
+| `hive-colony-layout` | JSON `{ id: {x, y} }` | `app/page.tsx`: where you placed colonies, free agents and resources on the map |
+| `hive-colony-zoom` | number | `app/page.tsx`: zoom of the colony map |
+| `hive-am.agents.q` | text | `agents/page.tsx`: search of the agent list |
+| `hive-am.agents.role` | `all` \| role | `agents/page.tsx`: role filter of the agent list |
+| `hive-am.agents.provider` | `all` \| provider | `agents/page.tsx`: provider filter of the agent list |
+| `hive-am.draft.<agentId>` | text | `Chat.tsx`: the unsent message of each agent (one key per agent) |
+| `hive-am.dock` | JSON `{ open, height, active }` | `lib/dock.tsx`: state of the bottom terminal panel |
+| `hive-am.logsize` | number (10 to 20) | `LogPane.tsx`: text size of the resource logs |
+| `hive-am.dbq.<resourceId>` | text | `DbWorkspace.tsx`: the SQL being written for each database resource |
+| `hive-am.git.last.<agentId>` | path | `GitExplorer.tsx`: the last file opened in the changes explorer of each agent |
 
 The former key `hive-rel-pos` is no longer used (it was dropped when the canvas was redesigned).
+
+How they are read and written: new keys go under the `hive-am.` prefix and use `usePersistentState` (JSON, safe when storage is blocked, the first render uses the default so there is no hydration mismatch); `useResizableWidth` stores the width of drawers and panels. Older keys that hold plain text (`hive-theme`, `hive-locale`) keep their format. Not everything is in `localStorage`: the selected tab or session lives in the URL (`?tab=`, `?session=`; see [11.3](11-frontend.md#113-global-state-libstoretsx)) and is never stored.
 
 ## 4.5 What is **not** stored
 

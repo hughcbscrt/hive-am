@@ -173,19 +173,22 @@ Al hacer clic se despliega un panel con:
 - Mientras el agente trabaja, el marcador cambia a "Queue a follow-up…": el mensaje se **encola** (ver [documento 9](09-orquestacion-y-relaciones.md#94-cola-por-agente)); aparece el botón **Stop**.
 - Al leer una sesión que no es la actual, la caja se reemplaza por un aviso de solo lectura, y la cabecera ofrece "Make this conversation current" (solo sesiones directas) y "Back to current".
 - Debajo se muestra "N queued" si hay mensajes en cola.
+- **Borrador por agente:** lo que has escrito y no enviado se guarda en el navegador (`hive-am.draft.<agentId>`), así que cambiar de agente o recargar no lo pierde; se borra al enviar.
 
 ## 10.7 Comportamiento del scroll
 
 La vista se mantiene anclada al final **mientras no te alejes**:
 
 - Un `ResizeObserver` sobre el contenido vuelve a anclar al final cuando algo crece (markdown, herramientas, tablas).
-- Girar la rueda hacia arriba **desancla**; volver a estar a menos de 40 px del final **reancla**; enviar un mensaje reancla.
+- Todo lo que te sube **desancla**: la rueda, arrastrar con el dedo, desplazarte hacia arriba o las teclas RePág / Flecha arriba / Inicio. Volver a estar a menos de 40 px del final **reancla**; enviar un mensaje reancla.
+- Mientras está desanclado aparece sobre la conversación un botón **Ir al final**; salta al fondo y reancla.
+- La conversación es una región `role="log"` con etiqueta: los mensajes nuevos se anuncian con cortesía a los lectores de pantalla (no palabra por palabra mientras un turno se transmite).
 - No se usa `scroll-behavior: smooth` (provocaba que no llegara al final).
 
 ## 10.8 Estado vacío y avisos
 
 - Sin conversación: tarjeta "Say hello to *nombre*" con un texto distinto para orquestador (describir una meta) y worker (dar una tarea).
-- Los avisos transitorios usan *toasts* (`useToast`): éxito en negro durante 3 s, error en rojo durante 6 s.
+- Los avisos transitorios usan *toasts* (`useToast`): los errores en rojo se anuncian como alertas (`role="alert"`) y duran más (7 s más lo que mida el texto, hasta 15 s); los demás duran 3,5 s más lo que mida el texto, hasta 8 s. Tienen botón de cierre, se pausan mientras el puntero está encima o tienen el foco, un aviso idéntico no se repite y se muestran como máximo 5 a la vez.
 - Los errores de la API se muestran con el mensaje exacto del servidor.
 
 ## 10.9 Formato de números (`lib/format.ts`)

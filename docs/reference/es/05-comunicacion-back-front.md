@@ -21,17 +21,20 @@ Navegador ── WebSocket directo ──▶ ws://<hostname>:4400/ws
 ```
 
 - `web/next.config.mjs` define un `rewrites()` que reenvía `/api/:path*` a `${HIVE_AM_API}/api/:path*` (por defecto `http://127.0.0.1:4400`). Por eso el front llama a rutas relativas y no hay problemas de CORS en uso normal.
-- El WebSocket **no pasa por el proxy**: `lib/store.tsx` abre `ws://${location.hostname}:${NEXT_PUBLIC_HIVE_WS_PORT ?? 4400}/ws`.
-- El servidor responde `Access-Control-Allow-Origin: *` (y métodos `GET,POST,PATCH,PUT,DELETE,OPTIONS`) y contesta `204` a `OPTIONS`. Está pensado para uso local; ver seguridad en el [documento 12](12-operacion-y-problemas.md).
+- El WebSocket **no pasa por el proxy**: `lib/store.tsx` abre `ws://${location.hostname}:${NEXT_PUBLIC_HIVE_WS_PORT ?? 4400}/ws` (`wss://` si la página se sirve por https; una variable de puerto vacía significa el mismo host y puerto de la página, para un proxy inverso).
+- El servidor responde `Access-Control-Allow-Origin: *` (y métodos `GET,POST,PATCH,PUT,DELETE,OPTIONS`) y contesta `204` a `OPTIONS`. Está pensado para uso local; ver seguridad en el [documento 12](12-operacion-y-problemas.md). Endurecerlo (comprobar Host/Origin en todas las rutas) sigue pendiente y está documentado como `TODO(security)` en `api.ts`: antes hay que demostrar que no rompe el proxy de Next ni a los clientes MCP.
 
 ## 5.2 Convenciones de la API REST
 
 - Todas las respuestas son JSON (`content-type: application/json`), también las de error.
 - Éxito: **HTTP 200** con el objeto resultante (las altas también devuelven 200, no 201). Algunas rutas devuelven `null` si no hay dato (p. ej. `/live` sin turno).
 - Error de validación: **400** `{ "error": "mensaje" }`. No encontrado: **404** `{ "error": "…" }`. Ruta inexistente: **404** `{ "error": "No such route" }`. Fallo interno: **500** `{ "error": "Unexpected server error" }`.
-- El cuerpo debe ser JSON válido; si no, 400 `Request body is not valid JSON`.
+- El cuerpo debe ser JSON válido **y un objeto**; si no, 400 `Request body is not valid JSON` o `Request body must be a JSON object`. Un escape `%` mal formado en la URL da 400 `Malformed URL`.
+- **Límite de tamaño del cuerpo** (`http/body.ts`): 2 MiB para JSON; las rutas que reciben archivos (los adjuntos del chat viajan en base64 dentro del JSON) aceptan unos 135 MB (5 archivos de 20 MB más el sobrecoste de base64). Pasado el límite la respuesta es **413** `The request is too big (limit N MB)` y la conexión se cierra tras responder.
+- **Los errores, en un solo sitio** (`http/errors.ts`): los handlers lanzan `HttpError` (400, 403, 404, 413) o un error de dominio; `toHttpError` convierte cada `DomainError` (`server/src/errors.ts`, base de `ObjectError`, `WakeError`, `ScheduleError`, `GitOpError`, etc.) en un estado según su `kind`: `invalid` 400, `forbidden` 403, `not_found` 404, `conflict` 409, `unavailable` 503. Así una acción rechazada es un 400 en todas las rutas, con el mismo mensaje de antes. Cualquier otra cosa se registra y se responde 500.
+- Los endpoints que actúan sobre la máquina usan una sola guarda (`requireLocal`, `http/guards.ts`): el `Origin` de un navegador debe ser esta máquina (o el nombre al que se dirigió la petición); las terminales además fijan el `Host` a un nombre de loopback. Los programas sin `Origin` (curl, el MCP) pasan.
 - El cliente (`web/lib/api.ts`) expone `api.get/post/patch/put/del`; ante un estado no-OK lanza `ApiError` con el mensaje del servidor, que la interfaz muestra tal cual en un aviso.
-- El enrutador (`api.ts`) convierte `:param` en un grupo de captura de expresión regular; no hay middlewares.
+- `api.ts` es una fachada sobre `http/`: el enrutador (`http/router.ts`) convierte `:param` en un grupo de captura de expresión regular y cada dominio registra sus rutas en `http/routes/<dominio>.ts`, con las reglas de negocio que no son solo HTTP en `services/` (agents, colonies, connections, notebook, schedules, providers). No hay middlewares.
 
 ## 5.3 Referencia de endpoints
 
@@ -198,26 +201,29 @@ Puntos importantes:
 `HiveProvider` mantiene en un reductor:
 
 ```
-ready, connected,
-agents[], types[], skills[], colonies[], providers[],
+ready, error, connected,
+agents[], types[], skills[], colonies[], providers[], dispatches[],
 live: { [agentId]: LiveTurn },       // turno en curso
 finished: { [agentId]: number }      // contador de turnos terminados
 ```
 
 | Momento | Qué ocurre |
 |---|---|
-| Montaje | `refresh()` carga agentes, tipos, skills y colonias; aparte se piden los proveedores. |
+| Montaje | `refresh()` carga agentes, tipos, skills, colonias y el registro de delegaciones; aparte se piden los proveedores. `ready` pasa a `true` solo cuando la API ha respondido; si falla, `error` guarda el mensaje (traducido) y el store reintenta con una pausa creciente (de 2 s hasta 15 s). `retry()` lo fuerza, y las pantallas muestran un aviso de error con un botón *Reintentar* en lugar de listas vacías. |
 | WebSocket abierto | `refresh(['agents'])`; luego, para cada agente con `live: true`, se pide `GET /live` y se **reconstruye** el turno con sus eventos acumulados. Así, recargar la página a mitad de un turno no pierde lo ya mostrado. |
-| `agents_changed` | `refresh(['agents','colonies'])`. |
+| `agents_changed` | `refresh(['agents','colonies','connections'])` y, con espera (400 ms), una recarga de `dispatches`. |
 | `turn_start` | Crea un `LiveTurn` vacío para ese agente. |
 | `event` | Pliega el evento en el `LiveTurn` (ver [documento 10](10-chat-y-visualizacion.md)). Ignora eventos de un `turnId` distinto al actual. |
 | `status` | Actualiza estado y cola del agente. `queued` se muestra como `running`. En `idle` borra el `LiveTurn` y, si lo había, sube `finished`; en `error` lo conserva. |
+| `turn_start` de una delegación, `status` `idle` / `error` | Recarga de `dispatches` con espera, para que el feed *Reciente* se mantenga al día sin sondeo. |
 | Cierre del socket | `connected = false`; reintenta con espera exponencial: `min(8000, 800 · 2^n)` ms. |
 
-El estado de conexión se muestra al pie de la barra lateral ("Connected to server" / "Server offline — retrying").
+Un mensaje mal formado se ignora (no rompe el manejador del socket). El estado de conexión se muestra al pie de la barra lateral ("Connected to server" / "Server offline. Retrying…").
+
+`useHive()` conserva su forma de siempre, pero los componentes calientes leen porciones más estrechas para que cada token del stream no los vuelva a renderizar: `useHiveSelector(select)`, `useHiveData()` (todo menos `live` y `finished`), `useLive(agentId)`, `useFinished(agentId)`, `useAgent(id)` y `useHiveActions()`. El cliente `api.ts` lanza `ApiError` (con `status`), y cada método acepta un último argumento `{ signal, timeoutMs }`; `isAbort(e)` reconoce una llamada cancelada.
 
 ## 5.7 Cómo se mantiene fresca la interfaz
 
 - Los cambios hechos por esta pestaña, o por otra, llegan como `agents_changed` y fuerzan un `refresh`.
-- Las pantallas que no escuchan eventos de forma directa (p. ej. *Recent delegations* en Colony) consultan periódicamente: `GET /api/dispatches` cada 6 s.
+- *Recent delegations* en Colony ya no consulta periódicamente: el store guarda `dispatches` y los recarga (con espera) cuando el WebSocket avisa de un cambio. Las demás pantallas que consultan (p. ej. schedules) usan `usePolling`, que se pausa con la pestaña oculta, aumenta la espera ante errores y avisa una sola vez.
 - El listado de proveedores se pide una vez; el servidor lo cachea 60 s.

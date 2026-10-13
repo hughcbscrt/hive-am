@@ -4,7 +4,7 @@
 
 ## 15.0 The Resources screen
 
-**Resources** in the left rail opens a screen laid out like an agent's: the list of resources at the left (grouped by colony, with a state dot, searchable, collapsible to icons; **+** creates one) and the selected resource on the right, with a header (state and Start / Stop / Restart, *Terminal here* where it applies) and tabs. On the Colony map, selecting a hexagon still shows the small card, now with **Open panel** (and the pencil goes to its settings).
+**Resources** in the left rail opens a screen laid out like an agent's: the list of resources at the left (grouped by colony, with a state dot, searchable, collapsible to icons; **+** creates one) and the selected resource on the right, with a header (state and Start / Stop / Restart, *Terminal here* where it applies) and tabs (the open tab is in the URL, `?tab=`, so a link opens it). Recreating a resource, clearing an HTTP history and forgetting an HTTP session ask for confirmation first. On the Colony map, selecting a hexagon still shows the small card, now with **Open panel** (and the pencil goes to its settings).
 
 | Kind | Tabs |
 |---|---|

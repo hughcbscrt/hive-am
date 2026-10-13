@@ -18,7 +18,8 @@ hive-am guarda datos en **cinco** lugares. Entender cuál guarda qué es clave:
 - Ubicación: `$HIVE_AM_HOME/hive-am.db` (por defecto `~/.hive-am/`).
 - Pragmas: `journal_mode = WAL` y `foreign_keys = ON`. Con WAL aparecen también `hive-am.db-wal` y `hive-am.db-shm`; es normal.
 - Los identificadores son UUID v4 en texto. Las fechas son milisegundos Unix (`Date.now()`).
-- El esquema se crea con `CREATE TABLE IF NOT EXISTS` al importar `db.ts`, y después se aplican **migraciones ligeras** (`ALTER TABLE … ADD COLUMN` si la columna falta). Esas migraciones corren siempre, también en bases nuevas, por eso algunas columnas no aparecen en el `CREATE TABLE` inicial.
+- **El esquema está versionado.** Vive en un solo lugar, `server/src/db/migrations.ts`: una lista de migraciones a la que solo se añade. `PRAGMA user_version` registra cuántas ha pasado una base; al abrirla corren las que faltan, cada una dentro de una transacción junto con el cambio de versión. Son aditivas e idempotentes (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN` solo si la columna no existe), así que una base de cualquier versión anterior abre sin perder una fila. La versión 1 es la **línea base**: todos los `CREATE TABLE` y `ALTER TABLE` que antes estaban repartidos por los módulos (no hace nada donde ya existen, por eso algunas columnas no aparecen en el primer `CREATE TABLE`). La versión 2 son los **renombres**: los recursos de tipo `boss` pasan a `cluster` y la skill que trae hive-am sigue el cambio de Objetos a Recursos (salvo que ya la hayas renombrado). Los módulos ya no crean tablas al importarse.
+- Acceso: `db.ts` guarda en caché sus sentencias preparadas, y crear o actualizar un agente, un tipo o una colonia (con sus skills y miembros) es **atómico**, una sola transacción. Las columnas JSON se leen con `db/json.ts` (`parseJson`): un valor dañado da un valor por defecto y un aviso único en el log, en lugar de un error en la petición.
 
 ### Diagrama de relaciones
 
@@ -193,8 +194,23 @@ Solo preferencias de vista; si se borran, la interfaz funciona igual.
 | `hive-locale` | `en` \| `es` | `lib/i18n`: idioma de la interfaz (nunca se refleja en la URL) |
 | `hive-git-view` | JSON `{ theme, whitespace, tabSize }` | `lib/git/gitPrefs.ts`: tema, espacios visibles y tabulador del visor de código |
 | `hive-switcher-collapsed` | `1` \| `0` | `agents/[id]/page.tsx`: si la lista lateral de agentes está contraída |
+| `hive-cfg-width` | número (px) | `agents/[id]/page.tsx`: ancho del panel de ajustes del agente (se arrastra, con `useResizableWidth`) |
+| `hive-am.drawerWidth` | número (px) | `Dialog.tsx` (`Drawer`): ancho de los paneles laterales (se arrastra, con `useResizableWidth`) |
+| `hive-obj-switcher-collapsed` | `1` \| `0` | `ObjectWorkspace.tsx`: si la lista de recursos está contraída |
+| `hive-colony-layout` | JSON `{ id: {x, y} }` | `app/page.tsx`: dónde colocaste colonias, agentes libres y recursos en el mapa |
+| `hive-colony-zoom` | número | `app/page.tsx`: zoom del mapa de la colonia |
+| `hive-am.agents.q` | texto | `agents/page.tsx`: búsqueda de la lista de agentes |
+| `hive-am.agents.role` | `all` \| rol | `agents/page.tsx`: filtro por rol de la lista de agentes |
+| `hive-am.agents.provider` | `all` \| proveedor | `agents/page.tsx`: filtro por proveedor de la lista de agentes |
+| `hive-am.draft.<agentId>` | texto | `Chat.tsx`: el mensaje sin enviar de cada agente (una clave por agente) |
+| `hive-am.dock` | JSON `{ open, height, active }` | `lib/dock.tsx`: estado del panel inferior de terminales |
+| `hive-am.logsize` | número (10 a 20) | `LogPane.tsx`: tamaño del texto de los logs de recursos |
+| `hive-am.dbq.<resourceId>` | texto | `DbWorkspace.tsx`: el SQL que se está escribiendo en cada recurso de base de datos |
+| `hive-am.git.last.<agentId>` | ruta | `GitExplorer.tsx`: el último archivo abierto en el explorador de cambios de cada agente |
 
 La clave anterior `hive-rel-pos` ya no se usa (se abandonó al rediseñar el lienzo).
+
+Cómo se leen y se escriben: las claves nuevas van bajo el prefijo `hive-am.` y usan `usePersistentState` (JSON, seguro si el almacenamiento está bloqueado, el primer render usa el valor por defecto para no desajustar la hidratación); `useResizableWidth` guarda el ancho de paneles y cajones. Las claves antiguas que guardan texto plano (`hive-theme`, `hive-locale`) conservan su formato. No todo está en `localStorage`: la pestaña o la sesión elegida vive en la URL (`?tab=`, `?session=`; ver [11.3](11-frontend.md#113-estado-global-libstoretsx)) y no se guarda.
 
 ## 4.5 Lo que **no** se guarda
 

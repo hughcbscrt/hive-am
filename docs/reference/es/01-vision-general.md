@@ -74,7 +74,7 @@ flowchart LR
 | Capa | Archivos | Responsabilidad |
 |---|---|---|
 | Presentación | `web/` | Páginas, formularios, chat, panal, lienzo de relaciones |
-| API | `server/src/api.ts` | Validación, rutas REST, orquestación de las demás capas |
+| API | `server/src/api.ts` → `http/`, `services/` | `api.ts` es una fachada; las rutas, la validación, las guardas y los errores viven en `http/`, las reglas de dominio en `services/` |
 | Tiempo real | `server/src/index.ts`, `runtime.ts` (`bus`) | Difunde eventos por WebSocket |
 | Ejecución | `server/src/runtime.ts`, `instructions.ts` | Cola por agente, sesiones y delegación; composición de instrucciones y herramientas de cada agente |
 | Proveedores | `server/src/providers/` | Construye el comando de cada CLI y traduce su salida a eventos comunes |

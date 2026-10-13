@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ## [Unreleased]
 
 ### Added
+- Interface accessibility: **dialogs and drawers** share one mechanism (the rest of the page is inert while one is open, only the topmost reacts to Esc, focus is trapped and given back, `data-autofocus` picks the first control), **tabs** have ARIA roles and arrow keys, **toasts** announce errors as alerts, can be closed, pause under the pointer and never repeat, the chat is a `role="log"`, table rows that open something work with the keyboard, form labels are tied to their fields, and the contrast of muted and success text meets 4.5:1.
+- Theme and language are applied **before the first paint** (no flash of the light theme with a saved dark one), and the theme button reports its state.
+- Colony and agents: one **New** menu (agent, colony, resource), statistics that link to their lists, a *Recent* feed with links to the agent and the session that updates from the WebSocket, **arrow keys to move** colonies and free hexagons, a skeleton while loading and an **error banner with Retry** when the API does not answer (instead of an empty colony). The agent list keeps its search and filters and scrolls sideways on a phone.
+- Chat and sessions: a **Latest** button when you scroll away from the end, an unsent **draft per agent** that survives switching agent or reloading, the agent's settings panel and tab in the URL (`?tab=`), and Sessions open from a link (`?session=`) and show the same blocks as the chat (tool calls and thinking included). Resources keep their open tab in the URL too.
+- **Confirmations and unsaved-change guards**: recreating a resource, clearing an HTTP history, forgetting an HTTP session, switching skill, and closing a drawer or leaving the tab with changes not saved now ask first.
+- **Schema versioning**: the database records its version (`PRAGMA user_version`) and applies idempotent migrations, each in a transaction, from one place (`db/migrations.ts`); a database from any earlier build opens without losing a row.
+- A **request body limit**: 2 MiB for JSON and about 135 MB for chat attachments; above that the answer is 413 and the connection is closed. Invalid bodies (not an object) and malformed URLs answer 400.
+- **Orderly shutdown**: Ctrl+C or a service stop closes the server, the WebSockets, the terminals, the channel connections and the database (5 s at most); a taken port gives a clear message. Servers and containers kept as resources keep running.
+- Settings that can be changed with environment variables: `HIVE_AM_KILL_GRACE_MS` (grace before a CLI is killed), `HIVE_AM_TELEGRAM_TIMEOUT_MS` and `HIVE_AM_WAKE_RETRY_MS`.
+- New test scripts that need no model: migrations, runtime recovery, shared provider code, Telegram timeouts, connection lifecycle and the HTTP core (21 `test-*.ts` in all).
 - Connections: agents can **react to messages** with an emoji (`channel_react`) instead of writing, only with the emoji the platform allows (on Telegram its fixed list; the tool lists the valid ones when one is refused). The "Chat channels" skill explains when to react and which emoji to use; existing libraries get the section added once.
 - Agents, types and connections: the **model** field is now a selector: it shows the model in use (or "CLI default"), opens a searchable list of what the CLI offers and still accepts any model id typed by hand.
 - Chat: **send files and pictures to an agent**: paste a picture or a copied file (Ctrl+V, ⌘V on a Mac), drop files on the text box or use the clip. Pictures show as previews and appear as thumbnails in the conversation; other files show as a chip that downloads. Up to 5 per message, 20 MB each, saved in the agent's inbox (with a note of where, so the agent opens them with its file tools); a picture is recognised by its bytes, anything else keeps its name and is never run.
@@ -42,6 +52,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Tags in the git explorer: a Tags tab lists the repository's tags; each one can be browsed read-only (its files as they were at that tag, with Markdown preview, and the changes of its commit). The working folder is never touched.
 
 ### Changed
+- Agent settings: the panel of an agent is now a **drawer over the page** (dimmed background, Escape and focus handled like the New agent and New colony panels) instead of a fixed side panel that covered the header and the message box of the chat. It opens with the Settings button or with `?tab=config|notebook|sessions` in the address, closing it with unsaved changes asks first, and reading or resuming a session closes it so the chat is in view.
+- Markdown (chat, sessions, skill preview, changes preview): headings with a visible hierarchy, quotes with a bar, tables that scroll instead of overflowing, tidier lists and task lists.
+- **Code structure, same behaviour**: `api.ts` is now a small facade over `http/` (router, errors, one local-only guard, body reading, validation and one file of routes per domain) and `services/` (agents, colonies, connections, notebook, schedules, providers); domain errors share one base (`DomainError`) that maps to a status in a single place, so a refused action is a 400 on every route; providers and history readers are registered behind an interface and share their JSON-line, text and process helpers; the database caches its prepared statements and creating or updating an agent, a type or a colony is one transaction. Routes and responses are the same. Pinning Origin/Host on every route is still pending (a `TODO(security)` in `api.ts`).
+- **Frontend building blocks**: dialogs, confirmations, tabs, empty states, banners, search boxes, checkbox rows and the workspace header (whose secondary actions fold into a menu when it is narrow) are shared components; the interface keeps its state in narrow store hooks (a streamed token no longer re-renders the navigation or the colony), and polling, saved preferences, unsaved-change guards, drag-resizable widths and URL state are hooks. Styles use tokens for layers, font sizes and meaning colours, and there is one dark block instead of two.
+- The git explorer is split into smaller parts (tabs, file tree, viewer, preview, history, branches, commit and discard confirmations), and its file tree supports the keyboard and screen readers.
+- The agent's settings panel reserves its width in the chat on wide screens instead of covering it, the path picker shows loading and errors, and dates and times follow the app's language.
 - The two example skills `concise-reports` and `careful-reviewer` are no longer created, and are removed on start where they are still as they were made.
 - One path picker for every folder or file field (agent, colony and server folders, the compose file, Docker volumes), including a file mode.
 - Your messages in the web chat (and in Sessions) are no longer inverted bubbles: light with a thin border in the light theme and dark in the dark theme.
@@ -51,6 +67,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The sessions list no longer reads every conversation to answer: sizes and costs are cached by conversation fingerprint and filled in the background, so the list appears at once even with very long sessions.
 - Thinner scrollbars with no track, tinted with the theme colour and darker while hovered, in light and dark themes.
 - The test scripts refuse to run against the real data folder: `HIVE_AM_HOME` must point to a temporary one.
+
+### Fixed
+- Chat: the **Jump to latest** button no longer shows up after every reply. When a turn ended, the live reply was swapped for the saved one, the page shrank for a moment and the browser moved the scroll position up; hive-am took that for you scrolling away, stopped following the conversation and left the view on your own message. Only your own gestures (wheel, touch, keys, dragging the scrollbar) release the auto-scroll now.
+- An agent no longer stays "running" when the preparation of its turn fails.
+- A wake-up whose delivery failed no longer stays orphaned: it is retried 12 times and then dropped.
+- Starting the same connection twice no longer leaves an adapter polling with no owner.
+- Telegram calls, uploads and downloads have a timeout, so a half-open connection no longer hangs a conversation.
+- A CLI that ignores the stop request is killed after a grace period, and a Docker command killed by a signal or by its output limit counts as a failure.
+- Deleting a skill or a type that fails now shows an error, and a failed API load shows a retry instead of empty lists.
+- The WebSocket uses `wss:` when the page is https and ignores a malformed frame.
 
 ## [1.1.0] - 2026-10-10
 
