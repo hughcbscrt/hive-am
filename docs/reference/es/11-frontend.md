@@ -67,6 +67,8 @@ Implementado en `app/page.tsx`, sin librerías de gráficos: celdas HTML posicio
 
 **Ajuste a la pantalla.** Un `ResizeObserver` mide el panel y escala el mapa completo con `transform: scale(k)` (`k ≤ 1`, nunca amplía) para que quepa sin scroll horizontal.
 
+**Mover cosas y zoom.** Una colonia se arrastra por la etiqueta con su nombre, y un agente o recurso sin colonia por su hexágono (un arrastre se distingue de un clic por un umbral de 6 px); la posición se guarda en este navegador (`localStorage`, `hive-colony-layout`) como píxeles absolutos del lienzo, y un botón devuelve todo a su lugar. El mapa tiene **zoom** (botones − / +, Ctrl/⌘ + rueda, 40–250 %, guardado en `hive-colony-zoom`) sobre la escala de ajuste a la pantalla; con zoom el panel se desplaza.
+
 **Hover/selección.** El estado `focus = hover ?? seleccionado` decide qué celdas y líneas se resaltan o se atenúan (`dim`, `linked`).
 
 ## 11.3 Estado global (`lib/store.tsx`)

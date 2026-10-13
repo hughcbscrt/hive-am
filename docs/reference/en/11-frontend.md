@@ -67,6 +67,8 @@ Implemented in `app/page.tsx`, with no charting libraries: absolutely positioned
 
 **Fit to screen.** A `ResizeObserver` measures the panel and scales the whole map with `transform: scale(k)` (`k ≤ 1`, never enlarges) so that it fits without horizontal scroll.
 
+**Moving things and zoom.** A colony can be dragged by its name label, and a free agent or resource by its hexagon (a drag is told apart from a click by a 6 px threshold); the position is kept in this browser (`localStorage`, `hive-colony-layout`) as absolute canvas pixels, and a button puts everything back. The map has **zoom** (− / + buttons, Ctrl/⌘ + wheel, 40–250 %, kept in `hive-colony-zoom`) on top of the fit-to-screen scale; zoomed in, the panel scrolls.
+
 **Hover/selection.** The state `focus = hover ?? selected` decides which cells and lines are highlighted or dimmed (`dim`, `linked`).
 
 ## 11.3 Global state (`lib/store.tsx`)

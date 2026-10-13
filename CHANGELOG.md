@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ## [Unreleased]
 
 ### Added
+- Colony map: **drag** a colony (by its name) or a free agent / resource to place it where you want (kept in this browser, with a button to put everything back), and **zoom** (− / +, Ctrl/⌘ + wheel).
 - Resources: a server, Docker or cluster resource has **one manager agent**, chosen by searching: in the resource's form (creating and editing), from its card on the colony map (*Add manager agent*) and from the agent's form (*Resources it looks after*, which takes several). With a manager only that agent looks after it (any colony); with none, the agents of its colony do. An agent without the "Colony resources" skill gets it when chosen.
 - Database resources: the SQL editor **suggests** tables, schemas, columns (by table or alias) and keywords, and has a **Format** button (Alt+Shift+F); saved queries can be **renamed, replaced and deleted** from the History tab; the schema tab's reload / collapse-all buttons no longer stretch; password fields have an **eye** to show what is typed.
 - Database objects: **driver properties** (a table of the options the Node driver of the engine really takes — `charset`, `application_name`, `search_path`, `appName`, `instanceName`, `foreign_keys`, `timeout`… — each with its description in English and Spanish and the right control, and none that could override what hive-am decides), **SSL files** (CA, client certificate and key) with a clear error when one is missing, and a **connection URL** that fills the form (`postgresql://…?sslmode=require`, `mysql://`, `mssql://`, `sqlite:///`). The creation drawer is redesigned: engine tiles, URL, connection with its test, safety and an *Advanced* section; the name can stay empty. `GET /api/object-db/props`.
@@ -41,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Tags in the git explorer: a Tags tab lists the repository's tags; each one can be browsed read-only (its files as they were at that tag, with Markdown preview, and the changes of its commit). The working folder is never touched.
 
 ### Changed
+- Colony map: the links of orchestrators, clusters and managers show only for what is under the cursor or selected (they used to cross other hexagons); tags on the hexagons say who is connected (⚙ the manager of a resource, ⚙ N what an agent looks after).
 - The two example skills `concise-reports` and `careful-reviewer` are no longer created, and are removed on start where they are still as they were made.
 - A query picked from the History or the saved ones is **added at the end** of the SQL editor (selected) instead of replacing what was written; the help popover of the editor no longer goes off screen; the new-resource form says what can be added.
 - The **Objects** section is now called **Resources** (menu, titles, messages and docs; the API keeps its name, and the old `/objects` address redirects to `/resources`; the "Colony objects" skill is now "Colony resources", and so are the messages agents and the app show).
