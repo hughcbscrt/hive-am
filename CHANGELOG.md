@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-13
+
 ### Added
+
 - **User manual** in English and Spanish (`docs/manual`): fourteen chapters per language, from the first steps to resources, the git explorer, terminals, permissions and troubleshooting, with screenshots of every screen. The README links it.
 - Interface accessibility: **dialogs and drawers** share one mechanism (the rest of the page is inert while one is open, only the topmost reacts to Esc, focus is trapped and given back, `data-autofocus` picks the first control), **tabs** have ARIA roles and arrow keys, **toasts** announce errors as alerts, can be closed, pause under the pointer and never repeat, the chat is a `role="log"`, table rows that open something work with the keyboard, form labels are tied to their fields, and the contrast of muted and success text meets 4.5:1.
 - Theme and language are applied **before the first paint** (no flash of the light theme with a saved dark one), and the theme button reports its state.
@@ -53,6 +56,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Tags in the git explorer: a Tags tab lists the repository's tags; each one can be browsed read-only (its files as they were at that tag, with Markdown preview, and the changes of its commit). The working folder is never touched.
 
 ### Changed
+
 - Agent settings: the panel of an agent is now a **drawer over the page** (dimmed background, Escape and focus handled like the New agent and New colony panels) instead of a fixed side panel that covered the header and the message box of the chat. It opens with the Settings button or with `?tab=config|notebook|sessions` in the address, closing it with unsaved changes asks first, and reading or resuming a session closes it so the chat is in view.
 - Markdown (chat, sessions, skill preview, changes preview): headings with a visible hierarchy, quotes with a bar, tables that scroll instead of overflowing, tidier lists and task lists.
 - **Code structure, same behaviour**: `api.ts` is now a small facade over `http/` (router, errors, one local-only guard, body reading, validation and one file of routes per domain) and `services/` (agents, colonies, connections, notebook, schedules, providers); domain errors share one base (`DomainError`) that maps to a status in a single place, so a refused action is a 400 on every route; providers and history readers are registered behind an interface and share their JSON-line, text and process helpers; the database caches its prepared statements and creating or updating an agent, a type or a colony is one transaction. Routes and responses are the same. Pinning Origin/Host on every route is still pending (a `TODO(security)` in `api.ts`).
@@ -71,6 +75,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The test scripts refuse to run against the real data folder: `HIVE_AM_HOME` must point to a temporary one.
 
 ### Fixed
+
 - Pressing Esc in a confirmation opened over a panel (deleting a colony, a connection or a type) also closed the panel and lost what you were editing, and the panel was not dimmed behind the confirmation. Only the topmost layer reacts to Esc now.
 - Schedules: the list stops refreshing while the tab is hidden, a server that does not answer shows one notice instead of one every 10 seconds, and opening the history of a schedule no longer reloads it on every refresh.
 - Skills: **Discard** on a skill that already existed did nothing; it now brings back the saved text.
@@ -128,6 +133,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/hughcbscrt/hive-am/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/hughcbscrt/hive-am/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/hughcbscrt/hive-am/releases/tag/v1.0.0
