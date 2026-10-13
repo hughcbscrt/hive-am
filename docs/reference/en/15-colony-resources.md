@@ -1,5 +1,7 @@
 # 15. Colony resources
 
+> **Naming.** They were called *objects* until 1.1. In the app they are **resources** and the screen lives at `/resources` (`/objects` still redirects). The API (`/api/objects…`), the data folder (`~/.hive-am/objects`), the agent tools (`object_list`, `object_logs`, `object_action`) and the skill id (`default-objects`) keep the old name so nothing that uses them breaks.
+
 ## 15.0 The Resources screen
 
 **Resources** in the left rail opens a screen laid out like an agent's: the list of resources at the left (grouped by colony, with a state dot, searchable, collapsible to icons; **+** creates one) and the selected resource on the right, with a header (state and Start / Stop / Restart, *Terminal here* where it applies) and tabs. On the Colony map, selecting a hexagon still shows the small card, now with **Open panel** (and the pencil goes to its settings).

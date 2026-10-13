@@ -6,7 +6,7 @@ A panel at the bottom of every screen holds **terminals** (real shells) and the 
 
 - **+** a terminal in the folder of the last one (home at first); the folder button asks for a folder.
 - From an **agent**'s header: a terminal in the agent's folder.
-- From an **resource**'s panel (see [15](15-colony-objects.md)): for a **server**, *Terminal here* (in its folder); for a Docker container (created or existing), *Shell in the container* (`docker exec -it … bash`, or `sh` when there is no bash); a compose project has several containers, so it only has logs. Every kind that has logs also has *Logs in the panel*.
+- From a **resource**'s panel (see [15](15-colony-resources.md)): for a **server**, *Terminal here* (in its folder); for a Docker container (created or existing), *Shell in the container* (`docker exec -it … bash`, or `sh` when there is no bash); a compose project has several containers, so it only has logs. Every kind that has logs also has *Logs in the panel*.
 
 Tabs show what is open; × closes one (a terminal is ended); a grey dot means the shell ended (its exit code is in the tooltip and printed in the terminal). The panel's state (open, height, last tab) is remembered by the browser.
 
@@ -14,7 +14,7 @@ Tabs show what is open; × closes one (a terminal is ended); a grey dot means th
 
 Each terminal is a pseudo-terminal (`node-pty`) in the **server**, shown with xterm.js. So:
 
-- Reloading the page, or opening another one, shows the same terminals; what they printed last (256 KB) is replayed. They end when the server stops (unlike server objects, which keep running).
+- Reloading the page, or opening another one, shows the same terminals; what they printed last (256 KB) is replayed. They end when the server stops (unlike server resources, which keep running).
 - Colours, cursor keys, `vim`, `top`, resizing and non-ASCII text work as in any terminal. The shell is yours (`$SHELL`, interactive) with your environment, minus hive-am's own variables.
 - Up to **12** terminals at a time.
 

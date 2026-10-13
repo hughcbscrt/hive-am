@@ -1,5 +1,7 @@
 # 15. Recursos de la colonia
 
+> **Nombre.** Antes se llamaban *objetos*. En la app son **recursos** y la pantalla está en `/resources` (`/objects` sigue redirigiendo). La API (`/api/objects…`), la carpeta de datos (`~/.hive-am/objects`), las herramientas de los agentes (`object_list`, `object_logs`, `object_action`) y el id de la skill (`default-objects`) conservan el nombre anterior para no romper nada de lo que los usa.
+
 ## 15.0 La pantalla de Recursos
 
 **Recursos** en el riel izquierdo abre una pantalla armada como la de un agente: la lista de recursos a la izquierda (agrupados por colonia, con un punto de estado, con buscador y que se contrae a iconos; **+** crea uno) y el recurso elegido a la derecha, con una cabecera (estado y Iniciar / Detener / Reiniciar, *Terminal aquí* donde aplica) y pestañas. En el mapa de la Colonia, elegir un hexágono sigue mostrando la tarjeta chica, ahora con **Abrir panel** (y el lápiz lleva a su configuración).

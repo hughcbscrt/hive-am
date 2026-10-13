@@ -6,7 +6,7 @@ Un panel al pie de todas las pantallas guarda **terminales** (shells reales) y l
 
 - **+** una terminal en la carpeta de la última (la personal al principio); el botón de carpeta pide una carpeta.
 - Desde la cabecera de un **agente**: una terminal en la carpeta del agente.
-- Desde el panel de un **recurso** (ver [15](15-objetos-de-la-colonia.md)): para un **servidor**, *Terminal aquí* (en su carpeta); para un contenedor Docker (creado o existente), *Shell en el contenedor* (`docker exec -it … bash`, o `sh` si no hay bash); un proyecto compose tiene varios contenedores, así que solo tiene logs. Todo tipo que tiene logs tiene también *Logs en el panel*.
+- Desde el panel de un **recurso** (ver [15](15-recursos-de-la-colonia.md)): para un **servidor**, *Terminal aquí* (en su carpeta); para un contenedor Docker (creado o existente), *Shell en el contenedor* (`docker exec -it … bash`, o `sh` si no hay bash); un proyecto compose tiene varios contenedores, así que solo tiene logs. Todo tipo que tiene logs tiene también *Logs en el panel*.
 
 Las pestañas muestran lo abierto; × cierra una (una terminal se termina); un punto gris indica que el shell terminó (el código de salida está en el tooltip y escrito en la terminal). El navegador recuerda el estado del panel (abierto, altura, última pestaña).
 

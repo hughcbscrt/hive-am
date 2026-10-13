@@ -133,7 +133,7 @@ Full documentation in English and Spanish: **[English](docs/reference/en/README.
 | Orchestration and relations | [docs/09](docs/reference/en/09-orchestration-and-relations.md) |
 | Changes explorer (git) | [docs/13](docs/reference/en/13-changes-explorer-git.md) |
 | External connections | [docs/14](docs/reference/en/14-external-connections.md) |
-| Colony resources (servers, Docker) | [docs/15](docs/reference/en/15-colony-objects.md) |
+| Colony resources (servers, Docker) | [docs/15](docs/reference/en/15-colony-resources.md) |
 | Terminals | [docs/16](docs/reference/en/16-terminals.md) |
 | Operation and troubleshooting | [docs/12](docs/reference/en/12-operations-and-troubleshooting.md) |
 
