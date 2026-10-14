@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- Claude agents can drive your Chrome through the Claude in Chrome extension. Turn on **Browser (Chrome)** in the agent's settings (it is off by default and adds nothing to the prompt). The chat shows each browser action (open page, read, click, run script) with its own icon and label. Chrome and the extension must be open on the machine where hive-am runs.
+- Kiro: agents get an instruction to fully detach long-running processes (`setsid nohup … > log 2>&1 < /dev/null &`) so the shell tool returns at once and the turn and chat keep going, instead of waiting for the command and everything it started to finish.
+
+### Fixed
+
+- Claude: after **/compact** the chat no longer shows the CLI's summary as if you had written it; a "Conversation compacted" divider with the size before and after appears instead.
+- Claude: the context percentage drops after a compact, using the size the CLI reports, instead of keeping the old value until the next reply.
+- Context gauge: it uses each model's real window instead of a fixed 200k, so a 1M model no longer shows 100% at 200k tokens. The window is learned from the CLIs and kept in `context-windows.json`: Claude reports it in every turn, Kiro lists it with its models and OpenCode has it in its model catalog (read once an hour with a short-lived server when a model is unknown). When no window is known the chat shows tokens instead of a made-up percentage. The gauge also counts the last reply, ignores synthetic entries (errors) that used to reset it, and its tooltip shows tokens used and window.
+
 ## [1.2.2] - 2026-10-13
 
 ### Fixed

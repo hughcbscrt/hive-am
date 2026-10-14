@@ -7,6 +7,7 @@ import { dispatchMcpConfig } from '../mcp-config.js';
 import { existsSync } from 'node:fs';
 import { inboxDir } from '../connections/files.js';
 import { withInstructions } from './preamble.js';
+import { learnWindows } from '../context.js';
 
 /** What editing a project must not touch: the repository's own data and private keys (.env stays editable, like in OpenCode). */
 export const CLAUDE_EDIT_DENY = ['Edit(**/.git/**)', 'Edit(**/*.pem)', 'Edit(**/*.key)'];
@@ -25,12 +26,16 @@ export async function* runClaude(o: TurnOptions): AsyncGenerator<StreamEvent> {
   // resumed conversation whose instructions changed (skills, team, notebook…) gets them as an update inside the message.
   if (o.instructions) args.push('--append-system-prompt', o.instructions);
   const prompt = withInstructions(o.prompt, o.instructions, !!agent.session_id, o.refreshInstructions);
+  // Agents with the Browser switch on drive the person's Chrome through its extension; `-p` has nobody to approve each call, so the tools are allowed up front.
+  const allowed: string[] = [];
+  if (agent.browser && agent.permission !== 'plan') { args.push('--chrome'); allowed.push('mcp__claude-in-chrome'); }
   if (o.mcpCaps.length) {
     const dir = join(DATA_DIR, 'mcp'); mkdirSync(dir, { recursive: true });
     const file = join(dir, `${agent.id}.json`);
     writeFileSync(file, JSON.stringify(dispatchMcpConfig(agent.id, o.mcpCaps)));
-    args.push('--mcp-config', file, '--allowedTools', 'mcp__hive');
+    args.push('--mcp-config', file); allowed.push('mcp__hive');
   }
+  if (allowed.length) args.push('--allowedTools', ...allowed);
 
   const toolNames = new Map<string, string>();
   let streamedText = false;
@@ -57,6 +62,8 @@ export async function* runClaude(o: TurnOptions): AsyncGenerator<StreamEvent> {
         if (b.type === 'tool_result') yield { t: 'tool_result', id: b.tool_use_id, output: flattenText(b.content), error: !!b.is_error };
       }
     } else if (ev.type === 'result') {
+      // The CLI says how big each model's window is: keep it, a saved conversation does not.
+      learnWindows('claude', Object.fromEntries(Object.entries(ev.modelUsage ?? {}).map(([m, x]: [string, any]) => [m, Number(x?.contextWindow)])));
       const u = ev.usage;
       if (u) yield {
         t: 'usage', cost: ev.total_cost_usd, durationMs: ev.duration_ms, model: Object.keys(ev.modelUsage ?? {})[0],

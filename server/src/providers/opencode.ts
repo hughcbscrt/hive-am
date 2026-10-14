@@ -8,7 +8,8 @@ import { spawnJson } from './spawn.js';
 import { dispatchMcpConfigOpencode } from '../mcp-config.js';
 import { opencodeSessionDir } from '../history/opencode.js';
 import { withInstructions } from './preamble.js';
-import { opencodeServer, stopOpencodeServer, type ServerAccess } from './opencode-server.js';
+import { contextWindow } from '../context.js';
+import { learnOpencodeWindows, opencodeServer, stopOpencodeServer, type ServerAccess } from './opencode-server.js';
 
 /**
  * What OpenCode may do for each permission level. It has no such modes, so they are written as its own rules (a `deny` holds even with `--auto`):
@@ -81,6 +82,7 @@ export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> 
     try { access = await opencodeServer(agent.id, agent.cwd, config, o.signal); }
     catch (e) { console.warn(`[opencode] no persistent server for ${agent.name}, using a private one: ${e instanceof Error ? e.message : e}`); }
   }
+  if (!contextWindow('opencode', agent.model)) void learnOpencodeWindows(agent.cwd, access);
   if (access) { args.splice(1, 0, '--server', access.url); env.OPENCODE_SERVER_PASSWORD = access.password; }
   else if (has('--standalone')) args.splice(1, 0, '--standalone');      // 1.x always runs its own server
   args.push(prompt);

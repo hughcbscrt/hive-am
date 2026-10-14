@@ -7,8 +7,6 @@ import { fmtCost, fmtDur, fmtTokens, totalTokens } from '@/lib/format';
 import { useI18n } from '@/lib/i18n/index';
 import type { Agent, SessionStats } from '@/lib/types';
 
-const CTX_WINDOW = 200_000;
-
 export function StatsBar({ agent, session }: { agent: Agent; session?: string | null }) {
   const { t } = useI18n();
   const { finished, live } = useHive();
@@ -28,7 +26,7 @@ export function StatsBar({ agent, session }: { agent: Agent; session?: string | 
   const tokens = totalTokens(s.usage) + (lu ? totalTokens({ input: lu.input ?? 0, output: lu.output ?? 0, cacheRead: lu.cacheRead ?? 0, cacheWrite: lu.cacheWrite ?? 0 }) : 0);
   const cost = (s.cost ?? 0) + (lv?.cost ?? 0);
   const credits = (s.usage.credits ?? 0) + (lu?.credits ?? 0);
-  const ctxPct = lu?.contextPct ?? s.contextPct ?? (s.lastContext ? Math.min(100, (s.lastContext / CTX_WINDOW) * 100) : null);
+  const ctxPct = lu?.contextPct ?? s.contextPct;
   const hasCost = s.cost !== null || lv?.cost !== undefined;
   const u = s.usage;
   const sum = Math.max(1, u.input + u.output + u.cacheRead + u.cacheWrite);
@@ -38,7 +36,7 @@ export function StatsBar({ agent, session }: { agent: Agent; session?: string | 
   return (
     <div className="stats-wrap">
       <button className="statsbar" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <span className="sb" title={t('stats.contextTitle')}><Gauge size={14} /><b>{ctxPct !== null ? `${ctxPct.toFixed(ctxPct < 10 ? 1 : 0)}%` : fmtTokens(s.lastContext)}</b>{t('stats.context')}</span>
+        <span className="sb" title={`${t('stats.contextTitle')} · ${fmtTokens(s.lastContext)}${s.contextWindow ? ` / ${fmtTokens(s.contextWindow)}` : ''}`}><Gauge size={14} /><b>{ctxPct !== null ? `${ctxPct.toFixed(ctxPct < 10 ? 1 : 0)}%` : fmtTokens(s.lastContext)}</b>{t('stats.context')}</span>
         <span className="sb"><Layers size={14} /><b>{fmtTokens(tokens)}</b>{t('stats.tokens')}</span>
         {credits > 0 && <span className="sb"><Coins size={14} /><b>{credits.toFixed(2)}</b>{t('stats.credits')}</span>}
         {hasCost && <span className="sb" title={s.costEstimated ? t('stats.costEstimated') : t('stats.costReported')}><Coins size={14} /><b>{s.costEstimated ? '≈ ' : ''}{fmtCost(cost)}</b></span>}

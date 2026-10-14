@@ -9,24 +9,27 @@ import { MemberPick } from './MemberPick';
 import type { Agent, AgentType, Colony, InheritField, Permission, Provider, Role, SkillLoad } from '@/lib/types';
 import { permissionLabel, shortPath } from '@/lib/meta';
 import { PickSearch } from '@/components/PickSearch';
+import { CheckRow } from '@/components/Primitives';
 import { MANAGEABLE } from '@/components/objects/ManagerField';
 
 export interface AgentDraft {
   name: string; description: string; role: Role; provider: Provider; model: string;
   system_prompt: string; permission: Permission; cwd: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; worker_ids: string[]; type_id: string | null;
   colony_id: string | null; overrides: InheritField[];
+  /** Claude only: the agent may drive the person's Chrome. */
+  browser: boolean;
   /** The resources (servers, containers, clusters) this agent looks after: kept here, saved apart from the agent. */
   object_ids: string[];
 }
 
 export const draftFromType = (t?: AgentType): AgentDraft => ({
   name: '', description: t?.description ?? '', role: t?.role ?? 'worker', provider: t?.provider ?? 'claude', model: t?.model ?? '',
-  system_prompt: t?.system_prompt ?? '', permission: t?.permission ?? 'acceptEdits', cwd: '', skill_ids: t?.skill_ids ?? [], skill_loads: t?.skill_loads ?? {}, worker_ids: [], type_id: t?.id ?? null, colony_id: null, overrides: [], object_ids: [],
+  system_prompt: t?.system_prompt ?? '', permission: t?.permission ?? 'acceptEdits', cwd: '', skill_ids: t?.skill_ids ?? [], skill_loads: t?.skill_loads ?? {}, worker_ids: [], type_id: t?.id ?? null, colony_id: null, overrides: [], browser: false, object_ids: [],
 });
 export const draftFromAgent = (a: Agent, objectIds: string[] = []): AgentDraft => ({
   name: a.name, description: a.description, role: a.role, provider: a.provider, model: a.model, system_prompt: a.system_prompt,
   permission: a.permission, cwd: a.cwd, skill_ids: a.skill_ids, skill_loads: a.skill_loads, worker_ids: a.worker_ids, type_id: a.type_id,
-  colony_id: a.colony_id, overrides: a.overrides, object_ids: objectIds,
+  colony_id: a.colony_id, overrides: a.overrides, browser: a.browser, object_ids: objectIds,
 });
 
 /** True when this field currently follows the agent's colony. */
@@ -75,8 +78,9 @@ export function AgentForm({ draft, onChange, errors, selfId, showType = true, fo
           {colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </Field>
-      <Field label={t('form.provider')}><ProviderPicker value={draft.provider} onChange={(p) => onChange({ ...draft, provider: p, model: '' })} providers={providers} /></Field>
+      <Field label={t('form.provider')}><ProviderPicker value={draft.provider} onChange={(p) => onChange({ ...draft, provider: p, model: '', browser: p === 'claude' && draft.browser })} providers={providers} /></Field>
       <ModelField provider={draft.provider} value={draft.model} onChange={(v) => set('model', v)} />
+      {draft.provider === 'claude' && <CheckRow checked={draft.browser} onChange={(v) => set('browser', v)} label={t('form.browser')} hint={t('form.browser.hint')} />}
       {colony && colony.inherit.permission && <InheritRow colony={colony} on={inh('permission')} onChange={(v) => toggle('permission', v)} label={t('inherit.permissions')} value={permissionLabel(colony.permission)} />}
       {!inh('permission') && <PermissionField value={draft.permission} onChange={(v) => set('permission', v)} locked={linked.length ? ['plan'] : []} />}
       {linked.length > 0 && <p className="hint m0"><b>{t('form.connections')}:</b> {t('form.connections.hint', { names: linked.map((c) => c.name).join(', ') })}</p>}

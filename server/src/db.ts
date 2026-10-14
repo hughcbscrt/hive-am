@@ -28,7 +28,7 @@ const q = (sql: string): Database.Statement => { let st = prepared.get(sql); if 
 type SkillRow = Skill;
 type TypeRow = Omit<AgentType, 'skill_ids' | 'skill_loads'>;
 type ColonyRow = Omit<Colony, 'inherit' | 'skill_ids' | 'skill_loads' | 'agent_ids'> & { inherit: string };
-type AgentRow = Omit<Agent, 'skill_ids' | 'skill_loads' | 'worker_ids' | 'overrides' | 'effective'> & { overrides: string | null };
+type AgentRow = Omit<Agent, 'skill_ids' | 'skill_loads' | 'worker_ids' | 'overrides' | 'effective' | 'browser'> & { overrides: string | null; browser: number };
 interface LoadRow { skill_id: string; load: string }
 interface CountRow { skill_id: string; c: number }
 export interface SessionRow { agent_id: string; provider: Provider; session_id: string; cwd: string; first_seen: number; last_seen: number; kind: 'direct' | 'delegation'; from_id: string | null; task: string | null; from_name: string | null }
@@ -191,7 +191,7 @@ function agentOf(r: AgentRow): Agent {
     skill_loads: { ...(follows('skills') ? col!.skill_loads : {}), ...loadsOf('agent', r.id) } as Record<string, SkillLoad>,
     inherited,
   };
-  return { ...r, skill_ids, skill_loads: loadsOf('agent', r.id), worker_ids, overrides, effective };
+  return { ...r, browser: !!r.browser, skill_ids, skill_loads: loadsOf('agent', r.id), worker_ids, overrides, effective };
 }
 
 /** The agent as it actually runs: colony-inherited values already folded into cwd/permission/prompt/skills. */
@@ -206,9 +206,9 @@ export const agents = {
   /** The agent, its skills and its workers are written together: either all of it exists afterwards or none. */
   create: db.transaction((p: Partial<Agent> & { name: string; role: Role; provider: Provider; cwd: string }): Agent => {
     const id = uid(), t = now();
-    q('INSERT INTO agents (id,name,description,role,type_id,provider,model,system_prompt,permission,cwd,session_id,status,created_at,updated_at,colony_id,overrides) VALUES (?,?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?)').run(
+    q('INSERT INTO agents (id,name,description,role,type_id,provider,model,system_prompt,permission,cwd,session_id,status,created_at,updated_at,colony_id,overrides,browser) VALUES (?,?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?,?)').run(
       id, p.name, p.description ?? '', p.role, p.type_id ?? null, p.provider, p.model ?? '', p.system_prompt ?? '',
-      (p.permission ?? 'acceptEdits') as Permission, p.cwd ?? '', 'idle', t, t, p.colony_id ?? null, JSON.stringify(p.overrides ?? []));
+      (p.permission ?? 'acceptEdits') as Permission, p.cwd ?? '', 'idle', t, t, p.colony_id ?? null, JSON.stringify(p.overrides ?? []), p.browser && p.provider === 'claude' ? 1 : 0);
     agents.setSkills(id, p.skill_ids ?? [], p.skill_loads);
     agents.setWorkers(id, p.worker_ids ?? []);
     return agents.get(id)!;
@@ -216,8 +216,8 @@ export const agents = {
   update: db.transaction((id: string, p: Partial<Agent>): Agent | undefined => {
     const cur = agents.get(id); if (!cur) return;
     const n = { ...cur, ...p };
-    q('UPDATE agents SET name=?, description=?, role=?, type_id=?, provider=?, model=?, system_prompt=?, permission=?, cwd=?, colony_id=?, overrides=?, updated_at=? WHERE id=?')
-      .run(n.name, n.description, n.role, n.type_id, n.provider, n.model, n.system_prompt, n.permission, n.cwd, n.colony_id ?? null, JSON.stringify(n.overrides ?? []), now(), id);
+    q('UPDATE agents SET name=?, description=?, role=?, type_id=?, provider=?, model=?, system_prompt=?, permission=?, cwd=?, colony_id=?, overrides=?, browser=?, updated_at=? WHERE id=?')
+      .run(n.name, n.description, n.role, n.type_id, n.provider, n.model, n.system_prompt, n.permission, n.cwd, n.colony_id ?? null, JSON.stringify(n.overrides ?? []), n.browser && n.provider === 'claude' ? 1 : 0, now(), id);
     if (p.skill_ids || p.skill_loads) agents.setSkills(id, p.skill_ids ?? cur.skill_ids, p.skill_loads);
     if (p.worker_ids) agents.setWorkers(id, p.worker_ids);
     return agents.get(id);

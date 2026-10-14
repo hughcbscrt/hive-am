@@ -185,6 +185,13 @@ CREATE TABLE IF NOT EXISTS object_agents (
       db.exec("UPDATE skills SET name='Colony resources' WHERE id='default-objects' AND name='Colony objects' AND NOT EXISTS (SELECT 1 FROM skills WHERE lower(name)='colony resources')");
     },
   },
+  {
+    version: 3, name: 'agent-browser',
+    up(db) {
+      // Whether a Claude agent may drive the person's Chrome (`--chrome`). Off for every agent that already exists.
+      addColumn(db, 'agents', 'browser INTEGER NOT NULL DEFAULT 0');
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

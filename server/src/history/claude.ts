@@ -54,7 +54,13 @@ function parseClaude(file: string): ChatMessage[] {
   const toolStart = new Map<string, number>();
 
   for (const e of jsonLines(file)) {
-    if (e.isSidechain || e.isMeta || (e.type !== 'user' && e.type !== 'assistant')) continue;
+    // `/compact` leaves a boundary (with the size before and after) and the summary as a user entry: the summary is the CLI's, not the person's.
+    if (e.type === 'system' && e.subtype === 'compact_boundary') {
+      const c = e.compactMetadata ?? {};
+      out.push({ id: e.uuid, role: 'assistant', ts: e.timestamp ? Date.parse(e.timestamp) : null, blocks: [], compact: { pre: c.preTokens ?? 0, post: c.postTokens ?? 0 } });
+      continue;
+    }
+    if (e.isSidechain || e.isMeta || e.isCompactSummary || (e.type !== 'user' && e.type !== 'assistant')) continue;
     const m = e.message; if (!m) continue;
     const ts = e.timestamp ? Date.parse(e.timestamp) : null;
 
@@ -102,7 +108,7 @@ function parseClaude(file: string): ChatMessage[] {
       }
     }
   }
-  return out.filter((m) => m.blocks.length);
+  return out.filter((m) => m.blocks.length || m.compact);
 }
 
 export function claudeMeta(file: string) {

@@ -82,7 +82,7 @@ route('GET', '/api/agents/:id/history', ({ params, url }) => {
 });
 route('GET', '/api/agents/:id/stats', ({ params, url }) => {
   const a = agentOrFail(params[0]);
-  return sessionStats(readHistory(resolved(a), sessionToRead(a, url.searchParams.get('session'))));
+  return sessionStats(readHistory(resolved(a), sessionToRead(a, url.searchParams.get('session'))), a.provider);
 });
 route('GET', '/api/agents/:id/live', ({ params }) => liveTurn(params[0]));
 route('GET', '/api/agents/:id/sessions', ({ params }) => agents.sessions(params[0]));

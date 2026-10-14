@@ -20,6 +20,7 @@ function coalesce(list: ChatMessage[]): (ChatMessage & { durationMs?: number })[
   let userTs: number | null = null;
   for (const m of list) {
     if (m.role === 'user') { userTs = m.ts; out.push(m); continue; }
+    if (m.compact) { out.push(m); continue; }
     const last = out[out.length - 1];
     const merged = (a?: ChatMessage['meta'], b?: ChatMessage['meta']): ChatMessage['meta'] => {
       if (!a) return b; if (!b) return a;
@@ -31,7 +32,7 @@ function coalesce(list: ChatMessage[]): (ChatMessage & { durationMs?: number })[
       };
     };
     let msg: ChatMessage & { durationMs?: number };
-    if (last?.role === 'assistant') { msg = { ...last, blocks: [...last.blocks, ...m.blocks], meta: merged(last.meta, m.meta) }; out[out.length - 1] = msg; }
+    if (last?.role === 'assistant' && !last.compact) { msg = { ...last, blocks: [...last.blocks, ...m.blocks], meta: merged(last.meta, m.meta) }; out[out.length - 1] = msg; }
     else { msg = { ...m }; out.push(msg); }
     const end = msg.meta?.endTs;
     msg.durationMs = userTs && end ? Math.max(0, end - userTs) : undefined;
@@ -121,11 +122,13 @@ type Reply = ChatMessage & { durationMs?: number };
 
 /** The saved transcript. Memoised so typing in the composer never re-renders it. */
 export const History = memo(function History({ msgs, agent }: { msgs: ChatMessage[]; agent: Pick<Agent, 'id' | 'name' | 'provider' | 'role'> }) {
-  useI18n(); // re-render the relative times when the language changes
+  const { t } = useI18n(); // also re-renders the relative times when the language changes
   const list = useMemo(() => coalesce(msgs), [msgs]);
   return (
     <>
-      {list.map((m: Reply) => m.role === 'user' ? (
+      {list.map((m: Reply) => m.compact ? (
+        <div key={m.id} className="compact-mark" role="separator"><span>{t('chat.compactMark', { pre: fmtTokens(m.compact.pre), post: fmtTokens(m.compact.post) })}</span></div>
+      ) : m.role === 'user' ? (
         <UserBubble key={m.id} agentId={agent.id} text={m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join('')} />
       ) : (
         <div key={m.id} className="msg assistant">

@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Provider } from './types.js';
+import { learnWindows } from './context.js';
 
 const run = promisify(execFile);
 const cache = new Map<Provider, { at: number; models: ModelInfo[] }>();
@@ -25,6 +26,7 @@ async function discover(p: Provider): Promise<ModelInfo[]> {
     const { stdout } = await run('kiro-cli', ['chat', '--list-models', '--format', 'json'], { timeout: 20000, maxBuffer: 4e6 });
     const j = JSON.parse(stdout);
     const list: any[] = Array.isArray(j) ? j : j.models ?? [];
+    learnWindows('kiro', Object.fromEntries(list.map((m) => [m.model_id ?? m.id ?? m.name, Number(m.context_window_tokens)])));
     return list.map((m) => ({ id: m.model_id ?? m.id ?? m.name, label: m.model_name ?? m.name ?? m.model_id ?? m.id })).filter((m) => m.id);
   } catch {
     return [];
