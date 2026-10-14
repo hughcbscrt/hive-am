@@ -53,6 +53,10 @@ export function composeInstructions(a: Agent, delegated = false): string {
   if (a.provider === 'opencode' && mcpCaps(a).length > 0) parts.push(`## Calling the hive tools
 The hive tools (\`tools.hive.*\`) are called from the \`execute\` tool, with \`await\`, using exactly the names given in these instructions. Do not \`search\` for them and do not probe with \`shell\` first: call them directly, e.g. \`execute\` with \`return await tools.hive.channel_reply({ text: "..." });\`. At the start of a turn the hive tools are still connecting, so your very first call can fail with \`Unknown tool 'hive.…'. Use search to find available tools.\` That is expected: ignore the hint, do not \`search\` and do not change tools; make the same call again right away with the same arguments and it will work. Use \`shell\` only for real shell work (commands, files), never to run JavaScript or as a placeholder. For a simple question, answer it in a single call.`);
 
+  // Kiro's shell tool returns only when the command's output pipes close, so a plain `cmd &` keeps the whole turn (and the chat) waiting until it ends.
+  if (a.provider === 'kiro') parts.push(`## Background commands
+Your shell tool waits until the command and everything it started has closed its output. To leave something running (a dev server, a watcher, a long build, a tunnel), detach it completely so the tool returns at once and the conversation can go on: \`setsid nohup <command> > <log file> 2>&1 < /dev/null & echo $!\`. All three redirections are required; a bare \`<command> &\` still blocks. Then read the log file when you need its output, and never wait for the process to end.`);
+
   if (a.system_prompt.trim()) parts.push(a.system_prompt.trim());
   const lazy = lazySkills(a);
   for (const sid of a.skill_ids) {

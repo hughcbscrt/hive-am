@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DATA_DIR } from '../db.js';
 import { createHash, randomBytes } from 'node:crypto';
+import { learnWindows } from '../context.js';
 
 /**
  * One long-lived `opencode serve` per agent. A private server per turn (`opencode run --standalone`) boots from zero every time and its
@@ -54,6 +55,48 @@ function reapOrphans(): void {
 reapOrphans();
 
 const auth = (password: string) => ({ authorization: `Basic ${Buffer.from(`opencode:${password}`).toString('base64')}` });
+
+let windowsAt = 0;
+/**
+ * Reads the context window of every model from OpenCode's catalog, using this turn's server, any running one or a short-lived one
+ * (about 4 s and 150 MB, once). At most once an hour, and a failure waits ten minutes: OpenCode 1.x has no catalog endpoint at all.
+ */
+export async function learnOpencodeWindows(cwd: string, access: ServerAccess | null): Promise<void> {
+  if (Date.now() - windowsAt < 60 * 60_000) return;
+  windowsAt = Date.now();
+  let proc: ChildProcess | undefined;
+  try {
+    let url = access?.url, password = access?.password;
+    if (!url) {
+      const live = [...servers.values()].find((x) => x.url && x.proc.exitCode === null);
+      if (live) { url = live.url; password = live.password; }
+    }
+    if (!url) {
+      password = randomBytes(18).toString('base64url');
+      const child = proc = spawn('opencode', ['serve', '--hostname', '127.0.0.1', '--port', '0'], { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PWD: cwd, OPENCODE_SERVER_PASSWORD: password } });
+      url = await new Promise<string>((resolve, reject) => {
+        let out = '';
+        const timer = setTimeout(() => reject(new Error('opencode serve did not start in time')), START_TIMEOUT_MS);
+        const onData = (d: Buffer) => { out = (out + d).slice(-2000); const m = /listening on (http:\/\/\S+)/i.exec(out); if (m) { clearTimeout(timer); resolve(m[1].replace(/\/$/, '')); } };
+        child.stdout!.on('data', onData); child.stderr!.on('data', onData);
+        child.on('error', (e) => { clearTimeout(timer); reject(e); });
+        child.on('exit', (c) => { clearTimeout(timer); reject(new Error(`opencode serve exited with code ${c}`)); });
+      });
+    }
+    // Right after it starts the catalog is empty for a moment: ask again until it has models.
+    const until = Date.now() + 10_000;
+    let list: any[] = [];
+    while (!list.length && Date.now() < until) {
+      const r = await fetch(`${url}/api/model`, { headers: auth(password!), signal: AbortSignal.timeout(5000) });
+      if (!r.ok) return;   // no catalog in this OpenCode: leave it for an hour
+      list = ((await r.json()) as any)?.data ?? [];
+      if (!list.length) await new Promise((res) => setTimeout(res, 400));
+    }
+    if (!list.length) throw new Error('the model catalog stayed empty');
+    learnWindows('opencode', Object.fromEntries(list.map((m) => [`${m.providerID}/${m.id}`, Number(m.limit?.context)])));
+  } catch { windowsAt = Date.now() - 50 * 60_000; /* try again in ten minutes */ }
+  finally { if (proc && !proc.killed) proc.kill('SIGTERM'); }
+}
 
 /** Waits until every MCP server the config asks for has finished connecting (connected or failed): no more "Unknown tool" at the first step. */
 async function mcpSettled(s: Srv, signal: AbortSignal): Promise<void> {

@@ -27,6 +27,7 @@ export function validateAgentInput(p: Body, partial = false): AgentInput {
   if (p.provider !== undefined && !isProvider(p.provider)) throw bad(`Unknown provider "${text(p.provider)}"`);
   if (p.role !== undefined && !['orchestrator', 'worker'].includes(p.role as string)) throw bad('Role must be orchestrator or worker');
   checkFolder(p.cwd);
+  if (p.browser !== undefined && typeof p.browser !== 'boolean') throw bad('browser must be true or false');
   if (p.colony_id && (typeof p.colony_id !== 'string' || !colonies.get(p.colony_id))) throw bad('That colony no longer exists');
   return p as AgentInput;
 }

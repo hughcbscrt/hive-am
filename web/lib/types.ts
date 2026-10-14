@@ -11,7 +11,7 @@ export interface Colony {
 export interface Agent {
   id: string; name: string; description: string; role: Role; type_id: string | null;
   provider: Provider; model: string; system_prompt: string; permission: Permission; cwd: string;
-  colony_id: string | null; overrides: InheritField[];
+  colony_id: string | null; overrides: InheritField[]; browser: boolean;
   effective: { cwd: string; permission: Permission; system_prompt: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; inherited: InheritField[] };
   session_id: string | null; status: 'idle' | 'running' | 'error';
   skill_ids: string[]; skill_loads: Record<string, SkillLoad>; worker_ids: string[]; created_at: number; updated_at: number;
@@ -51,12 +51,12 @@ export type Block =
   | { type: 'text'; text: string }
   | { type: 'thinking'; text: string }
   | { type: 'tool'; id: string; name: string; input: unknown; output?: string; error?: boolean; durationMs?: number; startedAt?: number };
-export interface ChatMessage { id: string; role: 'user' | 'assistant'; ts: number | null; blocks: Block[]; meta?: MsgMeta }
+export interface ChatMessage { id: string; role: 'user' | 'assistant'; ts: number | null; blocks: Block[]; meta?: MsgMeta; compact?: { pre: number; post: number } }
 export interface SessionStats {
   usage: Usage; cost: number | null; costEstimated: boolean; turns: number; toolCalls: number; toolErrors: number; toolTimeMs: number; durationMs: number;
   tools: { name: string; count: number; errors: number; totalMs: number }[];
   models: { model: string; messages: number; output: number }[];
-  lastContext: number; contextPct: number | null;
+  lastContext: number; contextWindow: number | null; contextPct: number | null;
   timeline: { ts: number | null; prompt: string; tokens: number; cost: number | null; durationMs: number; tools: number }[];
 }
 

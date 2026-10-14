@@ -1,6 +1,6 @@
 'use client';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { BookOpen, Bot, Paperclip, Check, ChevronRight, Copy, FilePen, FilePlus, FileText, Globe, ListChecks, MessageSquare, Search, Terminal, Volume2, VolumeX, Waypoints, Wrench } from 'lucide-react';
+import { BookOpen, Bot, Paperclip, Check, ChevronRight, Copy, FilePen, FilePlus, FileText, Globe, ListChecks, MessageSquare, MousePointerClick, Search, Terminal, Volume2, VolumeX, Waypoints, Wrench } from 'lucide-react';
 import { fmtDur } from '@/lib/format';
 import { translate as tr, useI18n } from '@/lib/i18n/index';
 import type { Block } from '@/lib/types';
@@ -27,6 +27,7 @@ export function CopyBtn({ text, label, compact = false }: { text: string; label?
   );
 }
 
+const entries0 = (o: Obj) => Object.keys(o).some((k) => k !== 'tabId');
 const str = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : JSON.stringify(v));
 const pick = (o: Obj, ...keys: string[]) => { for (const k of keys) if (o?.[k] != null && o[k] !== '') return o[k]; return undefined; };
 
@@ -120,6 +121,17 @@ export function describe(tool: Tool): Described {
   if (n === 'todowrite' && Array.isArray(input.todos)) {
     const done = input.todos.filter((x: Obj) => x.status === 'completed').length;
     return { icon: <ListChecks size={14} />, label: tr('tool.plan'), summary: tr('tool.planSummary', { done, total: input.todos.length }), body: <ul className="todos">{input.todos.map((x: Obj, i: number) => <li key={i} data-s={x.status}><i />{str(x.content)}</li>)}</ul> };
+  }
+  if (mcp?.[1] === 'claude-in-chrome') {
+    const act = str(input.action);
+    // `computer` is one tool for every click, keystroke and screenshot: the action says which.
+    const detail = str(pick(input, 'url', 'query', 'text', 'ref', 'value')) || (Array.isArray(input.coordinate) ? input.coordinate.join(', ') : '');
+    const nav = n === 'navigate' || n === 'tabscreatemcp' || n === 'tabscontextmcp' || n === 'tabsclosemcp';
+    const label = tr(n === 'navigate' ? 'tool.chrome.navigate' : n === 'tabscreatemcp' ? 'tool.chrome.tabNew' : n === 'tabsclosemcp' ? 'tool.chrome.tabClose' : n.startsWith('tabs') ? 'tool.chrome.tabs' : n === 'computer' ? 'tool.chrome.act' : n === 'readpage' || n === 'getpagetext' ? 'tool.chrome.read' : n === 'find' ? 'tool.chrome.find' : n === 'forminput' ? 'tool.chrome.form' : n === 'javascripttool' ? 'tool.chrome.js' : 'tool.chrome.other');
+    return {
+      icon: nav ? <Globe size={14} /> : <MousePointerClick size={14} />, label, summary: [n === 'computer' || n === 'javascripttool' ? act.replace(/_/g, ' ') : '', detail].filter(Boolean).join(' · ').slice(0, 140),
+      body: entries0(input) ? <Kv rows={Object.entries(input).filter(([k]) => k !== 'tabId').map(([k, v]) => [k, <span key={k} className="pre-wrap">{str(v)}</span>] as [string, ReactNode])} /> : null,
+    };
   }
   const entries = Object.entries(input);
   return {

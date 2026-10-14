@@ -51,6 +51,8 @@ export interface Agent {
   permission: Permission;
   cwd: string;
   colony_id: string | null;
+  /** Claude only: lets the agent drive the person's Chrome through the Claude in Chrome extension (`--chrome`). Off unless the person turns it on. */
+  browser: boolean;
   /** Fields where this agent ignores its colony and uses its own value. */
   overrides: InheritField[];
   /** What actually runs: own values merged with the colony's according to inherit/overrides. */
@@ -114,6 +116,8 @@ export interface ChatMessage {
   ts: number | null;
   blocks: Block[];
   meta?: MsgMeta;
+  /** Set on a marker (no blocks) where the CLI compacted the conversation: tokens in context before and after. */
+  compact?: { pre: number; post: number };
 }
 
 export interface TurnOptions {
