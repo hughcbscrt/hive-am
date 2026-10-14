@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-14
+
 ### Added
 
 - Claude agents can drive your Chrome through the Claude in Chrome extension. Turn on **Browser (Chrome)** in the agent's settings (it is off by default and adds nothing to the prompt). The chat shows each browser action (open page, read, click, run script) with its own icon and label. Chrome and the extension must be open on the machine where hive-am runs.
@@ -166,7 +168,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.2.2...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/hughcbscrt/hive-am/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/hughcbscrt/hive-am/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/hughcbscrt/hive-am/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/hughcbscrt/hive-am/compare/v1.1.0...v1.2.0
