@@ -2,7 +2,9 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Boxes, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, Server, SquareTerminal, Sun, Users, Plug } from 'lucide-react';
+import { Boxes, MessageSquare, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, Server, SquareTerminal, Sun, Users, Plug } from 'lucide-react';
+import { usePersistentState } from '@/lib/hooks/usePersistentState';
+import { LAST_CHAT } from '@/lib/lastChat';
 import { HiveProvider, useHive } from '@/lib/store';
 import { I18nProvider, LOCALES, useI18n } from '@/lib/i18n';
 import { Toaster } from './ui';
@@ -48,17 +50,20 @@ function Nav() {
     try { localStorage.setItem('hive-theme', next); } catch { /* ignore */ }
   };
   const running = agents.filter((a) => a.status === 'running').length;
-  const item = (href: string, label: string, icon: ReactNode, count?: number) => {
-    const active = href === '/' ? path === '/' : path.startsWith(href);
-    return <Link key={href} href={href} className="nav" aria-current={active ? 'page' : undefined}>{icon}<span className="t">{label}</span>{count !== undefined && <span className="count">{count}</span>}</Link>;
+  const [lastChat] = usePersistentState<string>(LAST_CHAT, '');
+  const chatHref = agents.some((a) => a.id === lastChat) ? `/agents/${lastChat}` : agents[0] ? `/agents/${agents[0].id}` : '/chat';
+  const item = (href: string, label: string, icon: ReactNode, count?: number, on?: boolean) => {
+    const active = on ?? (href === '/' ? path === '/' : path.startsWith(href));
+    return <Link key={label} href={href} className="nav" aria-current={active ? 'page' : undefined}>{icon}<span className="t">{label}</span>{count !== undefined && <span className="count">{count}</span>}</Link>;
   };
   return (
     <nav className="rail" aria-label={t('nav.main')}>
       <div className="brand"><HiveMark /><div>hive-am<small>{t('app.tagline')}</small></div></div>
       <LanguageSwitch />
+      {item(chatHref, t('nav.chat'), <MessageSquare size={18} />, undefined, path.startsWith('/agents/') || path === '/chat')}
       {item('/', t('nav.colony'), <Hexagon size={18} />, running || undefined)}
       {item('/resources', t('nav.objects'), <Server size={18} />, objects.length || undefined)}
-      {item('/agents', t('nav.agents'), <Users size={18} />, agents.length)}
+      {item('/agents', t('nav.agents'), <Users size={18} />, agents.length, path === '/agents')}
       {item('/relations', t('nav.relations'), <Network size={18} />)}
       {item('/connections', t('nav.connections'), <Plug size={18} />, connections.length || undefined)}
       {item('/schedules', t('nav.schedules'), <CalendarClock size={18} />)}

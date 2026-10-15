@@ -10,7 +10,7 @@ import { dbColumns, dbQuery, dbSchema, dbState, dbTest, forgetDatabase } from '.
 import { addSaved, clearQueries, forgetQueries, listQueries, listSaved, recordQuery, removeSaved, updateSaved } from './db-history.js';
 import { exportCollection, parseHttpFile, createHttpFile, exportHttp, type ExportFormat, describeHttp, dropSession, inspectHttp, readHttpFile, runHttp, scanHttp, writeHttpFile, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
 import { ObjectError, parseDatabase, type ClusterConfig, type DatabaseConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
-import { forgetServer, serverLogs, serverState, startServer, stopServer } from './runner.js';
+import { forgetServer, serverLogs, restartServer, serverState, startServer, stopServer } from './runner.js';
 import { forgetSupervision, resetSupervision, supervise } from './supervisor.js';
 import { maskConfig, objectsStore } from './store.js';
 
@@ -53,7 +53,7 @@ function clusterState(o: ObjectRow): ObjectState {
 async function serverStateSupervised(o: ObjectRow): Promise<ObjectState> {
   const cfg = o.config as ServerConfig;
   const base = await serverState(o.id, cfg);
-  return supervise(o, cfg, base, { start: () => startServer(o.id, cfg), restart: async () => { await stopServer(o.id, cfg); await startServer(o.id, cfg); } });
+  return supervise(o, cfg, base, { start: () => startServer(o.id, cfg), restart: () => restartServer(o.id, cfg) });
 }
 
 export async function stateOf(o: ObjectRow): Promise<ObjectState> {
@@ -96,7 +96,7 @@ async function act(o: ObjectRow, action: 'start' | 'stop' | 'restart'): Promise<
     const c = o.config as ServerConfig;
     if (action === 'start') await startServer(o.id, c);
     else if (action === 'stop') await stopServer(o.id, c);
-    else { await stopServer(o.id, c); await startServer(o.id, c); }
+    else await restartServer(o.id, c);
   } else {
     const c = o.config as DockerConfig;
     if (action === 'start') await startDocker(o.id, c); else if (action === 'stop') await stopDocker(o.id, c); else await restartDocker(o.id, c);

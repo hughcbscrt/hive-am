@@ -44,6 +44,25 @@ have installed; it does not replace them and it never copies your conversations 
 - **Terminals.** A bottom panel (Ctrl+`) with real shells and object logs, reachable only from this machine.
 - **Local and private.** The server binds to `127.0.0.1`. Data lives in `~/.hive-am/`.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/manual/en/img/colonia-mapa.jpg" alt="The colony map: colonies, agents and resources as hexagons" /><br /><sub><b>The colony.</b> Agents and resources as hexagons, grouped by colony.</sub></td>
+    <td width="50%"><img src="docs/manual/en/img/chat-conversacion.jpg" alt="A conversation with an orchestrator" /><br /><sub><b>Chat.</b> The real session of the CLI, with tokens, cost and tool calls.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/manual/en/img/recurso-servidor-logs.jpg" alt="A server resource with its live logs" /><br /><sub><b>Resources.</b> Servers, containers and databases with live logs.</sub></td>
+    <td width="50%"><img src="docs/manual/en/img/recurso-cluster.jpg" alt="A cluster that starts several resources together" /><br /><sub><b>Clusters.</b> Start and stop a group of resources in order.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/manual/en/img/cambios-diff.jpg" alt="The changes explorer showing a diff" /><br /><sub><b>Changes.</b> Git tree, diff, history and commit per agent.</sub></td>
+    <td width="50%"><img src="docs/manual/en/img/http-respuesta.jpg" alt="An HTTP request and its response" /><br /><sub><b>HTTP requests.</b> Run <code>.http</code> files and read the response.</sub></td>
+  </tr>
+</table>
+
+More in the [user manual](docs/manual/en/README.md).
+
 ## Providers
 
 | Provider | Run a turn | Transcript source |

@@ -54,7 +54,7 @@ export async function supervise(o: ObjectRow, cfg: ServerConfig, state: ObjectSt
 
   // Running: is it working?
   if ((state.status === 'running') && cfg.health) {
-    if (S.startedAt !== saved?.startedAt) { S.startedAt = saved?.startedAt ?? 0; S.fails = 0; S.lastCheck = 0; }
+    if (S.startedAt !== saved?.startedAt) { S.startedAt = saved?.startedAt ?? 0; S.fails = 0; S.lastCheck = now; }   // a new start: the first check comes one interval later, not right away
     if (now - S.lastCheck >= (cfg.health.intervalSec ?? 15) * 1000) {
       S.lastCheck = now;
       const r = await check(cfg, cfg.health);
