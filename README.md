@@ -12,10 +12,6 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/hive-am"><img alt="npm version" src="https://img.shields.io/npm/v/hive-am?style=flat-square&color=cb3837&logo=npm&logoColor=white" /></a>
   <a href="https://www.npmjs.com/package/hive-am"><img alt="npm downloads" src="https://img.shields.io/npm/dm/hive-am?style=flat-square&color=cb3837" /></a>
-  <a href="https://github.com/hughcbscrt/hive-am/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/hughcbscrt/hive-am?style=flat-square&color=bf963d" /></a>
-  <a href="https://github.com/hughcbscrt/hive-am/pulls?q=is%3Apr"><img alt="Pull requests" src="https://img.shields.io/github/issues-pr-closed/hughcbscrt/hive-am?style=flat-square&color=bf963d" /></a>
-  <a href="https://github.com/hughcbscrt/hive-am/issues"><img alt="Issues" src="https://img.shields.io/github/issues/hughcbscrt/hive-am?style=flat-square&color=bf963d" /></a>
-  <a href="https://github.com/hughcbscrt/hive-am"><img alt="Repo size" src="https://img.shields.io/github/repo-size/hughcbscrt/hive-am?style=flat-square&color=bf963d" /></a>
   <a href="https://github.com/hughcbscrt/hive-am"><img alt="Top language" src="https://img.shields.io/github/languages/top/hughcbscrt/hive-am?style=flat-square&color=3178c6" /></a>
   <img alt="Node 20+" src="https://img.shields.io/badge/node-%E2%89%A520-339933?style=flat-square&logo=nodedotjs&logoColor=white" />
   <img alt="Next.js 15" src="https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=nextdotjs&logoColor=white" />
