@@ -1,7 +1,7 @@
 'use client';
 import { ManagerField, MANAGEABLE } from './ManagerField';
 import { useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { ChevronRight, RefreshCw } from 'lucide-react';
 import { CheckRow, Field, FolderPicker, PathPicker, Segmented } from '@/components/ui';
 import { useComposeServices, useDockerLists } from '@/lib/useDocker';
 import { Suggest } from './Suggest';
@@ -17,7 +17,7 @@ type Mode = NonNullable<DockerConfig['mode']> | 'template';
 export interface Draft {
   name: string; colony_id: string; kind: ObjectKind; manager: string;
   cwd: string; start: string; stop: string; port: string; env: string;
-  restart: string; maxRestarts: string; healthKind: string; healthTarget: string; healthInterval: string; healthRetries: string; healthRestart: boolean; stopTimeout: string; logMax: string;
+  restart: string; maxRestarts: string; healthKind: string; healthTarget: string; healthInterval: string; healthTimeout: string; healthRetries: string; healthRestart: boolean; stopTimeout: string; logMax: string;
   folder: string; defEnv: string; variables: Vars; members: string[];
   template: string; tplValues: Record<string, string>;
   mode: Mode; image: string; ports: string; volumes: string; dockerRestart: string; command: string; file: string; project: string; services: string; container: string;
@@ -36,7 +36,7 @@ export const draftFrom = (o?: ObjectView, colony?: string, kind?: ObjectKind): D
     manager: o?.manager_id ?? '',
     name: o?.name ?? '', colony_id: o?.colony_id ?? colony ?? '', kind: o?.kind ?? kind ?? 'server',
     cwd: s.cwd ?? '', start: s.start ?? '', stop: s.stop ?? '', port: n(s.port), env: envToText(o?.kind === 'server' ? s.env : d.env),
-    restart: s.restart ?? 'no', maxRestarts: n(s.maxRestarts), healthKind: s.health?.kind ?? '', healthTarget: s.health?.target ?? '', healthInterval: n(s.health?.intervalSec), healthRetries: n(s.health?.retries), healthRestart: !!s.health?.restartWhenUnhealthy,
+    restart: s.restart ?? 'no', maxRestarts: n(s.maxRestarts), healthKind: s.health?.kind ?? '', healthTarget: s.health?.target ?? '', healthInterval: n(s.health?.intervalSec), healthTimeout: n(s.health?.timeoutSec), healthRetries: n(s.health?.retries), healthRestart: !!s.health?.restartWhenUnhealthy,
     stopTimeout: n(o?.kind === 'server' ? s.stopTimeoutSec : d.stopTimeoutSec), logMax: n(o?.kind === 'server' ? s.logMaxMb : d.logMaxMb),
     folder: h.folder ?? '', defEnv: h.env ?? '', variables: (h.variables ?? {}) as Vars, members: c.members ?? [],
     template: '', tplValues: {},
@@ -59,7 +59,7 @@ export function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | D
     return {
       cwd: d.cwd.trim(), start: d.start.trim(), stop: d.stop.trim() || undefined, port: num(d.port), env: textToEnv(d.env),
       restart: d.restart === 'no' ? undefined : (d.restart as ServerConfig['restart']), maxRestarts: num(d.maxRestarts), stopTimeoutSec: num(d.stopTimeout), logMaxMb: num(d.logMax),
-      health: d.healthKind && d.healthTarget.trim() ? { kind: d.healthKind as 'http', target: d.healthTarget.trim(), intervalSec: num(d.healthInterval), retries: num(d.healthRetries), restartWhenUnhealthy: d.healthRestart || undefined } : undefined,
+      health: d.healthKind && d.healthTarget.trim() ? { kind: d.healthKind as 'http', target: d.healthTarget.trim(), intervalSec: num(d.healthInterval), timeoutSec: num(d.healthTimeout), retries: num(d.healthRetries), restartWhenUnhealthy: d.healthRestart || undefined } : undefined,
     };
   }
   if (d.mode === 'template') return { mode: 'compose' };   // creating from a template goes through its own call (see ObjectEditor)
@@ -179,25 +179,41 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
           <Field label={t('obj.f.port')} hint={t('obj.f.port.hint')}>{text('port', { placeholder: '3000' })}</Field>
         </Card>
         <Card title={t('of.env')}><Field label={t('obj.f.env')} hint={t('obj.f.env.hint')}><textarea className="textarea mono" rows={5} value={d.env} onChange={(e) => set('env', e.target.value)} /></Field></Card>
-        <Card title={t('obj.sup.title')} hint={t('obj.sup.note')}>
+        <Card title={t('obj.sup.crash')} hint={t('obj.sup.note')}>
           <Field label={t('obj.sup.restart')} hint={t('obj.sup.restart.hint')}>
             <div className="row gap-s"><select className="select" value={d.restart} onChange={(e) => set('restart', e.target.value)}>
               <option value="no">{t('obj.sup.restart.no')}</option><option value="on-failure">{t('obj.sup.restart.fail')}</option><option value="always">{t('obj.sup.restart.always')}</option></select>
-              {d.restart !== 'no' && <input className="input res-mw130" value={d.maxRestarts} placeholder={t('obj.sup.max')} onChange={(e) => set('maxRestarts', e.target.value)} title={t('obj.sup.max.hint')} aria-label={t('obj.sup.max')} />}</div>
+              {(d.restart !== 'no' || d.healthRestart) && <input className="input res-mw130" value={d.maxRestarts} placeholder={t('obj.sup.max')} onChange={(e) => set('maxRestarts', e.target.value)} title={t('obj.sup.max.hint')} aria-label={t('obj.sup.max')} />}</div>
           </Field>
-          <Field label={t('obj.sup.health')} hint={t('obj.sup.health.hint')}>
+          <details className="fold of-fold">
+            <summary>{t('obj.sup.more')}<ChevronRight size={15} className="chev" aria-hidden /></summary>
+            <div className="of-grid2">
+              <Field label={t('obj.sup.stopTimeout')} hint={t('obj.sup.stopTimeout.hint')}>{text('stopTimeout', { placeholder: '8' })}</Field>
+              <Field label={t('obj.sup.logMax')} hint={t('obj.sup.logMax.hint')}>{text('logMax', { placeholder: '5' })}</Field>
+            </div>
+          </details>
+        </Card>
+        <Card title={t('obj.sup.health')} hint={t('obj.sup.health.hint')}>
+          <Field label={t('obj.sup.health.how')}>
             <div className="row gap-s"><select className="select res-mw170" value={d.healthKind} onChange={(e) => set('healthKind', e.target.value)}>
               <option value="">{t('obj.sup.health.none')}</option><option value="http">HTTP</option><option value="tcp">{t('obj.sup.health.tcp')}</option><option value="command">{t('obj.sup.health.command')}</option></select>
               {d.healthKind && <input className="input mono grow" value={d.healthTarget} onChange={(e) => set('healthTarget', e.target.value)} placeholder={d.healthKind === 'http' ? 'http://127.0.0.1:3000/health' : d.healthKind === 'tcp' ? '3000' : 'curl -fs localhost:3000'} aria-label={t('obj.sup.health')} />}</div>
-            {d.healthKind && (<div className="row gap-s wrap res-mt8">
-              <input className="input res-mw150" value={d.healthInterval} onChange={(e) => set('healthInterval', e.target.value)} placeholder={t('obj.sup.interval')} aria-label={t('obj.sup.interval')} />
-              <input className="input res-mw130" value={d.healthRetries} onChange={(e) => set('healthRetries', e.target.value)} placeholder={t('obj.sup.retries')} aria-label={t('obj.sup.retries')} />
-              <CheckRow checked={d.healthRestart} onChange={(v) => set('healthRestart', v)} label={t('obj.sup.healthRestart')} /></div>)}
           </Field>
-          <div className="of-grid2">
-            <Field label={t('obj.sup.stopTimeout')} hint={t('obj.sup.stopTimeout.hint')}>{text('stopTimeout', { placeholder: '8' })}</Field>
-            <Field label={t('obj.sup.logMax')} hint={t('obj.sup.logMax.hint')}>{text('logMax', { placeholder: '5' })}</Field>
-          </div>
+          {d.healthKind && (<>
+            <CheckRow checked={d.healthRestart} onChange={(v) => set('healthRestart', v)} label={t('obj.sup.healthRestart')} />
+            <p className="hint hint-block">{(() => {
+              const every = Number(d.healthInterval) || 15, fails = Number(d.healthRetries) || 3, max = Number(d.maxRestarts) || 5;
+              return t(d.healthRestart ? 'obj.sup.health.sumRestart' : 'obj.sup.health.sum', { a1: String(every), a2: String(fails), a3: String(every * fails), a4: String(max) });
+            })()}</p>
+            <details className="fold of-fold">
+              <summary>{t('obj.sup.timing')}<ChevronRight size={15} className="chev" aria-hidden /></summary>
+              <div className="of-grid3">
+                <Field label={t('obj.sup.interval')} hint={t('obj.sup.interval.hint')}>{text('healthInterval', { placeholder: '15' })}</Field>
+                <Field label={t('obj.sup.timeout')} hint={t('obj.sup.timeout.hint')}>{text('healthTimeout', { placeholder: '5' })}</Field>
+                <Field label={t('obj.sup.retries')} hint={t('obj.sup.retries.hint')}>{text('healthRetries', { placeholder: '3' })}</Field>
+              </div>
+            </details>
+          </>)}
         </Card>
       </>) : (<>
         <Card title={t('obj.f.mode')}>

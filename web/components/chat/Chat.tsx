@@ -295,7 +295,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
         onWheel={(e) => { if (e.deltaY < 0) release(); }} onTouchStart={touched} onTouchMove={touched} onPointerDown={touched} onPointerMove={(e) => { if (e.buttons) touched(); }}
         onKeyDown={(e) => { if (['PageUp', 'ArrowUp', 'Home'].includes(e.key) && !(e.target instanceof HTMLTextAreaElement)) release(); }}
         onScroll={(e) => { const el = e.currentTarget; const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 40; if (atEnd) { stick.current = true; setAway(false); } else if (el.scrollTop < lastTop.current - 1 && performance.now() - gesture.current < 700) release(); lastTop.current = el.scrollTop; }}>
-        <div className="thread-inner">
+        <div className={`thread-inner ${loaded ? 'in' : ''}`}>
           {isEmpty && (
             <div className="mt-l"><EmptyState icon={<Hex agent={agent} size="lg" />} title={t('chat.empty.title', { name: agent.name })} body={agent.role === 'orchestrator' ? t('chat.empty.orchestrator') : t('chat.empty.worker')} /></div>
           )}

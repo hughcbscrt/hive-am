@@ -101,6 +101,24 @@ export async function stopServer(id: string, cfg: ServerConfig): Promise<void> {
   if (isAlive(cur.saved.pid, cur.saved.stamp)) { note(id, 'did not stop in time: killing it'); killGroup(cur.saved.pid, 'SIGKILL'); for (let i = 0; i < 20 && isAlive(cur.saved.pid, cur.saved.stamp); i++) await sleep(100); }
 }
 
+/**
+ * Stop, then start again. With a port, the old listener must be gone before the new one starts: otherwise the check on the port would
+ * report "running" for the old process (a stop command that does not really stop the service) while the new one failed to bind.
+ */
+export async function restartServer(id: string, cfg: ServerConfig): Promise<void> {
+  await stopServer(id, cfg);
+  if (cfg.port) {
+    const grace = cfg.stopTimeoutSec ? cfg.stopTimeoutSec * 1000 : STOP_GRACE_MS;
+    let waited = 0;
+    while (await listening(cfg.port) && waited < grace) { await sleep(300); waited += 300; }
+    if (await listening(cfg.port)) {
+      note(id, `port ${cfg.port} is still in use after stopping: not starting it again. Check that the stop command really stops the service`);
+      throw new ObjectError(`Port ${cfg.port} is still in use after stopping, so it was not started again. Check that the stop command really stops the service.`);
+    }
+  }
+  await startServer(id, cfg);
+}
+
 /** Lines the object printed. `after` is a byte offset from an earlier call; without it the last `tail` lines come back. */
 export function serverLogs(id: string, o: { tail?: number; after?: number }): { text: string; cursor: string; reset?: boolean } {
   const { log } = files(id);

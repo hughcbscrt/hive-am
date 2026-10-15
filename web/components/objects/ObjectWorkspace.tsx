@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { Hammer, Info, Loader2, Play, PlugZap, RefreshCcw, RotateCw, Square } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
@@ -28,11 +28,12 @@ export function ObjectWorkspace({ id }: { id?: string }) {
   const { objects, ready, objects: all, error, retry } = useHive();
   const o = id ? objects.find((x) => x.id === id) : undefined;
   const [collapsed, setCollapsed] = useState(false);
-  useEffect(() => { try { setCollapsed(localStorage.getItem('hive-obj-switcher-collapsed') === '1'); } catch { /* none */ } }, []);
-  const toggle = () => setCollapsed((c) => { try { localStorage.setItem('hive-obj-switcher-collapsed', c ? '0' : '1'); } catch { /* none */ } return !c; });
+  useLayoutEffect(() => { try { setCollapsed(localStorage.getItem('hive-obj-switcher-collapsed') === '1'); } catch { /* none */ } }, []);
+  const [animate, setAnimate] = useState(false);
+  const toggle = () => { setAnimate(true); setCollapsed((c) => { try { localStorage.setItem('hive-obj-switcher-collapsed', c ? '0' : '1'); } catch { /* none */ } return !c; }); };
 
   return (
-    <div className={`ws ${collapsed ? 'sw-collapsed' : ''}`}>
+    <div className={`ws ${collapsed ? 'sw-collapsed' : ''} ${animate ? 'sw-anim' : ''}`}>
       <ObjectSwitcher activeId={id} collapsed={collapsed} onToggle={toggle} />
       {!ready && error ? (
         <section className="ws-chat"><div className="ow-pad"><Banner kind="err">
