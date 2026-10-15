@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-15
+
 ### Added
 
 - **Chat** item in the side rail, above Colony. It opens the last conversation you had open (or the first agent if that one no longer exists). With no agents yet, it shows an empty state with a button to create the first one.
@@ -184,7 +186,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/hughcbscrt/hive-am/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/hughcbscrt/hive-am/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/hughcbscrt/hive-am/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/hughcbscrt/hive-am/compare/v1.2.0...v1.2.1
