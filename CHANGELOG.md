@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Chat** item in the side rail, above Colony. It opens the last conversation you had open (or the first agent if that one no longer exists). With no agents yet, it shows an empty state with a button to create the first one.
+- **Resources strip** above each chat, folded by default. Closed, it is one line that counts the resources running, stopped or failing (failures in red). Open, it shows a card per resource with start or stop, restart and a link to its own screen. It shows the agent's resources and those of its colony, with a switch to see all of them; the choice and whether it is open are remembered.
+- The README now has screenshots of the colony, chat, resources, clusters, changes explorer and HTTP requests.
+
+### Changed
+
+- Servers: **Keeping it healthy** is split into **If it goes down** (restart policy and maximum restarts) and **Health check** (kind, target and restart when unhealthy). The check timing (every, wait, failures in a row) and the stop and log settings are folded, and the defaults are visible.
+- Servers: a restart waits for the port to be free before starting again, so a stop command that does not really stop the service is reported instead of leaving a failed start behind.
+- Servers: the first health check comes one interval after a start instead of right away.
+
+### Fixed
+
+- Entering a chat no longer flashes the default layout first: saved choices (the agent list collapsed, the resources strip open) apply before the first paint, the side panel only animates when you toggle it, and the conversation fades in when its history arrives.
+
 ## [1.3.0] - 2026-10-14
 
 ### Added
