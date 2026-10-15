@@ -1414,8 +1414,7 @@ a.card.stat:focus-visible, .table tbody tr.row-link:focus-visible { outline: 2px
 .compact-mark::before, .compact-mark::after { content: ''; flex: 1; border-top: 1px dashed var(--line); }
 .of-fold > .of-grid2, .of-fold > .of-grid3 { padding: 10px 12px 12px; border-top: 1px solid var(--line); background: var(--surface); }
 .cres { flex: none; border-bottom: 1px solid var(--line); }
-.cres-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 24px; border: 0; background: none; font: inherit; font-size: var(--fs-hint); color: var(--ink-2); cursor: pointer; text-align: left; } .cres-head:hover { background: var(--surface-2); }
-.cres-head .chev { margin-left: auto; color: var(--muted); transition: transform .15s; } .cres-head[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.cres-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 24px; border: 0; background: none; font: inherit; font-size: var(--fs-hint); color: var(--muted); cursor: pointer; text-align: left; } .cres-head:hover { background: var(--surface-2); }
 .cres-sum { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
 .cres-n { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-variant-numeric: tabular-nums; } .cres-n em { font-style: normal; font-weight: 500; color: var(--muted); }
 .cres-n.err { color: var(--err); } .cres-n.ok { color: var(--ok); }
@@ -1430,3 +1429,4 @@ a.card.stat:focus-visible, .table tbody tr.row-link:focus-visible { outline: 2px
 .cres-st { display: flex; align-items: center; gap: 6px; font-size: var(--fs-hint); color: var(--muted); min-width: 0; } .cres-st.ok { color: var(--ok); } .cres-st.err { color: var(--err); } .cres-st em { font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .cres-act { flex: none; display: flex; align-items: center; gap: 2px; opacity: .55; transition: opacity .15s; } .cres-card:hover .cres-act, .cres-card:focus-within .cres-act { opacity: 1; }
 .thread-inner { opacity: 0; } .thread-inner.in { opacity: 1; transition: opacity .18s ease; }
+.cres-head b { color: var(--ink); }

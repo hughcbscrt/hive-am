@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import { ChevronRight, ExternalLink, Loader2, Play, RotateCw, Server, Square } from 'lucide-react';
+import { ChevronDown, ExternalLink, Loader2, Play, RotateCw, Server, Square } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
@@ -47,7 +47,7 @@ export function ResourceStrip({ agent }: { agent: Agent }) {
         <span className="cres-sum">
           {ORDER.filter((s) => count(s) > 0).map((s) => <span key={s} className={`cres-n ${STATUS_TONE[s]}`}><StatusDot status={s} />{count(s)} <em>{t(`cres.n.${s}`)}</em></span>)}
         </span>
-        <ChevronRight size={15} className="chev" aria-hidden />
+        <ChevronDown size={15} className={`chev2 ${open ? 'open' : ''}`} aria-hidden />
       </button>
       {open && (
         <div className="cres-body">
