@@ -67,6 +67,13 @@ export function sessionToRead(a: Agent, requested: string | null): string | null
 }
 
 /** Only the agent's own conversations can be made current; delegated ones are read-only. */
+/** True when an OpenCode conversation started under a different permission than the agent has now: OpenCode keeps the tools a session started with. */
+export function permissionStale(a: Agent): boolean {
+  if (a.provider !== 'opencode' || !a.session_id) return false;
+  const row = agents.sessions(a.id).find((s) => s.session_id === a.session_id);
+  return !!row && row.permission !== null && row.permission !== a.effective.permission;
+}
+
 export function resumeSession(a: Agent, sessionId: unknown): void {
   if (!agents.sessions(a.id).some((s) => s.session_id === sessionId && s.kind !== 'delegation')) throw bad('Only the agent’s own conversations can be made current. Delegated sessions are read-only.');
   agents.setSession(a, sessionId as string); notifyAgentsChanged();
