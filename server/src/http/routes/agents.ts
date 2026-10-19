@@ -10,15 +10,15 @@ import { liveTurn, notifyAgentsChanged, queueDepth, sendTurn, stopAgent } from '
 import { sessionStats } from '../../stats.js';
 import { summaryOf } from '../../sessions-summary.js';
 import { emptyUsage } from '../../pricing.js';
-import { agentOrFail, createAgent, removeAgent, resumeSession, sessionToRead, updateAgent } from '../../services/agents.js';
+import { agentOrFail, createAgent, permissionStale, removeAgent, resumeSession, sessionToRead, updateAgent } from '../../services/agents.js';
 import { UPLOAD_LIMIT, body } from '../body.js';
 import { HttpError, bad, notFound } from '../errors.js';
 import { route } from '../router.js';
 import { qpath, text, validateAgentInput } from '../validate.js';
 
-route('GET', '/api/agents', () => agents.list().map((a) => ({ ...a, queued: queueDepth(a.id), live: !!liveTurn(a.id) })));
+route('GET', '/api/agents', () => agents.list().map((a) => ({ ...a, queued: queueDepth(a.id), live: !!liveTurn(a.id), permission_stale: permissionStale(a) })));
 route('POST', '/api/agents', async ({ req }) => createAgent(validateAgentInput(await body(req))));
-route('GET', '/api/agents/:id', ({ params }) => agentOrFail(params[0]));
+route('GET', '/api/agents/:id', ({ params }) => { const a = agentOrFail(params[0]); return { ...a, permission_stale: permissionStale(a) }; });
 route('PATCH', '/api/agents/:id', async ({ req, params }) => updateAgent(params[0], validateAgentInput(await body(req), true)));
 route('DELETE', '/api/agents/:id', ({ params }) => { removeAgent(params[0]); return { ok: true }; });
 route('POST', '/api/agents/:id/messages', async ({ req, params }) => {

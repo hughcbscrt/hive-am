@@ -179,9 +179,9 @@ Al hacer clic se despliega un panel con:
 
 La vista se mantiene anclada al final **mientras no te alejes**:
 
-- Un `ResizeObserver` sobre el contenido vuelve a anclar al final cuando algo crece (markdown, herramientas, tablas).
-- Todo lo que te sube **desancla**: la rueda, arrastrar con el dedo, desplazarte hacia arriba o las teclas RePág / Flecha arriba / Inicio. Volver a estar a menos de 40 px del final **reancla**; enviar un mensaje reancla.
-- Mientras está desanclado aparece sobre la conversación un botón **Ir al final**; salta al fondo y reancla.
+- Un `ResizeObserver` sobre el contenido **y sobre el propio hilo** mantiene el final a la vista mientras está anclado: cuando algo crece (markdown, herramientas, tablas) y cuando el hilo se encoge (un borrador más alto, cambiar el tamaño de la ventana, el panel de terminal).
+- Todo lo que te sube **desancla**, por poco que sea: la rueda, arrastrar con el dedo, desplazarte hacia arriba o las teclas RePág / Flecha arriba / Inicio. Solo cuenta si hay algo que desplazar. Estar a 2 px o menos del final **reancla**; enviar un mensaje reancla. La antigua tolerancia de 40 px ya no existe: el ajuste de la maquetación que sigue al final de un turno se distingue de un scroll de la persona por la ausencia de un gesto reciente (700 ms), no por la distancia.
+- Mientras está desanclado **y** con al menos 8 px de contenido fuera de vista aparece sobre la conversación un botón **Ir al final**; salta al fondo y reancla. Una conversación sin nada que desplazar nunca lo muestra.
 - La conversación es una región `role="log"` con etiqueta: los mensajes nuevos se anuncian con cortesía a los lectores de pantalla (no palabra por palabra mientras un turno se transmite).
 - No se usa `scroll-behavior: smooth` (provocaba que no llegara al final).
 

@@ -690,6 +690,9 @@ export const en = {
   "agent.newConvBody": "The agent starts with a fresh session. The current one stays in its Sessions tab and can be resumed anytime.",
   "agent.newConvStarted": "New conversation started",
   "agent.newConvStart": "Start new conversation",
+  "agent.permStale.title": "The permission changed after this conversation started.",
+  "agent.permStale.body": "OpenCode keeps the tools a conversation started with, so the new permission ({a1}) does not apply here yet. Start a new conversation to apply it. The current one stays in the Sessions tab.",
+  "agent.permStale.action": "Apply now",
 
   // ---- sessions ----
   "sessions.current": "Current",

@@ -94,6 +94,8 @@ function LiveMeta({ turn }: { turn: LiveTurn }) {
     </div>
   );
 }
+const ANCHOR_PX = 2;   // the view counts as at the bottom within this distance
+const JUMP_PX = 8;     // the "latest" button needs at least this much content out of view (about a line)
 const PAGE = 60; // messages loaded at first, and the step of "Show earlier" is twice this
 const pretty = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v, null, 2));
 
@@ -227,8 +229,13 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
   const gesture = useRef(0);
   const touched = useCallback(() => { gesture.current = performance.now(); }, []);
   const [away, setAway] = useState(false); // scrolled up from the newest content: shows the "latest" button
-  const release = useCallback(() => { stick.current = false; setAway(true); }, []);
+  // One measurement decides everything: how far the view is from the end. The button needs the view released by the person and something really out of view.
+  const distance = useCallback(() => { const el = threadRef.current; return el ? el.scrollHeight - el.scrollTop - el.clientHeight : 0; }, []);
+  const sync = useCallback(() => setAway(!stick.current && distance() >= JUMP_PX), [distance]);
+  const release = useCallback(() => { stick.current = false; sync(); }, [sync]);
   const toBottom = useCallback(() => { const el = threadRef.current; stick.current = true; setAway(false); if (el) el.scrollTop = el.scrollHeight; }, []);
+  // Going up only releases the view when there is something to scroll: on a short conversation the reply that grows must still be followed.
+  const scrollable = useCallback(() => { const el = threadRef.current; return !!el && el.scrollHeight > el.clientHeight; }, []);
   const turn = useLive(agent.id);
   const running = agent.status === 'running' || (!!turn && !turn.error);
   const readOnly = sessionOverride !== undefined && sessionOverride !== agent.session_id;
@@ -263,10 +270,11 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
   // including when markdown/tool blocks grow after the first paint.
   useEffect(() => {
     const el = threadRef.current; const inner = el?.firstElementChild; if (!el || !inner) return;
-    const pin = () => { if (stick.current) el.scrollTop = el.scrollHeight; };
-    const ro = new ResizeObserver(pin); ro.observe(inner); pin();
+    // The thread's own size matters too (a taller draft, a window resize, the terminal panel): while anchored the bottom stays in view.
+    const pin = () => { if (stick.current) el.scrollTop = el.scrollHeight; sync(); };
+    const ro = new ResizeObserver(pin); ro.observe(inner); ro.observe(el); pin();
     return () => ro.disconnect();
-  }, [loaded, agent.id]);
+  }, [loaded, agent.id, sync]);
 
   const send = useCallback(async (prompt: string, files: { name: string; data: string; type: string }[] = []) => {
     if (readOnly) return false;
@@ -292,9 +300,13 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
       <div className="thread-wrap">
       {/* A log, announced politely only between turns: while a reply streams it is aria-live off (a token-by-token read-out is unusable); the status line below says when it starts and ends. */}
       <div className="thread" ref={threadRef} role="log" aria-label={t('fa.chat.log', { name: agent.name })} aria-live={turn ? 'off' : 'polite'} aria-relevant="additions" tabIndex={-1}
-        onWheel={(e) => { if (e.deltaY < 0) release(); }} onTouchStart={touched} onTouchMove={touched} onPointerDown={touched} onPointerMove={(e) => { if (e.buttons) touched(); }}
-        onKeyDown={(e) => { if (['PageUp', 'ArrowUp', 'Home'].includes(e.key) && !(e.target instanceof HTMLTextAreaElement)) release(); }}
-        onScroll={(e) => { const el = e.currentTarget; const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 40; if (atEnd) { stick.current = true; setAway(false); } else if (el.scrollTop < lastTop.current - 1 && performance.now() - gesture.current < 700) release(); lastTop.current = el.scrollTop; }}>
+        onWheel={(e) => { if (e.deltaY < 0 && scrollable()) release(); }} onTouchStart={touched} onTouchMove={touched} onPointerDown={touched} onPointerMove={(e) => { if (e.buttons) touched(); }}
+        onKeyDown={(e) => { if (['PageUp', 'ArrowUp', 'Home'].includes(e.key) && !(e.target instanceof HTMLTextAreaElement) && scrollable()) release(); }}
+        onScroll={(e) => { const el = e.currentTarget;
+          // Anchored only at the very bottom; a person's move up (a recent gesture) releases at any size. The gesture window, not the distance, tells a layout clamp from a scroll.
+          if (distance() <= ANCHOR_PX) stick.current = true;
+          else if (el.scrollTop < lastTop.current - 1 && performance.now() - gesture.current < 700) stick.current = false;
+          sync(); lastTop.current = el.scrollTop; }}>
         <div className={`thread-inner ${loaded ? 'in' : ''}`}>
           {isEmpty && (
             <div className="mt-l"><EmptyState icon={<Hex agent={agent} size="lg" />} title={t('chat.empty.title', { name: agent.name })} body={agent.role === 'orchestrator' ? t('chat.empty.orchestrator') : t('chat.empty.worker')} /></div>

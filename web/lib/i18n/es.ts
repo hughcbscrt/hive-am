@@ -688,6 +688,9 @@ export const es: Record<DictKey, string> = {
   "agent.newConvBody": "El agente empieza con una sesión nueva. La actual queda en su pestaña Sesiones y se puede reanudar en cualquier momento.",
   "agent.newConvStarted": "Nueva conversación iniciada",
   "agent.newConvStart": "Empezar nueva conversación",
+  "agent.permStale.title": "El permiso cambió después de que empezó esta conversación.",
+  "agent.permStale.body": "OpenCode conserva las herramientas con las que empezó una conversación, así que el permiso nuevo ({a1}) todavía no aplica aquí. Inicia una conversación nueva para aplicarlo. La actual queda en la pestaña Sesiones.",
+  "agent.permStale.action": "Aplicar ahora",
 
   // ---- sessions ----
   "sessions.current": "Actual",
