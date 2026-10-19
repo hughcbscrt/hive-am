@@ -7,7 +7,7 @@ This guide collects the most common problems when using hive-am, with their like
 The server is not running or is on another port. The interface retries on its own.
 
 1. Look at the terminal where you started hive-am: is it still open and free of errors?
-2. If you closed it, start it again (`npx hive-am` or `hive-am`).
+2. If you closed it, start it again (`npx hive-am` or `hive-am`). If you started it with `hive-am start --background`, `hive-am status` tells you whether it is running and `hive-am logs` shows its last output; `hive-am stop` before backing up or resetting the data folder.
 3. If you changed the API port with `HIVE_AM_PORT`, the interface has to point to the same port. With the npm package the API port is fixed (4400).
 
 When the server comes back, the indicator changes to **Connected to server**.

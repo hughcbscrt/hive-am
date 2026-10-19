@@ -17,7 +17,7 @@ Abre `http://localhost:4401`.
 
 ### Desde npm
 
-Sin clonar el repositorio: `npx hive-am` (o `npm install -g hive-am` y luego `hive-am`). Arranca el servidor de la API (puerto 4400) y la interfaz (puerto 4401, se cambia con `HIVE_AM_WEB_PORT`) desde el paquete publicado. El puerto de la API es fijo en el paquete. Ver [Publicar una versión](#publicar-una-versión).
+Sin clonar el repositorio: `npx hive-am` (o `npm install -g hive-am` y luego `hive-am`); también corre en segundo plano con `hive-am start --background` (ver [El launcher](#el-launcher-hive-am)). Arranca el servidor de la API (puerto 4400) y la interfaz (puerto 4401, se cambia con `HIVE_AM_WEB_PORT`) desde el paquete publicado. El puerto de la API es fijo en el paquete. Ver [Publicar una versión](#publicar-una-versión).
 
 ### Scripts
 
@@ -166,3 +166,19 @@ make npm-publish                    # construye y publica (NPM_TAG=next para una
 `make npm-build` arma el paquete en `dist/npm` (ignorado por git): el servidor compilado a JavaScript (`server/dist`), el script MCP, la interfaz web ya construida (`web/.next`), el lanzador `hive-am` (`bin/hive-am.mjs`) y un `package.json` con solo las dependencias de ejecución. `make npm-publish` antes comprueba que hayas iniciado sesión en npm, que esa versión no esté ya publicada y que `HEAD` sea el tag `vX.Y.Z` con el árbol limpio (`FORCE=1` omite lo último).
 
 Ya publicado, `npx hive-am` (o `npm install -g hive-am` y `hive-am`) arranca el servidor y la interfaz. **Limitación de la versión empaquetada:** la API usa siempre el puerto 4400 (la interfaz está construida para hablar con él); solo se puede cambiar el de la interfaz, con `HIVE_AM_WEB_PORT`.
+
+### El launcher (`hive-am`)
+
+`bin/hive-am.mjs` es el punto de entrada del paquete. `hive-am` a secas (o `hive-am start`) corre la aplicación en la terminal, como siempre. Además recuerda la ejecución y ofrece:
+
+| Comando | Qué hace | Salida |
+|---|---|---|
+| `hive-am start --background` | Se lanza a sí mismo de nuevo, desacoplado y en su propio grupo de procesos, con la salida de los dos procesos en `run/hive-am.log`, y vuelve cuando la ejecución ya quedó registrada. Cerrar la terminal no lo detiene. | 0, o 1 si no arrancó |
+| `hive-am status` | `running (pid, desde, modo)` con si los puertos web y API responden; `not running`; o un registro obsoleto. | 0 corriendo, 1 no |
+| `hive-am logs [-f] [-n 200]` | Las últimas líneas del log, o lo mismo siguiéndolo. Una ejecución en primer plano no tiene archivo de log y lo dice. | 0 |
+| `hive-am stop` | Señala al launcher, que detiene el servidor y la web y los espera (el servidor cierra su base de datos al salir); a los 15 s fuerza el grupo. | 0 detenido, 1 nada que detener |
+| `hive-am restart` | `stop` y luego `start` en el mismo modo (en segundo plano si no había nada registrado). | 0 |
+
+Lo que guarda está en `<HIVE_AM_HOME>/run/`: `hive-am.json` (pid, hora de inicio del proceso, modo, puertos y ruta del log; lo escriben ambos modos y se borra cuando la aplicación se detiene) y `hive-am.log`, que pasa a `hive-am.log.1` al superar 10 MB cuando el launcher arranca y cada minuto mientras corre en segundo plano (unas pocas líneas escritas durante la rotación pueden perderse). El pid nunca se cree solo: cada comando revisa la hora de inicio, un registro cuyo proceso ya no existe o ahora es de otro se informa como obsoleto y nunca se le envía una señal, y un segundo `start` se niega y nombra al que está corriendo (también se niega si otra cosa ocupa un puerto). El launcher no importa nada del servidor, así que funciona con la aplicación caída y la carpeta de datos sin crear. Las terminales siguen terminando con la aplicación; los recursos y contenedores siguen sobreviviéndola.
+
+Variables solo para pruebas, que lee el launcher: `HIVE_AM_LAUNCHER_CHILDREN` (reemplaza los dos procesos por `[[comando, ...args], [comando, ...args]]`) y `HIVE_AM_LAUNCHER_API_PORT` (el puerto de la API que revisa e imprime; la interfaz empaquetada siempre usa 4400).

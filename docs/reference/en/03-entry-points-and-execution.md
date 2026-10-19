@@ -17,7 +17,7 @@ Open `http://localhost:4401`.
 
 ### From npm
 
-Without cloning the repository: `npx hive-am` (or `npm install -g hive-am` and then `hive-am`). It starts the API server (port 4400) and the UI (port 4401, change it with `HIVE_AM_WEB_PORT`) from the published package. The API port is fixed in the packaged build. See [Releasing and publishing](#releasing-and-publishing).
+Without cloning the repository: `npx hive-am` (or `npm install -g hive-am` and then `hive-am`). It starts the API server (port 4400) and the UI (port 4401, change it with `HIVE_AM_WEB_PORT`) from the published package. The API port is fixed in the packaged build. The launcher also runs it in the background and manages it: `hive-am start --background`, `status`, `logs [-f] [-n N]`, `stop` and `restart` (see [The launcher](#the-launcher-hive-am)). See [Releasing and publishing](#releasing-and-publishing).
 
 ### Scripts
 
@@ -166,3 +166,19 @@ make npm-publish                    # builds and publishes (NPM_TAG=next for a p
 `make npm-build` assembles the package in `dist/npm` (git-ignored): the server compiled to JavaScript (`server/dist`), the MCP script, the built web UI (`web/.next`), the `hive-am` launcher (`bin/hive-am.mjs`) and a `package.json` with only the runtime dependencies. `make npm-publish` first checks that you are logged in to npm, that this version is not already published and that `HEAD` is the release tag `vX.Y.Z` with a clean tree (`FORCE=1` skips the last check).
 
 Once published, `npx hive-am` (or `npm install -g hive-am` and `hive-am`) starts the server and the UI. **Limitation of the packaged build:** the API always uses port 4400 (the UI is built to talk to it); only the UI port can change, with `HIVE_AM_WEB_PORT`.
+
+### The launcher (`hive-am`)
+
+`bin/hive-am.mjs` is the package's entry point. Plain `hive-am` (or `hive-am start`) runs the app in the terminal, as always. It also remembers the run and offers:
+
+| Command | What it does | Exit |
+|---|---|---|
+| `hive-am start --background` | Starts the launcher again, detached and in its own process group, with the output of both processes in `run/hive-am.log`, and returns once the run is recorded. Closing the terminal does not stop it. | 0, or 1 when it did not start |
+| `hive-am status` | `running (pid, since, mode)` with whether the web and API ports answer; `not running`; or a stale record. | 0 running, 1 not |
+| `hive-am logs [-f] [-n 200]` | The last lines of the log, or the same following it. A foreground run has no log file and says so. | 0 |
+| `hive-am stop` | Signals the launcher, which stops the server and the web UI and waits for them (the server closes its database on the way out); after 15 s it forces the group. | 0 stopped, 1 nothing to stop |
+| `hive-am restart` | `stop` then `start` in the same mode (in the background when nothing was recorded). | 0 |
+
+What it keeps is in `<HIVE_AM_HOME>/run/`: `hive-am.json` (pid, the process start time, the mode, the ports and the log path; written by both modes and removed when the app stops) and `hive-am.log`, rotated to `hive-am.log.1` over 10 MB when the launcher starts and every minute while it runs in the background (a few lines written during the rotation can be lost). The pid is never trusted alone: every command checks the start time, a record whose process is gone or now belongs to another one is reported as stale and never signalled, and a second `start` refuses and names the one that is running (it also refuses when something else holds a port). The launcher imports nothing from the server, so it works with the app down and the data folder missing. Terminals still end with the app; resources and containers still outlive it.
+
+Test-only knobs, read by the launcher: `HIVE_AM_LAUNCHER_CHILDREN` (replaces the two processes with `[[command, ...args], [command, ...args]]`) and `HIVE_AM_LAUNCHER_API_PORT` (the API port it checks and prints; the packaged UI always uses 4400).
