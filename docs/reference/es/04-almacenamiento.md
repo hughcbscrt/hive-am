@@ -52,17 +52,28 @@ erDiagram
 
 Al instalar, `skills.seedDefaults` (`server/src/skills/defaults.ts`) añade **una vez** las skills que vienen con hive-am, anotando cada una en `seeded_skills (slug)`. A partir de ahí son skills normales: se editan o se borran, y una skill borrada **no vuelve** a crearse en el siguiente arranque. Si ya existía una con ese nombre, la nueva se añade como «Nombre (hive-am)». Una versión futura de hive-am que traiga más skills las añade una sola vez, y nunca modifica las que ya tienes. Su id es `default-<slug>`. Las que vienen con hive-am se crean `on_demand`, salvo Notebook (`always`).
 
-### Tabla `agent_notebooks`
+### Tablas `notebooks` y `notebook_readers`
 
-Cuaderno de cada agente (ver [7.3.2](07-agentes-tipos-skills-colonias.md#732-el-cuaderno-del-agente)). Va en tabla aparte para que no viaje con el listado de agentes.
+Un cuaderno (ver [7.3.2](07-agentes-tipos-skills-colonias.md#732-el-cuaderno-del-agente)) es un objeto propio con **lectores**: un agente y los clones hechos a partir de él leen y escriben el mismo. Van en tablas aparte para que no viajen con el listado de agentes. La migración 6 movió aquí la antigua tabla `agent_notebooks` sin perder ninguna fila (se conservan el texto, la versión y quién escribió al final, y cada agente que tenía cuaderno conserva uno propio).
+
+`notebooks`:
 
 | Columna | Tipo | Notas |
 |---|---|---|
-| `agent_id` | TEXT PK | `ON DELETE CASCADE` |
+| `id` | TEXT PK | |
 | `content` | TEXT | Markdown (máx. 8000 caracteres) |
 | `version` | INTEGER | Sube con cada cambio |
-| `seen` | INTEGER | Última versión que la conversación viva del agente ya contiene |
 | `updated_at`, `updated_by` | INTEGER, TEXT | `agent` o `user` |
+
+`notebook_readers` (una fila por agente que tiene cuaderno):
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `agent_id` | TEXT PK | `ON DELETE CASCADE`: eliminar un agente quita solo su fila de lector |
+| `notebook_id` | TEXT | El cuaderno que lee (`ON DELETE CASCADE`) |
+| `seen` | INTEGER | Última versión que la conversación viva de **este lector** ya contiene (cada agente tiene la suya) |
+
+El trigger `notebook_orphan` borra un cuaderno cuando se va su último lector, sea como sea (eliminar al agente, o pasar a otro cuaderno), así que no quedan filas huérfanas; eliminar a un lector mantiene el cuaderno, con su texto y el `seen` de los demás.
 
 ### Tabla `agent_types`
 
@@ -96,6 +107,7 @@ Tabla puente `type_skills (type_id, skill_id, load)`, ambas con `ON DELETE CASCA
 | `status` | `idle` \| `running` \| `error` |
 | `colony_id` | FK a `colonies`, `ON DELETE SET NULL` (migración) |
 | `overrides` | JSON: campos donde el agente ignora a su colonia, p. ej. `["cwd","skills"]` (migración) |
+| `cloned_from` | FK a `agents`, `ON DELETE SET NULL` (migración 7): el agente del que se clonó este, `NULL` para cualquier otro agente y cuando se elimina el origen |
 | `created_at`, `updated_at` | |
 
 Tablas puente:

@@ -206,6 +206,51 @@ CREATE TABLE IF NOT EXISTS object_agents (
       db.exec('CREATE INDEX IF NOT EXISTS idx_dispatches_created ON dispatches (created_at, id)');
     },
   },
+  {
+    version: 6, name: 'shared-notebook',
+    up(db) {
+      // A notebook stops belonging to one agent: it is its own row, with readers (an agent and its clones read and write the same one).
+      // `seen` moves to the reader, because each agent has its own live conversation and must be sent the text again on its own.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS notebooks (
+          id TEXT PRIMARY KEY, content TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 0,
+          updated_at INTEGER NOT NULL DEFAULT 0, updated_by TEXT NOT NULL DEFAULT ''
+        );
+        CREATE TABLE IF NOT EXISTS notebook_readers (
+          agent_id TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
+          notebook_id TEXT NOT NULL REFERENCES notebooks(id) ON DELETE CASCADE,
+          seen INTEGER NOT NULL DEFAULT 0
+        );
+        -- A notebook with no reader left goes with its last reader, however that reader goes (deleting the agent, or moving to another notebook).
+        CREATE TRIGGER IF NOT EXISTS notebook_orphan AFTER DELETE ON notebook_readers
+        BEGIN
+          DELETE FROM notebooks WHERE id = OLD.notebook_id AND NOT EXISTS (SELECT 1 FROM notebook_readers WHERE notebook_id = OLD.notebook_id);
+        END;
+      `);
+      // Every notebook of the old table becomes its own notebook with its agent as the only reader, keeping text, version, who wrote last and `seen`.
+      const old = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_notebooks'").get();
+      if (old) {
+        const rows = db.prepare('SELECT agent_id, content, version, seen, updated_at, updated_by FROM agent_notebooks').all() as { agent_id: string; content: string; version: number; seen: number; updated_at: number; updated_by: string }[];
+        const has = db.prepare('SELECT 1 FROM notebook_readers WHERE agent_id=?');
+        const insNb = db.prepare('INSERT INTO notebooks (id, content, version, updated_at, updated_by) VALUES (?,?,?,?,?)');
+        const insReader = db.prepare('INSERT INTO notebook_readers (agent_id, notebook_id, seen) VALUES (?,?,?)');
+        for (const r of rows) {
+          if (has.get(r.agent_id)) continue;                    // already moved (the migration ran before)
+          const id = `nb-${r.agent_id}`;
+          insNb.run(id, r.content, r.version, r.updated_at, r.updated_by);
+          insReader.run(r.agent_id, id, r.seen);
+        }
+        db.exec('DROP TABLE agent_notebooks');
+      }
+    },
+  },
+  {
+    version: 7, name: 'agent-cloned-from',
+    up(db) {
+      // The agent a clone was made from, so the interface can say it (the shared notebook says it only until the clone separates). NULL for any other agent, and when the source is deleted.
+      addColumn(db, 'agents', 'cloned_from TEXT REFERENCES agents(id) ON DELETE SET NULL');
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

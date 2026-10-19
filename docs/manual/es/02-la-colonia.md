@@ -54,8 +54,21 @@ La tarjeta muestra:
 - Nombre, rol (**Worker** u **Orquestador**) y estado (**Inactivo**, **Trabajando**, **Requiere atención**).
 - Descripción, **Proveedor** y modelo, **Permisos**, **Carpeta** (con "de la colonia" si la hereda), **Dirigido por** (en workers) o su equipo (en orquestadores), **Sesión** y cuándo se **Actualizó**.
 - Un selector **Colonia** para mover al agente a otra colonia (o dejarlo sin colonia).
-- El botón **Abrir chat** y, a la derecha, el icono de papelera para eliminar al agente.
+- El botón **Abrir chat** y, a la derecha, el icono para **clonar** al agente y el de papelera para eliminarlo.
 - Arriba, el icono de ajustes que abre la edición del agente sin salir del mapa.
+
+### Clonar un agente
+
+Pulsa el icono de clonar en la tarjeta de un agente (o **Clonar** en el pie de sus ajustes). Un diálogo pide el **nombre** del clon (se sugiere `Maggie 2`) y su **colonia** (la misma por defecto), y dice qué es el clon:
+
+- Es un **agente aparte**, así que su conversación y la del original pueden ocurrir **al mismo tiempo**. Un agente responde un mensaje a la vez, así que un clon es la forma de tener dos conversaciones en paralelo sin configurar todo otra vez.
+- Conserva la **misma configuración**: prompt, skills, permisos, modelo y carpeta. Dos agentes en la misma carpeta pueden editar los mismos archivos.
+- **Comparte el cuaderno** del original: las notas son las mismas para los dos, y lo que escribe uno lo lee el otro. En el cuaderno, cada nota dice qué agente la escribió.
+- **No trae** las conexiones (bots de Telegram o Slack), programaciones, avisos ni la administración de recursos del original. Si el clon debe responder por el mismo bot o cuidar los mismos servidores, eso se configura aparte.
+
+**Siempre se distingue un clon de su original.** En el mapa, el hexágono de un clon lleva una etiqueta violeta con el nombre del agente del que se clonó (por ejemplo *Maggie*). El listado de Agentes, la cabecera del chat y la lista junto al chat muestran la misma marca (en la lista y la cabecera es un enlace al original), igual que la pantalla de Relaciones; el original muestra cuántos clones tiene (*2 clones*, con sus nombres al pasar el mouse). La marca se conserva después de **Separar**. Si se elimina al original, sus clones simplemente dejan de tener uno.
+
+Eliminar a cualquiera de los dos mantiene el cuaderno para el otro. Si quieres que el clon deje de compartir, abre su pestaña **Cuaderno** y pulsa **Separar**: se queda con su propia copia de las notas y dejan de leerse entre sí.
 
 ### Tarjeta de un recurso
 

@@ -298,7 +298,10 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .drawer header { padding: 20px 24px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: flex-start; gap: 12px; }
 .drawer header h2 { font-size: 22px; }
 .drawer .body { padding: 22px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; flex: 1; }
-.drawer footer { padding: 14px 24px; border-top: 1px solid var(--line); display: flex; gap: 10px; justify-content: flex-end; }
+.drawer footer { padding: 14px 24px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; }
+.drawer footer .btn { white-space: nowrap; flex: none; }
+.foot-actions { display: flex; align-items: center; gap: 10px; flex: none; }      /* the buttons move together to the next row when they do not fit beside the note */
+.drawer footer > span.grow { min-width: max-content; }      /* the note never gets squeezed into a column: when the buttons do not fit beside it, they go to the next row */
 @keyframes slide { from { transform: translateX(30px); opacity: 0; } }
 @keyframes fade { from { opacity: 0; } }
 .modal { position: fixed; z-index: calc(var(--z-dialog) + var(--layer, 0) * 2 + 1); left: 50%; top: 14vh; transform: translateX(-50%); width: min(480px, 92vw); background: var(--surface); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 30px 80px -20px rgba(0,0,0,.5); max-height: calc(100vh - 14vh - 16px); overflow-y: auto; }
@@ -327,6 +330,8 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .rnode { width: 150px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
 .rnode .hex { --s: 66px; }
 .rnode b { font-family: var(--font-display); font-size: var(--fs-body); background: var(--surface); padding: 2px 10px; border-radius: 99px; border: 1px solid var(--line); }
+.rnode-clone:empty { display: none; }
+.rnode-clone { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
 .rnode small { color: var(--muted); font-size: var(--fs-micro); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
 .rnode .react-flow__handle { width: 12px; height: 12px; background: var(--honey); border: 2px solid var(--surface); }
 .react-flow__controls button { background: var(--surface); color: var(--ink); border-color: var(--line); fill: var(--ink); }
@@ -461,6 +466,7 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .sw-item[aria-current='page'] .sw-av .pip { border-color: var(--surface); }
 .sw-body { min-width: 0; display: flex; flex-direction: column; gap: 1px; flex: 1; }
 .sw-top { display: flex; align-items: center; gap: 6px; } .sw-top b { font-family: var(--font-display); font-size: var(--fs-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sw-top em.clone { display: inline-flex; align-items: center; gap: 3px; min-width: 0; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; letter-spacing: 0; color: #5b4bc4; background: color-mix(in srgb, #6a5acd 12%, var(--surface)); }
 .sw-top em { font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: color-mix(in srgb, var(--honey) 40%, var(--ink)); background: var(--honey-soft); padding: 1px 6px; border-radius: 99px; flex: none; }
 .sw-sub { font-size: var(--fs-hint); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sw-sub.empty { color: var(--muted); font-style: italic; }
 .sw-sub.live { color: color-mix(in srgb, var(--honey) 55%, var(--ink)); font-weight: 600; }
@@ -1276,7 +1282,10 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .sg-empty { padding: 8px 10px; font-size: var(--fs-hint); color: var(--muted); list-style: none; }
 .ps-inline .sg-list { position: static; margin-top: 6px; box-shadow: none; max-height: 160px; }
 
-.ltag.top { top: 7%; bottom: auto; } .ltag.mgr { background: #1f8f8f; color: #fff; }
+.ltag.top { top: 7%; bottom: auto; } .ltag.mgr { background: #1f8f8f; color: #fff; } .ltag.clone { background: #6a5acd; color: #fff; }
+.chip.clone { gap: 4px; color: #5b4bc4; background: color-mix(in srgb, #6a5acd 12%, var(--surface)); border-color: color-mix(in srgb, #6a5acd 35%, transparent); max-width: 160px; overflow: hidden; text-overflow: ellipsis; text-decoration: none; }
+.chip.clone svg { flex: none; }
+a.chip.clone:hover { background: color-mix(in srgb, #6a5acd 22%, var(--surface)); }
 
 /* Zoom and the things that can be dragged on the colony map. */
 .comb-zoom { position: absolute; right: 12px; top: 12px; z-index: var(--z-6); display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line); backdrop-filter: blur(4px); }
@@ -1314,6 +1323,7 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .cluster { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .stack-s { display: flex; flex-direction: column; gap: 6px; min-width: 0; } .stack-l { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .gap-xs { gap: 4px; } .gap-m { gap: 12px; }
+.clone-facts { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
 .push-r { margin-left: auto; } .nowrap { white-space: nowrap; } .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .m0 { margin: 0; } .mt-s { margin-top: 6px; } .mt-m { margin-top: 12px; } .mt-l { margin-top: 20px; }
 

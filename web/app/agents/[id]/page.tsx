@@ -20,6 +20,7 @@ import { GitExplorer } from '@/components/git/GitExplorer';
 import { useGit } from '@/lib/git/useGit';
 import { AgentForm } from '@/components/agents/AgentForm';
 import { NotebookPanel } from '@/components/agents/NotebookPanel';
+import { CloneChip, ClonesChip } from '@/components/agents/CloneTag';
 import { Banner, ConfirmDialog, Drawer, EmptyState, Hex, ProviderBadge, RoleChip, StatusChip, TabPanel, Tabs, WorkspaceHeader, useToast, type HeaderAction } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
 
@@ -59,7 +60,7 @@ function Workspace({ id }: { id: string }) {
   const changedCount = git.status && git.status.isRepo ? git.status.changes.length : 0;
 
   const setOpen = (v: boolean, tb?: CfgTab) => { const next = tb ?? tab; setLastTab(next); setQtab(v ? next : ''); };
-  const settings = useAgentSettings(agent, { onDeleted: () => router.push('/agents') });
+  const settings = useAgentSettings(agent, { onDeleted: () => router.push('/agents'), onCloned: (c) => router.push(`/agents/${c.id}`) });
   const { draft, setDraft, errors, dirty } = settings;
   // Closing with edits (X, Escape, scrim, Hide) asks first.
   const closeCfg = () => { if (dirty) setAskClose(true); else setOpen(false); };
@@ -97,7 +98,7 @@ function Workspace({ id }: { id: string }) {
           back={{ href: '/', label: t('agent.backToColony') }}
           avatar={<Hex agent={agent} />}
           title={agent.name}
-          meta={<><RoleChip role={agent.role} /><ProviderBadge provider={agent.provider} /><span className="small">{agent.model || t('model.cliDefault')}</span><StatusChip status={agent.status} /></>}
+          meta={<><RoleChip role={agent.role} /><ProviderBadge provider={agent.provider} /><span className="small">{agent.model || t('model.cliDefault')}</span><StatusChip status={agent.status} /><CloneChip agent={agent} link /><ClonesChip agent={agent} /></>}
           actions={actions}
           primary={<>
             <div className="seg" role="group" aria-label={t('git.tab.label')}>
@@ -171,6 +172,7 @@ function Workspace({ id }: { id: string }) {
       )}
 
       {settings.deleteModal}
+      {settings.cloneModal}
       {askClose && <ConfirmDialog danger title={t('fa.unsaved.title')} body={t('fa.unsaved.body')} confirmLabel={t('fa.unsaved.discard')} cancelLabel={t('fa.unsaved.keep')} onClose={() => setAskClose(false)} onConfirm={() => { settings.discard(); setOpen(false); }} />}
       {confirm === 'new' && (
         <ConfirmDialog title={t('agent.newConvTitle')} body={t('agent.newConvBody')} confirmLabel={t('agent.newConvStart')} onClose={() => setConfirm(null)}

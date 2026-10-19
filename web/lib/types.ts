@@ -15,6 +15,8 @@ export interface Agent {
   effective: { cwd: string; permission: Permission; system_prompt: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; inherited: InheritField[] };
   session_id: string | null; status: 'idle' | 'running' | 'error';
   skill_ids: string[]; skill_loads: Record<string, SkillLoad>; worker_ids: string[]; created_at: number; updated_at: number;
+  /** The agent this one was cloned from (null for any other agent, and when that agent was deleted). */
+  cloned_from: string | null;
   queued?: number; live?: boolean;
   /** OpenCode keeps the tools a conversation started with: true when the permission changed after it began. */
   permission_stale?: boolean;
@@ -25,7 +27,7 @@ export interface AgentType {
 }
 export type SkillLoad = 'always' | 'on_demand';
 export interface Skill { id: string; name: string; description: string; content: string; load: SkillLoad; created_at: number; updated_at: number }
-export interface NotebookInfo { content: string; version: number; size: number; max: number; updated_at: number; updated_by: string; enabled: boolean; /** The skill that switches the notebook on for an agent. */ skill_id: string }
+export interface NotebookInfo { content: string; version: number; size: number; max: number; updated_at: number; updated_by: string; enabled: boolean; /** The skill that switches the notebook on for an agent. */ skill_id: string; /** The other agents that read and write the same notebook (a clone and its source). */ shared_with: { id: string; name: string }[] }
 export interface ProviderInfo { id: Provider; label: string; installed: boolean; version: string }
 export type ChannelKind = 'telegram' | 'slack';
 export interface ConnectionStatus { state: 'connecting' | 'connected' | 'error' | 'stopped'; detail?: string; lastEventAt?: number }

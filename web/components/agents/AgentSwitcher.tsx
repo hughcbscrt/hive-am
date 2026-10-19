@@ -10,6 +10,7 @@ import { useAgentCard } from './AgentCard';
 import type { Agent } from '@/lib/types';
 import { Hex } from '@/components/ui';
 import { NewAgentDrawer } from './NewAgentDrawer';
+import { Copy } from 'lucide-react';
 
 export function AgentSwitcher({ activeId, collapsed = false, onToggle }: { activeId: string; collapsed?: boolean; onToggle?: () => void }) {
   const { t } = useI18n();
@@ -41,7 +42,7 @@ export function AgentSwitcher({ activeId, collapsed = false, onToggle }: { activ
             <div key={g.key} className="mini-group">
               <div className="mini-sep" title={`${g.name} · ${g.items.length}`} style={g.color ? { ['--c' as any]: g.color } : undefined} />
               {g.items.map((a) => (
-                <Link key={a.id} href={`/agents/${a.id}`} className="sw-item mini" aria-current={a.id === activeId ? 'page' : undefined} aria-label={a.name} {...card.bind(a.id)}>
+                <Link key={a.id} href={`/agents/${a.id}`} className="sw-item mini" aria-current={a.id === activeId ? 'page' : undefined} aria-label={a.cloned_from && agents.some((x) => x.id === a.cloned_from) ? `${a.name}, ${t('agent.cloneOf', { name: agents.find((x) => x.id === a.cloned_from)!.name })}` : a.name} {...card.bind(a.id)}>
                   <span className="sw-av"><Hex agent={a} />{a.status !== 'idle' && <i className={`pip ${a.status === 'error' ? 'err' : ''}`} />}</span>
                 </Link>
               ))}
@@ -73,7 +74,7 @@ export function AgentSwitcher({ activeId, collapsed = false, onToggle }: { activ
                 <Link key={a.id} href={`/agents/${a.id}`} className="sw-item" aria-current={a.id === activeId ? 'page' : undefined} {...card.bind(a.id)}>
                   <span className="sw-av"><Hex agent={a} />{a.status !== 'idle' && <i className={`pip ${a.status === 'error' ? 'err' : ''}`} />}</span>
                   <span className="sw-body">
-                    <span className="sw-top"><b>{a.name}</b>{a.role === 'orchestrator' && <em>{t('role.orchestrator')}</em>}</span>
+                    <span className="sw-top"><b>{a.name}</b>{a.role === 'orchestrator' && <em>{t('role.orchestrator')}</em>}{a.cloned_from && agents.some((x) => x.id === a.cloned_from) && <em className="clone" title={t('agent.cloneOf', { name: agents.find((x) => x.id === a.cloned_from)!.name })}><Copy size={9} aria-hidden />{agents.find((x) => x.id === a.cloned_from)!.name}</em>}</span>
                     <span className={`sw-sub ${act ? 'live' : a.description ? '' : 'blank'}`}>{act ?? (a.status === 'error' ? t('status.error') : a.description || t('switcher.noDescription'))}</span>
                     <span className="sw-meta"><i style={{ background: PROVIDERS[a.provider].color }} />{PROVIDERS[a.provider].short}{a.model ? ` · ${a.model}` : ''}<span className="sw-ago">{!!a.queued && a.queued > 0 ? t('queue.count', { count: a.queued }) : ago(a.updated_at)}</span></span>
                   </span>

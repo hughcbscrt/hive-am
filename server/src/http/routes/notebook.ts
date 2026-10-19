@@ -1,4 +1,4 @@
-import { liveIsDirect } from '../../runtime.js';
+import { liveIsDirect, notifyAgentsChanged } from '../../runtime.js';
 import { notebooks } from '../../skills/notebook.js';
 import { NOTEBOOK_SKILL_ID } from '../../skills/defaults.js';
 import { nbView, noteSource, notebookAgent, notebookEnabled } from '../../services/notebook.js';
@@ -22,7 +22,7 @@ route('POST', '/api/notebook/rewrite', async ({ req }) => {
 route('GET', '/api/agents/:id/notebook', ({ params }) => {
   const a = agentOrFail(params[0]);
   const n = notebooks.get(a.id);
-  return { ...nbView(n), updated_at: n.updated_at, updated_by: n.updated_by, enabled: notebookEnabled(a), skill_id: NOTEBOOK_SKILL_ID };
+  return { ...nbView(n), updated_at: n.updated_at, updated_by: n.updated_by, enabled: notebookEnabled(a), skill_id: NOTEBOOK_SKILL_ID, shared_with: notebooks.sharedWith(a.id) };
 });
 route('PUT', '/api/agents/:id/notebook', async ({ req, params }) => {
   requireLocal(req, 'The notebook can only be edited from the local app');
@@ -30,4 +30,12 @@ route('PUT', '/api/agents/:id/notebook', async ({ req, params }) => {
   const p = await body(req);
   const n = notebooks.edit(a.id, text(p.content), typeof p.version === 'number' ? p.version : undefined);
   return { ...nbView(n), updated_at: n.updated_at, updated_by: n.updated_by };
+});
+// Leaves the notebook it shares: the agent keeps a copy of the current text of its own and the others keep the shared one.
+route('POST', '/api/agents/:id/notebook/separate', ({ req, params }) => {
+  requireLocal(req, 'The notebook can only be changed from the local app');
+  const a = agentOrFail(params[0]);
+  const n = notebooks.separate(a.id);
+  notifyAgentsChanged();
+  return { ...nbView(n), updated_at: n.updated_at, updated_by: n.updated_by, shared_with: notebooks.sharedWith(a.id) };
 });

@@ -1,4 +1,5 @@
-import { agents, db, resolved } from '../db.js';
+import { agents, colonies, db, resolved } from '../db.js';
+import { notebooks } from '../skills/notebook.js';
 import { channelPermissionError } from '../connections/rules.js';
 import { liveTurn, notifyAgentsChanged, stopAgent } from '../runtime.js';
 import { findRepo } from '../git/repo.js';
@@ -35,6 +36,30 @@ export function spawnFromType(t: AgentType, p: AgentInput & { description?: stri
     name, description: p.description ?? t.description, role: t.role, type_id: t.id, provider: t.provider, model: t.model,
     system_prompt: t.system_prompt, permission: t.permission, cwd: p.cwd ?? '', skill_ids: t.skill_ids, skill_loads: t.skill_loads, colony_id: p.colony_id ?? null,
   });
+}
+
+/**
+ * A separate agent with the same configuration as `sourceId`: it runs in parallel with it (the turns of one agent are serialized, so conversations at the
+ * same time need separate agents) and READS THE SAME NOTEBOOK. It copies what the agent is (description, role, type, provider, model, prompt, permission,
+ * folder, overrides, browser, skills and, for an orchestrator, its team) and nothing it has done or is attached to: not its conversation or sessions,
+ * connections, wake-ups, schedules, watches, delegations or managed resources. Its colony is the source's unless another is given.
+ */
+export function cloneAgent(sourceId: string, p: { name?: unknown; colony_id?: unknown }): Agent {
+  const src = agentOrFail(sourceId);
+  const name = trimmed(typeof p.name === 'string' ? p.name : '');
+  if (!name) throw bad('Give the clone a name');
+  uniqueName(name);
+  const colony = p.colony_id === undefined ? src.colony_id : p.colony_id ? String(p.colony_id) : null;
+  if (colony && !colonies.get(colony)) throw bad('That colony no longer exists');
+  const clone = create({
+    name, description: src.description, role: src.role, type_id: src.type_id, provider: src.provider, model: src.model, system_prompt: src.system_prompt,
+    permission: src.permission, cwd: src.cwd, overrides: src.overrides, browser: src.browser, skill_ids: src.skill_ids, skill_loads: src.skill_loads,
+    worker_ids: src.role === 'orchestrator' ? src.worker_ids : [], colony_id: colony, cloned_from: src.id,
+  });
+  try { notebooks.share(src.id, clone.id); }
+  catch (e) { agents.remove(clone.id); throw e; }                  // never leave a clone that does not read the notebook of its source
+  notifyAgentsChanged();
+  return agents.get(clone.id)!;
 }
 
 export function updateAgent(id: string, p: AgentInput): Agent | undefined {
