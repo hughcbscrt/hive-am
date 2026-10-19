@@ -6,8 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- The launcher can run hive-am in the background and manage it: `hive-am start --background` (detached, with its output in `run/hive-am.log` in the data folder), `hive-am status`, `hive-am logs [-f] [-n N]`, `hive-am stop` and `hive-am restart`. A second start refuses and names the run that is already there, and a record whose process is gone or was reused by another one is reported as stale and never signalled. Plain `hive-am` behaves as before.
+- Every run of the launcher opens with a welcome that shows the version, the addresses and where the data and the log are. `hive-am version` prints the version, and `hive-am status` shows the version of the run.
+- `hive-am update` looks for a newer version on npm and installs it (`--check` only reports, `--restart` also restarts a run in the background), so updating no longer needs `npm install -g` by hand. It only installs when hive-am was installed globally with npm.
+
 ### Fixed
 
+- The server took the full 5 seconds to shut down and left its database unclosed, because it waited for its HTTP server to finish before dropping the WebSocket connections that were holding it open. It now drops them first and shuts down in a fraction of a second, with the write-ahead log merged.
 - Changes explorer: coming back to the tab now opens the file you were reading, with the folders that lead to it open, and the tab (History, Tags, Compare or Stashes) with what it had selected. Before, a folder with changes always replaced the remembered file with the first changed one, and in a clean folder of more than 40 files the file came back with every folder closed.
 - Chat: the **Jump to latest** button is no longer offered when there is nothing to scroll, and it appears for any scroll up with content out of view (a 25 px scroll up used to leave the last line cut with no button, and a streaming reply pulled the view back down). A taller draft or a resized window keeps the last message in view when you had not scrolled away.
 - OpenCode: changing an agent's permission did not apply to its existing conversation, so an agent switched to Full access kept saying it had no shell. The chat now warns that the permission changed after the conversation started and offers **Apply now**, which starts a new conversation (the current one stays in Sessions). Conversations recorded before this change are not detected.
