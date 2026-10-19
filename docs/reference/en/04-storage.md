@@ -206,7 +206,7 @@ View preferences only; if they are deleted, the UI works the same.
 | `hive-am.dock` | JSON `{ open, height, active }` | `lib/dock.tsx`: state of the bottom terminal panel |
 | `hive-am.logsize` | number (10 to 20) | `LogPane.tsx`: text size of the resource logs |
 | `hive-am.dbq.<resourceId>` | text | `DbWorkspace.tsx`: the SQL being written for each database resource |
-| `hive-am.git.last.<agentId>` | path | `GitExplorer.tsx`: the last file opened in the changes explorer of each agent |
+| `hive-am.git.where.<agentId>` | JSON | `GitExplorer.tsx`: where the person was in the changes explorer of each agent. Every field is optional: `{ file, dirs, mode, hist, commit, cmp: { base, head }, stash, tag }` (the file, the folders that were open, the tab and what it had selected) |
 
 The former key `hive-rel-pos` is no longer used (it was dropped when the canvas was redesigned).
 

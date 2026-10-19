@@ -4,7 +4,8 @@ import { ChevronDown, ChevronRight, File, Folder, GitBranch, ListFilter, Refresh
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { fmtDateTime, fmtNum, fmtTime } from '@/lib/format';
-import { buildTree, flatten, type Row, type TreeNode } from '@/lib/git/gitTree';
+import { buildTree, flatten, parentsOf, type Row, type TreeNode } from '@/lib/git/gitTree';
+import { readStored, writeStored } from '@/lib/hooks/usePersistentState';
 import type { Agent, GitChange, GitListing, GitTagInfo, GrepHit, StashItem, SwitchPlan } from '@/lib/types';
 import type { useGit } from '@/lib/git/useGit';
 import { CopyBtn } from '@/components/chat/ToolCall';
@@ -28,6 +29,9 @@ import { FilePreview } from './FilePreview';
 import { FileTree } from './FileTree';
 import { GitTabs, GIT_MODES, GIT_PANEL_ID, gitTabId, type GitMode } from './GitTabs';
 
+/** Where the person was in an agent's explorer: the file, the folders that lead to it, and the tab with what it had selected. Every field is optional. */
+interface Where { file?: string; dirs?: string[]; mode?: GitMode; hist?: string; commit?: string; cmp?: CompareSel; stash?: string; tag?: string }
+const WHERE_MAX_DIRS = 200;
 const TREE_MAX_ROWS = 2000;   // the file tree is a list of buttons, not windowed: it shows this many and asks for a narrower filter
 
 /* ------------------------------------------------------------------ explorer */
@@ -83,21 +87,40 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
     record(root);
     if (want.size) setExpanded((e) => new Set([...e, ...want]));
   }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (root && sel === null && repo?.changes.length) setSel((repo.changes.find((c) => c.status === 'conflict') ?? repo.changes[0]).path); }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Coming back, the explorer opens where the person was; the first conflict or change is only the fallback. One place decides, once per mount, and the record is written only after that
+  // (`ready`), so a mount cannot save its own empty state over a good record.
+  const whereKey = `hive-am.git.where.${agent.id}`;
+  const [ready, setReady] = useState(false);
+  const wantTag = useRef<string | null>(null);
+  useEffect(() => {
+    if (!root || ready) return;
+    const w = readStored<Where>(whereKey, {});
+    const exists = (p?: string): p is string => !!p && (!!files?.includes(p) || !!repo?.changes.some((c) => c.path === p));
+    const file = exists(w.file) ? w.file : (repo?.changes.find((c) => c.status === 'conflict') ?? repo?.changes[0])?.path ?? null;
+    if (file) setSel(file);
+    const dirs = [...(Array.isArray(w.dirs) ? w.dirs.filter((d) => typeof d === 'string') : []), ...(exists(w.file) ? parentsOf(w.file) : [])];
+    if (dirs.length) setExpanded((e) => new Set([...e, ...dirs]));
+    if (w.mode && GIT_MODES.includes(w.mode)) setMode(w.mode);
+    if (typeof w.hist === 'string') setHistPath(w.hist);
+    if (typeof w.commit === 'string') setCommitSel(w.commit);
+    if (w.cmp && typeof w.cmp.base === 'string' && typeof w.cmp.head === 'string') setCmp(w.cmp);
+    if (typeof w.stash === 'string') setStashSel(w.stash);
+    if (typeof w.tag === 'string') wantTag.current = w.tag;
+    setReady(true);
+  }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!ready) return;
+    writeStored(whereKey, {
+      file: sel ?? undefined, dirs: [...expanded].slice(0, WHERE_MAX_DIRS), mode, hist: histPath ?? undefined, commit: commitSel ?? undefined,
+      cmp: cmp.base || cmp.head ? cmp : undefined, stash: stashSel ?? undefined, tag: tagSel?.name ?? wantTag.current ?? undefined,
+    } satisfies Where);
+  }, [ready, whereKey, sel, expanded, mode, histPath, commitSel, cmp, stashSel, tagSel]);
 
   useEffect(() => {
     let dead = false;
     api.get<StashItem[]>(`/agents/${agent.id}/git/stashes`).then((l) => { if (!dead) { setStashes(l); setStashSel((s) => (s && l.some((x) => x.sha === s) ? s : l[0]?.sha ?? null)); } }).catch(() => undefined);
     return () => { dead = true; };
   }, [agent.id, repo?.generatedAt]);
-
-  // The last file open in each agent is remembered, so coming back to the tab continues where you left off.
-  const lastKey = `hive-am.git.last.${agent.id}`;
-  useEffect(() => { if (sel) { try { localStorage.setItem(lastKey, sel); } catch { /* private mode */ } } }, [sel, lastKey]);
-  useEffect(() => {
-    if (!root || sel !== null || repo?.changes.length) return;
-    try { const last = localStorage.getItem(lastKey); if (last && files?.includes(last)) setSel(last); } catch { /* private mode */ }
-  }, [root]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Searching the content runs git once typing pauses; fewer than 2 characters search nothing.
   useEffect(() => {
@@ -235,7 +258,7 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
           <GitTabs mode={mode} onChange={setMode} stashCount={stashes?.length ?? 0} label={t('git.filesLabel')} />
           <div className="gx-sidepanel" id={GIT_PANEL_ID} role="tabpanel" aria-labelledby={gitTabId(mode)}>
           {mode === 'stashes' ? <StashList stashes={stashes} sel={stashSel} onSelect={setStashSel} onSave={() => setSaveStash(true)} canSave={status.changes.length > 0 && !status.state} />
-            : mode === 'tags' ? <TagList agent={agent} sel={tagSel?.name ?? null} onSelect={setTagSel} />
+            : mode === 'tags' ? <TagList agent={agent} sel={tagSel?.name ?? null} onSelect={setTagSel} onLoaded={(tags) => { const want = wantTag.current; wantTag.current = null; if (want && !tagSel) setTagSel(tags.find((x) => x.name === want) ?? null); }} />
             : mode === 'compare' ? <CompareList refs={refs} sel={cmp} onChange={setCmp} />
             : mode === 'history' ? <HistoryList agent={agent} head={status.head?.sha} sel={commitSel} onSelect={setCommitSel} refs={refs} path={histPath} onClearPath={() => setHistPath(null)} /> : (<>
           <div className="gx-filter">

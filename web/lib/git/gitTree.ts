@@ -91,12 +91,8 @@ export function flatten(root: TreeNode, expanded: Set<string>, f: Filters): Row[
   return rows;
 }
 
-/** Folders that should start open: the ones that lead to a change, or everything when the tree is small. */
-export function defaultExpanded(root: TreeNode, totalFiles: number): Set<string> {
-  const open = new Set<string>();
-  const walk = (n: TreeNode) => {
-    for (const c of n.children) if (c.type === 'dir' && !c.ignored) { if (totalFiles <= 40 || c.changed > 0) open.add(c.path); walk(c); }
-  };
-  walk(root);
-  return open;
+/** The folders that lead to a path, outermost first: `a/b/c.ts` gives `a` and `a/b`. */
+export function parentsOf(path: string): string[] {
+  const parts = path.split('/'); parts.pop();
+  return parts.map((_, i) => parts.slice(0, i + 1).join('/'));
 }

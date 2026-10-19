@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+- Changes explorer: coming back to the tab now opens the file you were reading, with the folders that lead to it open, and the tab (History, Tags, Compare or Stashes) with what it had selected. Before, a folder with changes always replaced the remembered file with the first changed one, and in a clean folder of more than 40 files the file came back with every folder closed.
 - A turn whose tool stops answering no longer holds the agent's queue forever: after 10 minutes of silence it is stopped, reported as failed, and the messages behind it run. A failure while a turn starts is now reported as that turn's error instead of losing the message.
 - A message that begins with a dash (`- something`, a bullet list, `--word`) is no longer read as an option by OpenCode and Kiro, which ended the turn with no answer or an error. The prompt now goes after `--`.
 - A turn that produces no events is reported as a failure, with the first line the tool printed, instead of passing as an empty answer.
