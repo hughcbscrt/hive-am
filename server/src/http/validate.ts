@@ -3,6 +3,7 @@ import { agents, colonies } from '../db.js';
 import { validVision } from '../connections/vision.js';
 import type { Agent, Colony } from '../types.js';
 import { isProvider } from '../services/providers.js';
+import { EFFORTS, validEffort } from '../efforts.js';
 import { bad } from './errors.js';
 import type { Body } from './body.js';
 
@@ -28,6 +29,7 @@ export function validateAgentInput(p: Body, partial = false): AgentInput {
   if (p.role !== undefined && !['orchestrator', 'worker'].includes(p.role as string)) throw bad('Role must be orchestrator or worker');
   checkFolder(p.cwd);
   if (p.browser !== undefined && typeof p.browser !== 'boolean') throw bad('browser must be true or false');
+  if (p.effort !== undefined && (typeof p.effort !== 'string' || p.effort.length > 24)) throw bad('effort must be text');
   if (p.colony_id && (typeof p.colony_id !== 'string' || !colonies.get(p.colony_id))) throw bad('That colony no longer exists');
   return p as AgentInput;
 }
@@ -45,7 +47,7 @@ const REQUIRED: Record<string, string[]> = { telegram: ['token'], slack: ['bot_t
 export function validateConnection(kind: string, config: ConnConfig, agentId: string | null | undefined, enabled: boolean): void {
   const missing = (REQUIRED[kind] ?? []).filter((k) => typeof config[k] !== 'string' || !(config[k] as string).trim());
   if (missing.length) throw bad(`Missing: ${missing.join(', ')}`);
-  if (config.effort !== undefined && !['', 'low', 'medium', 'high'].includes(config.effort as string)) throw bad('effort must be empty, low, medium or high');
+  if (config.effort !== undefined && config.effort !== '' && !validEffort(config.effort)) throw bad(`effort must be empty or one of ${EFFORTS.join(', ')}`);
   if (config.on_silent !== undefined && !['notice', 'send_text', 'ignore'].includes(config.on_silent as string)) throw bad('on_silent must be notice, send_text or ignore');
   if (config.group_mode !== undefined && !['mention', 'open'].includes(config.group_mode as string)) throw bad('group_mode must be mention or open');
   if (config.vision !== undefined && config.vision !== null && !validVision(config.vision)) throw bad('vision must be { provider, model } or empty');

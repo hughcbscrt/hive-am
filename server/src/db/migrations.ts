@@ -251,6 +251,14 @@ CREATE TABLE IF NOT EXISTS object_agents (
       addColumn(db, 'agents', 'cloned_from TEXT REFERENCES agents(id) ON DELETE SET NULL');
     },
   },
+  {
+    version: 8, name: 'reasoning-effort',
+    up(db) {
+      // The reasoning effort of an agent (and of the type it is made from): '' is the CLI's own default, which is what every existing agent keeps.
+      addColumn(db, 'agents', "effort TEXT NOT NULL DEFAULT ''");
+      addColumn(db, 'agent_types', "effort TEXT NOT NULL DEFAULT ''");
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

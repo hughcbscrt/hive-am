@@ -81,6 +81,10 @@ Choose one of the three: **Claude Code**, **OpenCode** or **Kiro**. Each card sh
 
 The **Model** field is a searchable selector: "CLI default" (the CLI picks), the models the CLI lists, or any id you type by hand ("Use “id”").
 
+### Reasoning effort
+
+Under the model, **Reasoning effort** sets how hard the model thinks in **every** turn of this agent: the web chat, Telegram and Slack, schedules, wake-ups and delegated tasks. **Default** leaves the CLI's own, which is what every agent starts with. The field only offers what the chosen provider and model take: Claude Code and Kiro take **Low, Medium, High, Extra high** and **Max**; for OpenCode they are the variants the selected model has (read from OpenCode's own list: one model may offer Low, High and Max, another 0 to 5, another none, and then the field says so). Changing the provider or the model sends it back to **Default** if the level no longer applies. A **type** carries it too, and a connection can override it for its own chat (see [Connections](09-telegram-connections.md)). A lower level answers faster and thinks less.
+
 > **Note:** if you change the provider of an agent that already has a conversation, that conversation is discarded: a CLI's session id is of no use in another CLI. Earlier conversations are kept in the **Sessions** tab.
 
 ### What can it do? (permissions)

@@ -86,7 +86,7 @@ El agente también puede silenciarse si alguien se lo pide.
 
 - **Idioma del bot:** Español o Inglés (los avisos del bot).
 - **Si el agente termina sin responder:** **Avisar en el hilo**, **Enviar su texto normal** o **No hacer nada**.
-- **Esfuerzo de razonamiento:** **El del agente**, **Bajo**, **Medio** o **Alto**. **Bajo** responde un poco más rápido. Con OpenCode, déjalo en "El del agente" salvo que el modelo tenga esa variante.
+- **Esfuerzo de razonamiento:** **El del agente**, **Bajo**, **Medio**, **Alto**, **Muy alto** o **Máximo**. Reemplaza el esfuerzo que tiene el agente, solo en los turnos de esta conexión; déjalo en **El del agente** para usar el del agente. **Bajo** responde un poco más rápido. Con OpenCode el nivel se convierte en la variante que su modelo tiene para él; si el modelo no tiene, se usa el del propio agente.
 - **Activa:** apágala para detener el bot sin borrarlo.
 
 ## Estados

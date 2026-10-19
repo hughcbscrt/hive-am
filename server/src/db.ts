@@ -116,8 +116,8 @@ export const types = {
   get(id: string) { const r = q('SELECT * FROM agent_types WHERE id=?').get(id) as TypeRow | undefined; return r ? typeOf(r) : undefined; },
   create: db.transaction((p: Partial<AgentType> & { name: string; role: Role; provider: Provider }): AgentType => {
     const id = uid();
-    q('INSERT INTO agent_types (id,name,description,role,provider,model,system_prompt,permission,color,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)').run(
-      id, p.name, p.description ?? '', p.role, p.provider, p.model ?? '', p.system_prompt ?? '',
+    q('INSERT INTO agent_types (id,name,description,role,provider,model,effort,system_prompt,permission,color,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(
+      id, p.name, p.description ?? '', p.role, p.provider, p.model ?? '', p.effort ?? '', p.system_prompt ?? '',
       (p.permission ?? 'acceptEdits') as Permission, p.color ?? '', now());
     types.setSkills(id, p.skill_ids ?? [], p.skill_loads);
     return types.get(id)!;
@@ -125,8 +125,8 @@ export const types = {
   update: db.transaction((id: string, p: Partial<AgentType>): AgentType | undefined => {
     const cur = types.get(id); if (!cur) return;
     const n = { ...cur, ...p };
-    q('UPDATE agent_types SET name=?, description=?, role=?, provider=?, model=?, system_prompt=?, permission=?, color=? WHERE id=?')
-      .run(n.name, n.description, n.role, n.provider, n.model, n.system_prompt, n.permission, n.color, id);
+    q('UPDATE agent_types SET name=?, description=?, role=?, provider=?, model=?, effort=?, system_prompt=?, permission=?, color=? WHERE id=?')
+      .run(n.name, n.description, n.role, n.provider, n.model, n.effort ?? '', n.system_prompt, n.permission, n.color, id);
     if (p.skill_ids || p.skill_loads) types.setSkills(id, p.skill_ids ?? cur.skill_ids, p.skill_loads);
     return types.get(id);
   }),
@@ -206,8 +206,8 @@ export const agents = {
   /** The agent, its skills and its workers are written together: either all of it exists afterwards or none. */
   create: db.transaction((p: Partial<Agent> & { name: string; role: Role; provider: Provider; cwd: string }): Agent => {
     const id = uid(), t = now();
-    q('INSERT INTO agents (id,name,description,role,type_id,provider,model,system_prompt,permission,cwd,session_id,status,created_at,updated_at,colony_id,overrides,browser,cloned_from) VALUES (?,?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?,?,?)').run(
-      id, p.name, p.description ?? '', p.role, p.type_id ?? null, p.provider, p.model ?? '', p.system_prompt ?? '',
+    q('INSERT INTO agents (id,name,description,role,type_id,provider,model,effort,system_prompt,permission,cwd,session_id,status,created_at,updated_at,colony_id,overrides,browser,cloned_from) VALUES (?,?,?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?,?,?)').run(
+      id, p.name, p.description ?? '', p.role, p.type_id ?? null, p.provider, p.model ?? '', p.effort ?? '', p.system_prompt ?? '',
       (p.permission ?? 'acceptEdits') as Permission, p.cwd ?? '', 'idle', t, t, p.colony_id ?? null, JSON.stringify(p.overrides ?? []), p.browser && p.provider === 'claude' ? 1 : 0, p.cloned_from ?? null);
     agents.setSkills(id, p.skill_ids ?? [], p.skill_loads);
     agents.setWorkers(id, p.worker_ids ?? []);
@@ -216,8 +216,8 @@ export const agents = {
   update: db.transaction((id: string, p: Partial<Agent>): Agent | undefined => {
     const cur = agents.get(id); if (!cur) return;
     const n = { ...cur, ...p };
-    q('UPDATE agents SET name=?, description=?, role=?, type_id=?, provider=?, model=?, system_prompt=?, permission=?, cwd=?, colony_id=?, overrides=?, browser=?, updated_at=? WHERE id=?')
-      .run(n.name, n.description, n.role, n.type_id, n.provider, n.model, n.system_prompt, n.permission, n.cwd, n.colony_id ?? null, JSON.stringify(n.overrides ?? []), n.browser && n.provider === 'claude' ? 1 : 0, now(), id);
+    q('UPDATE agents SET name=?, description=?, role=?, type_id=?, provider=?, model=?, effort=?, system_prompt=?, permission=?, cwd=?, colony_id=?, overrides=?, browser=?, updated_at=? WHERE id=?')
+      .run(n.name, n.description, n.role, n.type_id, n.provider, n.model, n.effort ?? '', n.system_prompt, n.permission, n.cwd, n.colony_id ?? null, JSON.stringify(n.overrides ?? []), n.browser && n.provider === 'claude' ? 1 : 0, now(), id);
     if (p.skill_ids || p.skill_loads) agents.setSkills(id, p.skill_ids ?? cur.skill_ids, p.skill_loads);
     if (p.worker_ids) agents.setWorkers(id, p.worker_ids);
     return agents.get(id);

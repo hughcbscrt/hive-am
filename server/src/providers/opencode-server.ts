@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DATA_DIR } from '../db.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { learnWindows } from '../context.js';
+import { learnEfforts } from '../efforts.js';
 
 /**
  * One long-lived `opencode serve` per agent. A private server per turn (`opencode run --standalone`) boots from zero every time and its
@@ -61,7 +62,14 @@ let windowsAt = 0;
  * Reads the context window of every model from OpenCode's catalog, using this turn's server, any running one or a short-lived one
  * (about 4 s and 150 MB, once). At most once an hour, and a failure waits ten minutes: OpenCode 1.x has no catalog endpoint at all.
  */
-export async function learnOpencodeWindows(cwd: string, access: ServerAccess | null): Promise<void> {
+export function learnOpencodeWindows(cwd: string, access: ServerAccess | null): Promise<void> {
+  if (learning) return learning;                      // a read is under way (a turn and the agent form can ask at the same time): both wait for it
+  learning = readCatalog(cwd, access).finally(() => { learning = null; });
+  return learning;
+}
+let learning: Promise<void> | null = null;
+
+async function readCatalog(cwd: string, access: ServerAccess | null): Promise<void> {
   if (Date.now() - windowsAt < 60 * 60_000) return;
   windowsAt = Date.now();
   let proc: ChildProcess | undefined;
@@ -94,6 +102,8 @@ export async function learnOpencodeWindows(cwd: string, access: ServerAccess | n
     }
     if (!list.length) throw new Error('the model catalog stayed empty');
     learnWindows('opencode', Object.fromEntries(list.map((m) => [`${m.providerID}/${m.id}`, Number(m.limit?.context)])));
+    // Every model carries the variants it takes (`id` goes after `#`, `settings.reasoningEffort` is the level it stands for); a model with none takes no effort.
+    learnEfforts('opencode', Object.fromEntries(list.map((m) => [`${m.providerID}/${m.id}`, (Array.isArray(m.variants) ? m.variants : []).map((v: any) => ({ id: String(v?.id), level: typeof v?.settings?.reasoningEffort === 'string' ? v.settings.reasoningEffort : undefined }))])));
   } catch { windowsAt = Date.now() - 50 * 60_000; /* try again in ten minutes */ }
   finally { if (proc && !proc.killed) proc.kill('SIGTERM'); }
 }

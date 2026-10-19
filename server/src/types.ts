@@ -10,6 +10,8 @@ export interface AgentType {
   role: Role;
   provider: Provider;
   model: string;
+  /** Reasoning effort agents made from this type start with ('' is the CLI's default). */
+  effort: string;
   system_prompt: string;
   permission: Permission;
   color: string;
@@ -68,6 +70,8 @@ export interface Agent {
   skill_loads: Record<string, SkillLoad>;
   /** Workers this orchestrator may dispatch to (only meaningful for orchestrators). */
   worker_ids: string[];
+  /** Reasoning effort every turn of this agent asks for; '' keeps the CLI's own default. Claude and Kiro take a level, OpenCode a variant of the model. */
+  effort: string;
   /** The agent this one was cloned from (null for any other agent, and when that agent was deleted). */
   cloned_from: string | null;
   created_at: number;

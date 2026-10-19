@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { useI18n, translate as tr } from '@/lib/i18n/index';
 import { fmtNum } from '@/lib/format';
-import { Field, FolderPicker, ModelField, PermissionField, ProviderPicker, Segmented, SkillPicker } from '@/components/ui';
+import { EffortField, Field, FolderPicker, ModelField, PermissionField, ProviderPicker, Segmented, SkillPicker } from '@/components/ui';
 import { useHiveData } from '@/lib/store';
 import { MemberPick } from './MemberPick';
 import type { Agent, AgentType, Colony, InheritField, Permission, Provider, Role, SkillLoad } from '@/lib/types';
@@ -13,7 +13,7 @@ import { CheckRow } from '@/components/Primitives';
 import { MANAGEABLE } from '@/components/objects/ManagerField';
 
 export interface AgentDraft {
-  name: string; description: string; role: Role; provider: Provider; model: string;
+  name: string; description: string; role: Role; provider: Provider; model: string; effort: string;
   system_prompt: string; permission: Permission; cwd: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; worker_ids: string[]; type_id: string | null;
   colony_id: string | null; overrides: InheritField[];
   /** Claude only: the agent may drive the person's Chrome. */
@@ -23,11 +23,11 @@ export interface AgentDraft {
 }
 
 export const draftFromType = (t?: AgentType): AgentDraft => ({
-  name: '', description: t?.description ?? '', role: t?.role ?? 'worker', provider: t?.provider ?? 'claude', model: t?.model ?? '',
+  name: '', description: t?.description ?? '', role: t?.role ?? 'worker', provider: t?.provider ?? 'claude', model: t?.model ?? '', effort: t?.effort ?? '',
   system_prompt: t?.system_prompt ?? '', permission: t?.permission ?? 'acceptEdits', cwd: '', skill_ids: t?.skill_ids ?? [], skill_loads: t?.skill_loads ?? {}, worker_ids: [], type_id: t?.id ?? null, colony_id: null, overrides: [], browser: false, object_ids: [],
 });
 export const draftFromAgent = (a: Agent, objectIds: string[] = []): AgentDraft => ({
-  name: a.name, description: a.description, role: a.role, provider: a.provider, model: a.model, system_prompt: a.system_prompt,
+  name: a.name, description: a.description, role: a.role, provider: a.provider, model: a.model, effort: a.effort ?? '', system_prompt: a.system_prompt,
   permission: a.permission, cwd: a.cwd, skill_ids: a.skill_ids, skill_loads: a.skill_loads, worker_ids: a.worker_ids, type_id: a.type_id,
   colony_id: a.colony_id, overrides: a.overrides, browser: a.browser, object_ids: objectIds,
 });
@@ -78,8 +78,9 @@ export function AgentForm({ draft, onChange, errors, selfId, showType = true, fo
           {colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </Field>
-      <Field label={t('form.provider')}><ProviderPicker value={draft.provider} onChange={(p) => onChange({ ...draft, provider: p, model: '', browser: p === 'claude' && draft.browser })} providers={providers} /></Field>
+      <Field label={t('form.provider')}><ProviderPicker value={draft.provider} onChange={(p) => onChange({ ...draft, provider: p, model: '', effort: '', browser: p === 'claude' && draft.browser })} providers={providers} /></Field>
       <ModelField provider={draft.provider} value={draft.model} onChange={(v) => set('model', v)} />
+      <EffortField provider={draft.provider} model={draft.model} value={draft.effort} onChange={(v) => set('effort', v)} />
       {draft.provider === 'claude' && <CheckRow checked={draft.browser} onChange={(v) => set('browser', v)} label={t('form.browser')} hint={t('form.browser.hint')} />}
       {colony && colony.inherit.permission && <InheritRow colony={colony} on={inh('permission')} onChange={(v) => toggle('permission', v)} label={t('inherit.permissions')} value={permissionLabel(colony.permission)} />}
       {!inh('permission') && <PermissionField value={draft.permission} onChange={(v) => set('permission', v)} locked={linked.length ? ['plan'] : []} />}

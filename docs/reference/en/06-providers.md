@@ -162,6 +162,16 @@ The history readers **hide** these blocks when showing the chat (see [document 8
 
 The UI's model field is free text with suggestions (`<datalist>`): if the CLI does not list models, you can type any id; empty = the CLI's default model. Changing an agent's provider clears the model in the form.
 
+**Reasoning effort** (`server/src/efforts.ts`). The agent (and the agent type it is made from) has an `effort` field: empty is the CLI's own default (no flag, no `#variant`), which is what every agent starts with. It applies to **every** turn the agent runs: web chat, channels, schedules, wake-ups and delegations. A connection can still set its own (`config.effort`), which wins for the turns of that connection; on "Agent default" the agent's is used. Colonies do not lend it: it is not meaningful across providers.
+
+| Provider | How it is applied | Levels |
+|---|---|---|
+| Claude Code | `claude … --effort <level>` | `low`, `medium`, `high`, `xhigh`, `max` |
+| Kiro | `kiro-cli chat … --effort <level>` | the same five; once a model's turn reports `reasoning.effortLevels` only those are offered for it |
+| OpenCode | the model's variant: `-m provider/model#<id>` | the variants **the chosen model has** (`0`…`5`, or `none`, `low`, `medium`, `high`, `xhigh`, `max`, depending on the model), read from its catalog (`GET /api/model` → `variants[].id`, labelled by `settings.reasoningEffort`) |
+
+What was learned (`reasoning-efforts.json`, next to `context-windows.json`) is refreshed the way context windows are: the catalog is read at most once an hour, and again ten minutes later if the read failed. `GET /api/providers/:p/efforts?model=` gives the form the levels (and whether they are known); it reads OpenCode's catalog first when the model's are not known yet. An effort is checked when it is stored: a level the provider does not take, or a variant the OpenCode model does not have, is a 400; changing the provider or the model clears one that no longer applies. At turn time an effort that does not apply (the model changed under it) runs at the CLI's default, with a line in the server log, instead of failing the turn, and a connection's level name is turned into the variant the model has for it.
+
 ## 6.8 Costs and prices
 
 - Claude: `result.total_cost_usd` is emitted as `usage.cost` live; the history has no cost, so it is **estimated** with `pricing.ts`.

@@ -6,14 +6,14 @@ import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
 import { PROVIDERS } from '@/lib/meta';
 import type { AgentType, Permission, Provider, Role, SkillLoad } from '@/lib/types';
-import { ConfirmDialog, Drawer, EmptyState, Field, Hex, ModelField, PermissionField, ProviderPicker, RoleChip, Segmented, SkillPicker, useToast } from '@/components/ui';
+import { ConfirmDialog, Drawer, EffortField, EmptyState, Field, Hex, ModelField, PermissionField, ProviderPicker, RoleChip, Segmented, SkillPicker, useToast } from '@/components/ui';
 import { NewAgentDrawer } from '@/components/agents/NewAgentDrawer';
 import { useI18n } from '@/lib/i18n';
 import { fmtNum } from '@/lib/format';
 import { useUnsavedGuard } from '@/lib/hooks/useUnsavedGuard';
 
-interface Draft { id?: string; name: string; description: string; role: Role; provider: Provider; model: string; system_prompt: string; permission: Permission; skill_ids: string[]; skill_loads: Record<string, SkillLoad> }
-const blank: Draft = { name: '', description: '', role: 'worker', provider: 'claude', model: '', system_prompt: '', permission: 'acceptEdits', skill_ids: [], skill_loads: {} };
+interface Draft { id?: string; name: string; description: string; role: Role; provider: Provider; model: string; effort: string; system_prompt: string; permission: Permission; skill_ids: string[]; skill_loads: Record<string, SkillLoad> }
+const blank: Draft = { name: '', description: '', role: 'worker', provider: 'claude', model: '', effort: '', system_prompt: '', permission: 'acceptEdits', skill_ids: [], skill_loads: {} };
 
 export default function Types() {
   const { t } = useI18n();
@@ -75,8 +75,9 @@ export default function Types() {
           <Field label={t('form.name')} error={err}><input className="input" value={draft.name} onChange={(e) => set('name', e.target.value)} placeholder={t('types.name.placeholder')} autoFocus /></Field>
           <Field label={t('types.description')} hint={t('types.description.hint')}><input className="input" value={draft.description} onChange={(e) => set('description', e.target.value)} /></Field>
           <Field label={t('form.role')}><Segmented value={draft.role} onChange={(v) => set('role', v)} options={[{ id: 'worker', label: t('role.worker') }, { id: 'orchestrator', label: t('role.orchestrator') }]} /></Field>
-          <Field label={t('form.provider')}><ProviderPicker value={draft.provider} onChange={(p) => setDraft({ ...draft, provider: p, model: '' })} providers={providers} /></Field>
+          <Field label={t('form.provider')}><ProviderPicker value={draft.provider} onChange={(p) => setDraft({ ...draft, provider: p, model: '', effort: '' })} providers={providers} /></Field>
           <ModelField provider={draft.provider} value={draft.model} onChange={(v) => set('model', v)} />
+          <EffortField provider={draft.provider} model={draft.model} value={draft.effort ?? ''} onChange={(v) => set('effort', v)} />
           <PermissionField value={draft.permission} onChange={(v) => set('permission', v)} />
           <Field label={t('form.systemPrompt')} hint={t('types.chars', { count: draft.system_prompt.length, n: fmtNum(draft.system_prompt.length) })}><MarkdownEditor value={draft.system_prompt} onChange={(v) => set('system_prompt', v)} minHeight={260} /></Field>
           <Field label={t('form.skills')}><SkillPicker skills={skills} value={draft.skill_ids} loads={draft.skill_loads} onChange={(ids, loads) => setDraft({ ...draft, skill_ids: ids, skill_loads: loads })} /></Field>

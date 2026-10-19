@@ -86,7 +86,7 @@ The agent can also mute itself if someone asks it to.
 
 - **Bot language:** Spanish or English (the bot's notices).
 - **If the agent finishes without replying:** **Tell the thread**, **Send its plain text** or **Do nothing**.
-- **Reasoning effort:** **Agent default**, **Low**, **Medium** or **High**. **Low** answers a bit faster. With OpenCode, leave it on "Agent default" unless the model has that variant.
+- **Reasoning effort:** **Agent default**, **Low**, **Medium**, **High**, **Extra high** or **Max**. It overrides the effort set on the agent, only for the turns of this connection; leave it on **Agent default** to use the agent's. **Low** answers a bit faster. With OpenCode the level becomes the variant its model has for it; if the model has none, the agent's own is used.
 - **Active:** turn it off to stop the bot without deleting it.
 
 ## Statuses

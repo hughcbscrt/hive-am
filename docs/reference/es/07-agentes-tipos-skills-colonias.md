@@ -10,6 +10,7 @@ Un agente es **configuración + puntero a sesión**. Campos (`server/src/types.t
 | `role` | `orchestrator` o `worker`. |
 | `type_id` | Tipo del que se creó (informativo; ver 7.2). |
 | `provider`, `model` | Proveedor y modelo. **Siempre propios del agente**, nunca heredados. |
+| `effort` | Esfuerzo de razonamiento de cada turno (`''` es el predeterminado del CLI). También propio del agente, nunca heredado, y lo copian los tipos y los clones. Ver [6.7](06-proveedores.md#67-deteccion-de-instalacion-y-modelos). |
 | `permission` | `plan` (solo lectura), `acceptEdits` (edita archivos), `bypassPermissions` (acceso total). |
 | `system_prompt` | Prompt propio. |
 | `skill_ids` | Skills propias. |
