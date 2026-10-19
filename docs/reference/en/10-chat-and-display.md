@@ -179,9 +179,9 @@ Clicking expands a panel with:
 
 The view stays anchored to the bottom **as long as you do not move away**:
 
-- A `ResizeObserver` on the content re-anchors to the bottom when something grows (markdown, tools, tables).
-- Anything that moves you up **unanchors**: the wheel, a touch drag, scrolling up, or the PageUp / ArrowUp / Home keys. Getting back within 40 px of the bottom **re-anchors**; sending a message re-anchors.
-- While unanchored, a **Latest** (go to the end) button appears over the conversation; it jumps to the bottom and re-anchors.
+- A `ResizeObserver` on the content **and on the thread itself** keeps the bottom in view while anchored: when something grows (markdown, tools, tables) and when the thread shrinks (a taller draft, a window resize, the terminal panel).
+- Anything that moves you up **unanchors**, however little: the wheel, a touch drag, scrolling up, or the PageUp / ArrowUp / Home keys. It only counts when there is something to scroll. Being within 2 px of the bottom **re-anchors**; sending a message re-anchors. The old 40 px tolerance is gone: the layout clamp that follows a turn ending is told apart from a person's scroll by the absence of a recent gesture (700 ms), not by the distance.
+- While unanchored **and** with at least 8 px of content out of view, a **Latest** (go to the end) button appears over the conversation; it jumps to the bottom and re-anchors. A conversation with nothing to scroll never shows it.
 - The conversation is a `role="log"` region with a label: new messages are announced politely to screen readers (not word by word while a turn streams).
 - `scroll-behavior: smooth` is not used (it caused the view not to reach the bottom).
 
