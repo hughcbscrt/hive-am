@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DATA_DIR, agents, resolved } from '../db.js';
-import { OBJECTS_SKILL_ID } from '../skills/defaults.js';
+import { DATABASES_SKILL_ID, OBJECTS_SKILL_ID } from '../skills/defaults.js';
 import { bus } from '../runtime.js';
 import { renderTemplate, listTemplates } from './templates.js';
 import { composeServiceAction, inspectDocker, recreateDocker, type DockerAction, dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
@@ -264,19 +264,23 @@ export const dbSavedUpdate = (id: string, savedId: string, p: { name?: unknown; 
 };
 export const dbSavedRemove = (id: string, savedId: string) => { dbOf(id); if (!removeSaved(id, savedId)) throw new ObjectError('Saved query not found'); return listSaved(id); };
 /** Only these can be looked after by an agent: it starts, stops and restarts them. */
-const MANAGEABLE: string[] = ['server', 'docker', 'cluster'];
-/** An agent without the "Colony resources" skill gets it when it is made the manager of something: without it the tools are not offered. */
-function ensureSkill(agentId: string): boolean {
+const MANAGEABLE: string[] = ['server', 'docker', 'cluster', 'database'];
+/**
+ * An agent without the skill that goes with a resource gets it when it is made its manager: without it the tools are not offered.
+ * A database goes with "Database management"; the other kinds with "Colony resources".
+ */
+function ensureSkill(agentId: string, kind: string): boolean {
   const ag = agents.get(agentId); if (!ag) throw new ObjectError('That agent no longer exists');
-  if (resolved(ag).skill_ids.includes(OBJECTS_SKILL_ID)) return false;
-  agents.setSkills(agentId, [...ag.skill_ids, OBJECTS_SKILL_ID]); return true;
+  const skill = kind === 'database' ? DATABASES_SKILL_ID : OBJECTS_SKILL_ID;
+  if (resolved(ag).skill_ids.includes(skill)) return false;
+  agents.setSkills(agentId, [...ag.skill_ids, skill]); return true;
 }
 /** Chooses the one agent that looks after a resource (`null` leaves it to the agents of its colony). */
 export function setObjectManager(id: string, agentId: unknown): { object: ObjectView; skillAdded: boolean } {
   const o = get(id);
   if (!MANAGEABLE.includes(o.kind)) throw new ObjectError('This kind of resource is not looked after by agents');
   const a = agentId ? String(agentId) : null;
-  const skillAdded = a ? ensureSkill(a) : false;
+  const skillAdded = a ? ensureSkill(a, o.kind) : false;
   objectsStore.setManager(id, a); changed();
   return { object: viewOf(o), skillAdded };
 }
@@ -286,8 +290,10 @@ export function setAgentObjects(agentId: string, objectIds: unknown): { skillAdd
   if (!Array.isArray(objectIds)) throw new ObjectError('Choose the resources');
   const want = new Set(objectIds.map(String));
   const managers = objectsStore.managers();
-  for (const id of want) { const o = get(id); if (!MANAGEABLE.includes(o.kind)) throw new ObjectError('This kind of resource is not looked after by agents'); }
-  const skillAdded = want.size > 0 ? ensureSkill(agentId) : false;
+  const kinds = new Set<string>();
+  for (const id of want) { const o = get(id); if (!MANAGEABLE.includes(o.kind)) throw new ObjectError('This kind of resource is not looked after by agents'); kinds.add(o.kind === 'database' ? 'database' : 'other'); }
+  let skillAdded = false;
+  for (const k of kinds) skillAdded = ensureSkill(agentId, k === 'database' ? 'database' : 'server') || skillAdded;
   for (const [oid, aid] of managers) if (aid === agentId && !want.has(oid)) objectsStore.setManager(oid, null);
   for (const id of want) objectsStore.setManager(id, agentId);
   changed();

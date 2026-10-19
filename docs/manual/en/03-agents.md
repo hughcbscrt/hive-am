@@ -116,7 +116,7 @@ Click the tag to switch. Under the selector you see how much the "always" skills
 
 ### Resources it looks after
 
-Servers, containers and clusters the agent can see, read the logs of, and start, stop or restart. A resource has a single manager: if you choose one that another agent already looks after, it moves to this agent (the selector shows "now: name"). The agent gets the "Colony resources" skill. Resources are explained in [Resources](10-resources.md).
+Servers, containers and clusters the agent can see, read the logs of, and start, stop or restart, and databases it can look inside and run SQL on, as far as its permission allows. A resource has a single manager: if you choose one that another agent already looks after, it moves to this agent (the selector shows "now: name"). The agent gets the "Colony resources" skill, or "Database management" for a database. Resources are explained in [Resources](10-resources.md).
 
 ### Connections
 

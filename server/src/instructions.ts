@@ -1,7 +1,7 @@
 import { agents, colonies, resolved, skills } from './db.js';
 import { connections } from './connections/store.js';
 import { platformName } from './connections/prompt.js';
-import { NOTEBOOK_SKILL_ID, OBJECTS_SKILL_ID, WAKEUPS_SKILL_ID } from './skills/defaults.js';
+import { DATABASES_SKILL_ID, NOTEBOOK_SKILL_ID, OBJECTS_SKILL_ID, WAKEUPS_SKILL_ID } from './skills/defaults.js';
 import { NOTEBOOK_MAX, notebooks } from './skills/notebook.js';
 import type { Agent, Skill } from './types.js';
 
@@ -27,6 +27,7 @@ export function mcpCaps(a: Agent): string[] {
   if (a.skill_ids.includes(NOTEBOOK_SKILL_ID)) caps.push('memory');
   if (a.skill_ids.includes(WAKEUPS_SKILL_ID)) caps.push('wake');
   if (a.skill_ids.includes(OBJECTS_SKILL_ID)) caps.push('objects');
+  if (a.skill_ids.includes(DATABASES_SKILL_ID)) caps.push('databases');
   if (lazySkills(a).length > 0) caps.push('skills');
   return caps;
 }
@@ -96,6 +97,11 @@ You cannot write on your own between messages. To tell the person something late
   if (a.skill_ids.includes(OBJECTS_SKILL_ID)) {
     parts.push(`## Colony resources
 You look after the servers and containers of your colony. Tools: \`object_list\` (${toolName(a.provider, 'object_list')}) shows them with their state; \`object_logs\` (${toolName(a.provider, 'object_logs')}) reads the latest output of one; \`object_action\` (${toolName(a.provider, 'object_action')}) starts, stops or restarts one${a.permission === 'plan' ? ' (not available to you: you are read-only)' : ''}. Follow the "Colony resources" skill. You cannot create or change resources.`);
+  }
+  if (a.skill_ids.includes(DATABASES_SKILL_ID)) {
+    const t = (tool: string) => `\`${tool}\` (${toolName(a.provider, tool)})`;
+    parts.push(`## Database management
+You look after the database resources of your colony. Look: ${t('object_db_list')}, ${t('object_db_schema')}, ${t('object_db_columns')}, ${t('object_db_describe')}, ${t('object_db_search')}, ${t('object_db_ddl')}, ${t('object_db_sample')}, ${t('object_db_explain')}. Run SQL: ${t('object_db_query')} (one statement) and ${t('object_db_exec')} (several, in one transaction)${a.permission === 'plan' ? ' (read-only: you can only read)' : ''}; ${t('object_db_export')} writes a result to a file in your folder. Keep: ${t('object_db_saved')}, ${t('object_db_history')}, ${t('object_db_sessions')}. The resource itself: ${t('object_db_config')}, ${t('object_db_test')}, and with Full access ${t('object_db_config_set')}, ${t('object_db_create')}, ${t('object_db_delete')}, ${t('object_db_kill')}. Follow the "Database management" skill: writes are real, DROP and TRUNCATE need Full access, and you never write or repeat a password.`);
   }
   if (a.skill_ids.includes(NOTEBOOK_SKILL_ID)) {
     const nb = { read: toolName(a.provider, 'notebook_read'), add: toolName(a.provider, 'notebook_add'), rewrite: toolName(a.provider, 'notebook_rewrite') };

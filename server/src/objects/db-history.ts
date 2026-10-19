@@ -7,7 +7,7 @@ import { DATA_DIR } from '../db.js';
  * What a database object remembers, on disk so it survives a restart: the queries that were run (the last 200, newest first; the text is
  * cut at 20,000 characters, the rows are never kept) and the queries the person saved with a name.
  */
-export interface DbHistoryEntry { n: number; at: number; sql: string; database?: string; ok: boolean; ms: number; rows?: number; affected?: number; error?: string }
+export interface DbHistoryEntry { n: number; at: number; sql: string; database?: string; ok: boolean; ms: number; rows?: number; affected?: number; error?: string; /** the agent that ran it, when it was not a person */ by?: string }
 export interface DbSaved { id: string; name: string; sql: string; database?: string; at: number }
 const HISTORY_MAX = 200, SQL_MAX = 20_000, SAVED_MAX = 100;
 const dirOf = (kind: 'db-history' | 'db-saved') => join(DATA_DIR, kind);

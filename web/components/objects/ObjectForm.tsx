@@ -154,7 +154,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
             <option value="">{t('obj.noColony')}</option>{colonies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </Field>
-        {MANAGEABLE.includes(d.kind) && <ManagerField value={d.manager} onChange={(v) => set('manager', v)} />}
+        {MANAGEABLE.includes(d.kind) && <ManagerField kind={d.kind} value={d.manager} onChange={(v) => set('manager', v)} />}
         {d.kind === 'http' && !showKind && httpFiles}
       </Card>
 
