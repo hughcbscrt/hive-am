@@ -6,10 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
-### Changed
-
-- What hive-am keeps of its own record no longer grows for ever. Every six hours (and at start) it forgets: the messages of a channel conversation past the newest 500 once they are 30 days old, the delegations past the newest 200, the delegated conversations of an agent past the newest 50 once they have not been used for 90 days, and the conversations in the list that the CLI no longer has once they have not been used for 90 days (never an agent's current one). The record of a received file is emptied together with the file, so an agent is no longer handed a path that was deleted. The conversations themselves, in each CLI, are never touched.
-- Settings → Sessions of an agent, and the header of the Sessions screen, show the full session id, with a button to copy it.
+## [1.5.0] - 2026-10-19
 
 ### Added
 
@@ -19,6 +16,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The launcher can run hive-am in the background and manage it: `hive-am start --background` (detached, with its output in `run/hive-am.log` in the data folder), `hive-am status`, `hive-am logs [-f] [-n N]`, `hive-am stop` and `hive-am restart`. A second start refuses and names the run that is already there, and a record whose process is gone or was reused by another one is reported as stale and never signalled. Plain `hive-am` behaves as before.
 - Every run of the launcher opens with a welcome that shows the version, the addresses and where the data and the log are. `hive-am version` prints the version, and `hive-am status` shows the version of the run.
 - `hive-am update` looks for a newer version on npm and installs it (`--check` only reports, `--restart` also restarts a run in the background), so updating no longer needs `npm install -g` by hand. It only installs when hive-am was installed globally with npm.
+
+### Changed
+
+- What hive-am keeps of its own record no longer grows for ever. Every six hours (and at start) it forgets: the messages of a channel conversation past the newest 500 once they are 30 days old, the delegations past the newest 200, the delegated conversations of an agent past the newest 50 once they have not been used for 90 days, and the conversations in the list that the CLI no longer has once they have not been used for 90 days (never an agent's current one). The record of a received file is emptied together with the file, so an agent is no longer handed a path that was deleted. The conversations themselves, in each CLI, are never touched.
+- Settings → Sessions of an agent, and the header of the Sessions screen, show the full session id, with a button to copy it.
 
 ### Fixed
 
@@ -210,7 +212,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/hughcbscrt/hive-am/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/hughcbscrt/hive-am/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/hughcbscrt/hive-am/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/hughcbscrt/hive-am/compare/v1.2.1...v1.2.2
