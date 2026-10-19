@@ -206,7 +206,7 @@ Solo preferencias de vista; si se borran, la interfaz funciona igual.
 | `hive-am.dock` | JSON `{ open, height, active }` | `lib/dock.tsx`: estado del panel inferior de terminales |
 | `hive-am.logsize` | número (10 a 20) | `LogPane.tsx`: tamaño del texto de los logs de recursos |
 | `hive-am.dbq.<resourceId>` | texto | `DbWorkspace.tsx`: el SQL que se está escribiendo en cada recurso de base de datos |
-| `hive-am.git.last.<agentId>` | ruta | `GitExplorer.tsx`: el último archivo abierto en el explorador de cambios de cada agente |
+| `hive-am.git.where.<agentId>` | JSON | `GitExplorer.tsx`: dónde estaba la persona en el explorador de cambios de cada agente. Todos los campos son opcionales: `{ file, dirs, mode, hist, commit, cmp: { base, head }, stash, tag }` (el archivo, las carpetas abiertas, la pestaña y lo que tenía seleccionado) |
 
 La clave anterior `hive-rel-pos` ya no se usa (se abandonó al rediseñar el lienzo).
 

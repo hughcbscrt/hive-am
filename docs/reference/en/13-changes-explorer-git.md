@@ -312,7 +312,7 @@ Everything here is **read-only**: the working folder is never touched. Every bra
 - **View at…** (file view): the same file as it was at any branch, tag or commit, with a banner to go back to the current one.
 - **Search in files.** In the Files tab, switch the filter from *Name* to *Content*: `git grep` over the working files (tracked and new, never ignored ones), up to 300 matches; clicking one opens the file at that line.
 - **Branches.** Each local branch has a delete button (`git branch -d`: git refuses one with commits that are in no other branch, and the dialog then offers *Delete anyway*, `-D`). You cannot delete the branch you are on.
-- **Keys.** `/` jumps to the filter; `Alt+1…5` switch tabs. The last file open is remembered per agent.
+- **Keys.** `/` jumps to the filter; `Alt+1…5` switch tabs. Where you were is remembered per agent (`hive-am.git.where.<agentId>`): the file, the folders that lead to it, the tab (Files, History, Tags, Compare or Stashes) and what it had selected. It is read once, the first time the tree is ready, and it wins over the automatic first change, which is only the fallback when nothing is remembered or the file no longer exists. The filters and the search are not remembered.
 
 API (GET unless noted): `…/git/refs` (branches, remotes, tags), `…/git/tags`, `…/git/tag-tree?tag=`, `…/git/tag-file?tag=&path=`, `…/git/ref-file?ref=&path=`, `…/git/raw-at?ref=&path=` (pictures, served as inert images), `…/git/compare?base=&head=`, `…/git/compare-diff?base=&head=&path=`, `…/git/grep?q=&case=`, `…/git/log?skip=&q=&by=message|author|content&ref=&path=`; POST `…/git/branch-create` `{ branch, from }`, `…/git/branch-delete` `{ branch, force }`.
 

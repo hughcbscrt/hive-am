@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+- Changes explorer: coming back to the tab now opens the file you were reading, with the folders that lead to it open, and the tab (History, Tags, Compare or Stashes) with what it had selected. Before, a folder with changes always replaced the remembered file with the first changed one, and in a clean folder of more than 40 files the file came back with every folder closed.
 - Chat: the **Jump to latest** button is no longer offered when there is nothing to scroll, and it appears for any scroll up with content out of view (a 25 px scroll up used to leave the last line cut with no button, and a streaming reply pulled the view back down). A taller draft or a resized window keeps the last message in view when you had not scrolled away.
 - OpenCode: changing an agent's permission did not apply to its existing conversation, so an agent switched to Full access kept saying it had no shell. The chat now warns that the permission changed after the conversation started and offers **Apply now**, which starts a new conversation (the current one stays in Sessions). Conversations recorded before this change are not detected.
 - A turn whose tool stops answering no longer holds the agent's queue forever: after 10 minutes of silence it is stopped, reported as failed, and the messages behind it run. A failure while a turn starts is now reported as that turn's error instead of losing the message.
