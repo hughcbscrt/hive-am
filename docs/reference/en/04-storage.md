@@ -118,7 +118,7 @@ Junction table `colony_skills (colony_id, skill_id)` (`CASCADE`). Membership of 
 
 ### Table `agent_sessions`
 
-Log of **all** the native sessions an agent has used. It feeds the Sessions tabs and screens.
+Log of the native sessions an agent has used. It feeds the Sessions tabs and screens. It is trimmed by `retentionPass` (`retention.ts`, at start and every six hours, next to the inbox cleaning): delegated sessions past the newest 50 of their agent and unused for 90 days, and direct ones unused for 90 days whose transcript the CLI no longer has (never the agent's current one), are removed. The same pass keeps the newest 500 `thread_messages` of each thread plus anything younger than 30 days, the newest 200 `dispatches` (one still running is never removed), and empties `thread_messages.files` after the inbox's 14 days. Only these rows go: the conversations stay in the CLI. Migration 5 adds `idx_dispatches_created` for it.
 
 | Column | Notes |
 |---|---|

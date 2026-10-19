@@ -89,7 +89,8 @@ const rowsBefore = JSON.stringify(db.prepare('SELECT * FROM agents').all());
 db.pragma('user_version = 0'); migrate(db);   // as if the version mark were lost: every migration must be a harmless no-op
 check(JSON.stringify(db.prepare('SELECT * FROM agents').all()) === rowsBefore && skills.list().length === 3, 're-running every migration over live data changes nothing');
 const mem = new Database(':memory:');
-check(migrate(mem).join() === '1,2,3,4' && mem.pragma('user_version', { simple: true }) === SCHEMA_VERSION, 'a fresh database is built by the same migrations');
+check(migrate(mem).join() === '1,2,3,4,5' && mem.pragma('user_version', { simple: true }) === SCHEMA_VERSION, 'a fresh database is built by the same migrations');
+check(mem.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_dispatches_created'").get() !== undefined && !!db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_dispatches_created'").get(), 'the dispatch index exists in a fresh and in an upgraded database');
 const tablesOf = (d: Database.Database) => (d.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as { name: string }[]).map((r) => r.name).filter((n) => n !== 'sqlite_sequence').join();
 check(tablesOf(mem) === tablesOf(db), 'fresh and migrated databases have the same tables');
 // a failing migration leaves no half-applied schema and no new version

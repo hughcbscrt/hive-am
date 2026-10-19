@@ -118,7 +118,7 @@ Tabla puente `colony_skills (colony_id, skill_id)` (`CASCADE`). La pertenencia d
 
 ### Tabla `agent_sessions`
 
-Bitácora de **todas** las sesiones nativas que un agente ha usado. Alimenta las pestañas y pantallas de Sessions.
+Bitácora de las sesiones nativas que un agente ha usado. Alimenta las pestañas y pantallas de Sessions. La recorta `retentionPass` (`retention.ts`, al arrancar y cada seis horas, junto a la limpieza del buzón): se eliminan las sesiones delegadas que pasen de las 50 más nuevas de su agente y lleven 90 días sin usarse, y las directas sin uso en 90 días cuyo transcript la CLI ya no tiene (nunca la actual del agente). La misma pasada conserva los 500 `thread_messages` más nuevos de cada hilo y todo lo de menos de 30 días, los 200 `dispatches` más nuevos (uno que sigue en curso nunca se elimina) y vacía `thread_messages.files` pasados los 14 días del buzón. Solo se van esas filas: las conversaciones quedan en la CLI. La migración 5 añade `idx_dispatches_created` para esto.
 
 | Columna | Notas |
 |---|---|
