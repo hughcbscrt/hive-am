@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- A message that begins with a dash (`- something`, a bullet list, `--word`) is no longer read as an option by OpenCode and Kiro, which ended the turn with no answer or an error. The prompt now goes after `--`.
+- A turn that produces no events is reported as a failure, with the first line the tool printed, instead of passing as an empty answer.
+
 ## [1.4.0] - 2026-10-15
 
 ### Added

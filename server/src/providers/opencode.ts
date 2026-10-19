@@ -85,7 +85,8 @@ export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> 
   if (!contextWindow('opencode', agent.model)) void learnOpencodeWindows(agent.cwd, access);
   if (access) { args.splice(1, 0, '--server', access.url); env.OPENCODE_SERVER_PASSWORD = access.password; }
   else if (has('--standalone')) args.splice(1, 0, '--standalone');      // 1.x always runs its own server
-  args.push(prompt);
+  // After `--` so a message that begins with a dash is the prompt and never an option; nothing may be pushed after it.
+  args.push('--', prompt);
   // Stopping a turn must really stop the model: a client that is killed would leave the server working on, so the server goes down with it.
   if (access) o.signal.addEventListener('abort', () => stopOpencodeServer(agent.id), { once: true });
 

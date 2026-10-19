@@ -56,9 +56,18 @@ export function safeJson(line: string): any | null {
   try { return JSON.parse(line); } catch { return null; }
 }
 
-/** The JSON objects a CLI prints, one per line; lines that are not JSON (banners, warnings) are skipped. */
+/**
+ * The JSON objects a CLI prints, one per line; lines that are not JSON (banners, warnings) are skipped.
+ * A CLI that exits cleanly having printed only prose (its usage text, say) has not answered: that is an error carrying its first line.
+ */
 export async function* spawnJson(o: SpawnOpts): AsyncGenerator<any> {
-  for await (const line of spawnLines(o)) { const ev = safeJson(line); if (ev) yield ev; }
+  let events = 0;
+  let firstNoise = '';
+  for await (const line of spawnLines(o)) {
+    const ev = safeJson(line);
+    if (ev) { events++; yield ev; } else firstNoise ||= line.trim();
+  }
+  if (!events && firstNoise && !o.signal.aborted) throw new Error(`${o.cmd} produced no events, it printed: ${firstNoise.slice(0, 300)}`);
 }
 
 /** The text of a tool result, which CLIs send as a string, a list of blocks or any other JSON. */

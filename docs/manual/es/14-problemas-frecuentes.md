@@ -31,6 +31,13 @@ Al crear un agente, la tarjeta del proveedor muestra **no encontrado** cuando el
 2. Instálalo, o arranca hive-am desde una terminal donde esté accesible.
 3. Reinicia hive-am y vuelve a abrir el formulario: debe aparecer como **instalado**.
 
+## El turno falla con "produced no events"
+
+La herramienta de línea de comandos corrió pero no envió nada que hive-am pudiera usar, y escribió otra cosa en su lugar (a menudo su texto de uso). La primera línea que imprimió aparece en el aviso.
+
+1. Lee esa línea: dice qué no le gustó a la herramienta.
+2. Actualiza la herramienta, o prueba el mismo comando a mano en tu terminal.
+
 ## El turno falla con un error "exited with code N"
 
 La herramienta de línea de comandos falló: sesión caducada, modelo inválido, sin créditos, etc. El detalle aparece en el aviso rojo de la conversación.

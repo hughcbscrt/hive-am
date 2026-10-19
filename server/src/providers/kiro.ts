@@ -36,7 +36,8 @@ export async function* runKiro(o: TurnOptions): AsyncGenerator<StreamEvent> {
   if (agent.model) args.push('--model', agent.model);
   if (o.effort) args.push('--effort', o.effort);
   const prompt = withInstructions(o.prompt, o.instructions, !!agent.session_id, o.refreshInstructions);
-  args.push(prompt);
+  // After `--` so a message that begins with a dash is the prompt and never an option; nothing may be pushed after it.
+  args.push('--', prompt);
 
   let sawSession = false;
   const open = new Set<string>();
