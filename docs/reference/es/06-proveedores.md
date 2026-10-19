@@ -73,11 +73,11 @@ Si el proceso termina sin evento `result`, se emite un `done` simple.
 
 ## 6.4 OpenCode (`providers/opencode.ts`)
 
-**Comando** (el prompt va como **último argumento**):
+**Comando** (el prompt va como **último argumento, después de `--`**, así un mensaje que empieza con guion nunca se lee como opción):
 
 ```bash
 opencode run --standalone --format json --thinking --auto \
-  [-s <session_id>] [-m <proveedor/modelo>] "<prompt (con preámbulo si aplica)>"
+  [-s <session_id>] [-m <proveedor/modelo>] -- "<prompt (con preámbulo si aplica)>"
 ```
 
 | Aspecto | Comportamiento |
@@ -106,11 +106,11 @@ Al terminar el stream se emite `done`.
 
 ## 6.5 Kiro (`providers/kiro.ts`)
 
-**Comando** (prompt como último argumento):
+**Comando** (prompt como último argumento, después de `--`):
 
 ```bash
 kiro-cli chat --no-interactive --output-format stream-json \
-  [--agent hive-<id>] [--trust-all-tools] [--resume-id <session_id>] [--model <modelo>] "<prompt>"
+  [--agent hive-<id>] [--trust-all-tools] [--resume-id <session_id>] [--model <modelo>] -- "<prompt>"
 ```
 
 | Aspecto | Comportamiento |

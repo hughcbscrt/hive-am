@@ -76,6 +76,7 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
   let text = '';
   let summary: string | undefined;
   let error: string | undefined;
+  let events = 0;
   let hash = '', nbVersion = 0;
   const push = (event: StreamEvent) => { s.live?.events.push(event); emit({ kind: 'event', agentId, turnId, event }); };
 
@@ -93,6 +94,7 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
       mcpCaps: mcpCaps(agent), effort: origin?.effort,
     });
     for await (const ev of stream) {
+      if (ev.t !== 'done') events++;
       if (ev.t === 'session') {
         if (delegated) { agents.recordSession(agent, ev.sessionId, 'delegation', from, prompt); if (dispatchId) dispatches.setSession(dispatchId, ev.sessionId); }
         else { agents.setSession(agent, ev.sessionId); agent.session_id = ev.sessionId; }
@@ -108,6 +110,8 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
     if (!controller.signal.aborted) { error = e instanceof Error ? e.message : String(e); push({ t: 'error', message: error }); }
   }
 
+  // A turn with no event of any kind (no session, text, tool or usage) never reached the model: it is not an empty answer.
+  if (!events && !error && !controller.signal.aborted) { error = 'The agent produced no events, so the turn did not run'; push({ t: 'error', message: error }); }
   if (controller.signal.aborted && !error) push({ t: 'done', ok: false, summary: 'Stopped' });
   s.controller = null;
   s.live = null;

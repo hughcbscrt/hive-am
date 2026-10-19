@@ -31,6 +31,13 @@ When you create an agent, the provider card shows **not found** when the program
 2. Install it, or start hive-am from a terminal where it is available.
 3. Restart hive-am and open the form again: it should show as **installed**.
 
+## The turn fails with "produced no events"
+
+The command-line tool ran but sent nothing hive-am could use, and said something else instead (often its usage text). The first line it printed appears in the notice.
+
+1. Read that line: it says what the tool did not like.
+2. Update the tool, or try the same command by hand in your terminal.
+
 ## The turn fails with an "exited with code N" error
 
 The command-line tool failed: expired session, invalid model, no credits, and so on. The detail appears in the red notice in the conversation.
