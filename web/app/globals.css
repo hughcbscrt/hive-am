@@ -1387,7 +1387,7 @@ a.card.stat:focus-visible, .table tbody tr.row-link:focus-visible { outline: 2px
 .chat-jump { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: var(--z-3); box-shadow: var(--shadow); background: var(--surface); }
 .chat-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .chat-readonly { justify-content: space-between; align-items: center; }
-.fa-sess { gap: 8px; } .fa-sess.on { border-color: var(--honey); }
+.fa-sess { gap: 8px; } .sess-id { overflow-wrap: anywhere; } .fa-sess.on { border-color: var(--honey); }
 .fa-clamp3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .fa-title { font-family: var(--font-display); font-size: 16px; } .fa-title.lg { font-size: 17px; }
 .fa-card-title { font-size: 19px; } .fa-desc { min-height: 40px; }

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { agents } from '../db.js';
 import { liveOrigin, notifyAgentsChanged } from '../runtime.js';
 import { cleanInbox } from './files.js';
+import { retentionPass, retentionTouched } from '../retention.js';
 import { resolveSendable } from './outbound.js';
 import { syncChannelSkill } from './channel-skill.js';
 import { handleInbound } from './router.js';
@@ -62,10 +63,15 @@ export async function stopConnection(id: string): Promise<void> {
 }
 
 let cleaner: ReturnType<typeof setInterval> | undefined;
-export const startAll = () => {
-  // Received files are kept for a while, then removed.
+/** Received files are kept for a while, then removed; and what hive-am keeps of its own record is aged out (retention.ts). */
+function housekeeping(): void {
   cleanInbox();
-  cleaner ??= setInterval(() => cleanInbox(), 6 * 3_600_000).unref();
+  try { const r = retentionPass(); if (retentionTouched(r)) console.log(`[retention] removed ${r.messages} messages, ${r.dispatches} dispatches, ${r.sessions} sessions; emptied ${r.files} file records`); }
+  catch (e) { console.error('[retention]', e); }
+}
+export const startAll = () => {
+  housekeeping();
+  cleaner ??= setInterval(housekeeping, 6 * 3_600_000).unref();
   return Promise.all(connections.list().filter((c) => c.enabled).map((c) => startConnection(c.id)));
 };
 export const stopAll = () => Promise.all([...running.keys()].map(stopConnection));

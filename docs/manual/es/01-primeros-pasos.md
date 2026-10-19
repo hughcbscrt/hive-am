@@ -52,7 +52,7 @@ Cuando arranque, abre <http://127.0.0.1:4401> en tu navegador.
 
 ### Dónde se guardan los datos
 
-Todo se guarda en `~/.hive-am` (la base de datos es `~/.hive-am/hive-am.db`). Para usar otra carpeta, define la variable `HIVE_AM_HOME` antes de arrancar. Las conversaciones no están ahí: viven en los almacenes de cada herramienta (Claude Code, OpenCode, Kiro).
+Todo se guarda en `~/.hive-am` (la base de datos es `~/.hive-am/hive-am.db`). Para usar otra carpeta, define la variable `HIVE_AM_HOME` antes de arrancar. Las conversaciones no están ahí: viven en los almacenes de cada herramienta (Claude Code, OpenCode, Kiro). hive-am mantiene su propio registro dentro de límites: los mensajes de canal viejos, las delegaciones y las conversaciones que la herramienta ya no tiene se olvidan con el tiempo, nunca las conversaciones en sí ([detalle](13-permisos-y-seguridad.md)).
 
 > **Consejo:** para hacer una copia de seguridad, detén hive-am y copia la carpeta `~/.hive-am` completa.
 

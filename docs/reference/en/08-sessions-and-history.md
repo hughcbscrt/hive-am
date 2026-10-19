@@ -152,7 +152,7 @@ A turn's duration is the last assistant message's `endTs` minus the instant of t
 | Settings → **Sessions** (on the agent) | *Conversations* (direct, with *Current*) and *Delegated tasks* (from orchestrators) with *Read transcript* |
 | **Sessions** screen | All your agents' sessions, grouped by day, with search by agent/folder/first message and a provider filter; the label says "Current" or "Delegated by X"; it shows tokens, cost, tools and model; the right panel is the transcript (text only) |
 
-The Sessions screen shows **only sessions managed by hive-am**, not every one that exists in the CLI.
+The Sessions screen shows **only sessions managed by hive-am**, not every one that exists in the CLI. Each session shows its **full id** with a copy button (in the agent's Settings → Sessions and in the header of the Sessions screen). A conversation the CLI no longer has stops being listed once it has not been used for 90 days, and old delegated sessions past the newest 50 of an agent are dropped after the same time (see the `agent_sessions` table in the storage document).
 
 ## 8.8 Considerations
 

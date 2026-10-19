@@ -6,6 +6,7 @@ import { useHiveData } from '@/lib/store';
 import { usePolling } from '@/lib/hooks/usePolling';
 import { useQueryState } from '@/lib/hooks/useQueryState';
 import { History } from '@/components/chat/Chat';
+import { CopyBtn } from '@/components/chat/ToolCall';
 import { PROVIDERS, ago, shortPath } from '@/lib/meta';
 import { fmtCost, fmtTokens, totalTokens } from '@/lib/format';
 import type { ChatMessage, Provider, SessionRow } from '@/lib/types';
@@ -92,7 +93,7 @@ export default function Sessions() {
           {!sel ? <section className="sk-main sk-none"><p className="muted">{t('sessions.select')}</p></section> : (
             <section className="sk-main">
               <header className="sx-head">
-                <div className="grow"><b className="fa-title lg">{sel.agent_name}</b><div className="muted small mono ellipsis">{shortPath(sel.cwd)} · {sel.session_id}</div></div>
+                <div className="grow"><b className="fa-title lg">{sel.agent_name}</b><div className="muted small mono sess-id">{shortPath(sel.cwd)} · {sel.session_id} <CopyBtn compact text={sel.session_id} label={t('agent.sessions.copyId')} /></div></div>
                 {agent && <Link className="btn sm primary" href={`/agents/${agent.id}`}>{t('sessions.openAgent')}</Link>}
               </header>
               <div className="transcript col sx-transcript" ref={scroller}>

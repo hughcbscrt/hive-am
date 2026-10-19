@@ -152,7 +152,7 @@ La duración de un turno es `endTs` del último mensaje del asistente menos el i
 | Settings → **Sessions** (en el agente) | *Conversations* (directas, con *Current*) y *Delegated tasks* (de orquestadores) con *Read transcript* |
 | Pantalla **Sessions** | Todas las sesiones de tus agentes, agrupadas por día, con búsqueda por agente/carpeta/primer mensaje y filtro por proveedor; la etiqueta indica "Current" o "Delegated by X"; muestra tokens, costo, herramientas y modelo; el panel derecho es la transcripción (solo texto) |
 
-La pantalla Sessions muestra **solo sesiones gestionadas por hive-am**, no todas las que existan en el CLI.
+La pantalla Sessions muestra **solo sesiones gestionadas por hive-am**, no todas las que existan en el CLI. Cada sesión muestra su **id completo** con un botón para copiarlo (en Ajustes → Sesiones del agente y en el encabezado de la pantalla Sesiones). Una conversación que la CLI ya no tiene deja de listarse cuando lleva 90 días sin usarse, y las sesiones delegadas viejas que pasen de las 50 más nuevas de un agente se descartan tras el mismo tiempo (ver la tabla `agent_sessions` en el documento de almacenamiento).
 
 ## 8.8 Consideraciones
 

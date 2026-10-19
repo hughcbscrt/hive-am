@@ -676,6 +676,7 @@ export const en = {
   "agent.sessions.intro": "Native sessions in {path}. Reading one never changes the agent.",
   "agent.sessions.conversations": "Conversations",
   "agent.sessions.empty": "No conversations yet. The first message creates one.",
+  "agent.sessions.copyId": "Copy session id",
   "agent.sessions.started": "Started {started} · last used {last}",
   "agent.sessions.viewing": "Viewing",
   "agent.sessions.read": "Read transcript",

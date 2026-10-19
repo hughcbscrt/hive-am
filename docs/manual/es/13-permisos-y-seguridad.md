@@ -93,6 +93,8 @@ Puedes cambiar la carpeta con la variable de entorno `HIVE_AM_HOME`.
 
 Las conversaciones no están ahí: las guarda cada CLI en su propio almacén (por ejemplo `~/.claude`). Ver [Sesiones](07-sesiones.md).
 
+Lo que hive-am guarda de su propio registro no crece para siempre. Cada seis horas olvida los mensajes de una conversación de canal que pasen de los 500 más nuevos cuando tengan 30 días, las delegaciones que pasen de las 200 más nuevas, las conversaciones delegadas de un agente que pasen de las 50 más nuevas cuando lleven 90 días sin usarse, y las conversaciones de la lista que la CLI ya no tiene cuando lleven 90 días sin usarse (la que un agente usa ahora nunca se olvida). Solo se recorta la lista propia de hive-am: las conversaciones en sí, en cada CLI, nunca se tocan.
+
 > **Nota:** la base de datos contiene tus prompts, skills y los cuadernos de los agentes en texto plano. El cuaderno rechaza las notas con credenciales.
 
 ## Dónde van los secretos

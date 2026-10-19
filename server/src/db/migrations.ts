@@ -199,6 +199,13 @@ CREATE TABLE IF NOT EXISTS object_agents (
       addColumn(db, 'agent_sessions', 'permission TEXT');
     },
   },
+  {
+    version: 5, name: 'dispatch-created-index',
+    up(db) {
+      // The retention pass orders the delegation log by this when it keeps the newest ones.
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dispatches_created ON dispatches (created_at, id)');
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

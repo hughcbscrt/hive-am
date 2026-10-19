@@ -674,6 +674,7 @@ export const es: Record<DictKey, string> = {
   "agent.sessions.intro": "Sesiones nativas en {path}. Leer una nunca modifica al agente.",
   "agent.sessions.conversations": "Conversaciones",
   "agent.sessions.empty": "Aún no hay conversaciones. El primer mensaje crea una.",
+  "agent.sessions.copyId": "Copiar id de la sesión",
   "agent.sessions.started": "Iniciada {started} · último uso {last}",
   "agent.sessions.viewing": "Viendo",
   "agent.sessions.read": "Leer transcripción",

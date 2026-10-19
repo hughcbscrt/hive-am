@@ -14,6 +14,7 @@ import { useQueryState } from '@/lib/hooks/useQueryState';
 import { Chat } from '@/components/chat/Chat';
 import { StatsBar } from '@/components/chat/StatsBar';
 import { ResourceStrip } from '@/components/chat/ResourceStrip';
+import { CopyBtn } from '@/components/chat/ToolCall';
 import { AgentSwitcher } from '@/components/agents/AgentSwitcher';
 import { GitExplorer } from '@/components/git/GitExplorer';
 import { useGit } from '@/lib/git/useGit';
@@ -148,7 +149,7 @@ function Workspace({ id }: { id: string }) {
                 const current = s.session_id === agent.session_id;
                 return (
                   <div key={s.session_id} className={`card card-pad col fa-sess ${viewing === s.session_id ? 'on' : ''}`}>
-                    <div className="row"><span className="mono grow">{s.session_id.slice(0, 18)}…</span>{current && <span className="chip honey">{t('sessions.current')}</span>}</div>
+                    <div className="row gap-xs"><span className="mono grow sess-id">{s.session_id}</span><CopyBtn compact text={s.session_id} label={t('agent.sessions.copyId')} />{current && <span className="chip honey">{t('sessions.current')}</span>}</div>
                     <span className="muted small">{t('agent.sessions.started', { started: ago(s.first_seen), last: ago(s.last_seen) })}</span>
                     <div className="row gap-s"><button className="btn sm" onClick={() => { setViewing(current ? undefined : s.session_id); setOpen(false); }}>{viewing === s.session_id ? t('agent.sessions.viewing') : t('agent.sessions.read')}</button>{!current && <button className="btn sm" onClick={() => resume(s.session_id).then(() => setOpen(false)).catch((e) => toast(e instanceof Error ? e.message : String(e), 'err'))}>{t('agent.sessions.resume')}</button>}</div>
                   </div>
@@ -159,6 +160,7 @@ function Workspace({ id }: { id: string }) {
                 <div key={s.session_id} className={`card card-pad col fa-sess ${viewing === s.session_id ? 'on' : ''}`}>
                   <div className="row gap-s"><Waypoints size={14} className="muted" /><b className="grow">{t('agent.sessions.from', { name: s.from_name ?? t('chat.anOrchestrator') })}</b><span className="muted small">{ago(s.last_seen)}</span></div>
                   {s.task && <span className="small fa-clamp3">{s.task}</span>}
+                  <div className="row gap-xs"><span className="mono muted small grow sess-id">{s.session_id}</span><CopyBtn compact text={s.session_id} label={t('agent.sessions.copyId')} /></div>
                   <div className="row gap-s"><button className="btn sm" onClick={() => { setViewing(viewing === s.session_id ? undefined : s.session_id); setOpen(false); }}>{viewing === s.session_id ? t('agent.sessions.viewing') : t('agent.sessions.read')}</button></div>
                 </div>
               ))}

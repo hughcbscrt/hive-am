@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Changed
+
+- What hive-am keeps of its own record no longer grows for ever. Every six hours (and at start) it forgets: the messages of a channel conversation past the newest 500 once they are 30 days old, the delegations past the newest 200, the delegated conversations of an agent past the newest 50 once they have not been used for 90 days, and the conversations in the list that the CLI no longer has once they have not been used for 90 days (never an agent's current one). The record of a received file is emptied together with the file, so an agent is no longer handed a path that was deleted. The conversations themselves, in each CLI, are never touched.
+- Settings → Sessions of an agent, and the header of the Sessions screen, show the full session id, with a button to copy it.
+
 ### Added
 
 - The launcher can run hive-am in the background and manage it: `hive-am start --background` (detached, with its output in `run/hive-am.log` in the data folder), `hive-am status`, `hive-am logs [-f] [-n N]`, `hive-am stop` and `hive-am restart`. A second start refuses and names the run that is already there, and a record whose process is gone or was reused by another one is reported as stale and never signalled. Plain `hive-am` behaves as before.

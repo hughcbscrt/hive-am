@@ -109,7 +109,7 @@ hive-am is meant as a **local, single-user tool**. It is worth knowing its reach
    The provider (`claude`, `opencode`, `kiro`) is the first argument; all of them end with `ALL PASSED` or `N FAILED`.
 7. **Delegation:** create an orchestrator (Claude or OpenCode), connect a worker to it and ask it to delegate; check the row in `GET /api/dispatches`, the delegation session in `GET /api/agents/<worker>/sessions` and that the worker's direct chat did not change.
 
-**Test scripts that need no model** (`server/scripts/test-*.ts`, 24 of them: addressing, cron, format, HTTP core, HTTP scripts, migrations, objects and their kinds, supervision, tools and database, providers' common code, provider arguments, session permission, the launcher, rate, reactions, runtime recovery, schedules, Telegram timeouts, terminals, uploads, watch, connection lifecycle). They spend no tokens, but they create and delete data, so they refuse to run unless `HIVE_AM_HOME` points to a temporary folder. Use a port other than 4400 (that one is for your instance) with `HIVE_AM_PORT`:
+**Test scripts that need no model** (`server/scripts/test-*.ts`, 25 of them: addressing, cron, format, HTTP core, HTTP scripts, migrations, objects and their kinds, supervision, tools and database, providers' common code, provider arguments, session permission, the launcher, retention, rate, reactions, runtime recovery, schedules, Telegram timeouts, terminals, uploads, watch, connection lifecycle). They spend no tokens, but they create and delete data, so they refuse to run unless `HIVE_AM_HOME` points to a temporary folder. Use a port other than 4400 (that one is for your instance) with `HIVE_AM_PORT`:
 
 ```bash
 cd server

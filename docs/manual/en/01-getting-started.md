@@ -52,7 +52,7 @@ Once it starts, open <http://127.0.0.1:4401> in your browser.
 
 ### Where your data is stored
 
-Everything is stored in `~/.hive-am` (the database is `~/.hive-am/hive-am.db`). To use another folder, set the `HIVE_AM_HOME` variable before starting. Conversations are not there: they live in the stores of each tool (Claude Code, OpenCode, Kiro).
+Everything is stored in `~/.hive-am` (the database is `~/.hive-am/hive-am.db`). To use another folder, set the `HIVE_AM_HOME` variable before starting. Conversations are not there: they live in the stores of each tool (Claude Code, OpenCode, Kiro). hive-am keeps its own record within limits: old channel messages, delegations and conversations that the tool no longer has are forgotten after a while, never the conversations themselves ([details](13-permissions-and-security.md)).
 
 > **Tip:** to back up your data, stop hive-am and copy the whole `~/.hive-am` folder.
 
