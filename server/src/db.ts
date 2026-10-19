@@ -31,7 +31,7 @@ type ColonyRow = Omit<Colony, 'inherit' | 'skill_ids' | 'skill_loads' | 'agent_i
 type AgentRow = Omit<Agent, 'skill_ids' | 'skill_loads' | 'worker_ids' | 'overrides' | 'effective' | 'browser'> & { overrides: string | null; browser: number };
 interface LoadRow { skill_id: string; load: string }
 interface CountRow { skill_id: string; c: number }
-export interface SessionRow { agent_id: string; provider: Provider; session_id: string; cwd: string; first_seen: number; last_seen: number; kind: 'direct' | 'delegation'; from_id: string | null; task: string | null; from_name: string | null }
+export interface SessionRow { agent_id: string; provider: Provider; session_id: string; cwd: string; first_seen: number; last_seen: number; kind: 'direct' | 'delegation'; from_id: string | null; task: string | null; from_name: string | null; permission: Permission | null }
 export interface SessionWithAgentRow extends SessionRow { agent_name: string; agent_role: Role }
 export interface DispatchRow { id: string; from_id: string; to_id: string; task: string; status: string; result: string | null; created_at: number; finished_at: number | null; session_id: string | null }
 
@@ -227,16 +227,17 @@ export const agents = {
   setSession: db.transaction((a: Agent, sessionId: string | null) => {
     q('UPDATE agents SET session_id=?, session_cwd=?, instr_hash=NULL, updated_at=? WHERE id=?').run(sessionId, sessionId ? a.effective.cwd : null, now(), a.id);
     if (sessionId) {
-      q(`INSERT INTO agent_sessions (agent_id, provider, session_id, cwd, first_seen, last_seen) VALUES (?,?,?,?,?,?)
+      // The permission is written once, when the session is first seen: it never changes on conflict, or a later change of permission would be hidden.
+      q(`INSERT INTO agent_sessions (agent_id, provider, session_id, cwd, first_seen, last_seen, permission) VALUES (?,?,?,?,?,?,?)
         ON CONFLICT(agent_id, session_id) DO UPDATE SET last_seen=excluded.last_seen`)
-        .run(a.id, a.provider, sessionId, a.effective.cwd, now(), now());
+        .run(a.id, a.provider, sessionId, a.effective.cwd, now(), now(), a.effective.permission);
     }
   }),
   /** Logs a native session without making it the agent's current conversation (used for delegations). */
   recordSession(a: Agent, sessionId: string, kind: 'direct' | 'delegation', fromId?: string, task?: string) {
-    q(`INSERT INTO agent_sessions (agent_id, provider, session_id, cwd, first_seen, last_seen, kind, from_id, task) VALUES (?,?,?,?,?,?,?,?,?)
+    q(`INSERT INTO agent_sessions (agent_id, provider, session_id, cwd, first_seen, last_seen, kind, from_id, task, permission) VALUES (?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(agent_id, session_id) DO UPDATE SET last_seen=excluded.last_seen`)
-      .run(a.id, a.provider, sessionId, a.effective.cwd, now(), now(), kind, fromId ?? null, task ? task.slice(0, 500) : null);
+      .run(a.id, a.provider, sessionId, a.effective.cwd, now(), now(), kind, fromId ?? null, task ? task.slice(0, 500) : null, a.effective.permission);
   },
   setSkills: (id: string, ids: string[], loads?: Record<string, SkillLoad>) => assignSkills('agent', id, ids, loads),
   /** Replaces the workers an orchestrator may dispatch to (never itself). */

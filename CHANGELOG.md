@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+- OpenCode: changing an agent's permission did not apply to its existing conversation, so an agent switched to Full access kept saying it had no shell. The chat now warns that the permission changed after the conversation started and offers **Apply now**, which starts a new conversation (the current one stays in Sessions). Conversations recorded before this change are not detected.
 - A turn whose tool stops answering no longer holds the agent's queue forever: after 10 minutes of silence it is stopped, reported as failed, and the messages behind it run. A failure while a turn starts is now reported as that turn's error instead of losing the message.
 - A message that begins with a dash (`- something`, a bullet list, `--word`) is no longer read as an option by OpenCode and Kiro, which ended the turn with no answer or an error. The prompt now goes after `--`.
 - A turn that produces no events is reported as a failure, with the first line the tool printed, instead of passing as an empty answer.

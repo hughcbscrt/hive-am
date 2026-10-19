@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { History, RotateCcw, SlidersHorizontal, Waypoints } from 'lucide-react';
 import { useAgent, useHiveData } from '@/lib/store';
 import { api } from '@/lib/api';
-import { ago, shortPath, PROVIDERS } from '@/lib/meta';
+import { ago, shortPath, PROVIDERS, permissionLabel } from '@/lib/meta';
 import { LAST_CHAT } from '@/lib/lastChat';
 import { usePersistentState, writeStored } from '@/lib/hooks/usePersistentState';
 import { useQueryState } from '@/lib/hooks/useQueryState';
@@ -109,6 +109,11 @@ function Workspace({ id }: { id: string }) {
         />
         {/* The chat stays mounted (just hidden) so a half-written message and the scroll position survive a visit to Changes. */}
         <div className="chat-pane" hidden={view !== 'chat'}>
+          {agent.permission_stale && !viewing && (
+            <Banner kind="warn" action={<button type="button" className="btn sm" onClick={() => setConfirm('new')}>{t('agent.permStale.action')}</button>}>
+              <b>{t('agent.permStale.title')}</b> {t('agent.permStale.body', { a1: permissionLabel(agent.effective.permission) })}
+            </Banner>
+          )}
           <ResourceStrip agent={agent} />
           <StatsBar agent={agent} session={viewing} />
           <Chat agent={agent} sessionOverride={viewing} />

@@ -87,6 +87,8 @@ The **Model** field is a searchable selector: "CLI default" (the CLI picks), the
 
 Three levels: **Read-only**, **Edit files** and **Full access**. If you do not use a type, a new agent starts at **Edit files**. What each level means for each provider is in [Permissions and security](13-permissions-and-security.md).
 
+OpenCode keeps the tools a conversation started with. If you change an OpenCode agent's permission (or its colony's) while a conversation is open, the chat shows a warning and an **Apply now** button, which starts a new conversation with the new permission. The current one stays in the Sessions tab. Conversations that were open before this warning existed are not detected: use **New conversation**.
+
 > **Tip:** use **Full access** only in throwaway folders or folders you have a copy of.
 
 ### Working folder
