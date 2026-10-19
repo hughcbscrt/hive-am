@@ -68,7 +68,7 @@ Change the level in the agent's settings (or in the colony, if it inherits it). 
 
 ## My message was lost after a restart or shutdown
 
-If the server stops in the middle of a turn, that turn is lost. The session stays intact and the agent goes back to **Idle** on restart, but you have to send the message again.
+If the server stops in the middle of a turn, that turn is lost. The session stays intact and the agent goes back to **Idle** on restart, but you have to send the message again. Messages that were queued and had not started are lost too.
 
 ## The session does not resume or the agent seems to start from scratch
 
@@ -95,6 +95,10 @@ Delegation has no time limit. If the worker hung, click **Stop** on the worker. 
 ## Stop did not empty the queue
 
 **Stop** aborts the turn in progress, but messages that were already queued go on their way.
+
+## The agent's queue stopped moving
+
+A tool that prints nothing for 10 minutes is stopped by hive-am, and the turn fails with "stopped answering". The messages behind it then run. Send the message that failed again if you still need it.
 
 ## A terminal does not open
 

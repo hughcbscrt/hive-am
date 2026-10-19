@@ -1,7 +1,13 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 
+/** A CLI that prints nothing for this long has hung (a long turn is fine as long as it keeps emitting). */
+const STALL_MS = () => Number(process.env.HIVE_AM_TURN_STALL_MS) || 10 * 60_000;
+const quietFor = (ms: number) => ms >= 60_000 ? `${Math.round(ms / 6000) / 10} minutes` : `${Math.round(ms / 100) / 10} seconds`;
 const KILL_GRACE_MS = Number(process.env.HIVE_AM_KILL_GRACE_MS) || 5000;
+
+/** The CLI hung and was cut off; adapters must not replace this reason with an error the dying CLI printed. */
+export class StalledError extends Error {}
 
 export interface SpawnOpts {
   cmd: string;
@@ -30,25 +36,40 @@ export async function* spawnLines(o: SpawnOpts): AsyncGenerator<string> {
   };
   o.signal.addEventListener('abort', kill, { once: true });
 
+  // Silence, not length: the timer restarts on every stdout line and, when it fires, ends the CLI like a Stop would, but the turn fails with its own text.
+  let stalled = false;
+  let stallTimer: ReturnType<typeof setTimeout> | undefined;
+  const armStall = () => {
+    clearTimeout(stallTimer);
+    stallTimer = setTimeout(() => { stalled = true; kill(); }, STALL_MS());
+    stallTimer.unref?.();
+  };
+  armStall();
+
   let stderr = '';
   child.stderr.on('data', (d) => { stderr = (stderr + d).slice(-4000); });
   const exit = new Promise<number | null>((res) => {
     child.on('error', (e) => { stderr += String(e); res(-1); });
     // 'exit' (not 'close'): a daemon the CLI forks (e.g. opencode's background service) can keep
     // inheriting our stdout pipe forever, so 'close' would never fire. Drain briefly, then cut the pipe.
-    child.on('exit', (c) => { if (hardKill) clearTimeout(hardKill); setTimeout(() => child.stdout.destroy(), 250); res(c); });
+    child.on('exit', (c) => { if (hardKill) clearTimeout(hardKill); setTimeout(() => { child.stdout.destroy(); child.stderr.destroy(); }, 250); res(c); });
   });
 
   child.stdin.on('error', () => { /* the CLI quit before reading its prompt: its exit code tells why */ });
   if (o.stdin !== undefined) child.stdin.end(o.stdin); else child.stdin.end();
 
   try {
-    for await (const line of createInterface({ input: child.stdout })) if (line.trim()) yield line;
+    // readline only ends on the stream's 'end'; a stream we destroy (the exit handler above) emits 'close' alone, so close it ourselves.
+    const rl = createInterface({ input: child.stdout });
+    child.stdout.on('close', () => rl.close());
+    for await (const line of rl) { armStall(); if (line.trim()) yield line; }
   } finally {
+    clearTimeout(stallTimer);
     o.signal.removeEventListener('abort', kill);
     kill();
   }
   const code = await exit;
+  if (stalled && !o.signal.aborted) throw new StalledError(`${o.cmd} stopped answering (nothing on stdout for ${quietFor(STALL_MS())})`);
   if (code !== 0 && !o.signal.aborted) throw new Error(`${o.cmd} exited with code ${code}${stderr ? `: ${stderr.trim().slice(-600)}` : ''}`);
 }
 

@@ -82,6 +82,7 @@ State = { chain: Promise, controller: AbortController | null, queued: number, li
 
 - **One turn at a time per agent.** If a message (yours or a delegation) arrives while one is in progress, it is **queued** and run afterwards, in order. `queued` is exposed in the API and the UI ("N queued").
 - Different agents run **in parallel** with each other.
+- A turn whose CLI prints nothing for 10 minutes is cut off and reported as failed (`<cmd> stopped answering`), and the queue goes on with the next message. The queue lives in memory: a restart loses the messages that had not started.
 - **Stop** (`POST …/stop`) aborts only the turn **in progress** (`SIGTERM` to the CLI). Turns already queued **continue** and will run next.
 - A delegation to a busy worker waits its turn in the same queue; the orchestrator stays blocked meanwhile.
 - Each turn emits `turn_start`, events and `status` over WebSocket, and keeps `live` (accumulated events) so the view can be rebuilt if the browser reloads.

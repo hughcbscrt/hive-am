@@ -82,6 +82,7 @@ State = { chain: Promise, controller: AbortController | null, queued: number, li
 
 - **Un solo turno a la vez por agente.** Si llega un mensaje (tuyo o una delegación) mientras hay uno en curso, se **encola** y se ejecuta después, en orden. `queued` se expone en la API y en la interfaz ("N queued").
 - Agentes distintos corren en **paralelo** entre sí.
+- Un turno cuyo CLI no imprime nada durante 10 minutos se corta y se reporta como fallido (`<cmd> stopped answering`), y la cola sigue con el siguiente mensaje. La cola vive en memoria: un reinicio pierde los mensajes que no habían empezado.
 - **Stop** (`POST …/stop`) aborta solo el turno **en curso** (`SIGTERM` al CLI). Los turnos ya encolados **siguen** y se ejecutarán a continuación.
 - Una delegación a un worker ocupado espera su turno en la misma cola; el orquestador queda bloqueado mientras tanto.
 - Cada turno emite `turn_start`, eventos y `status` por WebSocket, y guarda `live` (eventos acumulados) para poder reconstruir la vista si el navegador recarga.

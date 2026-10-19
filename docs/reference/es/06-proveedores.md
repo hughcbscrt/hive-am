@@ -32,6 +32,7 @@ Un runner debe: construir los argumentos, lanzar el CLI con `spawnLines`, y **tr
   > **Por qué `PWD`:** Node hereda `PWD` del servidor de hive-am; OpenCode confía en `PWD` por encima del `cwd` real y registraba las sesiones en la carpeta del servidor. Fijarlo explícitamente lo corrige para los tres proveedores.
 - Entrega **stdout línea a línea** (`readline`), ignorando líneas vacías.
 - `stdin`: si se da texto, lo escribe y cierra; si no, cierra el stdin de inmediato.
+- Silencio: el temporizador se reinicia con cada línea de stdout; tras 10 minutos sin ninguna (`HIVE_AM_TURN_STALL_MS`, para pruebas) el CLI se detiene como en una cancelación y la llamada lanza `<cmd> stopped answering`. Un turno largo no se corta mientras el CLI siga emitiendo.
 - Cancelación: al abortarse la señal envía `SIGTERM` al proceso, y si sigue vivo tras un periodo de gracia (5 s, `HIVE_AM_KILL_GRACE_MS`) envía `SIGKILL`.
 - Termina con `exit` y no con `close`: algunos CLIs (OpenCode) lanzan un servicio en segundo plano que hereda el pipe de stdout y haría que `close` no ocurriera nunca. Tras `exit` espera 250 ms para vaciar el pipe y luego lo destruye.
 - Si el proceso sale con código ≠ 0 y no fue cancelado, lanza un `Error` con el código y los últimos 600 caracteres de stderr. El runtime lo convierte en un evento `error`.
