@@ -10,7 +10,8 @@ import { join } from 'node:path';
 import { agents, colonies, skills } from '../src/db.js';
 import '../src/index.js';
 import { composeInstructions, mcpCaps } from '../src/instructions.js';
-import { DEFAULT_SKILLS, OBJECTS_SKILL_ID } from '../src/skills/defaults.js';
+import { DATABASES_SKILL_ID, DEFAULT_SKILLS, OBJECTS_SKILL_ID } from '../src/skills/defaults.js';
+import Database from 'better-sqlite3';
 import { createObject, removeObject, setAgentObjects, setObjectManager, stateOf } from '../src/objects/index.js';
 import { objectsStore } from '../src/objects/store.js';
 
@@ -105,6 +106,21 @@ const st = await m.call('object_action', { name: 'colony-job', action: 'stop' })
 check(!st.err && /stopped/.test(st.text), 'stop works');
 const r1 = await m.call('object_action', { name: 'colony-job', action: 'restart' });
 check(!r1.err && await until(async () => (await stateOf(objectsStore.get(mine.id)!)).status === 'running'), 'restart works');
+
+// A database can be given a manager too: the agent gets the "Database management" skill (not the other one), and starting or stopping it is still refused.
+const dbFile = join(dir, 'tools.db'); new Database(dbFile).close();
+const dbo = createObject({ name: 'tools-db', kind: 'database', colony_id: colony.id, config: { engine: 'sqlite', file: dbFile } });
+check((await m.call('object_list')).text.includes('tools-db · database'), 'a database shows in object_list with its state');
+const ba = await m.call('object_action', { name: 'tools-db', action: 'start' });
+check(ba.err && /not started or stopped/.test(ba.text), 'object_action still refuses to start or stop a database');
+const dbMgr = mk('db-manager', { colony_id: colony.id });
+const dl = setObjectManager(dbo.id, dbMgr.id);
+check(dl.skillAdded && agents.get(dbMgr.id)!.skill_ids.includes(DATABASES_SKILL_ID) && !agents.get(dbMgr.id)!.skill_ids.includes(OBJECTS_SKILL_ID), 'a database can be given a manager, which gets the Database management skill and not Colony resources');
+check(objectsStore.managers().get(dbo.id) === dbMgr.id, 'and the manager is stored');
+setAgentObjects(dbMgr.id, [dbo.id, mine.id]);
+check(agents.get(dbMgr.id)!.skill_ids.includes(OBJECTS_SKILL_ID) && agents.get(dbMgr.id)!.skill_ids.includes(DATABASES_SKILL_ID), 'from the agent side, a mix of a server and a database gives both skills');
+setObjectManager(dbo.id, null); setObjectManager(mine.id, null);
+await removeObject(dbo.id);
 
 for (const c of [m, l2, rd, pl, ghost]) c.close();
 await removeObject(mine.id); await removeObject(free.id);

@@ -116,7 +116,7 @@ Haz clic en la etiqueta para alternar. Bajo el selector verás cuánto pesa lo q
 
 ### Recursos que cuida
 
-Servidores, contenedores y clústeres que el agente puede ver, de los que lee los logs y que inicia, detiene o reinicia. Un recurso tiene un solo administrador: si eliges uno que ya cuida otro agente, pasa a este (el selector muestra "ahora: nombre"). El agente recibe la skill "Colony resources". Los recursos se explican en [Recursos](10-recursos.md).
+Servidores, contenedores y clústeres que el agente puede ver, de los que lee los logs y que inicia, detiene o reinicia, y bases de datos en las que puede mirar dentro y ejecutar SQL, hasta donde le permita su permiso. Un recurso tiene un solo administrador: si eliges uno que ya cuida otro agente, pasa a este (el selector muestra "ahora: nombre"). El agente recibe la skill "Colony resources", o "Database management" para una base de datos. Los recursos se explican en [Recursos](10-recursos.md).
 
 ### Conexiones
 

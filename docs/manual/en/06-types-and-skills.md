@@ -60,6 +60,7 @@ Ten skills are created on install, ready to assign:
 - **Wake-ups:** lets an agent remind itself later (see [Schedules](08-schedules.md)).
 - **Chat channels:** how to behave on Telegram (see [Connections](09-telegram-connections.md)). It is assigned automatically when a connection answers through an agent.
 - **Colony resources:** looking after the colony's servers and containers (see [Resources](10-resources.md)).
+- **Database management:** looking inside the colony's databases and using them: structure, queries and, with the right permission, changes (see [Resources](10-resources.md#agents-and-databases)).
 - **Git workflow**, **Pull requests**, **Code review**, **Release checklist**, **Running tests** and **Log triage**: general guides.
 
 They are like any other skill: you can edit or delete them, and a deleted one is not created again. They only cost prompt in the agents you assign them to. Three have a built-in function: without **Notebook** the agent does not have the notebook tools, without **Wake-ups** it cannot remind itself later, and **Chat channels** is added to the agent that answers on a channel.

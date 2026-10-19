@@ -60,6 +60,7 @@ Al instalar se crean diez skills listas para asignar:
 - **Wake-ups:** permite a un agente avisarse más tarde (ver [Programados](08-programados.md)).
 - **Chat channels:** cómo comportarse en Telegram (ver [Conexiones](09-conexiones-telegram.md)). Se asigna sola cuando una conexión responde por un agente.
 - **Colony resources:** cuidar los servidores y contenedores de la colonia (ver [Recursos](10-recursos.md)).
+- **Database management:** mirar dentro de las bases de datos de la colonia y usarlas: estructura, consultas y, con el permiso adecuado, cambios (ver [Recursos](10-recursos.md#agentes-y-bases-de-datos)).
 - **Git workflow**, **Pull requests**, **Code review**, **Release checklist**, **Running tests** y **Log triage**: guías generales.
 
 Son iguales a cualquier otra skill: puedes editarlas o borrarlas, y una borrada no se vuelve a crear. Solo cuestan prompt en los agentes a los que se las asignes. Tres tienen una función atada: sin **Notebook** el agente no tiene las herramientas del cuaderno, sin **Wake-ups** no puede avisarse más tarde y **Chat channels** se agrega al agente que responde en un canal.

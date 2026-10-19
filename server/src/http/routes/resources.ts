@@ -2,6 +2,7 @@ import { notifyAgentsChanged } from '../../runtime.js';
 import { DRIVER_PROPS } from '../../objects/driver-props.js';
 import { composeServices, listContainers, listImages } from '../../objects/docker-info.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from '../../objects/agent.js';
+import { agentDb } from '../../objects/agent-db.js';
 import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, objectInspect, objectLogs, removeObject, updateObject } from '../../objects/index.js';
 import { body, type Body } from '../body.js';
 import { notFound } from '../errors.js';
@@ -23,6 +24,8 @@ const guarded = (path: string, fn: (ctx: Ctx) => unknown, method = 'GET') => rou
 route('POST', '/api/agent-objects/list', async ({ req }) => { const b = await body(req); return { objects: agentObjects(b.from) }; });
 route('POST', '/api/agent-objects/action', async ({ req }) => { const b = await body(req); return agentObjectAction(b.from, b.name, b.action); });
 route('POST', '/api/agent-objects/logs', async ({ req }) => { const b = await body(req); return agentObjectLogs(b.from, b.name, b.tail); });
+// The tools `object_db_*` of the "Database management" skill: one route, the operation in the path; scope and permission are checked in objects/agent-db.ts.
+route('POST', '/api/agent-objects/db/:op', async ({ req, params }) => agentDb(params[0], await body(req)));
 route('GET', '/api/objects', () => listObjects());
 write('POST', '/api/objects', (b) => createObject(b as Parameters<typeof createObject>[0]));
 write('PATCH', '/api/objects/:id', (b, { params }) => updateObject(params[0], b as Parameters<typeof updateObject>[1]));

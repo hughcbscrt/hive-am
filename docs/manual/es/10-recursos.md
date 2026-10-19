@@ -320,9 +320,19 @@ Son las únicas herramientas. Un agente **no puede crear, editar ni eliminar** r
 - Un agente de **solo lectura** puede listar y leer logs, pero no iniciar, detener ni reiniciar.
 - Cada acción queda escrita en el log del servidor, para saber quién hizo qué.
 
+### Agentes y bases de datos
+
+Para que un agente use una **base de datos**, dale la skill **Database management** (elegirlo como administrador de una base de datos le da la skill). Entonces puede mirar la estructura (tablas, columnas, claves, índices), ejecutar SQL, guardar consultas, leer el historial y, con el permiso adecuado, cambiar los datos. Lo que puede hacer depende de su permiso:
+
+- **Solo lectura:** mirar y leer. Nada de lo que escriba llega a la base de datos.
+- **Editar archivos:** además insertar, actualizar, borrar, crear y alterar, ejecutar un script de varias sentencias como una transacción (todo o nada), guardar consultas, exportar un resultado a un archivo en su propia carpeta y ver quién está conectado. No puede hacer `DROP` ni `TRUNCATE`.
+- **Acceso total:** además `DROP` y `TRUNCATE`, cambiar cómo se conecta el recurso, crear y eliminar recursos de base de datos y cancelar lo que ejecuta otra sesión.
+
+El interruptor de **solo lectura** del recurso es para ti, en su panel: no frena a un agente. Lo que decide es el permiso del agente, así que en una base de datos que importa, dale al agente un usuario de la base con permisos limitados. Una contraseña que un agente fija se guarda y no se vuelve a mostrar, y ninguna respuesta, entrada del historial ni log la contiene. Cada consulta que ejecuta un agente aparece en la pestaña **Historial** con el nombre del agente. Más en la referencia, [sección 15.12](../../reference/es/15-recursos-de-la-colonia.md#1512-agentes-que-usan-una-base-de-datos).
+
 ### Elegir un agente administrador
 
-Un servidor, un contenedor Docker o un clúster puede tener **un agente administrador**. Con uno elegido, solo ese agente ve el recurso y puede actuar sobre él, aunque sea de otra colonia. Sin ninguno, lo cuidan los agentes de su colonia que tengan la skill.
+Un servidor, un contenedor Docker, un clúster o una base de datos puede tener **un agente administrador**. Con uno elegido, solo ese agente ve el recurso y puede actuar sobre él, aunque sea de otra colonia. Sin ninguno, lo cuidan los agentes de su colonia que tengan la skill.
 
 Puedes elegirlo de tres maneras:
 

@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui';
 import { PickSearch } from '@/components/PickSearch';
 import { useHive } from '@/lib/store';
 import { useDock } from '@/lib/dock';
-import { OBJECTS_SKILL_ID } from '@/components/agents/NewAgentDrawer';
+import { DATABASES_SKILL_ID, OBJECTS_SKILL_ID } from '@/components/agents/NewAgentDrawer';
 import { KIND, STATUS_TONE, detailText } from './meta';
 import { LogView } from './LogView';
 
@@ -41,7 +41,7 @@ export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { o
   const canShell = o.kind === 'server' || (o.kind === 'docker' && (o.config as DockerConfig).mode !== 'compose');
   // The agents that can act on it: the ones with the Colony resources skill in the same colony (or, with no colony, among the objects that have none).
   // One chosen manager looks after it alone; with none chosen, the agents of its colony that have the skill do.
-  const managers = o.manager_id ? agents.filter((a) => a.id === o.manager_id) : agents.filter((a) => a.skill_ids.includes(OBJECTS_SKILL_ID) && (a.colony_id ?? null) === (o.colony_id ?? null));
+  const managers = o.manager_id ? agents.filter((a) => a.id === o.manager_id) : agents.filter((a) => a.skill_ids.includes(o.kind === 'database' ? DATABASES_SKILL_ID : OBJECTS_SKILL_ID) && (a.colony_id ?? null) === (o.colony_id ?? null));
   const [adding, setAdding] = useState(false);
   const { refresh } = useHive();
   const setManager = async (agentId: string | null) => {
@@ -111,10 +111,10 @@ export function ObjectPanel({ object: o, target, onClose, onCreateManager }: { o
         </div>
         <div><div className="eyebrow res-mb6">{t('obj.logs')}</div><LogView id={o.id} /></div>
       </>)}
-      {o.kind !== 'http' && o.kind !== 'database' && <div className="obj-managers">
+      {o.kind !== 'http' && <div className="obj-managers">
         <div className="eyebrow res-mb6">{t('obj.managers')}</div>
         {managers.length ? <div className="row gap-s wrap">{managers.map((a) => (
-          <span key={a.id} className="chip ps-chip"><Link href={`/agents/${a.id}`} title={a.permission === 'plan' ? t('obj.managers.readonly') : undefined}>{a.name}{a.permission === 'plan' ? ` · ${t('obj.managers.ro')}` : ''}</Link>
+          <span key={a.id} className="chip ps-chip"><Link href={`/agents/${a.id}`} title={a.permission === 'plan' ? t(o.kind === 'database' ? 'obj.managers.readonly.db' : 'obj.managers.readonly') : undefined}>{a.name}{a.permission === 'plan' ? ` · ${t('obj.managers.ro')}` : ''}</Link>
             {o.manager_id === a.id && <button type="button" onClick={() => void setManager(null)} aria-label={t('obj.managers.remove')} title={t('obj.managers.remove')}><X size={12} /></button>}</span>))}</div>
           : <p className="muted small res-m0">{t('obj.managers.none')}</p>}
         {o.manager_id && <p className="muted small res-mt6">{t('obj.managers.only')}</p>}

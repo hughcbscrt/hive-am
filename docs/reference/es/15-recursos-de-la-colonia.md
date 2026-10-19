@@ -118,6 +118,7 @@ API: `GET /api/docker/containers`, `GET /api/docker/images`, `GET /api/docker/co
 | `DELETE /api/objects/:id` | Lo elimina (ver 15.2 para lo que pasa con el contenedor). |
 | `POST /api/objects/:id/action` | `{ action: "start" \| "stop" \| "restart" }` |
 | `GET /api/objects/:id/logs?tail=&after=` | `{ text, cursor, reset? }` |
+| `POST /api/agent-objects/db/:op` | Las herramientas de la skill Database management (ver 15.12): `{ from: <id del agente>, name?, … }`. |
 | `GET /api/objects/:id/stats` | Lo que usa ahora un servidor o un recurso Docker: `{ cpu, memBytes, memLimitBytes, pids, net, block, info, services? }` |
 
 **Seguridad:** los recursos ejecutan comandos, así que crearlos, cambiarlos, eliminarlos y actuar sobre ellos se rechaza cuando la petición no viene de la app local (la misma regla que las acciones de git). Leer está abierto como el resto de la API, que solo escucha en `127.0.0.1`.
@@ -126,13 +127,13 @@ API: `GET /api/docker/containers`, `GET /api/docker/images`, `GET /api/docker/co
 
 Un agente con la skill **Colony resources** (`default-objects`, una de las skills que vienen con hive-am) recibe tres herramientas: `object_list`, `object_logs` y `object_action` (iniciar, detener, reiniciar). Para crear uno, elige un recurso en el mapa y pulsa **Crear un agente administrador** en su panel: abre el formulario de agente nuevo con la skill, la colonia y el permiso *Editar archivos* ya puestos (la misma skill se puede agregar a cualquier agente desde el selector de skills). El panel muestra quién cuida cada recurso.
 
-**Elegir el administrador.** Un servidor, un contenedor Docker o un clúster puede tener **un agente administrador**, elegido buscando entre los agentes: en el formulario del recurso (al crear y al editar), desde su tarjeta en el mapa de la colonia (*Agregar agente administrador*, junto a *Crear agente administrador*) o desde el formulario de un agente (*Recursos que cuida*, que admite varios). Con un administrador elegido, solo ese agente ve el recurso en `object_list` y puede actuar sobre él, aunque sea de otra colonia; sin ninguno, lo cuidan los agentes de su colonia que tengan la skill. Elegir un agente sin la skill se la da; elegir un recurso que cuida otro agente se lo quita a ese. API: `PUT /api/objects/:id/manager` con `{ agent_id }` (`null` lo quita) y `PUT /api/agents/:id/resources` con `{ object_ids }` (solo desde la app local; ambos devuelven `skillAdded`).
+**Elegir el administrador.** Un servidor, un contenedor Docker, un clúster o una base de datos puede tener **un agente administrador**, elegido buscando entre los agentes: en el formulario del recurso (al crear y al editar), desde su tarjeta en el mapa de la colonia (*Agregar agente administrador*, junto a *Crear agente administrador*) o desde el formulario de un agente (*Recursos que cuida*, que admite varios). Con un administrador elegido, solo ese agente ve el recurso en `object_list` y puede actuar sobre él, aunque sea de otra colonia; sin ninguno, lo cuidan los agentes de su colonia que tengan la skill. Elegir un agente sin la skill se la da; elegir un recurso que cuida otro agente se lo quita a ese. API: `PUT /api/objects/:id/manager` con `{ agent_id }` (`null` lo quita) y `PUT /api/agents/:id/resources` con `{ object_ids }` (solo desde la app local; ambos devuelven `skillAdded`).
 
 Las reglas las aplica el servidor, no solo las escribe la skill:
 
 - Un agente ve solo los recursos de **su propia colonia**; uno sin colonia ve los que no tienen. El recurso de otra colonia se ve como si no existiera.
 - Un agente de **solo lectura** puede listar y leer logs pero no iniciar, detener ni reiniciar nada. (Claude bloquea todas las herramientas MCP en solo lectura de todos modos.)
-- **No hay herramienta para crear, editar ni eliminar** recursos, ni para cambiar el comando que corren: eso queda para las personas.
+- **No hay herramienta para crear, editar ni eliminar** servidores, contenedores, recursos HTTP ni clústeres, ni para cambiar el comando que corren: eso queda para las personas. Las bases de datos son la única excepción, con su propia skill (15.12).
 - Cada acción de un agente queda escrita en el log del servidor (`[hive-am] manager asked to restart`), para saber quién hizo qué.
 - Un agente sin la skill es rechazado aunque llegue a las herramientas.
 
@@ -195,4 +196,39 @@ Un recurso **base de datos** se *usa*, no se inicia: hive-am abre una conexión 
 - **Solo lectura (por defecto).** Solo se acepta una sentencia que lee (`SELECT`, `WITH`, `SHOW`, `DESCRIBE`, `EXPLAIN`, un `PRAGMA` que no cambie nada): hive-am revisa el texto (sin comentarios ni lo que va entre comillas: `INSERT`, `UPDATE`, `DELETE`, `DROP`, `SELECT … INTO`, `EXPLAIN ANALYZE` de una escritura se rechazan) y, donde el motor lo permite, la conexión misma es de solo lectura (PostgreSQL `BEGIN READ ONLY`, sesión `READ ONLY` en MySQL, SQLite abierto en solo lectura). Apagarlo en la configuración deja correr las escrituras de verdad, y el mapa muestra *Puede escribir* en rojo.
 - **En el mapa.** Su tarjeta muestra el estado, adónde se conecta, el motor, solo lectura o puede escribir, **Probar conexión** y **Abrir panel**.
 - **API** (solo desde la app local, porque usan la contraseña guardada): `GET /api/object-db/props` (qué pueden ser las propiedades del driver), `POST /api/object-db/test` (`{ id?, config }`), `GET /api/objects/:id/db/schema?database=`, `GET …/db/columns?schema=&table=&database=`, `POST …/db/query` (`{ sql, database? }`), `GET|DELETE …/db/history`, `GET|POST …/db/saved`, `DELETE …/db/saved/:id`.
-- **Agentes.** La ven en `object_list` (estado), pero todavía no hay herramienta para consultarla: iniciarla o pedir sus logs dice qué es.
+- **Agentes.** La ven en `object_list` (estado); para mirar dentro y ejecutar SQL necesitan la skill **Database management** (15.12). Iniciarla o pedir sus logs dice qué es.
+
+## 15.12 Agentes que usan una base de datos
+
+Un agente con la skill **Database management** (`default-databases`, una de las skills que vienen con hive-am; capacidad MCP `databases`) recibe veinte herramientas con el prefijo `object_db_`, una por operación. Esto rompe a propósito la regla "un agente no puede crear, editar ni eliminar recursos", **solo para bases de datos**. Hacer a un agente administrador de una base de datos le da esta skill (y no *Colony resources*); un mismo agente puede cuidar servidores y bases de datos a la vez.
+
+| Herramienta | Qué hace |
+|---|---|
+| `object_db_list` | Las bases de datos que cuida: nombre, motor, base y estado (no necesita *Colony resources*). |
+| `object_db_schema`, `_columns`, `_describe` | Bases de datos, tablas y vistas; las columnas de una tabla; y una tabla completa (clave primaria, índices, claves foráneas, número de filas). |
+| `object_db_search`, `_ddl`, `_sample`, `_explain` | Tablas y columnas por nombre; la sentencia `CREATE` (la guarda MySQL y SQLite, se arma desde el catálogo en PostgreSQL y SQL Server); las primeras filas; el plan de una sentencia **sin ejecutarla**. |
+| `object_db_query`, `_exec` | Una sentencia (lectura, escritura o DDL); o varias en **una transacción**, todas aplicadas o ninguna (un fallo dice cuál sentencia fue; MySQL confirma solo con un DDL). |
+| `object_db_export` | Un resultado como CSV o JSON en un archivo **dentro de la propia carpeta del agente**: nunca fuera (tampoco por un enlace simbólico), nunca sobre un archivo existente salvo `overwrite: true`. |
+| `object_db_saved`, `_history` | Las consultas con nombre y las últimas 200 consultas (también las de las personas; cada entrada dice qué agente la ejecutó). |
+| `object_db_sessions`, `_kill` | Quién está conectado y qué ejecuta (MySQL, PostgreSQL, SQL Server); cancelar una consulta (MySQL, PostgreSQL) o terminar una sesión (SQL Server). SQLite responde "sin sesiones". |
+| `object_db_config`, `_test` | Cómo se conecta (la contraseña nunca se muestra: `passwordSet` dice si hay una) y una prueba de una conexión guardada. |
+| `object_db_config_set`, `_create`, `_delete` | Cambiar la conexión (el motor no cambia), crear un recurso de base de datos (en la colonia del agente, o ninguna; el agente pasa a ser su administrador), eliminarlo. Una conexión se **prueba antes de guardarse**; si falla, no se guarda nada. |
+
+Cualquier herramienta que reciba `database` puede usar otra base del mismo servidor.
+
+**Qué puede hacer el agente** depende de su permiso **efectivo** (el que tiene después de lo que le presta su colonia). El ajuste `readOnly` del recurso es del panel de la persona y **no se aplica a un agente**:
+
+| | `plan` | `acceptEdits` | `bypassPermissions` |
+|---|---|---|---|
+| Descubrimiento y lecturas, `explain`, listar `saved` e `history`, `config`, `test` de una conexión guardada | sí | sí | sí |
+| `INSERT`, `UPDATE`, `DELETE`, `CREATE`, `ALTER` (`query`, `exec`), consultas guardadas, vaciar el historial, `export`, `sessions` | no | sí | sí |
+| `DROP` y `TRUNCATE` (también `ALTER … DROP`, también dentro de un script, que entonces no ejecuta nada) | no | no | sí |
+| `config_set`, un `test` de borrador, `create`, `delete`, `kill` | no | no | sí |
+
+Un agente `plan` siempre corre en una conexión de solo lectura con el texto revisado. `isDestructive()` (en `database.ts`) es un **resguardo, no un sandbox**: ignora comentarios y texto entre comillas, pero no ve un `DELETE` sin `WHERE`, un `CALL`, un bloque `DO` de PostgreSQL ni un procedimiento almacenado. El límite real son los permisos del usuario de la base de datos.
+
+**Alcance y auditoría.** Un agente ve las bases de datos de su propia colonia, o solo las que se eligió que cuidara; una ajena o desconocida se ve como si no existiera, y solo puede mover un recurso a su propia colonia. Cada consulta va al historial del recurso (con `by`, el agente) y escribe `[hive-am] <agente> ran <primeros 200 caracteres>` en el log del servidor. No tiene límite propio de filas ni de tiempo: valen el `maxRows` y el `timeoutSec` del recurso.
+
+**Las contraseñas son de solo escritura.** Un agente puede fijar una con `create` o `config_set`, pero nada la devuelve: ni la respuesta de una herramienta, ni un error, ni el historial, ni las consultas guardadas, ni el log del servidor, ni una respuesta a un chat. El SQL que fija una contraseña (`IDENTIFIED BY '…'`, `PASSWORD '…'`, `WITH PASSWORD = '…'`) se guarda con `***` en su lugar, y `findSecret` bloquea un mensaje de chat que contenga la contraseña de cualquier recurso de base de datos (de seis caracteres o más). **Límite:** el valor que un agente escribe en una llamada a una herramienta lo ve ese agente durante su turno y queda en el almacén de conversaciones de la CLI; la garantía es que ninguna herramienta le deja leer una contraseña guardada.
+
+API que usa el script MCP: `POST /api/agent-objects/db/<op>` con `{ from: <id del agente>, … }`. Pruebas: `test-db-tools.ts` (SQLite, por el script MCP real) y `test-db-tools-engines.ts` (MySQL/MariaDB, PostgreSQL y SQL Server, con servidores dados por `DBT_*_PORT`).

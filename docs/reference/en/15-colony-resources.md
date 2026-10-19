@@ -118,6 +118,7 @@ API: `GET /api/docker/containers`, `GET /api/docker/images`, `GET /api/docker/co
 | `DELETE /api/objects/:id` | Deletes it (see 15.2 for what happens to the container). |
 | `POST /api/objects/:id/action` | `{ action: "start" \| "stop" \| "restart" }` |
 | `GET /api/objects/:id/logs?tail=&after=` | `{ text, cursor, reset? }` |
+| `POST /api/agent-objects/db/:op` | The tools of the Database management skill (see 15.12): `{ from: <agent id>, name?, … }`. |
 | `GET /api/objects/:id/stats` | What a server or Docker resource uses now: `{ cpu, memBytes, memLimitBytes, pids, net, block, info, services? }` |
 
 **Security:** resources run commands, so creating, changing, deleting and acting on them are refused when the request does not come from the local app (same rule as the git actions). Reading is open like the rest of the API, which only listens on `127.0.0.1`.
@@ -126,13 +127,13 @@ API: `GET /api/docker/containers`, `GET /api/docker/images`, `GET /api/docker/co
 
 An agent with the **Colony resources** skill (`default-objects`, one of the skills that ship with hive-am) gets three tools: `object_list`, `object_logs` and `object_action` (start, stop, restart). To make one, select an resource on the map and press **Create a manager agent** in its panel: it opens the new-agent form with the skill, the colony and *Edit files* permission already set (the same skill can be added to any agent from the skill picker). The panel lists who looks after each resource.
 
-**Choosing the manager.** A server, a Docker container or a cluster can have **one manager agent**, chosen by searching the agents: in the resource's form (creating and editing), from its card on the colony map (*Add manager agent*, next to *Create manager agent*), or from an agent's form (*Resources it looks after*, which takes several). With a manager chosen, only that agent sees the resource in `object_list` and can act on it, even if it belongs to another colony; with none, the agents of its colony that have the skill do. Choosing an agent that lacks the skill gives it the skill; choosing a resource that another agent looks after moves it. API: `PUT /api/objects/:id/manager` with `{ agent_id }` (`null` clears it) and `PUT /api/agents/:id/resources` with `{ object_ids }` (local app only; both return `skillAdded`).
+**Choosing the manager.** A server, a Docker container, a cluster or a database can have **one manager agent**, chosen by searching the agents: in the resource's form (creating and editing), from its card on the colony map (*Add manager agent*, next to *Create manager agent*), or from an agent's form (*Resources it looks after*, which takes several). With a manager chosen, only that agent sees the resource in `object_list` and can act on it, even if it belongs to another colony; with none, the agents of its colony that have the skill do. Choosing an agent that lacks the skill gives it the skill; choosing a resource that another agent looks after moves it. API: `PUT /api/objects/:id/manager` with `{ agent_id }` (`null` clears it) and `PUT /api/agents/:id/resources` with `{ object_ids }` (local app only; both return `skillAdded`).
 
 The rules are enforced by the server, not just written in the skill:
 
 - An agent sees only the resources of **its own colony**; one with no colony sees the resources that have none. Another colony's resource looks like one that does not exist.
 - A **read-only** agent can list and read logs but cannot start, stop or restart anything. (Claude blocks every MCP tool in read-only mode anyway.)
-- There is **no tool to create, edit or delete** resources, nor to change the command they run: that stays with people.
+- There is **no tool to create, edit or delete** servers, containers, HTTP resources or clusters, nor to change the command they run: that stays with people. Databases are the one exception, with their own skill (15.12).
 - Each action an agent takes is written in the server's log (`[hive-am] manager asked to restart`), so you can tell who did what.
 - An agent without the skill is refused even if it reaches the tools.
 
@@ -195,4 +196,39 @@ A **database** resource is *used*, not started: hive-am opens a connection when 
 - **Read-only (the default).** Only one statement that reads is accepted (`SELECT`, `WITH`, `SHOW`, `DESCRIBE`, `EXPLAIN`, a `PRAGMA` that does not set): hive-am checks the text (without comments or what is inside quotes: `INSERT`, `UPDATE`, `DELETE`, `DROP`, `SELECT … INTO`, `EXPLAIN ANALYZE` of a write are refused) and, where the engine allows it, the connection itself is read-only (PostgreSQL `BEGIN READ ONLY`, MySQL `READ ONLY` session, SQLite opened read-only). Turning it off in the settings lets writes run for real, and the map shows *Can write* in red.
 - **On the map.** Its card shows the state, where it connects, the engine, read-only or can-write, **Test connection** and **Open panel**.
 - **API** (local app only, because they use the saved password): `GET /api/object-db/props` (what the driver properties can be), `POST /api/object-db/test` (`{ id?, config }`), `GET /api/objects/:id/db/schema?database=`, `GET …/db/columns?schema=&table=&database=`, `POST …/db/query` (`{ sql, database? }`), `GET|DELETE …/db/history`, `GET|POST …/db/saved`, `DELETE …/db/saved/:id`.
-- **Agents.** They see it in `object_list` (state), but there is no tool to query it yet: starting it or asking for its logs says what it is.
+- **Agents.** They see it in `object_list` (state); to look inside it and run SQL they need the **Database management** skill (15.12). Starting it or asking for its logs says what it is.
+
+## 15.12 Agents that use a database
+
+An agent with the **Database management** skill (`default-databases`, one of the skills that ship with hive-am; MCP capability `databases`) gets twenty tools with the prefix `object_db_`, one per operation. This deliberately breaks the rule "an agent cannot create, edit or delete resources", **only for databases**. Making an agent the manager of a database gives it this skill (and not *Colony resources*); one agent can look after servers and databases at once.
+
+| Tool | What it does |
+|---|---|
+| `object_db_list` | The databases it looks after: name, engine, database and state (it does not need *Colony resources*). |
+| `object_db_schema`, `_columns`, `_describe` | Databases, tables and views; the columns of a table; and a table in full (primary key, indexes, foreign keys, row count). |
+| `object_db_search`, `_ddl`, `_sample`, `_explain` | Tables and columns by name; the `CREATE` statement (kept by MySQL and SQLite, put together from the catalog for PostgreSQL and SQL Server); the first rows; the plan of a statement **without running it**. |
+| `object_db_query`, `_exec` | One statement (read, write or DDL); or several in **one transaction**, all applied or none (a failure says which statement it was; MySQL commits by itself on DDL). |
+| `object_db_export` | A result as CSV or JSON in a file **inside the agent's own folder**: never outside it (a symbolic link included), never over an existing file unless `overwrite: true`. |
+| `object_db_saved`, `_history` | The named queries and the last 200 queries (also the ones people ran; each entry says which agent ran it). |
+| `object_db_sessions`, `_kill` | Who is connected and what they run (MySQL, PostgreSQL, SQL Server); cancel a query (MySQL, PostgreSQL) or end a session (SQL Server). SQLite answers "no sessions". |
+| `object_db_config`, `_test` | How it connects (the password never shown: `passwordSet` says whether there is one), and a test of a saved connection. |
+| `object_db_config_set`, `_create`, `_delete` | Change the connection (the engine cannot change), create a database resource (in the agent's colony, or none; the agent becomes its manager), delete one. A connection is **tested before it is saved**; nothing is saved if it fails. |
+
+Any tool that takes `database` can use another database of the same server.
+
+**What the agent may do** depends on its **effective** permission (the one it has after what its colony lends). The `readOnly` setting of the resource is for the person's panel and **does not apply to an agent**:
+
+| | `plan` | `acceptEdits` | `bypassPermissions` |
+|---|---|---|---|
+| Discovery and reads, `explain`, `saved` and `history` list, `config`, `test` of a saved connection | yes | yes | yes |
+| `INSERT`, `UPDATE`, `DELETE`, `CREATE`, `ALTER` (`query`, `exec`), saved queries, clearing the history, `export`, `sessions` | no | yes | yes |
+| `DROP` and `TRUNCATE` (also `ALTER … DROP`, also inside a script, which then runs nothing) | no | no | yes |
+| `config_set`, a draft `test`, `create`, `delete`, `kill` | no | no | yes |
+
+A `plan` agent always runs on a read-only connection with the text checked. `isDestructive()` (in `database.ts`) is a **guardrail, not a sandbox**: it ignores comments and quoted text, but does not see a `DELETE` without a `WHERE`, a `CALL`, a PostgreSQL `DO` block or a stored procedure. The real boundary is the grants of the database user.
+
+**Scope and audit.** An agent sees the databases of its own colony, or only the ones it was chosen to look after; a foreign or unknown one looks like one that does not exist, and it can only move a resource into its own colony. Every query goes to the history of the resource (with `by`, the agent) and writes `[hive-am] <agent> ran <first 200 characters>` in the server log. There is no row or time limit of its own: the resource's `maxRows` and `timeoutSec` apply.
+
+**Passwords are write-only.** An agent can set one with `create` or `config_set`, but nothing returns one: not a tool answer, an error, the history, the saved queries, the server log or a reply to a chat. SQL that sets a password (`IDENTIFIED BY '…'`, `PASSWORD '…'`, `WITH PASSWORD = '…'`) is stored with `***` in its place, and `findSecret` blocks a chat message that holds the password of any database resource (six characters or more). **Limit:** the value an agent types in a tool call is visible to that agent during its turn and stays in the CLI's own conversation store; the guarantee is that no tool lets it read a stored password back.
+
+API used by the MCP script: `POST /api/agent-objects/db/<op>` with `{ from: <agent id>, … }`. Tests: `test-db-tools.ts` (SQLite, through the real MCP script) and `test-db-tools-engines.ts` (MySQL/MariaDB, PostgreSQL and SQL Server, with servers given through `DBT_*_PORT`).

@@ -4,6 +4,7 @@
 //   channel  → channel_reply, channel_send_file, channel_react, channel_mute (agents linked to Telegram/Slack)
 //   wake     → wake_me, wake_when_done, schedule_create, schedule_list, schedule_cancel (agents with the Wake-ups skill: to be woken later in the same place)
 //   objects  → object_list, object_logs, object_action (agents with the Colony objects skill: the servers and containers of their colony)
+//   databases → object_db_* (agents with the Database management skill: the database resources of their colony)
 // It only talks to the hive-am HTTP API; all rules (assignments, queueing) live there.
 import { createInterface } from 'node:readline';
 
@@ -218,7 +219,67 @@ const allTools = [
     inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'The schedule id.' } }, required: ['id'], additionalProperties: false },
   },
 ];
+
+// ---- Database management (cap `databases`): one tool per operation, all answered by POST /api/agent-objects/db/<op> ----
+const NAME = { type: 'string', description: 'The exact name of the database resource, as object_db_list shows it.' };
+const DB = { type: 'string', description: 'Another database of the same server to use instead of the one the resource opens by default (see object_db_schema).' };
+const SCHEMA = { type: 'string', description: 'The schema (PostgreSQL, SQL Server), the database (MySQL) or "main" (SQLite), as object_db_schema shows it.' };
+const TABLE = { type: 'string', description: 'The table or view name.' };
+const dbTool = (name, description, properties = {}, required = []) => ({ cap: 'databases', name: `object_db_${name}`, description, inputSchema: { type: 'object', properties, required, additionalProperties: false } });
+const dbTools = [
+  dbTool('list', 'List the database resources you look after: name, engine, database and state. Use these exact names in the other object_db tools.'),
+  dbTool('schema', 'The structure of a database: the databases of the server, the current one and its tables and views (with a row estimate). Start here.', { name: NAME, database: DB }, ['name']),
+  dbTool('columns', 'The columns of a table or view: name, type, nullable, key and default.', { name: NAME, schema: SCHEMA, table: TABLE, database: DB }, ['name', 'schema', 'table']),
+  dbTool('describe', 'A table in full: columns, primary key, indexes, foreign keys and the number of rows.', { name: NAME, schema: SCHEMA, table: TABLE, database: DB }, ['name', 'schema', 'table']),
+  dbTool('search', 'Find tables, views and columns whose name contains some text, across everything the connection can see.', { name: NAME, query: { type: 'string', description: 'Part of a name.' }, database: DB }, ['name', 'query']),
+  dbTool('ddl', 'The CREATE statement of a table (with its indexes).', { name: NAME, schema: SCHEMA, table: TABLE, database: DB }, ['name', 'schema', 'table']),
+  dbTool('sample', 'The first rows of a table or view, without writing SQL.', { name: NAME, schema: SCHEMA, table: TABLE, limit: { type: 'number', description: 'How many rows (default 10).' }, database: DB }, ['name', 'schema', 'table']),
+  dbTool('query', 'Run ONE SQL statement: a read, or (not in read-only mode) a write or DDL. DROP and TRUNCATE need Full access. A result is cut at the resource\'s row limit and a query at its time limit. Writes are real and cannot be undone: say what you are about to change first. Results can contain secrets: never repeat them in a chat.', { name: NAME, sql: { type: 'string', description: 'One SQL statement.' }, database: DB }, ['name', 'sql']),
+  dbTool('exec', 'Run several SQL statements as ONE transaction: all are applied or none (a failure says which statement it was). Not in read-only mode; DROP and TRUNCATE need Full access and one of them refuses the whole script. MySQL commits by itself on CREATE, ALTER and DROP, so a DDL in the middle cannot be undone there.', { name: NAME, sql: { type: 'string', description: 'Statements separated by ;' }, database: DB }, ['name', 'sql']),
+  dbTool('explain', 'The execution plan of a statement, without running it.', { name: NAME, sql: { type: 'string', description: 'One SQL statement.' }, database: DB }, ['name', 'sql']),
+  dbTool('export', 'Write the result of a query to a CSV or JSON file inside your own working folder. It never writes outside it and never overwrites a file unless overwrite is true. Not in read-only mode.', { name: NAME, sql: { type: 'string', description: 'The query.' }, format: { type: 'string', enum: ['csv', 'json'] }, file: { type: 'string', description: 'The file, relative to your working folder.' }, overwrite: { type: 'boolean' }, database: DB }, ['name', 'sql', 'format', 'file']),
+  dbTool('saved', 'The named queries saved on a resource: list them, or add, update or remove one (not in read-only mode). A password in the text is replaced by ***.', { name: NAME, op: { type: 'string', enum: ['list', 'add', 'update', 'remove'] }, id: { type: 'string', description: 'The id of the saved query (update, remove).' }, query_name: { type: 'string', description: 'Its name (add, update).' }, sql: { type: 'string', description: 'Its text (add, update).' }, database: DB }, ['name', 'op']),
+  dbTool('history', 'The last 200 queries run on a resource (by people and by agents), or clear them (not in read-only mode).', { name: NAME, op: { type: 'string', enum: ['list', 'clear'] } }, ['name', 'op']),
+  dbTool('sessions', 'Who is connected to the server and what they are running (MySQL, PostgreSQL, SQL Server). Not in read-only mode.', { name: NAME }, ['name']),
+  dbTool('kill', 'Cancel what a session is running (MySQL, PostgreSQL) or end the session (SQL Server). Full access only. It can interrupt other people: look at object_db_sessions first and do it only when asked.', { name: NAME, id: { type: 'number', description: 'The session id from object_db_sessions.' } }, ['name', 'id']),
+  dbTool('config', 'How a resource connects: engine, host, port, user, database, SSL, driver properties and limits. The password is never shown: passwordSet says whether one exists.', { name: NAME }, ['name']),
+  dbTool('config_set', 'Change how a resource connects (Full access only). Give only the fields to change inside config; the engine cannot change. The new connection is tested first and nothing is saved if it fails. A password you give is stored and never shown again: do not repeat it anywhere. Can also rename it, move it to your colony or out of any, and choose the agent that looks after it.', { name: NAME, config: { type: 'object', description: 'Fields to change: host, port, user, password, database, file (SQLite), ssl, trustCert, props, readOnly, timeoutSec, maxRows.' }, new_name: { type: 'string' }, colony_id: { type: 'string', description: '"mine" (your colony) or "none".' }, manager_id: { type: 'string', description: 'An agent name or id, "me", or "none" to leave it to the colony.' } }, ['name']),
+  dbTool('test', 'Test a connection: a saved resource by name, or (Full access) a configuration that is not saved yet.', { name: { type: 'string', description: 'A saved resource to test.' }, config: { type: 'object', description: 'A draft configuration to test instead (Full access).' } }),
+  dbTool('create', 'Create a database resource (Full access only). The connection is tested first and nothing is created if it fails. It is created in your colony (or none) and you become the agent that looks after it. A password in config is stored and never shown again: do not repeat it anywhere.', { name: { type: 'string', description: 'The name of the new resource.' }, config: { type: 'object', description: 'engine (mysql, postgresql, sqlite, mssql) and host, port, user, password, database (or file for SQLite), ssl, trustCert, props, readOnly, timeoutSec, maxRows.' }, colony_id: { type: 'string', description: '"mine" (default) or "none".' } }, ['name', 'config']),
+  dbTool('delete', 'Delete a database resource (Full access only). The database itself is not touched: only hive-am forgets the connection, its saved queries and its history.', { name: NAME }, ['name']),
+];
+allTools.push(...dbTools);
 const tools = allTools.filter((t) => CAPS.has(t.cap)).map(({ cap, ...t }) => t);
+
+// ---- how a database answer is written for the model ----
+const cellText = (v) => (v === null || v === undefined ? 'NULL' : String(v).replace(/\r?\n/g, '\\n'));
+const table = (columns, rows) => [columns.map((c) => c.name ?? c).join('\t'), ...rows.map((r) => r.map(cellText).join('\t'))].join('\n');
+const resultText = (r) => {
+  if (!r.columns?.length) return r.affected !== undefined ? `OK, ${r.affected} row${r.affected === 1 ? '' : 's'} affected (${r.ms ?? 0} ms).` : `OK (${r.ms ?? 0} ms).`;
+  return `${table(r.columns, r.rows)}\n${r.rows.length} row${r.rows.length === 1 ? '' : 's'}${r.truncated ? ' (cut at the resource\'s row limit: ask for fewer rows or columns)' : ''} in ${r.ms ?? 0} ms.`;
+};
+const dbAnswer = (op, j) => {
+  switch (op) {
+    case 'list': return j.databases.length ? j.databases.map((d) => `${d.name} · ${d.engine}${d.database ? ` · ${d.database}` : ''} · ${d.status}${d.detail ? ` (${d.detail})` : ''}`).join('\n') : 'You look after no database resources.';
+    case 'schema': return `${j.engine}, database ${j.database || '(none)'}${j.databases.length ? `. Databases on the server: ${j.databases.join(', ')}` : ''}.\n${j.tables.length ? j.tables.map((t) => `${t.schema}.${t.name} (${t.type}${t.rows !== undefined ? `, ~${t.rows} rows` : ''})`).join('\n') : 'No tables.'}`;
+    case 'columns': return j.columns.length ? j.columns.map((c) => `${c.name} ${c.type}${c.nullable ? '' : ' NOT NULL'}${c.key ? ` ${c.key}` : ''}${c.default !== undefined && c.default !== null ? ` DEFAULT ${c.default}` : ''}`).join('\n') : 'No columns: that table does not exist.';
+    case 'describe': return [`${j.schema}.${j.table}: ${j.rowCount ?? '?'} rows`, 'Columns:', ...j.columns.map((c) => `  ${c.name} ${c.type}${c.nullable ? '' : ' NOT NULL'}${c.key ? ` ${c.key}` : ''}`), `Primary key: ${j.primaryKey.join(', ') || '(none)'}`, 'Indexes:', ...(j.indexes.length ? j.indexes.map((i) => `  ${i.name}${i.unique ? ' UNIQUE' : ''} (${i.columns.join(', ')})`) : ['  (none)']), 'Foreign keys:', ...(j.foreignKeys.length ? j.foreignKeys.map((f) => `  ${f.name}: (${f.columns.join(', ')}) -> ${f.refSchema ? `${f.refSchema}.` : ''}${f.refTable} (${f.refColumns.join(', ')})`) : ['  (none)'])].join('\n');
+    case 'search': return j.matches.length ? j.matches.map((m) => (m.column ? `${m.schema}.${m.table}.${m.column} (column)` : `${m.schema}.${m.table} (${m.type})`)).join('\n') : 'Nothing matches.';
+    case 'ddl': return j.ddl;
+    case 'sample': case 'query': case 'explain': case 'sessions': return resultText(j);
+    case 'exec': return `${j.results.length} statement${j.results.length === 1 ? '' : 's'} applied in one transaction (${j.ms} ms).\n${j.results.map((r, n) => `${n + 1}. ${r.statement.replace(/\s+/g, ' ').slice(0, 80)}\n   ${resultText(r).split('\n').join('\n   ')}`).join('\n')}`;
+    case 'export': return `Wrote ${j.rows} row${j.rows === 1 ? '' : 's'} as ${j.format} to ${j.file} (${j.bytes} bytes)${j.truncated ? ', cut at the resource\'s row limit' : ''}.`;
+    case 'saved': return j.saved === undefined ? 'Done.' : Array.isArray(j.saved) ? (j.saved.length ? j.saved.map((q) => `${q.id} · ${q.name}${q.database ? ` (${q.database})` : ''}\n${q.sql}`).join('\n\n') : 'No saved queries.') : `Saved: ${j.saved.id} · ${j.saved.name}`;
+    case 'history': return j.cleared ? 'History cleared.' : j.history.length ? j.history.map((h) => `${new Date(h.at).toISOString().slice(0, 19)} ${h.ok ? 'ok' : 'FAILED'}${h.by ? ` (${h.by})` : ''} ${h.sql.replace(/\s+/g, ' ').slice(0, 160)}${h.error ? ` -> ${h.error}` : ''}`).join('\n') : 'No history.';
+    case 'kill': return j.text;
+    case 'config': return JSON.stringify({ name: j.name, ...j.config }, null, 2);
+    case 'test': return `Connection works: ${j.version} (${j.ms} ms).`;
+    case 'create': return `Created the database resource "${j.name}" (${j.engine}). You look after it now.`;
+    case 'config_set': return `Saved the connection of "${j.name}" after testing it.`;
+    case 'delete': return `Deleted the database resource "${j.deleted}".`;
+    default: return JSON.stringify(j);
+  }
+};
 
 async function call(name, args) {
   if (!tools.some((t) => t.name === name)) throw new Error(`Unknown tool ${name}`);
@@ -292,6 +353,13 @@ async function call(name, args) {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? `channel_mute failed (${r.status})`);
     return j.muted ? `Muted in this thread (${j.place}). You will only be woken when someone mentions you or replies to you.` : `Unmuted in this thread (${j.place}).`;
+  }
+  if (name.startsWith('object_db_')) {
+    const op = name.slice('object_db_'.length);
+    const r = await fetch(`${API}/api/agent-objects/db/${op}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ from: FROM, ...args }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `${name} failed (${r.status})`);
+    return dbAnswer(op, j);
   }
   if (name === 'object_list' || name === 'object_logs' || name === 'object_action') {
     const r = await fetch(`${API}/api/agent-objects/${name.slice('object_'.length)}`, {

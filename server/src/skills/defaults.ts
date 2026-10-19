@@ -13,6 +13,7 @@ export const WAKEUPS_SKILL_ID = 'default-wakeups';
 
 /** Running the servers and containers of the colony. Its tools (`object_list`, `object_action`, `object_logs`) exist only for agents that have this skill. */
 export const OBJECTS_SKILL_ID = 'default-objects';
+export const DATABASES_SKILL_ID = 'default-databases';
 
 /**
  * How to react to messages in a chat. It is part of the "Chat channels" skill; agents that already had that skill get it added once
@@ -160,7 +161,40 @@ The resources of your own colony, or the ones that belong to no colony if you ar
 ## Care
 - Stopping or restarting a server or a container interrupts whoever is using it. If the person did not ask for it and the resource is running fine, ask first.
 - Logs can contain secrets (tokens, passwords, connection strings). Never repeat them in a chat; replace them with \`***\`.
-- Do not run the resource's command yourself from a terminal as a way around \`object_action\`: use the tool, so hive-am knows what is running.`,
+- Do not run the resource's command yourself from a terminal as a way around \`object_action\`: use the tool, so hive-am knows what is running.
+
+## Databases
+A **database** resource is not started or stopped: it is used. \`object_list\` shows its state, but to look inside it or run SQL you need the "Database management" skill.`,
+  },
+  {
+    slug: 'databases',
+    load: 'always',
+    name: 'Database management',
+    description: 'Look inside the database resources of the colony and use them: structure, queries, writes, saved queries, history, and (with Full access) their connection.',
+    content: `The colony you belong to can have **database resources** (MySQL or MariaDB, PostgreSQL, SQL Server, SQLite). You can look at their structure, run SQL, keep saved queries and, with Full access, change how they connect. hive-am opens a connection when you ask something and closes it right after.
+
+## Which databases are yours
+The ones of your own colony, or the ones that belong to no colony if you are in none, unless a person chose one agent to look after a database (then only that agent). Another colony's databases are not visible to you. Use the exact name that \`object_db_list\` shows. \`object_db_list\` answers even when you do not have the Colony resources skill.
+
+## How to work
+1. **Look before you run.** \`object_db_list\`, then \`object_db_schema\` (databases, tables and views), \`object_db_columns\` and \`object_db_describe\` (keys, indexes, foreign keys, row count), \`object_db_search\` (find a table or column by name), \`object_db_ddl\` (the CREATE statement) and \`object_db_sample\` (the first rows without writing SQL). \`object_db_explain\` shows the plan of a statement without running it.
+2. **Run SQL** with \`object_db_query\` (one statement: a read, a write or a DDL) or \`object_db_exec\` (several statements in ONE transaction: all are applied or none; MySQL commits by itself on a CREATE, ALTER or DROP, so those cannot be undone there). Another database of the same server: pass \`database\`.
+3. **Keep what is useful**: \`object_db_saved\` (list, add, update, remove named queries) and \`object_db_history\` (the last 200 queries, including the ones people ran). \`object_db_export\` writes a result as CSV or JSON to a file inside your own working folder (it never overwrites unless you say so).
+4. **A result is cut at the resource's row limit and a query at its time limit**: ask for fewer rows or columns instead of working around it. Never \`SELECT *\` from a big table without a \`LIMIT\` or a \`WHERE\`: it fills your context.
+
+## What you may do
+Your permission decides it (the \`readOnly\` setting of the resource is for people using its panel and does not apply to you):
+- **Read-only (plan)**: everything that looks and reads. The connection is read-only and only SELECT, WITH, SHOW, DESCRIBE and EXPLAIN pass.
+- **Edit files (acceptEdits)**: also INSERT, UPDATE, DELETE, CREATE and ALTER, scripts, saved queries, clearing the history, exports and \`object_db_sessions\`. **DROP and TRUNCATE are refused**, also inside a script (nothing of it runs).
+- **Full access (bypassPermissions)**: also DROP and TRUNCATE, \`object_db_config_set\` (host, port, user, password, database, SSL, driver properties, limits, name, colony, manager), \`object_db_create\`, \`object_db_delete\` and \`object_db_kill\`.
+
+## Care
+- **Writes and DDL are real and irreversible.** Think first: say what you are going to change and on which database, prefer a transaction (\`object_db_exec\`), try a \`SELECT\` with the same \`WHERE\` before an UPDATE or DELETE, and suggest a backup before anything that cannot be undone. A DELETE or UPDATE without a WHERE is the commonest mistake.
+- hive-am refuses DROP and TRUNCATE without Full access, but that is a guardrail, not a sandbox: it does not see a DELETE without a WHERE, a CALL, a PostgreSQL DO block or a stored procedure. The real boundary is what the database user is allowed to do: recommend a user with limited grants.
+- **Results can contain secrets** (password hashes, tokens, personal data). Never repeat them in a chat; replace them with \`***\`.
+- **Passwords are write-only.** You can set or replace one with \`object_db_create\` or \`object_db_config_set\`, but no tool will ever show you a stored one (\`object_db_config\` only says whether one is set). Never repeat a password, write it in a file, a note or a chat, or put it in a query that is not needed. If a person types one in a chat, use it once in the tool without echoing it, and prefer asking them to type it in the resource's panel. When you write SQL that sets a password (\`CREATE USER … IDENTIFIED BY\`), hive-am replaces the literal with \`***\` in the history and the logs.
+- Changing a connection (\`object_db_config_set\`) points hive-am at that server with those credentials. Do it only when asked.
+- \`object_db_kill\` cancels what another session is running: look at \`object_db_sessions\` first and do it only when asked.`,
   },
   {
     slug: 'git-workflow',

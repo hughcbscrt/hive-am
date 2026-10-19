@@ -320,9 +320,19 @@ These are the only tools. An agent **cannot create, edit or delete** resources, 
 - A **read-only** agent can list and read logs, but not start, stop or restart.
 - Every action is written to the server log, so you know who did what.
 
+### Agents and databases
+
+To let an agent use a **database**, give it the **Database management** skill (choosing it as the manager of a database gives it the skill). It can then look at the structure (tables, columns, keys, indexes), run SQL, keep saved queries, read the history and, with the right permission, change the data. What it may do depends on its permission:
+
+- **Read-only:** look and read. Nothing it writes can reach the database.
+- **Edit files:** also insert, update, delete, create and alter, run a script of several statements as one transaction (all or nothing), save queries, export a result to a file in its own folder and look at who is connected. It cannot `DROP` or `TRUNCATE`.
+- **Full access:** also `DROP` and `TRUNCATE`, change how the resource connects, create and delete database resources and cancel what another session is running.
+
+The **read-only** switch of the resource is for you, in its panel: it does not stop an agent. What decides is the agent's permission, so for a database that matters, give the agent a database user with limited grants. A password an agent sets is stored and never shown again, and no answer, history entry or log holds it. Every query an agent runs appears in the **History** tab with the name of the agent. More in the reference, [section 15.12](../../reference/en/15-colony-resources.md#1512-agents-that-use-a-database).
+
 ### Choose a manager agent
 
-A server, a Docker container or a cluster can have **one manager agent**. With one chosen, only that agent sees the resource and can act on it, even if it is in another colony. With none, it is looked after by the agents of its colony that have the skill.
+A server, a Docker container, a cluster or a database can have **one manager agent**. With one chosen, only that agent sees the resource and can act on it, even if it is in another colony. With none, it is looked after by the agents of its colony that have the skill.
 
 You can choose it in three ways:
 

@@ -8,7 +8,7 @@ import { useHive } from '@/lib/store';
 import { usePersistentState } from '@/lib/hooks/usePersistentState';
 import { StatusDot } from '@/components/objects/ObjectPanel';
 import { KIND, STATUS_TONE, detailText } from '@/components/objects/meta';
-import { MANAGEABLE } from '@/components/objects/ManagerField';
+import { ACTIONABLE } from '@/components/objects/ManagerField';
 import { useToast } from '@/components/ui';
 import type { Agent, ObjectView } from '@/lib/types';
 
@@ -60,7 +60,7 @@ export function ResourceStrip({ agent }: { agent: Agent }) {
           {mine.length === 0 && <p className="muted small cres-note">{t('cres.none')}</p>}
           <ul className="cres-grid">
             {shown.map((o) => {
-              const Icon = KIND[o.kind].icon, st = o.state.status, live = st === 'running' || st === 'starting', can = MANAGEABLE.includes(o.kind);
+              const Icon = KIND[o.kind].icon, st = o.state.status, live = st === 'running' || st === 'starting', can = ACTIONABLE.includes(o.kind);
               const mine1 = busy?.startsWith(`${o.id}:`) ?? false;
               const detail = detailText(t, o.state.detail);
               return (

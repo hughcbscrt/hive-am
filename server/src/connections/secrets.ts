@@ -1,4 +1,6 @@
 import { connections } from './store.js';
+import { objectsStore } from '../objects/store.js';
+import type { DatabaseConfig } from '../objects/model.js';
 
 /**
  * Last line of defence for text an agent sends to a chat. The instructions tell the agent never to share secrets, but a model can be
@@ -30,6 +32,8 @@ const SECRET_ENV = /(password|passwd|secret|token|api[_-]?key|private[_-]?key|cr
 function knownSecrets(): string[] {
   const out = new Set<string>();
   for (const c of connections.list()) for (const k of ['token', 'signing_secret', 'app_token', 'bot_token']) { const v = c.config?.[k]; if (typeof v === 'string' && v.length >= 8) out.add(v); }
+  // The password of a database resource: an agent can use it to connect, but it must never be repeated in a chat.
+  for (const o of objectsStore.list()) if (o.kind === 'database') { const pw = (o.config as DatabaseConfig).password; if (typeof pw === 'string' && pw.length >= 6) out.add(pw); }
   for (const [k, v] of Object.entries(process.env)) if (v && v.length >= 12 && SECRET_ENV.test(k)) out.add(v);
   return [...out];
 }

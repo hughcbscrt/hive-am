@@ -12,18 +12,21 @@ import type { Agent } from '@/lib/types';
 
 /** The skill that gives an agent the tools to look after objects (seeded by the server). */
 export const OBJECTS_SKILL_ID = 'default-objects';
+/** The skill that gives an agent the tools to look inside the database resources of its colony and run SQL. */
+export const DATABASES_SKILL_ID = 'default-databases';
 
 /** Step 1: start from a type (or blank). Step 2: fill in the details. */
 /** `manager`: an agent that looks after the objects of a colony (it starts with the "Colony resources" skill, and edit permission so it can start and stop them). */
 export function NewAgentDrawer({ onClose, onCreated, presetTypeId, presetColonyId, presetObjectId, manager = false }: { onClose: () => void; onCreated?: (id: string) => void; presetTypeId?: string; presetColonyId?: string; presetObjectId?: string; manager?: boolean }) {
   const { t } = useI18n();
-  const { types, agents, refresh, colonies } = useHiveData();
+  const { types, agents, refresh, colonies, objects } = useHiveData();
   const toast = useToast();
   const router = useRouter();
   const [step, setStep] = useState<'type' | 'form'>(presetTypeId || manager ? 'form' : 'type');
   const [draft, setDraft] = useState<AgentDraft>(() => {
     const base = { ...draftFromType(types.find((ty) => ty.id === presetTypeId)), colony_id: presetColonyId ?? null, object_ids: presetObjectId ? [presetObjectId] : [] };
-    return manager ? { ...base, description: t('obj.manager.description'), permission: 'acceptEdits', skill_ids: [...new Set([...base.skill_ids, OBJECTS_SKILL_ID])], skill_loads: { ...base.skill_loads, [OBJECTS_SKILL_ID]: 'always' } } : base;
+    const skill = objects.find((o) => o.id === presetObjectId)?.kind === 'database' ? DATABASES_SKILL_ID : OBJECTS_SKILL_ID;
+    return manager ? { ...base, description: t(skill === DATABASES_SKILL_ID ? 'obj.manager.description.db' : 'obj.manager.description'), permission: 'acceptEdits', skill_ids: [...new Set([...base.skill_ids, skill])], skill_loads: { ...base.skill_loads, [skill]: 'always' } } : base;
   });
   // What the form starts with: picking a type fills it in, and that is not an edit of the person's own.
   const [initial, setInitial] = useState(() => JSON.stringify(draft));
