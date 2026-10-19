@@ -5,6 +5,7 @@ import './_guard.js';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
+import { chmodSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -82,6 +83,10 @@ check(r.code === 0 && r.out.includes(`pid ${s.pid}`) && /web .* up/.test(r.out) 
 
 const log = readFileSync(run.logFile(), 'utf8');
 check(/api up/.test(log) && /web up/.test(log), 'the log holds the output of both processes');
+const version = JSON.parse(readFileSync(join(here, '..', '..', 'package.json'), 'utf8')).version;
+check(readFileSync(run.logFile(), 'utf8').trimStart().startsWith(`hive-am ${version}`) && log.includes(`web   http://127.0.0.1:${webPort}`) && log.includes('hive-am stop'), 'the log opens with a welcome: the version, the addresses and how to stop it');
+check(hive('status').out.includes(`v${version}`), 'status says which version the run is');
+check(hive('version').out.trim() === version && hive('--version').out.trim() === version, 'version and --version print the version');
 r = hive('logs', '-n', '2');
 check(r.code === 0 && r.out.trim().split('\n').length <= 2 && /tick|up/.test(r.out), 'logs -n 2 returns the last two lines');
 const cur = run.readLog({ tail: 1 }).cursor;
@@ -129,6 +134,39 @@ const exited = new Promise<number | null>((res) => fg.on('exit', (c) => res(c)))
 r = hive('stop');
 const code = await Promise.race([exited, sleep(10_000).then(() => 'timeout')]);
 check(r.code === 0 && code === 0 && !existsSync(run.stateFile()), 'stop ends a foreground run and its record goes with it');
+
+
+// ---- update: the npm of the stand-in decides what is "latest", and records what it was asked to install ----
+const npmLog = join(run.runDir(), 'npm.log');
+const fakeNpm = join(run.runDir(), 'fake-npm.sh');
+writeFileSync(fakeNpm, `#!/bin/sh\ncase "$1" in view) [ -n "$STUB_LATEST" ] && echo "$STUB_LATEST" || exit 1;; root) echo /nowhere;; install) echo "$@" >> "${npmLog}";; esac\n`);
+chmodSync(fakeNpm, 0o755);
+const updateEnv = (latest: string, install = 'global') => ({ ...env, HIVE_AM_NPM: fakeNpm, STUB_LATEST: latest, HIVE_AM_LAUNCHER_INSTALL: install });
+const upd = (e: NodeJS.ProcessEnv, ...a: string[]) => { const x = spawnSync(process.execPath, [bin, 'update', ...a], { env: e, encoding: 'utf8', timeout: 60_000 }); return { code: x.status, out: `${x.stdout}${x.stderr}` }; };
+const installs = () => (existsSync(npmLog) ? readFileSync(npmLog, 'utf8').trim().split('\n').filter(Boolean) : []);
+
+let u = upd(updateEnv(version));
+check(u.code === 0 && /up to date/.test(u.out) && installs().length === 0, 'update with nothing newer says up to date and installs nothing');
+u = upd(updateEnv('99.0.0'), '--check');
+check(u.code === 0 && /update is available/.test(u.out) && u.out.includes('99.0.0') && installs().length === 0, 'update --check reports a newer version and installs nothing');
+u = upd(updateEnv('99.0.0', 'npx'));
+check(u.code === 1 && /npx/.test(u.out) && installs().length === 0, 'a copy run through npx is told to use npx hive-am@latest');
+u = upd(updateEnv('99.0.0', 'source'));
+check(u.code === 1 && /source checkout/.test(u.out) && installs().length === 0, 'a source checkout is told to use git');
+u = upd(updateEnv(''));
+check(u.code === 1 && /Could not ask npm/.test(u.out), 'an unreachable registry is an error, not a crash');
+u = upd(updateEnv('99.0.0'));
+check(u.code === 0 && /updated/.test(u.out) && installs().join('|') === 'install -g hive-am@99.0.0', 'update installs exactly the version it found, globally');
+
+// with a run going: it says the run is on the old version, and --restart replaces it
+r = hive('start', '--background');
+const before = state();
+u = upd(updateEnv('99.0.0'));
+check(u.code === 0 && u.out.includes(`pid ${before.pid}`) && /hive-am restart/.test(u.out) && state()?.pid === before.pid, 'with a run going, update says it still runs the old version and leaves it alone');
+u = upd(updateEnv('99.0.0'), '--restart');
+const after = state();
+check(u.code === 0 && !!after && after.pid !== before.pid && alive(after.pid) && !alive(before.pid), 'update --restart restarts the run on the new files');
+hive('stop');
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

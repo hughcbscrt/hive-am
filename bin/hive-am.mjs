@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // hive-am launcher: starts the API server and the web UI from the published package, in this terminal or in the background,
 // and stops it, reports on it and shows its log afterwards.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as run from './run.mjs';
 
@@ -23,7 +24,8 @@ Usage:
   hive-am logs [-f] [-n 200]   show the last lines of the log, or follow it
   hive-am stop                 stop it and wait until it is gone
   hive-am restart              stop it and start it again in the same mode (in the background when nothing was recorded)
-  hive-am --version            print the version
+  hive-am update [--check]     look for a newer version on npm and install it (--check only says; --restart also restarts a run)
+  hive-am version              print the version (so does --version)
   hive-am --help               show this help
 
 Environment:
@@ -33,11 +35,11 @@ Environment:
 The API server always uses port 4400: the packaged UI is built to talk to it.
 Requires Node >= ${pkg.engines?.node?.replace('>=', '') ?? '20'} and at least one of the CLIs installed and logged in: claude, opencode, kiro-cli.`;
 
-const COMMANDS = ['start', 'stop', 'status', 'logs', 'restart'];
+const COMMANDS = ['start', 'stop', 'status', 'logs', 'restart', 'update', 'version'];
 const fail = (msg, code = 1) => { console.error(msg); process.exit(code); };
 
 if (args.includes('--help') || args.includes('-h')) { console.log(HELP); process.exit(0); }
-if (args.includes('--version') || args.includes('-v')) { console.log(pkg.version); process.exit(0); }
+if (args.includes('--version') || args.includes('-v') || args[0] === 'version') { console.log(pkg.version); process.exit(0); }
 
 const cmd = !args.length || args[0].startsWith('-') ? 'start' : args[0];
 const flags = COMMANDS.includes(args[0]) ? args.slice(1) : args;
@@ -60,7 +62,7 @@ const startOptions = (list) => {
   for (const a of list) if (!['--background', '-b', '--foreground', '--run-background'].includes(a)) fail(`Unknown option for start: ${a}\n\n${HELP}`);
   return { background: list.includes('--background') || list.includes('-b'), detached: list.includes('--run-background') };
 };
-if (cmd !== 'start' && cmd !== 'logs' && flags.length) fail(`Unknown option for ${cmd}: ${flags[0]}\n\n${HELP}`);
+if (cmd !== 'start' && cmd !== 'logs' && cmd !== 'update' && flags.length) fail(`Unknown option for ${cmd}: ${flags[0]}\n\n${HELP}`);
 
 if (process.env.HIVE_AM_PORT && process.env.HIVE_AM_PORT !== '4400') {
   fail('HIVE_AM_PORT is not supported by the packaged build: the UI is built to talk to the API on port 4400.');
@@ -89,10 +91,25 @@ async function blocked() {
   return null;
 }
 
+/** What a run prints first: the version, where to open it and where it keeps things. In the background it is the first thing in the log. */
+function welcome(mode) {
+  const data = run.dataDir().replace(homedir(), '~');
+  console.log(`
+  hive-am ${pkg.version}
+  ${pkg.description.split(':')[0]}
+
+  web   http://127.0.0.1:${webPort}
+  api   127.0.0.1:${apiPort}
+  data  ${data}
+${mode === 'background' ? '  log   ' + run.logFile().replace(homedir(), '~') + '\n  Stop it with: hive-am stop' : '  Stop it with Ctrl+C'}   (more: hive-am --help)
+`);
+}
+
 /** Runs the app in this process until it stops. In the background the output of both children goes to the same log. */
 function serve(mode) {
   const children = specs().map((s) => spawn(s.cmd, s.args, { cwd: s.cwd, stdio: 'inherit' }));
-  run.writeState({ pid: process.pid, stamp: run.processStamp(process.pid), mode, startedAt: Date.now(), webPort, apiPort, log: mode === 'background' ? run.logFile() : null });
+  welcome(mode);
+  run.writeState({ pid: process.pid, stamp: run.processStamp(process.pid), mode, version: pkg.version, startedAt: Date.now(), webPort, apiPort, log: mode === 'background' ? run.logFile() : null });
   process.on('exit', () => run.removeState(process.pid));
 
   let closing = false, code = 0, left = children.length;
@@ -163,7 +180,7 @@ async function status() {
   const s = cur.state;
   const [web, api] = await Promise.all([run.portOpen(s.webPort), run.portOpen(s.apiPort)]);
   const ports = `web http://127.0.0.1:${s.webPort} ${web ? 'up' : 'not answering'}, api 127.0.0.1:${s.apiPort} ${api ? 'up' : 'not answering'}`;
-  console.log(`running (pid ${s.pid}, since ${run.clock(s.startedAt)}, ${s.mode}) ${ports}${web || api ? '' : '\nNothing answers on its ports: it may still be starting, or it is stuck.'}${s.log ? `\nlog ${s.log}` : ''}`);
+  console.log(`running (pid ${s.pid}, ${s.version ? `v${s.version}, ` : ''}since ${run.clock(s.startedAt)}, ${s.mode}) ${ports}${web || api ? '' : '\nNothing answers on its ports: it may still be starting, or it is stuck.'}${s.log ? `\nlog ${s.log}` : ''}`);
   process.exit(0);
 }
 
@@ -200,7 +217,49 @@ async function restart() {
   await start(mode === 'background' ? ['--background'] : []);
 }
 
+/** Compares two `x.y.z` versions (a pre-release tag is ignored). */
+const versionCmp = (a, b) => { const n = (v) => String(v).split('-')[0].split('.').map((x) => Number(x) || 0); const [x, y] = [n(a), n(b)]; for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0); return 0; };
+const npm = (list, opts = {}) => spawnSync(process.env.HIVE_AM_NPM || 'npm', list, { encoding: 'utf8', timeout: 120_000, ...opts });
+
+/** How this copy of hive-am was installed, which decides whether it can update itself. `HIVE_AM_LAUNCHER_INSTALL` (tests only) forces the answer. */
+function installKind() {
+  if (process.env.HIVE_AM_LAUNCHER_INSTALL) return process.env.HIVE_AM_LAUNCHER_INSTALL;
+  if (root.includes(`${sep}_npx${sep}`)) return 'npx';
+  if (existsSync(join(root, '.git')) || existsSync(join(root, 'server', 'src'))) return 'source';
+  const g = npm(['root', '-g']).stdout?.trim();
+  return g && root.startsWith(g) ? 'global' : 'other';
+}
+
+async function update(list) {
+  for (const a of list) if (!['--check', '--restart'].includes(a)) fail(`Unknown option for update: ${a}\n\n${HELP}`);
+  const check = list.includes('--check'), again = list.includes('--restart');
+  const view = npm(['view', pkg.name, 'version']);
+  const latest = view.status === 0 ? view.stdout.trim() : '';
+  if (!latest) fail(`Could not ask npm for the latest version of ${pkg.name}${view.error ? ` (${view.error.message})` : ''}. Are you online?`);
+  console.log(`installed ${pkg.version}, latest ${latest}`);
+  if (versionCmp(latest, pkg.version) <= 0) { console.log('hive-am is up to date.'); process.exit(0); }
+  if (check) { console.log(`An update is available. Install it with: hive-am update`); process.exit(0); }
+
+  const kind = installKind();
+  if (kind === 'npx') fail('This copy runs through npx, which fetches what you ask for: start the new version with `npx hive-am@latest`.');
+  if (kind === 'source') fail('This is a source checkout: update it with `git pull` and `npm install`, then rebuild.');
+  if (kind !== 'global') fail(`hive-am was not installed globally with npm (${root}), so it cannot update itself. Install the new version the way you installed this one: npm install -g ${pkg.name}@${latest}`);
+
+  console.log(`Installing ${pkg.name}@${latest} ...`);
+  const r = npm(['install', '-g', `${pkg.name}@${latest}`], { stdio: 'inherit', encoding: undefined });
+  if (r.status !== 0) fail(`npm could not install ${pkg.name}@${latest} (exit ${r.status}). If it is a permissions error, see https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally`);
+  let now = latest;
+  try { now = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version; } catch { /* the folder was replaced: keep what npm installed */ }
+  console.log(`hive-am updated: ${pkg.version} -> ${now}`);
+  const cur = run.inspect();
+  if (cur.kind !== 'running') process.exit(0);
+  if (again) { console.log('Restarting it on the new version ...'); process.exit(spawnSync(process.execPath, [self, 'restart'], { stdio: 'inherit' }).status ?? 1); }
+  console.log(`hive-am (pid ${cur.state.pid}) is still running the old version. Apply the update with: hive-am restart`);
+  process.exit(0);
+}
+
 if (cmd === 'start') await start(flags);
+else if (cmd === 'update') await update(flags);
 else if (cmd === 'stop') await stop();
 else if (cmd === 'status') await status();
 else if (cmd === 'logs') await logs(flags);
