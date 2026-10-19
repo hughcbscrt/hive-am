@@ -52,17 +52,28 @@ erDiagram
 
 On install, `skills.seedDefaults` (`server/src/skills/defaults.ts`) adds **once** the skills that ship with hive-am, recording each one in `seeded_skills (slug)`. From then on they are ordinary skills: you edit or delete them, and a deleted skill is **not** recreated on the next start. If one with that name already existed, the new one is added as "Name (hive-am)". A future hive-am version that brings more skills adds them only once, and never modifies the ones you already have. Their id is `default-<slug>`. The ones that ship with hive-am are created `on_demand`, except Notebook (`always`).
 
-### Table `agent_notebooks`
+### Tables `notebooks` and `notebook_readers`
 
-Each agent's notebook (see [7.3.2](07-agents-types-skills-colonies.md#732-the-agents-notebook)). It lives in a separate table so it does not travel with the agent list.
+A notebook (see [7.3.2](07-agents-types-skills-colonies.md#732-the-agents-notebook)) is an object of its own with **readers**: an agent and the clones made from it read and write the same one. They live in separate tables so they do not travel with the agent list. Migration 6 moved the old `agent_notebooks` table here without losing a row (text, version and who wrote last are kept, and each agent that had a notebook keeps a notebook of its own).
+
+`notebooks`:
 
 | Column | Type | Notes |
 |---|---|---|
-| `agent_id` | TEXT PK | `ON DELETE CASCADE` |
+| `id` | TEXT PK | |
 | `content` | TEXT | Markdown (max. 8000 characters) |
 | `version` | INTEGER | Goes up with every change |
-| `seen` | INTEGER | Last version that the agent's live conversation already contains |
 | `updated_at`, `updated_by` | INTEGER, TEXT | `agent` or `user` |
+
+`notebook_readers` (one row per agent that has a notebook):
+
+| Column | Type | Notes |
+|---|---|---|
+| `agent_id` | TEXT PK | `ON DELETE CASCADE`: deleting an agent removes only its reader row |
+| `notebook_id` | TEXT | The notebook it reads (`ON DELETE CASCADE`) |
+| `seen` | INTEGER | Last version that **this reader's** live conversation already contains (each agent has its own) |
+
+The trigger `notebook_orphan` deletes a notebook when its last reader goes, however it goes (deleting the agent, or moving to another notebook), so no orphan rows are left; deleting one reader keeps the notebook, with its text and the others' `seen`.
 
 ### Table `agent_types`
 

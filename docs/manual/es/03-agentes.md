@@ -164,6 +164,8 @@ Para editarlo:
 
 **Borrar todo** pide confirmación ("¿Borrar el cuaderno?"): el agente olvidará todo lo anotado y no se puede deshacer. **Recargar** trae la última versión.
 
+**Cuaderno compartido.** Un agente y sus clones (ver [La colonia](02-la-colonia.md#clonar-un-agente)) leen y escriben el mismo cuaderno. Cuando se comparte, la pestaña lo dice ("Compartido con Backend 2: lo que escribe cualquiera de ellos, lo leen todos") y ofrece **Separar**. **Borrar todo** entonces lo vacía para todos, y su confirmación lo dice.
+
 > **Nota:** el cuaderno funciona gracias a la skill **Notebook**. Si el agente no la tiene, la pestaña lo avisa ("Este agente no tiene la skill «Notebook»") y ofrece un botón **Activar**.
 
 La pestaña **Sesiones** se explica en [Sesiones](07-sesiones.md).
@@ -174,6 +176,6 @@ La pestaña **Sesiones** se explica en [Sesiones](07-sesiones.md).
 2. Pulsa **Eliminar agente** en el pie.
 3. Confirma en "¿Eliminar a nombre?". Con **Conservar agente** cancelas.
 
-Se eliminan el agente y sus conexiones. Los archivos de sus sesiones nativas permanecen en disco, intactos.
+Se eliminan el agente y sus conexiones. Los archivos de sus sesiones nativas permanecen en disco, intactos. Si su cuaderno se comparte con otros agentes, se queda con ellos (el diálogo lo dice); un cuaderno que nadie comparte se va con su agente.
 
 Siguiente: [Chat](04-chat.md)

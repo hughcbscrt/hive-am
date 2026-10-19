@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Boxes, Hexagon, Maximize2, Minus, Plus, RotateCcw, Settings2, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { ArrowRight, Boxes, Copy, Hexagon, Maximize2, Minus, Plus, RotateCcw, Settings2, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { useHiveData } from '@/lib/store';
 import { usePersistentState } from '@/lib/hooks/usePersistentState';
 import { api } from '@/lib/api';
@@ -13,6 +13,7 @@ import { NewAgentDrawer } from '@/components/agents/NewAgentDrawer';
 import { ColonyEditor } from '@/components/agents/ColonyEditor';
 import { AgentEditDrawer } from '@/components/agents/AgentEditDrawer';
 import { DeleteAgentModal } from '@/components/agents/DeleteAgentModal';
+import { CloneAgentModal } from '@/components/agents/CloneAgentModal';
 import { HelpPopover } from '@/components/HelpPopover';
 import { AgentDetails, AnchoredCard } from '@/components/agents/AgentCard';
 import { useI18n } from '@/lib/i18n';
@@ -165,6 +166,7 @@ export default function Colony() {
   const managerLinks = objects.filter((o) => o.manager_id && pos.has(o.manager_id) && pos.has(o.id)).map((o) => ({ from: o.manager_id!, to: o.id }));
   const managedBy = (agentId: string) => objects.filter((o) => o.manager_id === agentId);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [cloning, setCloning] = useState<string | null>(null);
   const selected = agents.find((a) => a.id === sel) ?? null;
   const selectedObject = objects.find((o) => o.id === sel) ?? null;
   // The card of what is selected opens beside its hex, so the element has to be found once the canvas is drawn.
@@ -359,6 +361,7 @@ export default function Colony() {
               </div>
               <div className="row ap-pin-actions">
                 <Link className="btn primary grow" href={`/agents/${selected.id}`}>{t('colony.openChat')} <ArrowRight size={16} /></Link>
+                <button className="btn icon" onClick={() => setCloning(selected.id)} aria-label={t('agent.clone')} title={t('agent.clone.hint')}><Copy size={16} /></button>
                 <button className="btn danger icon" onClick={() => setDeleting(selected.id)} aria-label={t('agent.delete')} title={t('agent.delete')}><Trash2 size={16} /></button>
               </div>
             </AnchoredCard>
@@ -378,6 +381,7 @@ export default function Colony() {
             </div>
           ))}</div>}
       </div>
+      {cloning && agents.find((a) => a.id === cloning) && <CloneAgentModal agent={agents.find((a) => a.id === cloning)!} onClose={() => setCloning(null)} onCloned={(c) => setSel(c.id)} />}
       {deleting && agents.find((a) => a.id === deleting) && <DeleteAgentModal agent={agents.find((a) => a.id === deleting)!} onClose={() => setDeleting(null)} onDeleted={() => setSel(null)} />}
       {creating && <NewAgentDrawer presetColonyId={creating.colonyId} presetObjectId={creating.objectId} manager={creating.manager} onClose={() => setCreating(null)} onCreated={(id) => setSel(id)} />}
       {editingAgent && agents.find((a) => a.id === editingAgent) && <AgentEditDrawer key={editingAgent} agent={agents.find((a) => a.id === editingAgent)!} onClose={() => setEditingAgent(null)} />}

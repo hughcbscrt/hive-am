@@ -8,7 +8,7 @@ import type { Agent } from '@/lib/types';
 /** Edit an agent without leaving the page you're on. Same form and actions as the agent workspace sidebar. */
 export function AgentEditDrawer({ agent, onClose }: { agent: Agent; onClose: () => void }) {
   const { t } = useI18n();
-  const s = useAgentSettings(agent, { onSaved: onClose, onDeleted: onClose });
+  const s = useAgentSettings(agent, { onSaved: onClose, onDeleted: onClose, onCloned: onClose });
   if (!s.draft) return null;
   return (
     <>
@@ -17,6 +17,7 @@ export function AgentEditDrawer({ agent, onClose }: { agent: Agent; onClose: () 
         <AgentForm draft={s.draft} onChange={s.setDraft} errors={s.errors} selfId={agent.id} />
       </Drawer>
       {s.deleteModal}
+      {s.cloneModal}
     </>
   );
 }

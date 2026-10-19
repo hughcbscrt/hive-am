@@ -54,8 +54,19 @@ The card shows:
 - Name, role (**Worker** or **Orchestrator**) and status (**Idle**, **Working**, **Needs attention**).
 - Description, **Provider** and model, **Permissions**, **Folder** (with "from colony" if it inherits it), **Directed by** (for workers) or its team (for orchestrators), **Session** and when it was **Updated**.
 - A **Colony** selector to move the agent to another colony (or leave it without one).
-- The **Open chat** button and, on the right, the trash icon to delete the agent.
+- The **Open chat** button and, on the right, the icon to **clone** the agent and the trash icon to delete it.
 - At the top, the settings icon that opens the agent's editor without leaving the map.
+
+### Clone an agent
+
+Press the clone icon on an agent's card (or **Clone** in its settings footer). A dialog asks for the **name** of the clone (`Maggie 2` is suggested) and its **colony** (the same one by default), and says what the clone is:
+
+- It is a **separate agent**, so its conversation and the original's can happen **at the same time**. One agent answers one message at a time, so a clone is how you get two conversations in parallel without setting anything up again.
+- It keeps the **same configuration**: prompt, skills, permissions, model and folder. Two agents in the same folder can edit the same files.
+- It **shares the notebook** of the original: the notes are the same for both, and whoever writes is read by the other. In the notebook, each note says which agent wrote it.
+- It does **not bring** the connections (Telegram or Slack bots), schedules, wake-ups or resource management of the original. If the clone should answer the same bot or look after the same servers, set that up separately.
+
+Deleting either one keeps the notebook for the other. If you want the clone to stop sharing, open its **Notebook** tab and press **Separate**: it keeps its own copy of the notes and they stop reading each other's.
 
 ### A resource's card
 

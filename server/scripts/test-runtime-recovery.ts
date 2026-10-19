@@ -22,12 +22,12 @@ runners.claude = async function* () { yield { t: 'text', delta: 'hello' }; yield
 
 // ---- a turn ----
 check((await sendTurn(a.id, 'hi')).text === 'hello', 'a normal turn answers');
-db.exec('ALTER TABLE agent_notebooks RENAME TO nb_tmp');   // makes preparing the turn throw before the model is called
+db.exec('ALTER TABLE notebook_readers RENAME TO nb_tmp');   // makes preparing the turn throw before the model is called
 const bad = await sendTurn(a.id, 'hi again');
-check(!bad.ok && /agent_notebooks/.test(bad.error ?? ''), 'a failure while preparing the turn is reported as its error');
+check(!bad.ok && /notebook_readers/.test(bad.error ?? ''), 'a failure while preparing the turn is reported as its error');
 check(liveTurn(a.id) === null && queueDepth(a.id) === 0, 'nothing is left live or queued');
 check(agents.get(a.id)?.status === 'error', 'the agent is marked as failed, not "running" forever');
-db.exec('ALTER TABLE nb_tmp RENAME TO agent_notebooks');
+db.exec('ALTER TABLE nb_tmp RENAME TO notebook_readers');
 const again = await sendTurn(a.id, 'and now?');
 check(again.ok && again.text === 'hello' && agents.get(a.id)?.status === 'idle', 'the next message works');
 

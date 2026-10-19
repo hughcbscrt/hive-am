@@ -1,12 +1,14 @@
+import { randomUUID } from 'node:crypto';
 import { db } from '../db.js';
 import { DomainError } from '../errors.js';
 
 /**
- * An agent's notebook: Markdown it keeps for itself across conversations (see the «Notebook» default skill).
- * Lives in its own table so it never travels with the agent list. Every change bumps `version`; `seen` is the version the
- * agent's live conversation already contains, so the runtime knows when it must be re-sent (e.g. after the user edits it).
+ * A notebook: Markdown an agent keeps for itself across conversations (see the «Notebook» default skill). It is an object of its own with
+ * readers (`notebooks` and `notebook_readers`, created by db/migrations.ts): an agent and the clones made from it read and write the same one, and
+ * it goes away only with its last reader. It lives in its own table so it never travels with the agent list. Every change bumps `version`;
+ * `seen` belongs to the reader: it is the version that agent's live conversation already contains, so the runtime knows when the text must be
+ * re-sent to it (e.g. after the user, or another agent that shares the notebook, changed it).
  */
-// The table (agent_notebooks) is created by db/migrations.ts.
 
 /** It is prompt overhead on every turn, so it has a hard cap. */
 export const NOTEBOOK_MAX = 8000;
@@ -40,21 +42,65 @@ const refuseSecret = (text: string) => {
 
 const empty = (): Notebook => ({ content: '', version: 0, seen: 0, updated_at: 0, updated_by: '' });
 
-export const notebooks = {
-  get: (agentId: string): Notebook => (db.prepare('SELECT content,version,seen,updated_at,updated_by FROM agent_notebooks WHERE agent_id=?').get(agentId) as Notebook | undefined) ?? empty(),
+/** The notebook an agent reads, with that agent's own `seen`. */
+const readerRow = (agentId: string) => db.prepare(`SELECT n.id, n.content, n.version, r.seen, n.updated_at, n.updated_by FROM notebook_readers r JOIN notebooks n ON n.id = r.notebook_id WHERE r.agent_id = ?`).get(agentId) as (Notebook & { id: string }) | undefined;
 
-  /** The agent (or the user) replaced the text. `live`: the change happened inside the conversation the agent is running now. */
-  save(agentId: string, content: string, by: 'agent' | 'user', live: boolean): Notebook {
-    const cur = notebooks.get(agentId), version = cur.version + 1, t = Date.now();
-    const seen = live ? version : cur.seen;
-    db.prepare(`INSERT INTO agent_notebooks (agent_id,content,version,seen,updated_at,updated_by) VALUES (?,?,?,?,?,?)
-      ON CONFLICT(agent_id) DO UPDATE SET content=excluded.content, version=excluded.version, seen=excluded.seen, updated_at=excluded.updated_at, updated_by=excluded.updated_by`)
-      .run(agentId, content, version, seen, t, by);
-    return notebooks.get(agentId);
+export interface Reader { id: string; name: string }
+
+/** The notebook the agent reads, created empty (version 0) when it has none yet. */
+function ensure(agentId: string) {
+  let row = readerRow(agentId);
+  if (!row) {
+    const id = randomUUID();
+    db.prepare('INSERT INTO notebooks (id) VALUES (?)').run(id);
+    db.prepare('INSERT INTO notebook_readers (agent_id, notebook_id, seen) VALUES (?,?,0)').run(agentId, id);
+    row = readerRow(agentId)!;
+  }
+  return row;
+}
+
+export const notebooks = {
+  get: (agentId: string): Notebook => { const r = readerRow(agentId); return r ? { content: r.content, version: r.version, seen: r.seen, updated_at: r.updated_at, updated_by: r.updated_by } : empty(); },
+
+  /** The other agents that read the same notebook (empty for an ordinary notebook). */
+  sharedWith(agentId: string): Reader[] {
+    const r = readerRow(agentId); if (!r) return [];
+    return db.prepare('SELECT a.id, a.name FROM notebook_readers x JOIN agents a ON a.id = x.agent_id WHERE x.notebook_id = ? AND x.agent_id <> ? ORDER BY a.name').all(r.id, agentId) as Reader[];
   },
 
+  /** The agent (or the user) replaced the text. `live`: the change happened inside the conversation the agent is running now. */
+  save: db.transaction((agentId: string, content: string, by: 'agent' | 'user', live: boolean): Notebook => {
+    const row = ensure(agentId);                                       // an agent that never had one gets its own
+    const version = row.version + 1;
+    db.prepare('UPDATE notebooks SET content=?, version=?, updated_at=?, updated_by=? WHERE id=?').run(content, version, Date.now(), by, row.id);
+    // Only the writer's own conversation already contains what it just wrote; the other readers are sent it on their next turn.
+    if (live) db.prepare('UPDATE notebook_readers SET seen=? WHERE agent_id=?').run(version, agentId);
+    return notebooks.get(agentId);
+  }),
+
   /** The runtime sent version `v` to the agent's conversation. */
-  markSeen: (agentId: string, v: number) => { db.prepare('UPDATE agent_notebooks SET seen=MAX(seen, ?) WHERE agent_id=?').run(v, agentId); },
+  markSeen: (agentId: string, v: number) => { db.prepare('UPDATE notebook_readers SET seen=MAX(seen, ?) WHERE agent_id=?').run(v, agentId); },
+
+  /**
+   * `to` starts reading the notebook of `from` (a clone sharing its source's notes): `from` gets one if it had none, and what `to` read before
+   * is dropped with its last reader. Its `seen` starts at 0, so its first turn is sent the text.
+   */
+  share: db.transaction((fromId: string, toId: string): void => {
+    if (fromId === toId) return;
+    const nb = ensure(fromId);
+    db.prepare('INSERT INTO notebook_readers (agent_id, notebook_id, seen) VALUES (?,?,0) ON CONFLICT(agent_id) DO UPDATE SET notebook_id=excluded.notebook_id, seen=0').run(toId, nb.id);
+    db.prepare('DELETE FROM notebooks WHERE id NOT IN (SELECT notebook_id FROM notebook_readers)').run();      // what `to` read before, if nobody else does
+  }),
+
+  /** Gives the agent its own copy of the notebook it shares, and leaves the shared one with the others. Does nothing for an agent that shares nothing. */
+  separate: db.transaction((agentId: string): Notebook => {
+    const row = readerRow(agentId);
+    if (!row || !notebooks.sharedWith(agentId).length) return notebooks.get(agentId);
+    const id = randomUUID();
+    db.prepare('INSERT INTO notebooks (id, content, version, updated_at, updated_by) VALUES (?,?,?,?,?)').run(id, row.content, row.version, row.updated_at, row.updated_by);
+    db.prepare('UPDATE notebook_readers SET notebook_id=? WHERE agent_id=?').run(id, agentId);              // `seen` stays: it still describes what this agent's conversation holds
+    return notebooks.get(agentId);
+  }),
 
   /** Edit from the UI. `version` (when given) must be the one the user was looking at. */
   edit(agentId: string, content: string, version?: number): Notebook {

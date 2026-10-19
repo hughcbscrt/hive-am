@@ -178,7 +178,7 @@ No hay un framework de pruebas: `server/scripts/test-*.ts` son scripts independi
 | `types.ts` | `Agent`, `Colony`, `AgentType`, `Skill`, `StreamEvent`, `Block`, `ChatMessage`, `Usage`, `TurnOptions`, etc. |
 | `seed.ts` | Si la base está vacía crea 2 skills y 3 tipos (Queen, Builder, Reviewer). |
 | `skills/defaults.ts` | Las diez skills que vienen con hive-am (`skills.seedDefaults` las crea una sola vez); ver [7.3](07-agentes-tipos-skills-colonias.md#73-skills). |
-| `skills/notebook.ts` | El cuaderno de cada agente: tabla `agent_notebooks`, límites, notas sin duplicados, rechazo de credenciales y versiones. |
+| `skills/notebook.ts` | Un cuaderno con lectores (un agente y sus clones comparten uno): tablas `notebooks` y `notebook_readers`, límites, notas sin duplicados, rechazo de credenciales y versiones. |
 | `connections/*` | Conexiones externas (Telegram): adaptador, enrutador de mensajes, grupos, silencio y herramientas del canal; ver [documento 14](14-conexiones-externas.md). |
 | `models.ts` | Modelos disponibles por proveedor; caché de 10 minutos. |
 | `pricing.ts` | Tabla de precios por familia (opus/sonnet/haiku) y utilidades de suma de uso. |

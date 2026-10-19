@@ -93,7 +93,9 @@ Reads: [document 13, §13.4](13-changes-explorer-git.md#134-read-api). History a
 | `PATCH /api/skills/:id` | subset | The skill |
 | `DELETE /api/skills/:id` | — | `{ ok: true }` |
 | `POST /api/skills/read` | `{ from, name }` | Used by the `hive` MCP (`skill_read`): `{ name, content }` of a skill that agent `from` has; 400 with the list of its skills if the name does not exist |
-| `GET /api/agents/:id/notebook` | — | `{ content, version, size, max, updated_at, updated_by, enabled }` (`enabled`: the agent has the Notebook skill) |
+| `POST /api/agents/:id/clone` | `{ name, colony_id? }` | A separate agent with the same configuration that reads the same notebook (see 7.3.2). 400 for a repeated name or an unknown colony, 404 for a missing agent. |
+| `GET /api/agents/:id/notebook` | - | `{ content, version, size, max, updated_at, updated_by, enabled, skill_id, shared_with }` (`enabled`: the agent has the Notebook skill; `shared_with`: `{ id, name }[]`, the other agents that read the same notebook) |
+| `POST /api/agents/:id/notebook/separate` | - | The agent keeps a copy of the current text as its own notebook and the shared one stays with the rest. Local origin only. |
 | `PUT /api/agents/:id/notebook` | `{ content, version? }` | User edit. 400 if it exceeds 8000 characters or if `version` is no longer the current one (the agent wrote in the meantime). Local origin only. |
 | `POST /api/notebook/read` · `/add` · `/rewrite` | `{ from, … }` | Used by the `hive` MCP (`notebook_read`, `notebook_add`, `notebook_rewrite`) |
 

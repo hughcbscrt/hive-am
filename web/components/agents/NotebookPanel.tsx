@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, BookOpen, RefreshCw, Trash2 } from 'lucide-react';
+import { AlertTriangle, BookOpen, RefreshCw, Trash2, Unlink, Users } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useHive } from '@/lib/store';
 import { useI18n } from '@/lib/i18n/index';
@@ -19,6 +19,7 @@ export function NotebookPanel({ agent }: { agent: Agent }) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [wipe, setWipe] = useState(false);
+  const [separating, setSeparating] = useState(false);
   const base = useRef('');           // what the server last had; the text is dirty when it differs
   const dirty = !!info && text !== base.current;
   const dirtyRef = useRef(false); dirtyRef.current = dirty;
@@ -26,7 +27,7 @@ export function NotebookPanel({ agent }: { agent: Agent }) {
   const load = useCallback(async (force = false) => {
     try {
       const n = await api.get<NotebookInfo>(`/agents/${agent.id}/notebook`);
-      setInfo((cur) => (cur && cur.version === n.version && cur.enabled === n.enabled ? cur : n));
+      setInfo((cur) => (cur && cur.version === n.version && cur.enabled === n.enabled && JSON.stringify(cur.shared_with) === JSON.stringify(n.shared_with) ? cur : n));
       if (force || !dirtyRef.current) { base.current = n.content; setText(n.content); }
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   }, [agent.id]);
@@ -45,6 +46,11 @@ export function NotebookPanel({ agent }: { agent: Agent }) {
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     setSaving(false);
   };
+  const separate = async () => {
+    setSeparating(false); setError('');
+    try { await api.post(`/agents/${agent.id}/notebook/separate`); toast(t('notebook.separated')); await load(true); await refresh(['agents']); }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  };
   const addSkill = async () => {
     try { await api.patch(`/agents/${agent.id}`, { skill_ids: [...new Set([...agent.skill_ids, info!.skill_id])] }); await refresh(['agents']); await load(true); }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); }
@@ -52,10 +58,14 @@ export function NotebookPanel({ agent }: { agent: Agent }) {
 
   if (!info) return <div className="pane"><p className="hint">{error || t('git.loading')}</p></div>;
   const used = text.length, over = used > info.max, nearly = used > info.max * 0.8;
+  const others = info.shared_with ?? [];
   return (
     <>
       <div className="pane">
         <p className="hint" style={{ margin: 0 }}>{t('notebook.intro')}</p>
+        {others.length > 0 && (
+          <div className="banner"><Users size={16} /><div className="grow">{t('notebook.sharedWith', { names: others.map((o) => o.name).join(', ') })}</div><button className="btn sm" onClick={() => setSeparating(true)}><Unlink size={13} />{t('notebook.separate')}</button></div>
+        )}
         {!info.enabled && (
           <div className="banner honey"><AlertTriangle size={16} /><div className="grow">{t('notebook.off')}</div><button className="btn sm" onClick={addSkill}>{t('notebook.on')}</button></div>
         )}
@@ -76,10 +86,19 @@ export function NotebookPanel({ agent }: { agent: Agent }) {
       </div>
       {wipe && (
         <Modal title={t('notebook.clear.title')} onClose={() => setWipe(false)}>
-          <p style={{ margin: 0 }} className="muted">{t('notebook.clear.confirm')}</p>
+          <p style={{ margin: 0 }} className="muted">{others.length ? t('notebook.clear.shared', { names: others.map((o) => o.name).join(', ') }) : t('notebook.clear.confirm')}</p>
           <div className="row" style={{ justifyContent: 'flex-end' }}>
             <button className="btn ghost" onClick={() => setWipe(false)}>{t('common.cancel')}</button>
             <button className="btn danger" onClick={() => { setWipe(false); void save(''); }}>{t('notebook.clear')}</button>
+          </div>
+        </Modal>
+      )}
+      {separating && (
+        <Modal title={t('notebook.separate.title')} onClose={() => setSeparating(false)}>
+          <p style={{ margin: 0 }} className="muted">{t('notebook.separate.confirm', { name: agent.name, names: others.map((o) => o.name).join(', ') })}</p>
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
+            <button className="btn ghost" onClick={() => setSeparating(false)}>{t('common.cancel')}</button>
+            <button className="btn primary" onClick={() => void separate()}>{t('notebook.separate')}</button>
           </div>
         </Modal>
       )}

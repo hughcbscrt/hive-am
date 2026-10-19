@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Copy, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui';
 import { draftFromAgent, validate, type AgentDraft } from './AgentForm';
 import { DeleteAgentModal } from './DeleteAgentModal';
+import { CloneAgentModal } from './CloneAgentModal';
 import { useHiveData } from '@/lib/store';
 import { useUnsavedGuard } from '@/lib/hooks/useUnsavedGuard';
 import { api } from '@/lib/api';
@@ -14,7 +15,7 @@ import type { Agent } from '@/lib/types';
  * One place for editing an agent's settings, shared by the agent workspace sidebar and the colony drawer
  * so both validate, save, discard, delete and word things the same way.
  */
-export function useAgentSettings(agent: Agent | undefined, opts: { onSaved?: () => void; onDeleted?: () => void } = {}) {
+export function useAgentSettings(agent: Agent | undefined, opts: { onSaved?: () => void; onDeleted?: () => void; onCloned?: (clone: Agent) => void } = {}) {
   const { t } = useI18n();
   const { agents, colonies, objects, refresh } = useHiveData();
   const toast = useToast();
@@ -24,6 +25,7 @@ export function useAgentSettings(agent: Agent | undefined, opts: { onSaved?: () 
   const [draft, setDraft] = useState<AgentDraft | null>(() => (agent ? draftFromAgent(agent, managed) : null));
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [cloning, setCloning] = useState(false);
   // Follow the saved agent (another agent selected, or the server changed it).
   useEffect(() => { setDraft(agent ? draftFromAgent(agent, managed) : null); }, [base]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -49,15 +51,20 @@ export function useAgentSettings(agent: Agent | undefined, opts: { onSaved?: () 
 
   /** Delete (left), then Discard and Save. Same buttons, same order, same labels everywhere. */
   const actions = (o: { size?: 'sm'; onCancel?: () => void } = {}) => (
-    <>
-      <button className={`btn danger push-r ${o.size ?? ''}`} onClick={() => setConfirmDelete(true)}><Trash2 size={o.size ? 14 : 15} />{t('agent.delete')}</button>
+    <span className="foot-actions push-r">
+      <span className="row gap-s">
+        <button className={`btn danger ${o.size ?? ''}`} onClick={() => setConfirmDelete(true)}><Trash2 size={o.size ? 14 : 15} />{t('agent.delete')}</button>
+        <button className={`btn icon ${o.size ?? ''}`} onClick={() => setCloning(true)} title={t('agent.clone.hint')} aria-label={t('agent.clone')}><Copy size={o.size ? 14 : 15} /></button>
+      </span>
       {o.onCancel
         ? <button className={`btn ghost ${o.size ?? ''}`} onClick={o.onCancel}>{t('common.cancel')}</button>
         : <button className={`btn ghost ${o.size ?? ''}`} disabled={!dirty} onClick={discard}>{t('common.discard')}</button>}
       <button className={`btn primary ${o.size ?? ''}`} disabled={!dirty || saving} onClick={save}>{saving ? t('common.saving') : t('common.saveChanges')}</button>
-    </>
+    </span>
   );
   const deleteModal = confirmDelete && agent ? <DeleteAgentModal agent={agent} onClose={() => setConfirmDelete(false)} onDeleted={opts.onDeleted} /> : null;
 
-  return { draft, setDraft, errors, dirty, saving, save, discard, actions, deleteModal };
+  const cloneModal = cloning && agent ? <CloneAgentModal agent={agent} onClose={() => setCloning(false)} onCloned={opts.onCloned} /> : null;
+
+  return { draft, setDraft, errors, dirty, saving, save, discard, actions, deleteModal, cloneModal };
 }

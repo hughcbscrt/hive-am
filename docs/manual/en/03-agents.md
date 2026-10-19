@@ -128,7 +128,7 @@ To edit an existing agent, open its screen and click **Settings** in the header.
 
 ![Queen's settings panel, Configuration tab, with the form and the footer buttons](img/agente-ajustes-configuracion.jpg)
 
-*The **Configuration** tab for Queen. The footer has **Delete agent**, **Discard** and **Save changes**, next to the text "All changes saved."*
+*The **Configuration** tab for Queen. The footer has **Delete agent**, **Clone**, **Discard** and **Save changes**, next to the text "All changes saved."*
 
 - The **Configuration** tab has the same form as above.
 - You can widen the panel with the button in the corner, or drag its left edge (double-click to toggle).
@@ -164,6 +164,8 @@ To edit it:
 
 **Clear all** asks for confirmation ("Clear the notebook?"): the agent will forget everything it noted, and this cannot be undone. **Reload** brings the latest version.
 
+**Shared notebook.** An agent and its clones (see [The colony](02-the-colony.md#clone-an-agent)) read and write the same notebook. When it is shared, the tab says so ("Shared with Backend 2: what any of them writes, all of them read") and offers **Separate**. **Clear all** then empties it for all of them, and says so in its confirmation.
+
 > **Note:** the notebook works thanks to the **Notebook** skill. If the agent does not have it, the tab warns you ("This agent doesn’t have the “Notebook” skill, so it doesn’t use its notebook.") and offers a **Turn on** button.
 
 The **Sessions** tab is explained in [Sessions](07-sessions.md).
@@ -174,6 +176,6 @@ The **Sessions** tab is explained in [Sessions](07-sessions.md).
 2. Click **Delete agent** in the footer.
 3. Confirm in "Delete *name*?". **Keep agent** cancels.
 
-The agent and its connections are removed. The files of its native sessions stay on disk, untouched.
+The agent and its connections are removed. The files of its native sessions stay on disk, untouched. If its notebook is shared with other agents, it stays with them (the dialog says so); a notebook that nobody shares goes with its agent.
 
 Next: [Chat](04-chat.md)

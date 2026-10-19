@@ -298,7 +298,10 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .drawer header { padding: 20px 24px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: flex-start; gap: 12px; }
 .drawer header h2 { font-size: 22px; }
 .drawer .body { padding: 22px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; flex: 1; }
-.drawer footer { padding: 14px 24px; border-top: 1px solid var(--line); display: flex; gap: 10px; justify-content: flex-end; }
+.drawer footer { padding: 14px 24px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; align-items: center; }
+.drawer footer .btn { white-space: nowrap; flex: none; }
+.foot-actions { display: flex; align-items: center; gap: 10px; flex: none; }      /* the buttons move together to the next row when they do not fit beside the note */
+.drawer footer > span.grow { min-width: max-content; }      /* the note never gets squeezed into a column: when the buttons do not fit beside it, they go to the next row */
 @keyframes slide { from { transform: translateX(30px); opacity: 0; } }
 @keyframes fade { from { opacity: 0; } }
 .modal { position: fixed; z-index: calc(var(--z-dialog) + var(--layer, 0) * 2 + 1); left: 50%; top: 14vh; transform: translateX(-50%); width: min(480px, 92vw); background: var(--surface); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 30px 80px -20px rgba(0,0,0,.5); max-height: calc(100vh - 14vh - 16px); overflow-y: auto; }
@@ -1314,6 +1317,7 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .cluster { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .stack-s { display: flex; flex-direction: column; gap: 6px; min-width: 0; } .stack-l { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .gap-xs { gap: 4px; } .gap-m { gap: 12px; }
+.clone-facts { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
 .push-r { margin-left: auto; } .nowrap { white-space: nowrap; } .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .m0 { margin: 0; } .mt-s { margin-top: 6px; } .mt-m { margin-top: 12px; } .mt-l { margin-top: 20px; }
 

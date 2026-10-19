@@ -59,7 +59,7 @@ function Workspace({ id }: { id: string }) {
   const changedCount = git.status && git.status.isRepo ? git.status.changes.length : 0;
 
   const setOpen = (v: boolean, tb?: CfgTab) => { const next = tb ?? tab; setLastTab(next); setQtab(v ? next : ''); };
-  const settings = useAgentSettings(agent, { onDeleted: () => router.push('/agents') });
+  const settings = useAgentSettings(agent, { onDeleted: () => router.push('/agents'), onCloned: (c) => router.push(`/agents/${c.id}`) });
   const { draft, setDraft, errors, dirty } = settings;
   // Closing with edits (X, Escape, scrim, Hide) asks first.
   const closeCfg = () => { if (dirty) setAskClose(true); else setOpen(false); };
@@ -171,6 +171,7 @@ function Workspace({ id }: { id: string }) {
       )}
 
       {settings.deleteModal}
+      {settings.cloneModal}
       {askClose && <ConfirmDialog danger title={t('fa.unsaved.title')} body={t('fa.unsaved.body')} confirmLabel={t('fa.unsaved.discard')} cancelLabel={t('fa.unsaved.keep')} onClose={() => setAskClose(false)} onConfirm={() => { settings.discard(); setOpen(false); }} />}
       {confirm === 'new' && (
         <ConfirmDialog title={t('agent.newConvTitle')} body={t('agent.newConvBody')} confirmLabel={t('agent.newConvStart')} onClose={() => setConfirm(null)}

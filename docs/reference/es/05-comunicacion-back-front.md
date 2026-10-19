@@ -93,7 +93,9 @@ Lecturas: [documento 13, §13.4](13-explorador-de-cambios-git.md#134-api-de-lect
 | `PATCH /api/skills/:id` | subconjunto | La skill |
 | `DELETE /api/skills/:id` | — | `{ ok: true }` |
 | `POST /api/skills/read` | `{ from, name }` | Lo usa el MCP `hive` (`skill_read`): `{ name, content }` de una skill que el agente `from` tiene; 400 con la lista de sus skills si el nombre no existe |
-| `GET /api/agents/:id/notebook` | — | `{ content, version, size, max, updated_at, updated_by, enabled }` (`enabled`: el agente tiene la skill Notebook) |
+| `POST /api/agents/:id/clone` | `{ name, colony_id? }` | Un agente aparte con la misma configuración que lee el mismo cuaderno (ver 7.3.2). 400 por nombre repetido o colonia desconocida, 404 si el agente no existe. |
+| `GET /api/agents/:id/notebook` | - | `{ content, version, size, max, updated_at, updated_by, enabled, skill_id, shared_with }` (`enabled`: el agente tiene la skill Notebook; `shared_with`: `{ id, name }[]`, los demás agentes que leen el mismo cuaderno) |
+| `POST /api/agents/:id/notebook/separate` | - | El agente se queda con una copia del texto actual como su propio cuaderno y el compartido sigue con los demás. Solo origen local. |
 | `PUT /api/agents/:id/notebook` | `{ content, version? }` | Edición del usuario. 400 si pasa de 8000 caracteres o si `version` ya no es la actual (el agente escribió mientras tanto). Solo origen local. |
 | `POST /api/notebook/read` · `/add` · `/rewrite` | `{ from, … }` | Los usa el MCP `hive` (`notebook_read`, `notebook_add`, `notebook_rewrite`) |
 
