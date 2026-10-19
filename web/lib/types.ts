@@ -16,6 +16,8 @@ export interface Agent {
   session_id: string | null; status: 'idle' | 'running' | 'error';
   skill_ids: string[]; skill_loads: Record<string, SkillLoad>; worker_ids: string[]; created_at: number; updated_at: number;
   queued?: number; live?: boolean;
+  /** OpenCode keeps the tools a conversation started with: true when the permission changed after it began. */
+  permission_stale?: boolean;
 }
 export interface AgentType {
   id: string; name: string; description: string; role: Role; provider: Provider; model: string;

@@ -192,6 +192,13 @@ CREATE TABLE IF NOT EXISTS object_agents (
       addColumn(db, 'agents', 'browser INTEGER NOT NULL DEFAULT 0');
     },
   },
+  {
+    version: 4, name: 'session-permission',
+    up(db) {
+      // The effective permission an OpenCode session started with. NULL for sessions recorded before this column existed (unknown).
+      addColumn(db, 'agent_sessions', 'permission TEXT');
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

@@ -87,6 +87,8 @@ El campo **Modelo** es un selector con búsqueda: "Predeterminado del CLI" (lo e
 
 Tres niveles: **Solo lectura**, **Editar archivos** y **Acceso total**. Si no usas un tipo, un agente nuevo empieza en **Editar archivos**. Qué significa cada uno en cada proveedor está en [Permisos y seguridad](13-permisos-y-seguridad.md).
 
+OpenCode conserva las herramientas con las que empezó una conversación. Si cambias el permiso de un agente de OpenCode (o el de su colonia) con una conversación abierta, el chat muestra un aviso y un botón **Aplicar ahora**, que empieza una conversación nueva con el permiso nuevo. La actual queda en la pestaña Sesiones. Las conversaciones que estaban abiertas antes de existir este aviso no se detectan: usa **Nueva conversación**.
+
 > **Consejo:** usa **Acceso total** solo en carpetas desechables o de las que tengas copia.
 
 ### Carpeta de trabajo
