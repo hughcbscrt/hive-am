@@ -1,5 +1,6 @@
 import { agents, colonies, db, resolved } from '../db.js';
 import { notebooks } from '../skills/notebook.js';
+import { checkEffort } from '../efforts.js';
 import { channelPermissionError } from '../connections/rules.js';
 import { liveTurn, notifyAgentsChanged, stopAgent } from '../runtime.js';
 import { findRepo } from '../git/repo.js';
@@ -23,9 +24,13 @@ function create(p: NewAgent): Agent {
   notifyAgentsChanged();
   return a;
 }
+/** An effort that does not apply to the provider and model is refused (an empty one always applies). */
+const checkAgentEffort = (provider: Agent['provider'], model: string, effort: unknown) => { const why = checkEffort(provider, model, effort); if (why) throw bad(why); };
+
 export function createAgent(p: AgentInput): Agent {
   const name = trimmed(p.name);
   uniqueName(name);
+  if (p.effort !== undefined && p.provider) checkAgentEffort(p.provider, p.model ?? '', p.effort);
   return create({ ...p, name, cwd: p.cwd ?? '' } as NewAgent);
 }
 /** A new agent that starts from a type: the type lends everything but name, description, folder and colony. */
@@ -34,6 +39,7 @@ export function spawnFromType(t: AgentType, p: AgentInput & { description?: stri
   uniqueName(name);
   return create({
     name, description: p.description ?? t.description, role: t.role, type_id: t.id, provider: t.provider, model: t.model,
+    effort: checkEffort(t.provider, t.model, t.effort) === null ? t.effort : '',     // a type whose level the model no longer takes starts at the default
     system_prompt: t.system_prompt, permission: t.permission, cwd: p.cwd ?? '', skill_ids: t.skill_ids, skill_loads: t.skill_loads, colony_id: p.colony_id ?? null,
   });
 }
@@ -52,7 +58,7 @@ export function cloneAgent(sourceId: string, p: { name?: unknown; colony_id?: un
   const colony = p.colony_id === undefined ? src.colony_id : p.colony_id ? String(p.colony_id) : null;
   if (colony && !colonies.get(colony)) throw bad('That colony no longer exists');
   const clone = create({
-    name, description: src.description, role: src.role, type_id: src.type_id, provider: src.provider, model: src.model, system_prompt: src.system_prompt,
+    name, description: src.description, role: src.role, type_id: src.type_id, provider: src.provider, model: src.model, effort: src.effort, system_prompt: src.system_prompt,
     permission: src.permission, cwd: src.cwd, overrides: src.overrides, browser: src.browser, skill_ids: src.skill_ids, skill_loads: src.skill_loads,
     worker_ids: src.role === 'orchestrator' ? src.worker_ids : [], colony_id: colony, cloned_from: src.id,
   });
@@ -65,6 +71,11 @@ export function cloneAgent(sourceId: string, p: { name?: unknown; colony_id?: un
 export function updateAgent(id: string, p: AgentInput): Agent | undefined {
   const cur = agentOrFail(id);
   if (p.name && p.name.toLowerCase() !== cur.name.toLowerCase()) uniqueName(p.name, id);
+  // The effort has to apply to the provider and model the agent will have. One that is sent is checked; one that was saved and no longer applies
+  // (the provider or the model changed) falls back to the CLI's default instead of failing every turn.
+  const provider = p.provider ?? cur.provider, model = p.model ?? cur.model;
+  if (p.effort !== undefined) checkAgentEffort(provider, model, p.effort);
+  else if (cur.effort && checkEffort(provider, model, cur.effort) !== null) p = { ...p, effort: '' };
   // Changing provider invalidates the native session pointer. (A changed folder is detected when the next turn starts.)
   // All-or-nothing: a change that would leave a linked agent in Plan mode is rolled back.
   const a = db.transaction(() => {

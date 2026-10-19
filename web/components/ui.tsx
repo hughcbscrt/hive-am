@@ -158,6 +158,34 @@ export function ModelField({ provider, value, onChange }: { provider: Provider; 
   );
 }
 
+/** The reasoning levels a provider (and, for OpenCode and Kiro, a model) takes, as the server knows them. */
+interface EffortInfo { options: { id: string; level?: string }[]; known: boolean }
+/**
+ * The agent's reasoning effort: the CLI's default, or one of the levels the chosen provider and model take (never one that would fail the turn).
+ * For OpenCode they are the variants of the model, read from its catalog; when they are not known only the default is offered.
+ */
+export function EffortField({ provider, model, value, onChange }: { provider: Provider; model: string; value: string; onChange: (v: string) => void }) {
+  const { t } = useI18n();
+  const [info, setInfo] = useState<EffortInfo | null>(null);
+  useEffect(() => {
+    let dead = false; setInfo(null);
+    api.get<EffortInfo>(`/providers/${provider}/efforts?model=${encodeURIComponent(model)}`).then((r) => { if (!dead) setInfo(r); }).catch(() => { if (!dead) setInfo({ options: [], known: false }); });
+    return () => { dead = true; };
+  }, [provider, model]);
+  // A saved value the model does not take any more goes back to the default (only once what the model takes is known).
+  useEffect(() => { if (info?.known && value && !info.options.some((o) => o.id === value)) onChange(''); }, [info]); // eslint-disable-line react-hooks/exhaustive-deps
+  const label = (o: { id: string; level?: string }) => {
+    const named = (x: string) => ((['low', 'medium', 'high', 'xhigh', 'max'] as const).includes(x as 'low') ? t(`effort.${x as 'low'}`) : x);
+    return o.level && o.level !== o.id ? `${o.id} · ${named(o.level)}` : named(o.id);
+  };
+  const hint = info === null ? t('form.effort.loading') : !info.known ? t('form.effort.unknown') : info.options.length === 0 ? t('form.effort.none') : t('form.effort.hint');
+  return (
+    <Field label={t('form.effort')} hint={hint}>
+      <Segmented value={value} onChange={onChange} options={[{ id: '', label: t('form.effort.default') }, ...(info?.options ?? []).map((o) => ({ id: o.id, label: label(o) }))]} />
+    </Field>
+  );
+}
+
 export function PermissionField({ value, onChange, locked = [] }: { value: Permission; onChange: (v: Permission) => void; locked?: Permission[] }) {
   const { t } = useI18n();
   const list = permissions();

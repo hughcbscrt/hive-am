@@ -196,7 +196,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
           <Segmented value={silent} onChange={setSilent} options={(['notice', 'send_text', 'ignore'] as Silent[]).map((s) => ({ id: s, label: t(`conn.silent.${s}`) }))} />
         </Field>
         <Field label={t('conn.effort')} hint={t('conn.effort.hint')}>
-          <Segmented value={effort} onChange={setEffort} options={[{ id: '', label: t('conn.effort.default') }, { id: 'low', label: t('conn.effort.low') }, { id: 'medium', label: t('conn.effort.medium') }, { id: 'high', label: t('conn.effort.high') }]} />
+          <Segmented value={effort} onChange={setEffort} options={[{ id: '', label: t('conn.effort.default') }, { id: 'low', label: t('conn.effort.low') }, { id: 'medium', label: t('conn.effort.medium') }, { id: 'high', label: t('conn.effort.high') }, { id: 'xhigh', label: t('conn.effort.xhigh') }, { id: 'max', label: t('conn.effort.max') }]} />
         </Field>
         <Field label={t('conn.enabled')} hint={t('conn.enabled.hint')}>
           <Segmented value={enabled ? 'on' : 'off'} onChange={(v) => setEnabled(v === 'on')} options={[{ id: 'on', label: t('common.yes') }, { id: 'off', label: t('conn.status.stopped') }]} />

@@ -1,3 +1,4 @@
+import { learnEfforts } from '../efforts.js';
 import type { StreamEvent, TurnOptions } from '../types.js';
 import { spawnJson } from './spawn.js';
 import { withInstructions } from './preamble.js';
@@ -46,6 +47,10 @@ export async function* runKiro(o: TurnOptions): AsyncGenerator<StreamEvent> {
     const d = ev.data ?? {};
     if (d.sessionId && !sawSession) { sawSession = true; yield { t: 'session', sessionId: d.sessionId }; }
 
+    // The turn's metadata says which reasoning levels the model takes: remembered per model, so the agent form offers only those.
+    if (ev.type === 'metadata' && agent.model && Array.isArray(d.reasoning?.effortLevels) && d.reasoning.effortLevels.length) {
+      learnEfforts('kiro', { [agent.model]: d.reasoning.effortLevels.filter((l: unknown) => typeof l === 'string').map((l: string) => ({ id: l })) });
+    }
     if (ev.type === 'metadata' && (d.meteringUsage || d.contextUsagePercentage !== undefined)) {
       const credits = (d.meteringUsage ?? []).reduce((n: number, m: any) => n + (m.value ?? 0), 0);
       yield { t: 'usage', durationMs: d.turnDurationMs, usage: { credits: credits || undefined, contextPct: d.contextUsagePercentage } };

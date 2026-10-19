@@ -81,6 +81,10 @@ Elige uno de los tres: **Claude Code**, **OpenCode** o **Kiro**. Cada tarjeta in
 
 El campo **Modelo** es un selector con búsqueda: "Predeterminado del CLI" (lo elige el CLI), los modelos que lista el CLI, o cualquier id que escribas a mano ("Usar «id»").
 
+### Esfuerzo de razonamiento
+
+Debajo del modelo, **Esfuerzo de razonamiento** fija cuánto piensa el modelo en **cada** turno de este agente: el chat web, Telegram y Slack, las programaciones, los avisos y las tareas delegadas. **Predeterminado** deja el del propio CLI, que es con lo que empieza cualquier agente. El campo solo ofrece lo que admiten el proveedor y el modelo elegidos: Claude Code y Kiro admiten **Bajo, Medio, Alto, Muy alto** y **Máximo**; en OpenCode son las variantes que tiene el modelo seleccionado (se leen de la propia lista de OpenCode: un modelo puede ofrecer Bajo, Alto y Máximo, otro de 0 a 5, otro ninguna, y entonces el campo lo dice). Cambiar el proveedor o el modelo lo devuelve a **Predeterminado** si el nivel ya no aplica. Un **tipo** también lo lleva, y una conexión puede reemplazarlo para su propio chat (ver [Conexiones](09-conexiones-telegram.md)). Un nivel más bajo responde más rápido y piensa menos.
+
 > **Nota:** si cambias el proveedor de un agente que ya tiene conversación, esta se descarta: el id de sesión de un CLI no sirve en otro. Las conversaciones anteriores se conservan en la pestaña **Sesiones**.
 
 ### ¿Qué puede hacer? (permisos)

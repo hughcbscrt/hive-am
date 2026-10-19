@@ -10,6 +10,7 @@ An agent is **configuration + session pointer**. Fields (`server/src/types.ts`, 
 | `role` | `orchestrator` or `worker`. |
 | `type_id` | Type it was created from (informational; see 7.2). |
 | `provider`, `model` | Provider and model. **Always the agent's own**, never inherited. |
+| `effort` | Reasoning effort of every turn (`''` is the CLI's default). Also the agent's own, never inherited, and copied by types and clones. See [6.7](06-providers.md#67-install-detection-and-models). |
 | `permission` | `plan` (read-only), `acceptEdits` (edits files), `bypassPermissions` (full access). |
 | `system_prompt` | Own prompt. |
 | `skill_ids` | Own skills. |

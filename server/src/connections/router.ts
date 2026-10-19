@@ -14,7 +14,7 @@ const DEFAULT_RATE = 20; // messages per user per minute
 const DEFAULT_CHATTER_PER_MINUTE = 10; // times per minute that chatter nobody aimed at the agent may wake it, per thread
 /** Sent once when a turn aimed at the agent ended without a reply. */
 const NUDGE = '[hive:channel] System reminder: your last turn ended without calling `channel_reply`, so the person received nothing. If you had an answer, send it now with `channel_reply` (if the tool says it is unknown, call it again: it was still connecting). If you chose not to answer, say so in one short sentence with `channel_reply`.';
-export const EFFORTS = ['low', 'medium', 'high'];
+import { validEffort } from '../efforts.js';
 const QUIET_MS = 4000;   // group chatter is handed over once it pauses this long, so a burst is one turn
 const LONG_TURN_MS = 45_000; // an unaddressed turn this long did real work: if it never replied, remind it
 const QUIET_RETRIES = 15; // while the agent is busy the hand-over waits (about a minute); after this it is left as context for the next turn
@@ -171,7 +171,7 @@ async function deliver(conn: Connection, adapter: ChannelAdapter, thread: Thread
   const unseen = threadMessages.unseen(thread.id, fresh.seen_id, msgId).map((r) => ({ name: r.user_name ?? r.user_id ?? '?', text: r.text as string, files: r.files ? parseJson<SavedFile[] | undefined>(r.files, undefined, `thread message ${r.id} files`) : undefined }));
   threads.markSeen(thread.id, msgId);
 
-  const origin: Origin = { connectionId: conn.id, threadId: thread.id, externalKey: m.externalKey, platform: conn.kind, place: m.place, userName: m.userName, userId: m.userId, group: !!m.group, mention: m.mention, addressed, replied: false, messageId: m.externalId, effort: EFFORTS.includes(conn.config.effort) ? conn.config.effort : undefined };
+  const origin: Origin = { connectionId: conn.id, threadId: thread.id, externalKey: m.externalKey, platform: conn.kind, place: m.place, userName: m.userName, userId: m.userId, group: !!m.group, mention: m.mention, addressed, replied: false, messageId: m.externalId, effort: validEffort(conn.config.effort) ? conn.config.effort : undefined };
   if (addressed) await adapter.busy(m.target, 'working', m.externalId).catch(() => undefined);
   const startedAt = Date.now();
   let res = await sendTurn(agent.id, channelPrompt(conn.kind, m, { addressed, muted: fresh.muted, unseen }), 'user', undefined, undefined, origin);

@@ -6,6 +6,7 @@ import { runners } from './providers/index.js';
 import { notebooks } from './skills/notebook.js';
 import type { Origin } from './connections/types.js';
 import type { Agent, StreamEvent } from './types.js';
+import { resolveEffort } from './efforts.js';
 
 export type BusMessage =
   | { kind: 'event'; agentId: string; turnId: string; event: StreamEvent }
@@ -36,6 +37,18 @@ export const liveSource = (id: string) => states.get(id)?.live?.source;
 /** Whether the turn running now is the agent's own conversation (not work delegated to it by an orchestrator). */
 export const liveIsDirect = (id: string) => states.get(id)?.live?.source === 'user';
 
+
+/**
+ * The reasoning effort a turn asks for: the one a connection sets for its own turns, else the agent's. One that does not apply to the agent's
+ * model (it changed, or the model never had that level) falls back to the CLI's own default, with a line in the log, instead of failing the turn.
+ */
+function effortOf(agent: Agent, fromOrigin?: string): string | undefined {
+  const asked = fromOrigin || agent.effort;
+  if (!asked) return undefined;
+  const use = resolveEffort(agent.provider, agent.model, asked);
+  if (!use) console.warn(`[effort] ${agent.name}: "${asked}" does not apply to ${agent.model || 'the default model'} (${agent.provider}): the turn runs at the CLI's own default`);
+  return use || undefined;
+}
 
 export interface TurnResult { ok: boolean; text: string; error?: string }
 
@@ -98,7 +111,7 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
     const stream = runners[agent.provider]({
       agent, prompt, signal: controller.signal,
       instructions, refreshInstructions,
-      mcpCaps: mcpCaps(agent), effort: origin?.effort,
+      mcpCaps: mcpCaps(agent), effort: effortOf(agent, origin?.effort),
     });
     for await (const ev of stream) {
       if (ev.t !== 'done') events++;

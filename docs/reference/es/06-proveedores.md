@@ -162,6 +162,16 @@ Los lectores de historial **ocultan** estos bloques al mostrar el chat (ver [doc
 
 El campo de modelo de la interfaz es texto libre con sugerencias (`<datalist>`): si el CLI no lista modelos, puedes escribir cualquier id; vacío = modelo por defecto del CLI. Cambiar el proveedor de un agente limpia el modelo en el formulario.
 
+**Esfuerzo de razonamiento** (`server/src/efforts.ts`). El agente (y el tipo de agente del que se hace) tiene un campo `effort`: vacío es el predeterminado del propio CLI (sin bandera ni `#variante`), que es con lo que empieza cualquier agente. Se aplica a **todos** los turnos del agente: chat web, canales, programaciones, avisos y delegaciones. Una conexión aún puede fijar el suyo (`config.effort`), que gana en los turnos de esa conexión; con "El del agente" se usa el del agente. Las colonias no lo prestan: no tiene sentido entre proveedores.
+
+| Proveedor | Cómo se aplica | Niveles |
+|---|---|---|
+| Claude Code | `claude … --effort <nivel>` | `low`, `medium`, `high`, `xhigh`, `max` |
+| Kiro | `kiro-cli chat … --effort <nivel>` | los mismos cinco; cuando el turno de un modelo informa `reasoning.effortLevels` solo se ofrecen esos para él |
+| OpenCode | la variante del modelo: `-m proveedor/modelo#<id>` | las variantes **que tiene el modelo elegido** (`0`…`5`, o `none`, `low`, `medium`, `high`, `xhigh`, `max`, según el modelo), leídas de su catálogo (`GET /api/model` → `variants[].id`, con la etiqueta de `settings.reasoningEffort`) |
+
+Lo aprendido (`reasoning-efforts.json`, junto a `context-windows.json`) se refresca como las ventanas de contexto: el catálogo se lee como mucho una vez por hora, y otra vez diez minutos después si la lectura falló. `GET /api/providers/:p/efforts?model=` le da al formulario los niveles (y si se conocen); lee primero el catálogo de OpenCode cuando todavía no se conocen los del modelo. Un esfuerzo se comprueba al guardarlo: un nivel que el proveedor no admite, o una variante que el modelo de OpenCode no tiene, es un 400; cambiar el proveedor o el modelo borra el que ya no aplica. Al correr el turno, un esfuerzo que no aplica (el modelo cambió) corre con el predeterminado del CLI, con una línea en el log del servidor, en vez de hacer fallar el turno, y el nombre de nivel de una conexión se convierte en la variante que el modelo tiene para él.
+
 ## 6.8 Costos y precios
 
 - Claude: `result.total_cost_usd` se emite como `usage.cost` en vivo; en el historial no hay costo, así que se **estima** con `pricing.ts`.

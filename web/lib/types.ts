@@ -15,6 +15,8 @@ export interface Agent {
   effective: { cwd: string; permission: Permission; system_prompt: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; inherited: InheritField[] };
   session_id: string | null; status: 'idle' | 'running' | 'error';
   skill_ids: string[]; skill_loads: Record<string, SkillLoad>; worker_ids: string[]; created_at: number; updated_at: number;
+  /** Reasoning effort of every turn ('' is the CLI's own default). Claude and Kiro take a level, OpenCode a variant of the model. */
+  effort: string;
   /** The agent this one was cloned from (null for any other agent, and when that agent was deleted). */
   cloned_from: string | null;
   queued?: number; live?: boolean;
@@ -22,7 +24,7 @@ export interface Agent {
   permission_stale?: boolean;
 }
 export interface AgentType {
-  id: string; name: string; description: string; role: Role; provider: Provider; model: string;
+  id: string; name: string; description: string; role: Role; provider: Provider; model: string; effort: string;
   system_prompt: string; permission: Permission; color: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; created_at: number;
 }
 export type SkillLoad = 'always' | 'on_demand';
