@@ -60,8 +60,11 @@ async function shutdown(why: string, code: number) {
   console.log(`[server] ${why}: shutting down`);
   const force = setTimeout(() => { console.error('[server] shutdown took too long: leaving'); process.exit(code || 1); }, 5000); force.unref();
   const step = async (name: string, f: () => unknown) => { try { await f(); } catch (e) { console.error(`[server] shutdown, ${name}:`, e); } };
-  await step('http', () => new Promise<void>((done) => { server.close(() => done()); server.closeAllConnections(); }));
+  // `server.close` only ends once every connection is gone, and a WebSocket is not one `closeAllConnections` can close: stop taking requests first,
+  // drop the sockets, and only then wait for the server (waiting first made every shutdown last the full 5 s and left the database unclosed).
+  const httpClosed = new Promise<void>((done) => { server.close(() => done()); server.closeAllConnections(); });
   await step('websockets', () => { for (const w of [wss, termWss]) { for (const c of w.clients) c.terminate(); w.close(); } });
+  await step('http', () => httpClosed);
   await step('terminals', closeAllTerminals);
   await step('connections', stopAll);
   await step('database', () => db.close());
