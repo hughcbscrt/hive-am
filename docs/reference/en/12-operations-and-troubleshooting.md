@@ -118,7 +118,7 @@ H=$(mktemp -d); HIVE_AM_HOME=$H HIVE_AM_PORT=4440 npx tsx scripts/test-migration
 H=$(mktemp -d); HIVE_AM_HOME=$H HIVE_AM_PORT=4441 HIVE_AM_WATCH_POLL_MS=300 HIVE_AM_WAKE_MS_PER_MINUTE=1500 npx tsx scripts/test-watch.ts; rm -rf $H
 ```
 
-Each prints `PASS` / `FAIL` per check and ends with `ALL PASSED` (or exits with an error code). `HIVE_AM_WATCH_POLL_MS` (how often a watched process or file is checked) and `HIVE_AM_WAKE_MS_PER_MINUTE` (how long a wake-up "minute" lasts) are read only by `test-watch.ts`. Run `sim-*.ts`, `bench-*.ts` and `fake-telegram.ts` only on purpose: they use real agents or a simulated platform.
+Each prints `PASS` / `FAIL` per check and ends with `ALL PASSED` (or exits with an error code). `HIVE_AM_TURN_STALL_MS` (how long a CLI may stay silent before its turn is cut, 10 minutes by default; read only by `spawnLines`), `HIVE_AM_WATCH_POLL_MS` (how often a watched process or file is checked) and `HIVE_AM_WAKE_MS_PER_MINUTE` (how long a wake-up "minute" lasts) are read only by `test-watch.ts`. Run `sim-*.ts`, `bench-*.ts` and `fake-telegram.ts` only on purpose: they use real agents or a simulated platform.
 
 ## 12.5 Data maintenance
 

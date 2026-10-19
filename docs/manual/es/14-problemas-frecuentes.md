@@ -68,7 +68,7 @@ Cambia el nivel en los ajustes del agente (o en la colonia, si lo hereda). Un ag
 
 ## Mi mensaje se perdió después de reiniciar o apagar
 
-Si el servidor se detiene a mitad de un turno, ese turno se pierde. La sesión queda intacta y el agente vuelve a **Inactivo** al reiniciar, pero tienes que reenviar el mensaje.
+Si el servidor se detiene a mitad de un turno, ese turno se pierde. La sesión queda intacta y el agente vuelve a **Inactivo** al reiniciar, pero tienes que reenviar el mensaje. Los mensajes en cola que no habían empezado también se pierden.
 
 ## La sesión no se reanuda o el agente parece empezar de cero
 
@@ -91,6 +91,10 @@ Si no tiene workers conectados, no puede delegar. Conéctalos en **Relaciones** 
 ## Un orquestador espera sin fin a un worker
 
 La delegación no tiene tiempo límite. Si el worker se colgó, pulsa **Detener** en el worker. Un worker ocupado hace esperar al orquestador, porque cada agente atiende un turno a la vez.
+
+## La cola del agente dejó de avanzar
+
+Una herramienta que no imprime nada durante 10 minutos la detiene hive-am, y el turno falla con "stopped answering". Los mensajes que esperaban detrás se ejecutan. Reenvía el mensaje que falló si aún lo necesitas.
 
 ## Detener no vació la cola
 

@@ -52,27 +52,29 @@ export function sendTurn(agentId: string, prompt: string, source: 'user' | 'disp
 async function execute(agentId: string, prompt: string, source: 'user' | 'dispatch', from?: string, dispatchId?: string, origin?: Origin): Promise<TurnResult> {
   const s = st(agentId);
   s.queued--;
-  const raw = agents.get(agentId);
-  if (!raw) return { ok: false, text: '', error: 'Agent no longer exists' };
-  const agent = resolved(raw);
-  if (!agent.cwd) return { ok: false, text: '', error: 'This agent has no working folder. Set one on the agent or on its colony.' };
-  const delegated = source === 'dispatch';
-  if (delegated) {
-    // Every delegation gets its own native session, so the agent's direct conversation never fills up with delegated work.
-    agent.session_id = null;
-  } else if (raw.session_id && raw.session_cwd && raw.session_cwd !== agent.cwd) {
-    // Native sessions are tied to the folder they started in; if the folder changed, start a fresh one.
-    agents.setSession(raw, null); agent.session_id = null; emit({ kind: 'agents_changed' });
+  let raw: ReturnType<typeof agents.get>;
+  let agent: ReturnType<typeof resolved>;
+  let delegated = false;
+  try {
+    raw = agents.get(agentId);
+    if (!raw) return { ok: false, text: '', error: 'Agent no longer exists' };
+    agent = resolved(raw);
+    if (!agent.cwd) return { ok: false, text: '', error: 'This agent has no working folder. Set one on the agent or on its colony.' };
+    delegated = source === 'dispatch';
+    if (delegated) {
+      // Every delegation gets its own native session, so the agent's direct conversation never fills up with delegated work.
+      agent.session_id = null;
+    } else if (raw.session_id && raw.session_cwd && raw.session_cwd !== agent.cwd) {
+      // Native sessions are tied to the folder they started in; if the folder changed, start a fresh one.
+      agents.setSession(raw, null); agent.session_id = null; emit({ kind: 'agents_changed' });
+    }
+  } catch (e) {
+    // Preparing a turn can fail too (a damaged row, a database write): that is this turn's error, not a rejected promise nobody waits for.
+    return { ok: false, text: '', error: e instanceof Error ? e.message : String(e) };
   }
 
   const turnId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const controller = new AbortController();
-  s.controller = controller;
-  s.live = { turnId, prompt, events: [], source, origin };
-  agents.setStatus(agentId, 'running');
-  emit({ kind: 'turn_start', agentId, turnId, prompt, source, from, channel: origin && { platform: origin.platform, place: origin.place, user: origin.userName } });
-  emit({ kind: 'status', agentId, status: 'running', queued: s.queued });
-
   let text = '';
   let summary: string | undefined;
   let error: string | undefined;
@@ -81,6 +83,11 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
   const push = (event: StreamEvent) => { s.live?.events.push(event); emit({ kind: 'event', agentId, turnId, event }); };
 
   try {
+    s.controller = controller;
+    s.live = { turnId, prompt, events: [], source, origin };
+    agents.setStatus(agentId, 'running');
+    emit({ kind: 'turn_start', agentId, turnId, prompt, source, from, channel: origin && { platform: origin.platform, place: origin.place, user: origin.userName } });
+    emit({ kind: 'status', agentId, status: 'running', queued: s.queued });
     // Composing the instructions can fail too (a damaged skill row...): that is this turn's error, and it must not leave the agent "running" forever.
     const base = composeInstructions(agent, delegated);
     nbVersion = notebooks.get(agentId).version;

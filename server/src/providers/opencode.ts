@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 
 const INBOX_ROOT = join(DATA_DIR, 'inbox');
-import { spawnJson } from './spawn.js';
+import { spawnJson, StalledError } from './spawn.js';
 import { dispatchMcpConfigOpencode } from '../mcp-config.js';
 import { opencodeSessionDir } from '../history/opencode.js';
 import { withInstructions } from './preamble.js';
@@ -127,7 +127,7 @@ export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> 
     }
     if (failure) throw new Error(failure);
   } catch (e) {
-    if (failure && !o.signal.aborted) throw new Error(failure);      // OpenCode's own reason says more than "exited with code 1"
+    if (failure && !o.signal.aborted && !(e instanceof StalledError)) throw new Error(failure);      // OpenCode's own reason says more than "exited with code 1"
     throw e;
   } finally { access?.release(); }
   yield { t: 'done', ok: true };
