@@ -12,6 +12,7 @@ import { api } from '@/lib/api';
 import { PROVIDERS, SERIES_COLORS } from '@/lib/meta';
 import type { Agent } from '@/lib/types';
 import { Banner, EmptyState, Hex, useToast } from '@/components/ui';
+import { CloneChip, ClonesChip } from '@/components/agents/CloneTag';
 import { useI18n } from '@/lib/i18n';
 
 /** One colour per orchestrator, so overlapping lines can still be told apart; lightened in the dark theme (--series-mix). */
@@ -31,6 +32,7 @@ function AgentNode({ data }: { data: NodeData }) {
       <Hex agent={a} />
       <b>{a.name}</b>
       <small>{a.role === 'orchestrator' ? t('role.orchestrator') : PROVIDERS[a.provider].short}</small>
+      <span className="rnode-clone"><CloneChip agent={a} /><ClonesChip agent={a} /></span>
       {a.role === 'orchestrator' && <Handle type="source" position={Position.Bottom} />}
     </div>
   );

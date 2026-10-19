@@ -206,9 +206,9 @@ export const agents = {
   /** The agent, its skills and its workers are written together: either all of it exists afterwards or none. */
   create: db.transaction((p: Partial<Agent> & { name: string; role: Role; provider: Provider; cwd: string }): Agent => {
     const id = uid(), t = now();
-    q('INSERT INTO agents (id,name,description,role,type_id,provider,model,system_prompt,permission,cwd,session_id,status,created_at,updated_at,colony_id,overrides,browser) VALUES (?,?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?,?)').run(
+    q('INSERT INTO agents (id,name,description,role,type_id,provider,model,system_prompt,permission,cwd,session_id,status,created_at,updated_at,colony_id,overrides,browser,cloned_from) VALUES (?,?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?,?,?)').run(
       id, p.name, p.description ?? '', p.role, p.type_id ?? null, p.provider, p.model ?? '', p.system_prompt ?? '',
-      (p.permission ?? 'acceptEdits') as Permission, p.cwd ?? '', 'idle', t, t, p.colony_id ?? null, JSON.stringify(p.overrides ?? []), p.browser && p.provider === 'claude' ? 1 : 0);
+      (p.permission ?? 'acceptEdits') as Permission, p.cwd ?? '', 'idle', t, t, p.colony_id ?? null, JSON.stringify(p.overrides ?? []), p.browser && p.provider === 'claude' ? 1 : 0, p.cloned_from ?? null);
     agents.setSkills(id, p.skill_ids ?? [], p.skill_loads);
     agents.setWorkers(id, p.worker_ids ?? []);
     return agents.get(id)!;

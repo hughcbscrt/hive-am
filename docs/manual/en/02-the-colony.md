@@ -66,6 +66,8 @@ Press the clone icon on an agent's card (or **Clone** in its settings footer). A
 - It **shares the notebook** of the original: the notes are the same for both, and whoever writes is read by the other. In the notebook, each note says which agent wrote it.
 - It does **not bring** the connections (Telegram or Slack bots), schedules, wake-ups or resource management of the original. If the clone should answer the same bot or look after the same servers, set that up separately.
 
+**You can always tell a clone from its original.** On the map the hexagon of a clone carries a violet tag with the name of the agent it was cloned from (for example *Maggie*). The Agents list, the header of the chat and the list beside the chat show the same mark (in the list and the header it is a link to the original), and so does the Relations screen; the original shows how many clones it has (*2 clones*, with their names on hover). The mark stays after **Separate**. If the original is deleted, its clones simply stop having one.
+
 Deleting either one keeps the notebook for the other. If you want the clone to stop sharing, open its **Notebook** tab and press **Separate**: it keeps its own copy of the notes and they stop reading each other's.
 
 ### A resource's card

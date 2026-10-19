@@ -244,6 +244,13 @@ CREATE TABLE IF NOT EXISTS object_agents (
       }
     },
   },
+  {
+    version: 7, name: 'agent-cloned-from',
+    up(db) {
+      // The agent a clone was made from, so the interface can say it (the shared notebook says it only until the clone separates). NULL for any other agent, and when the source is deleted.
+      addColumn(db, 'agents', 'cloned_from TEXT REFERENCES agents(id) ON DELETE SET NULL');
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

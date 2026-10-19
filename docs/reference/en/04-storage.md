@@ -107,6 +107,7 @@ Junction table `type_skills (type_id, skill_id, load)`, both with `ON DELETE CAS
 | `status` | `idle` \| `running` \| `error` |
 | `colony_id` | FK to `colonies`, `ON DELETE SET NULL` (migration) |
 | `overrides` | JSON: fields where the agent ignores its colony, e.g. `["cwd","skills"]` (migration) |
+| `cloned_from` | FK to `agents`, `ON DELETE SET NULL` (migration 7): the agent this one was cloned from, `NULL` for any other agent and when the source is deleted |
 | `created_at`, `updated_at` | |
 
 Junction tables:

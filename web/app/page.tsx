@@ -165,6 +165,8 @@ export default function Colony() {
   // An agent that looks after a resource (chosen on the resource, or from the agent's form).
   const managerLinks = objects.filter((o) => o.manager_id && pos.has(o.manager_id) && pos.has(o.id)).map((o) => ({ from: o.manager_id!, to: o.id }));
   const managedBy = (agentId: string) => objects.filter((o) => o.manager_id === agentId);
+  /** The name of the agent this one was cloned from, if it still exists. */
+  const cloneOf = (a: { cloned_from: string | null }) => (a.cloned_from ? agents.find((x) => x.id === a.cloned_from)?.name : undefined);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [cloning, setCloning] = useState<string | null>(null);
   const selected = agents.find((a) => a.id === sel) ?? null;
@@ -288,8 +290,11 @@ export default function Colony() {
                         <span className="shape" />
                         <span className="label"><b>{a.name}</b><small>{PROVIDERS[a.provider].short}</small></span>
                         {a.status !== 'idle' && <span className={`pip ${a.status === 'error' ? 'err' : ''}`} />}
-                        {managedBy(a.id).length > 0 && (
-                          <span className="ltag top mgr" title={t('colony.manages', { names: managedBy(a.id).map((x) => x.name).join(', ') })}>⚙ {managedBy(a.id).length === 1 ? managedBy(a.id)[0].name : managedBy(a.id).length}</span>
+                        {(managedBy(a.id).length > 0 || cloneOf(a)) && (
+                          <span className={`ltag top ${managedBy(a.id).length > 0 ? 'mgr' : 'clone'}`}
+                            title={[cloneOf(a) ? t('agent.cloneOf', { name: cloneOf(a)! }) : '', managedBy(a.id).length > 0 ? t('colony.manages', { names: managedBy(a.id).map((x) => x.name).join(', ') }) : ''].filter(Boolean).join(' · ')}>
+                            {cloneOf(a) ? `⧉ ${cloneOf(a)}` : ''}{cloneOf(a) && managedBy(a.id).length > 0 ? ' · ' : ''}{managedBy(a.id).length > 0 ? `⚙ ${managedBy(a.id).length === 1 ? managedBy(a.id)[0].name : managedBy(a.id).length}` : ''}
+                          </span>
                         )}
                         {(a.role === 'orchestrator' ? a.worker_ids.length > 0 : ups(a.id).length > 0) && (
                           <span className="ltag" title={a.role === 'orchestrator' ? t('colony.delegatesTo', { count: a.worker_ids.length }) : t('colony.connectedTo', { names: ups(a.id).map((q) => q.name).join(', ') })}>

@@ -9,6 +9,7 @@ import { PROVIDERS, ago, shortPath } from '@/lib/meta';
 import type { Provider, Role } from '@/lib/types';
 import { Banner, EmptyState, Hex, RoleChip, SearchInput, Segmented, StatusChip } from '@/components/ui';
 import { NewAgentDrawer } from '@/components/agents/NewAgentDrawer';
+import { CloneChip, ClonesChip } from '@/components/agents/CloneTag';
 import { useI18n } from '@/lib/i18n';
 
 export default function Agents() {
@@ -52,7 +53,7 @@ export default function Agents() {
                 return (
                 <tr key={a.id} className="row-link" tabIndex={0} aria-label={t('cx.openAgent', { name: a.name })} onClick={open}
                   onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); } }}>
-                  <td><div className="name-cell"><Hex agent={a} /><div><b><Link href={`/agents/${a.id}`} onClick={(e) => e.stopPropagation()}>{a.name}</Link></b><span>{a.description || (a.role === 'orchestrator' ? t('agents.orchestratorLine', { count: a.worker_ids.length }) : t('role.worker'))}</span></div></div></td>
+                  <td><div className="name-cell"><Hex agent={a} /><div><b><Link href={`/agents/${a.id}`} onClick={(e) => e.stopPropagation()}>{a.name}</Link> <CloneChip agent={a} link /><ClonesChip agent={a} /></b><span>{a.description || (a.role === 'orchestrator' ? t('agents.orchestratorLine', { count: a.worker_ids.length }) : t('role.worker'))}</span></div></div></td>
                   <td><div className="fw-600">{PROVIDERS[a.provider].label}</div><span className="muted small">{a.model || t('model.cliDefault')}</span></td>
                   <td>{c ? <span className="chip"><i className="cdot cx-chip-dot" style={{ background: c.color || 'var(--honey)' }} />{c.name}</span> : <span className="muted small">—</span>}</td>
                   <td className="mono muted small">{shortPath(a.effective.cwd)}{a.effective.inherited.includes('cwd') ? ' ·' : ''}{a.effective.inherited.includes('cwd') && <span className="muted"> {t('agents.colonyWord')}</span>}</td>

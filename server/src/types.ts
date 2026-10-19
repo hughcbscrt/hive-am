@@ -68,6 +68,8 @@ export interface Agent {
   skill_loads: Record<string, SkillLoad>;
   /** Workers this orchestrator may dispatch to (only meaningful for orchestrators). */
   worker_ids: string[];
+  /** The agent this one was cloned from (null for any other agent, and when that agent was deleted). */
+  cloned_from: string | null;
   created_at: number;
   updated_at: number;
 }

@@ -107,6 +107,7 @@ Tabla puente `type_skills (type_id, skill_id, load)`, ambas con `ON DELETE CASCA
 | `status` | `idle` \| `running` \| `error` |
 | `colony_id` | FK a `colonies`, `ON DELETE SET NULL` (migración) |
 | `overrides` | JSON: campos donde el agente ignora a su colonia, p. ej. `["cwd","skills"]` (migración) |
+| `cloned_from` | FK a `agents`, `ON DELETE SET NULL` (migración 7): el agente del que se clonó este, `NULL` para cualquier otro agente y cuando se elimina el origen |
 | `created_at`, `updated_at` | |
 
 Tablas puente:

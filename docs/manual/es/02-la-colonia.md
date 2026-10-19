@@ -66,6 +66,8 @@ Pulsa el icono de clonar en la tarjeta de un agente (o **Clonar** en el pie de s
 - **Comparte el cuaderno** del original: las notas son las mismas para los dos, y lo que escribe uno lo lee el otro. En el cuaderno, cada nota dice qué agente la escribió.
 - **No trae** las conexiones (bots de Telegram o Slack), programaciones, avisos ni la administración de recursos del original. Si el clon debe responder por el mismo bot o cuidar los mismos servidores, eso se configura aparte.
 
+**Siempre se distingue un clon de su original.** En el mapa, el hexágono de un clon lleva una etiqueta violeta con el nombre del agente del que se clonó (por ejemplo *Maggie*). El listado de Agentes, la cabecera del chat y la lista junto al chat muestran la misma marca (en la lista y la cabecera es un enlace al original), igual que la pantalla de Relaciones; el original muestra cuántos clones tiene (*2 clones*, con sus nombres al pasar el mouse). La marca se conserva después de **Separar**. Si se elimina al original, sus clones simplemente dejan de tener uno.
+
 Eliminar a cualquiera de los dos mantiene el cuaderno para el otro. Si quieres que el clon deje de compartir, abre su pestaña **Cuaderno** y pulsa **Separar**: se queda con su propia copia de las notas y dejan de leerse entre sí.
 
 ### Tarjeta de un recurso

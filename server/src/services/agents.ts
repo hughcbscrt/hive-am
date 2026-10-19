@@ -54,7 +54,7 @@ export function cloneAgent(sourceId: string, p: { name?: unknown; colony_id?: un
   const clone = create({
     name, description: src.description, role: src.role, type_id: src.type_id, provider: src.provider, model: src.model, system_prompt: src.system_prompt,
     permission: src.permission, cwd: src.cwd, overrides: src.overrides, browser: src.browser, skill_ids: src.skill_ids, skill_loads: src.skill_loads,
-    worker_ids: src.role === 'orchestrator' ? src.worker_ids : [], colony_id: colony,
+    worker_ids: src.role === 'orchestrator' ? src.worker_ids : [], colony_id: colony, cloned_from: src.id,
   });
   try { notebooks.share(src.id, clone.id); }
   catch (e) { agents.remove(clone.id); throw e; }                  // never leave a clone that does not read the notebook of its source

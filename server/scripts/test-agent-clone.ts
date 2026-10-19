@@ -55,7 +55,9 @@ check(c.description === src.description && c.role === 'orchestrator' && c.provid
 check(c.colony_id === colony.id && JSON.stringify(c.overrides) === JSON.stringify(['permission']), 'it is in the source\'s colony by default and keeps its overrides');
 check(c.skill_ids.includes(NOTEBOOK_SKILL_ID) && c.skill_loads[NOTEBOOK_SKILL_ID] === 'always', 'it copies the skills and how each one loads');
 check(c.worker_ids.length === 1 && c.worker_ids[0] === worker.id, 'an orchestrator keeps its team');
+check(c.cloned_from === src.id && src.cloned_from === null && agents.get(src.id)!.cloned_from === null, 'the clone remembers the agent it was made from, and the source is not a clone');
 const w = cloneAgent(worker.id, { name: 'helper 2' });
+check(w.cloned_from === worker.id, 'also a clone of a worker');
 check(w.worker_ids.length === 0, 'a worker has no team to copy');
 
 // ---- and nothing it did or is attached to ----
@@ -115,6 +117,8 @@ check((await call('GET', `/api/agents/${worker.id}/notebook`)).json.shared_with.
 // ---- separating ----
 const sep = await call('POST', `/api/agents/${hc.json.id}/notebook/separate`);
 check(sep.status === 200 && sep.json.shared_with.length === 0 && /8443/.test(sep.json.content), 'Separate gives the agent its own copy of the text');
+check(agents.get(hc.json.id)!.cloned_from === src.id, 'and it is still known as a clone of its source');
+check((await call('GET', '/api/agents')).json.find((x: any) => x.id === hc.json.id)?.cloned_from === src.id, 'the agent list says so');
 notebooks.add(hc.json.id, 'Own', 'Only mine.', '2026-01-01', true);
 check(!/Only mine/.test(notebooks.get(src.id).content) && !notebooks.sharedWith(src.id).some((r) => r.id === hc.json.id), 'and what it writes afterwards stays out of the shared one');
 check(/8443/.test(notebooks.get(src.id).content) && notebooks.sharedWith(src.id).length === 3, 'which the rest keep reading');
@@ -126,6 +130,7 @@ removeAgent(c.id);
 check(notebooks.get(src.id).content === sharedText && notebooks.get(src.id).seen === sharedSeen && notebooks.get(src.id).version === sharedVersion, 'deleting a clone keeps the notebook for the others, with its text, version and their `seen`');
 check(notebooks.sharedWith(src.id).every((r) => r.id !== c.id) && orphans() === 0, 'and it stops being a reader');
 removeAgent(src.id);
+check(agents.get(moved.id)!.cloned_from === null, 'deleting the source leaves its clones with no source to point to (not deleted)');
 check(notebooks.get(moved.id).content === sharedText && notebooks.sharedWith(moved.id).length >= 1, 'deleting the source keeps the notebook for the clones, which keep working');
 check((await sendTurn(moved.id, 'still here')).ok, 'a clone whose source is gone still runs a turn');
 const remaining = notebooks.sharedWith(moved.id).map((r) => r.id);

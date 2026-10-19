@@ -7,6 +7,7 @@ import { PROVIDERS, ago, permissionLabel, shortPath } from '@/lib/meta';
 import { activity } from '@/lib/activity';
 import { Hex, RoleChip, StatusChip } from '@/components/ui';
 import type { Agent } from '@/lib/types';
+import { CloneChip, ClonesChip } from './CloneTag';
 
 const OPEN_DELAY = 280;   // ms of hovering before the card appears
 const CARD_W = 310;
@@ -78,7 +79,7 @@ export function AgentDetails({ agent: a, hideColony = false }: { agent: Agent; h
       <Hex agent={a} />
       <div className="grow">
         <b className="ap-name">{a.name}</b>
-        <div className="row gap-s wrap mt-s"><RoleChip role={a.role} /><StatusChip status={a.status} /></div>
+        <div className="row gap-s wrap mt-s"><RoleChip role={a.role} /><StatusChip status={a.status} /><CloneChip agent={a} /><ClonesChip agent={a} /></div>
       </div>
     </div>
     <p className={`ap-desc ${a.description ? '' : 'muted'}`}>{a.description || t('switcher.noDescription')}</p>

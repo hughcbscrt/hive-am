@@ -15,6 +15,8 @@ export interface Agent {
   effective: { cwd: string; permission: Permission; system_prompt: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; inherited: InheritField[] };
   session_id: string | null; status: 'idle' | 'running' | 'error';
   skill_ids: string[]; skill_loads: Record<string, SkillLoad>; worker_ids: string[]; created_at: number; updated_at: number;
+  /** The agent this one was cloned from (null for any other agent, and when that agent was deleted). */
+  cloned_from: string | null;
   queued?: number; live?: boolean;
   /** OpenCode keeps the tools a conversation started with: true when the permission changed after it began. */
   permission_stale?: boolean;
