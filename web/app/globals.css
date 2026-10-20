@@ -466,6 +466,12 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .switcher-head .input { padding: 7px 10px 7px 32px; font-size: var(--fs-ui-lg); } .switcher-head .search svg { left: 10px; }
 .switcher-list { overflow-y: auto; flex: 1; padding: 6px 8px 16px; }
 .switcher-group { display: flex; align-items: center; gap: 6px; padding: 12px 8px 5px; font-size: var(--fs-micro); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); } .switcher-group span { margin-left: auto; font-weight: 600; }
+/* The chat's agent list: each colony heading is a button that folds its group. */
+button.switcher-group { width: 100%; margin-top: 6px; padding: 7px 8px 5px; border: 0; border-radius: 8px; background: none; font-family: inherit; font-size: var(--fs-hint); letter-spacing: .06em; color: var(--ink-2); text-align: left; cursor: pointer; }
+button.switcher-group:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 6%, transparent); } button.switcher-group:disabled { cursor: default; }
+button.switcher-group .chev { flex: none; color: var(--muted); transition: transform .15s; } button.switcher-group[aria-expanded='true'] .chev { transform: rotate(90deg); }
+button.switcher-group span.sg-name { margin-left: 0; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } button.switcher-group .sg-count { color: var(--muted); }
+button.switcher-group .pip { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--honey); animation: pulse 1.2s infinite; }
 .sw-item { display: flex; gap: 10px; padding: 9px 8px; border-radius: 10px; align-items: flex-start; } .sw-item:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
 .sw-item[aria-current='page'] { background: var(--surface); box-shadow: var(--shadow); }
 .sw-av { position: relative; flex: none; } .sw-av .hex { --s: 34px; } .sw-av .pip { position: absolute; top: -1px; right: -2px; width: 10px; height: 10px; border-radius: 50%; background: var(--honey); border: 2px solid var(--bg-deep); animation: pulse 1.2s infinite; } .sw-av .pip.err { background: var(--err); animation: none; }

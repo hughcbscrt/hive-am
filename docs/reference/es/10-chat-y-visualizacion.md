@@ -22,7 +22,7 @@ Este documento describe **qué se muestra** en la conversación con un agente, *
 
 Se puede **contraer** con el botón de su cabecera (icono de panel): pasa de 290 px a 68 px y deja solo el **avatar con la inicial** de cada agente, agrupados por colonia con una pequeña barra de color. Al pasar el mouse, el *tooltip* muestra el nombre y el proveedor; el agente actual sigue resaltado y los que trabajan conservan su punto pulsante. Cambiar de agente no lo expande y la elección se recuerda (`hive-switcher-collapsed` en `localStorage`).
 
-Lista lateral agrupada por colonia (y "No colony"), con búsqueda. Cada agente muestra:
+Lista lateral agrupada por colonia (en el orden de las colonias y luego "Sin colonia"; los grupos vacíos se ocultan), con búsqueda. Dentro de cada grupo los orquestadores van primero y después el resto en el orden en que llegan. El encabezado de cada grupo es un `<button>` con `aria-expanded` que lo pliega; los grupos plegados se recuerdan (`hive-am.switcher.folded`, los ids de colonia y `free`; los ids de colonias borradas se descartan en el siguiente cambio). Un grupo plegado conserva la fila del agente actual y muestra un punto pulsante cuando alguno de sus agentes está en marcha. Mientras la búsqueda tiene texto, todo grupo con coincidencias está abierto, sin tocar lo guardado. Sin ningún agente, la lista dice "Aún no hay agentes". El plegado no aplica al modo contraído (avatares). Cada agente muestra:
 
 | Elemento | Origen |
 |---|---|

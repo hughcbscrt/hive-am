@@ -293,6 +293,11 @@ export const en = {
   "switcher.noDescription": "No description yet",
   "switcher.collapse": "Collapse the agent list",
   "switcher.expand": "Expand the agent list",
+  "switcher.empty": "No agents yet",
+  "switcher.groupFold": "Fold {name}",
+  "switcher.groupUnfold": "Unfold {name}",
+  "switcher.groupBusy_one": "{count} agent working",
+  "switcher.groupBusy_other": "{count} agents working",
 
   // ---- queue ----
   "queue.count_one": "{count} queued",

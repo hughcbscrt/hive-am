@@ -22,7 +22,7 @@ This document describes **what is shown** in the conversation with an agent, **w
 
 It can be **collapsed** with the button in its header (panel icon): it goes from 290 px to 68 px and leaves only each agent's **avatar with the initial**, grouped by colony with a small color bar. On hover, the *tooltip* shows the name and the provider; the current agent stays highlighted and those that are working keep their pulsing dot. Switching agent does not expand it and the choice is remembered (`hive-switcher-collapsed` in `localStorage`).
 
-Side list grouped by colony (and "No colony"), with search. Each agent shows:
+Side list grouped by colony (in the order of the colonies, then "No colony"; empty groups are hidden), with search. Inside each group orchestrators come first, then the rest in the order they arrive. Each group heading is a `<button>` with `aria-expanded` that folds the group; the folded groups are remembered (`hive-am.switcher.folded`, the colony ids and `free`; ids of deleted colonies are dropped on the next change). A folded group keeps the row of the current agent and shows a pulsing dot when one of its agents is running. While the search has text every group with a match is open, without touching what is saved. With no agents at all the list says "No agents yet". The folding does not apply to the collapsed (avatars) mode. Each agent shows:
 
 | Element | Source |
 |---|---|

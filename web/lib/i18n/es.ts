@@ -291,6 +291,11 @@ export const es: Record<DictKey, string> = {
   "switcher.noDescription": "Aún sin descripción",
   "switcher.collapse": "Contraer la lista de agentes",
   "switcher.expand": "Expandir la lista de agentes",
+  "switcher.empty": "Aún no hay agentes",
+  "switcher.groupFold": "Plegar {name}",
+  "switcher.groupUnfold": "Desplegar {name}",
+  "switcher.groupBusy_one": "{count} agente trabajando",
+  "switcher.groupBusy_other": "{count} agentes trabajando",
 
   // ---- queue ----
   "queue.count_one": "{count} en cola",
