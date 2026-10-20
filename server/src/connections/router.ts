@@ -71,13 +71,6 @@ export function senderOf(c: Connection, m: Inbound): AllowedUser | undefined {
   const member = (Array.isArray(chat.members) ? chat.members : []).find((x) => x.id === m.userId);
   return member ? { id: m.userId, name: member.name ?? m.userName, ...(listed?.admin ? { admin: true } : {}) } : undefined;
 }
-/** Why senderOf said no, for the log: the ids the connection knows against the ones that arrived. */
-function denyReason(c: Connection, m: Inbound): string {
-  if (!m.group) return `user not in the people list (${c.allowed.length} listed)`;
-  const chat = chatsOf(c).find((x) => x.id === m.target.chat);
-  if (!chat) return `user not in the people list and chat is not authorized (authorized chats: ${chatsOf(c).map((x) => x.id).join(', ') || 'none'})`;
-  return `chat is restricted to its members and the user is not one, the people list does not open it (${chat.members?.length ?? 0} listed)`;
-}
 const aliasesOf = (c: Connection): string[] => (Array.isArray(c.config.aliases) ? c.config.aliases : []).map((a: unknown) => String(a).trim()).filter(Boolean);
 
 /** Group chatter that speaks TO the agent by one of its aliases counts as aimed at it, even without @mention. */
@@ -106,12 +99,10 @@ export async function handleInbound(connectionId: string, adapter: ChannelAdapte
   if (group && !addressed && conn.config.group_mode !== 'open') return;
 
   const user = senderOf(conn, m);
-  if (addressed || !user) console.log(`[access] ${conn.name}: ${group ? 'group' : 'dm'} chat=${m.target.chat} user=${m.userId} addressed=${addressed} -> ${user ? 'allowed' : 'denied: ' + denyReason(conn, m)}`);
   if (!user) {
     if (!addressed) return; // never answer strangers' chatter
     // Told at every message, so the bot never looks dead; capped per person and per chat (topics and threads share it) so nobody can make it flood a chat.
     if (!allow(`denied:${connectionId}:${m.userId}:${m.target.chat}`, DENIED_PER_MINUTE) || !allow(`denied-chat:${connectionId}:${m.target.chat}`, DENIED_CHAT_PER_MINUTE)) {
-      console.log(`[access] ${conn.name}: notice withheld for user=${m.userId} chat=${m.target.chat} (too many from this person or chat)`);
       return;
     }
     const restricted = group && chatsOf(conn).some((c) => c.id === m.target.chat && c.mode === 'members');
