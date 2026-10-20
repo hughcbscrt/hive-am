@@ -58,6 +58,12 @@ En un chat privado el bot siempre responde. Para grupos y temas, la sección **G
 | **Escucha todo y opina** | Lee todo lo que se escribe y habla solo cuando tiene algo útil que aportar |
 
 - **Grupos autorizados:** pulsa **Añadir grupo** y escribe el id del grupo (suele empezar por `-100`). Cualquier miembro de ese grupo puede hablarle sin estar en la lista de personas, y los permisos del agente aplican a todos. Para saber el id, menciona al bot en el grupo: responde con el id del chat.
+- **Quién puede hablar aquí:** bajo cada grupo autorizado elige **Todos los miembros** (lo predeterminado) o **Solo estas personas**. Con la segunda, añade a cada persona con **Añadir persona** y su id de Telegram (un número; cada quien ve el suyo con `/id` o escribiéndole al bot). Entonces:
+  - solo esas personas, más las de **Quién puede hablarle**, pueden hablar con el agente en ese grupo, en todos sus temas. La lista de personas sigue valiendo en cualquier grupo y conserva su marca de administrador; las personas del grupo nunca son administradoras (`/new` sigue siendo de la lista de personas);
+  - a cualquier otra persona la ignora. Si llama al agente, el bot le avisa una vez de que el grupo solo admite a su lista, con su id y el del grupo, para que puedas añadirla;
+  - con **Escucha todo y opina**, sus mensajes no se leen en absoluto: no llegan al agente ni como contexto;
+  - si la lista está vacía, solo pueden hablar ahí las personas de **Quién puede hablarle**;
+  - el chat privado no cambia: estar en la lista de un grupo no da acceso por mensaje privado.
 - **Nombres con los que responde:** alias separados por comas (por ejemplo "Morena, queen"). Si alguien escribe uno en un grupo, cuenta como una mención.
 - **Telegram oculta los mensajes de grupo** que no mencionan al bot (modo de privacidad). Para usar **Escucha todo y opina**, en @BotFather envía `/setprivacy` y elige **Disable**, y vuelve a añadir el bot a cada grupo.
 
@@ -134,7 +140,7 @@ Una conexión de Slack funciona como una de Telegram (la misma conversación ún
 
 ### Crear la conexión
 
-En **Conexiones**, **Nueva conexión**, elige **Slack** y pega los dos tokens: **Token del bot** (`xoxb-…`) y **Token de la app** (`xapp-…`). Completa el agente y las personas permitidas con su **id de miembro de Slack** (`U…`: abre el perfil de la persona, menú ⋮, **Copiar ID de miembro**). Para canales enteros, añade su **id de canal** (`C…`, al final de los detalles del canal). La plataforma de una conexión guardada no se puede cambiar.
+En **Conexiones**, **Nueva conexión**, elige **Slack** y pega los dos tokens: **Token del bot** (`xoxb-…`) y **Token de la app** (`xapp-…`). Completa el agente y las personas permitidas con su **id de miembro de Slack** (`U…`: abre el perfil de la persona, menú ⋮, **Copiar ID de miembro**). Para canales enteros, añade su **id de canal** (`C…`, al final de los detalles del canal). Un canal también se puede limitar a unas personas con **Solo estas personas**, con sus ids de miembro (`U…`, o `W…` en Enterprise Grid); funciona como en los [grupos de Telegram](#grupos) y abarca todos los hilos del canal. La plataforma de una conexión guardada no se puede cambiar.
 
 ### Cómo se comporta en Slack
 
