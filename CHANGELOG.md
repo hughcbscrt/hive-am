@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+- **A long answer from a delegated task, a wake-up or a schedule is no longer refused in a chat.** These notices went through the 8000 character limit of incoming messages, so a subagent's answer longer than that came back as "Message too long." and never reached the orchestrator in its Telegram or Slack thread (it stayed readable with `dispatch_status`). The limit now applies only to what people write.
 - **A delegation longer than five minutes no longer fails with `fetch failed` and loses the answer.** The synchronous `dispatch` held one HTTP request until the subagent finished, and Node's `fetch` gives up after 300 seconds without an answer. It now starts the task and waits with short `dispatch_status` calls (25 seconds each), so it returns the subagent's answer however long it takes. The orchestrator's own CLI is still cut after 10 minutes of silence while it waits on a tool, which is why `dispatch` goes in the background by default. The Recent delegations list shows a task waiting behind a busy subagent as queued (it used to look failed), and its status on hover.
 
 ## [1.5.0] - 2026-10-19
