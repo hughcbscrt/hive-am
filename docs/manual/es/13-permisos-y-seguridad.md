@@ -62,7 +62,7 @@ Un agente vinculado a Telegram o Slack no puede estar en **Solo lectura**: un ag
 Además, quien puede hablarle por el canal controla lo que el agente hace con sus permisos:
 
 - Con **Acceso total**, cualquiera de la lista de personas autorizadas puede hacer que ejecute lo que sea en tu máquina.
-- Autorizar un grupo da ese acceso a todos sus miembros, también a quien entre después. Para tener un grupo con **Acceso total**, elige **Solo estas personas** bajo él y lista quién puede hablar ahí.
+- Autorizar un grupo da ese acceso a todos sus miembros, también a quien entre después. Para tener un grupo con **Acceso total**, elige **Solo estas personas** bajo él y lista quién puede hablar ahí: entonces solo entra esa lista, ni siquiera las personas de **Personas (mensajes directos)** salvo que también las añadas, y una lista vacía no admite a nadie. Un grupo que no listas en absoluto sigue dejando entrar a las personas de **Personas (mensajes directos)**.
 - OpenCode ignora el ajuste de permisos en estos casos, y puede editar archivos y ejecutar comandos diga lo que diga la configuración. La pantalla de la conexión lo avisa.
 
 Ver [Conexiones](09-conexiones-telegram.md).

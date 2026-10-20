@@ -62,7 +62,7 @@ An agent linked to Telegram or Slack cannot be at **Read-only**: a read-only age
 Also, whoever can talk to it through the channel controls what the agent does with its permissions:
 
 - With **Full access**, anyone on the list of authorized people can make it run anything on your machine.
-- Authorizing a group gives that access to all of its members, including people who join later. To keep a group with **Full access**, choose **Only these people** under it and list who may talk there.
+- Authorizing a group gives that access to all of its members, including people who join later. To keep a group with **Full access**, choose **Only these people** under it and list who may talk there: then only that list gets in, not even the people of **People (direct messages)** unless you add them too, and an empty list admits nobody. A group you do not list at all still lets in the people of **People (direct messages)**.
 - OpenCode ignores the permission setting in these cases, and can edit files and run commands whatever the setting says. The connection screen warns you about it.
 
 See [Connections](09-telegram-connections.md).
