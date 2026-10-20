@@ -1410,6 +1410,9 @@ a.card.stat:focus-visible, .table tbody tr.row-link:focus-visible { outline: 2px
 .fa-err { color: var(--err); } .fa-gap10 { gap: 10px; } .fa-w150 { width: 150px; } .fa-w190 { width: 190px; }
 /* One authorized group in the connection form: its mode and members hang under it. */
 .fa-chat { padding-left: 10px; border-left: 2px solid var(--line); }
+/* Id, name and remove rows in the connection form: at narrow widths they wrap instead of overflowing; the name takes the spare room. */
+.fa-idrow > .fa-w150, .fa-idrow > .fa-w190 { flex: 1 1 150px; max-width: 100%; }
+.fa-idrow > .grow { flex: 999 1 120px; }
 .sx-transcript { gap: 16px; } .push-c { align-self: center; }
 .m-xl { margin: 36px; } .pad-m { padding: 16px; } .tl { text-align: left; } .mt-xs { margin-top: 4px; } .row.between { justify-content: space-between; }
 .fa-c-cr { background: var(--p-opencode); } .fa-c-cw { background: var(--p-kiro); } .fa-c-in { background: var(--honey); } .fa-c-out { background: var(--p-claude); }

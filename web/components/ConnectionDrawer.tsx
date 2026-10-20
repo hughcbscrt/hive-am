@@ -162,7 +162,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
           <div className="stack-s">
             {allowed.length === 0 && <p className="hint m0">{t('conn.allowed.empty')}</p>}
             {allowed.map((u, i) => (
-              <div key={i} className="row gap-s">
+              <div key={i} className="row gap-s wrap fa-idrow">
                 <input className="input mono fa-w150" value={u.id} onChange={(e) => setUser(i, { id: cleanUser(e.target.value) })} placeholder={t(slack ? 'conn.allowed.id.slack' : 'conn.allowed.id')} aria-label={t(slack ? 'conn.allowed.id.slack' : 'conn.allowed.id')} />
                 <input className="input grow" value={u.name ?? ''} onChange={(e) => setUser(i, { name: e.target.value })} placeholder={t('conn.allowed.name')} aria-label={t('conn.allowed.name')} />
                 <span title={t('conn.allowed.adminHint')} className="nowrap"><CheckRow checked={!!u.admin} onChange={(v) => setUser(i, { admin: v })} label={t('conn.allowed.admin')} /></span>
@@ -179,7 +179,14 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
             <p className="hint m0">{t(slack ? 'conn.groups.hint.slack' : 'conn.groups.hint')}</p>
             <Segmented value={groupMode} onChange={setGroupMode} options={[{ id: 'mention', label: t('conn.mode.mention') }, { id: 'open', label: t('conn.mode.open') }]} />
             <p className="hint m0">{t(slack ? `conn.mode.${groupMode}.hint.slack` : `conn.mode.${groupMode}.hint`)}</p>
-            <div className="eyebrow">{t(slack ? 'conn.chats.slack' : 'conn.chats')}</div>
+            <Field label={t('conn.aliases')} hint={t(slack ? 'conn.aliases.hint.slack' : 'conn.aliases.hint')}>
+              <input className="input" value={aliases} onChange={(e) => setAliases(e.target.value)} placeholder={t('conn.aliases.placeholder')} />
+            </Field>
+          </div>
+        </Field>
+
+        <Field label={t(slack ? 'conn.chats.slack' : 'conn.chats')} hint={t(slack ? 'conn.chats.hint.slack' : 'conn.chats.hint')}>
+          <div className="stack-s fa-gap10">
             {chats.length === 0 && <p className="hint m0">{t(slack ? 'conn.chats.empty.slack' : 'conn.chats.empty')}</p>}
             {chats.map((c, i) => {
               const mode: ChatMode = c.mode === 'members' ? 'members' : 'everyone';
@@ -187,7 +194,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
               const memberId = t(slack ? 'conn.chats.member.id.slack' : 'conn.chats.member.id');
               return (
                 <div key={i} className="stack-s fa-chat">
-                  <div className="row gap-s">
+                  <div className="row gap-s wrap fa-idrow">
                     <input className="input mono fa-w190" value={c.id} onChange={(e) => setChat(i, { id: cleanChat(e.target.value) })} placeholder={t(slack ? 'conn.chats.id.slack' : 'conn.chats.id')} aria-label={t(slack ? 'conn.chats.id.slack' : 'conn.chats.id')} />
                     <input className="input grow" value={c.name ?? ''} onChange={(e) => setChat(i, { name: e.target.value })} placeholder={t('conn.chats.name')} aria-label={t('conn.chats.name')} />
                     <button className="btn ghost icon sm" onClick={() => setChats((l) => l.filter((_, j) => j !== i))} aria-label={t('conn.chats.remove')} title={t('conn.chats.remove')}><X size={15} /></button>
@@ -201,7 +208,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
                     <>
                       {!members.some((m) => m.id.trim()) && <p className="hint warn m0">{t(slack ? 'conn.chats.mode.members.empty.slack' : 'conn.chats.mode.members.empty')}</p>}
                       {members.map((m, k) => (
-                        <div key={k} className="row gap-s">
+                        <div key={k} className="row gap-s wrap fa-idrow">
                           <input className="input mono fa-w150" value={m.id} onChange={(e) => setMembers(i, (l) => l.map((x, j) => (j === k ? { ...x, id: cleanUser(e.target.value) } : x)))} placeholder={memberId} aria-label={memberId} />
                           <input className="input grow" value={m.name ?? ''} onChange={(e) => setMembers(i, (l) => l.map((x, j) => (j === k ? { ...x, name: e.target.value } : x)))} placeholder={t('conn.chats.member.name')} aria-label={t('conn.chats.member.name')} />
                           <button className="btn ghost icon sm" onClick={() => setMembers(i, (l) => l.filter((_, j) => j !== k))} aria-label={t('conn.chats.member.remove')} title={t('conn.chats.member.remove')}><X size={15} /></button>
@@ -214,10 +221,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
               );
             })}
             <div><button className="btn sm" onClick={() => setChats((l) => [...l, { id: '' }])}><Plus size={14} />{t(slack ? 'conn.chats.add.slack' : 'conn.chats.add')}</button></div>
-            <p className="hint m0">{t(slack ? 'conn.chats.hint.slack' : 'conn.chats.hint')} {t(slack ? 'conn.chats.howto.slack' : 'conn.chats.howto')}</p>
-            <Field label={t('conn.aliases')} hint={t(slack ? 'conn.aliases.hint.slack' : 'conn.aliases.hint')}>
-              <input className="input" value={aliases} onChange={(e) => setAliases(e.target.value)} placeholder={t('conn.aliases.placeholder')} />
-            </Field>
+            <p className="hint m0">{t(slack ? 'conn.chats.howto.slack' : 'conn.chats.howto')}</p>
           </div>
         </Field>
 
