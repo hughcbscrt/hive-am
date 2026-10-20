@@ -9,13 +9,12 @@ import { useAgent, useHiveData } from '@/lib/store';
 import { api } from '@/lib/api';
 import { ago, shortPath, PROVIDERS, permissionLabel } from '@/lib/meta';
 import { LAST_CHAT } from '@/lib/lastChat';
-import { usePersistentState, writeStored } from '@/lib/hooks/usePersistentState';
+import { writeStored } from '@/lib/hooks/usePersistentState';
 import { useQueryState } from '@/lib/hooks/useQueryState';
 import { Chat } from '@/components/chat/Chat';
 import { StatsBar } from '@/components/chat/StatsBar';
 import { ResourceStrip } from '@/components/chat/ResourceStrip';
 import { CopyBtn } from '@/components/chat/ToolCall';
-import { AgentSwitcher } from '@/components/agents/AgentSwitcher';
 import { GitExplorer } from '@/components/git/GitExplorer';
 import { useGit } from '@/lib/git/useGit';
 import { AgentForm } from '@/components/agents/AgentForm';
@@ -30,7 +29,8 @@ const CFG_TABS: CfgTab[] = ['config', 'notebook', 'sessions'];
 
 export default function AgentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  // Keyed so switching agents from the side list resets every piece of local state.
+  // Keyed so switching agents resets every piece of the chat's local state (draft, tab, viewed session). The side agent list
+  // and the grid around it come from app/agents/layout.tsx, which is not mounted again, so the list keeps its scroll.
   return <Workspace key={id} id={id} />;
 }
 
@@ -50,11 +50,6 @@ function Workspace({ id }: { id: string }) {
   const [viewing, setViewing] = useState<string | undefined>(undefined);
   const [confirm, setConfirm] = useState<'new' | null>(null);
   const [view, setView] = useState<'chat' | 'changes'>('chat');
-  const [swCollapsedN, setSwCollapsed] = usePersistentState<number>('hive-switcher-collapsed', 0);
-  const swCollapsed = swCollapsedN === 1;
-  // The width only animates when the person flips it, never while the saved choice is applied on arrival.
-  const [swAnimate, setSwAnimate] = useState(false);
-  const toggleSwitcher = () => { setSwAnimate(true); setSwCollapsed(swCollapsed ? 0 : 1); };
   // Always loaded (cheap) so the tab can show how many files changed; the file tree loads when the tab opens.
   const git = useGit(agent, view === 'changes');
   const changedCount = git.status && git.status.isRepo ? git.status.changes.length : 0;
@@ -70,11 +65,9 @@ function Workspace({ id }: { id: string }) {
   useEffect(() => { if (agent) writeStored(LAST_CHAT, agent.id); }, [agent]);
 
   if (!agent) return (
-    <div className={`ws ${swCollapsed ? 'sw-collapsed' : ''} ${swAnimate ? 'sw-anim' : ''}`}><AgentSwitcher activeId={id} collapsed={swCollapsed} onToggle={toggleSwitcher} />
-      <div className="page">
-        {!ready && error ? <Banner kind="err"><span>{error}</span> <button type="button" className="btn sm" onClick={() => void retry()}>{t('fa.retry')}</button></Banner>
-          : ready ? <EmptyState title={t('agent.missing.title')} body={t('agent.missing.body')} action={<Link className="btn" href="/agents">{t('agent.missing.back')}</Link>} /> : null}
-      </div>
+    <div className="page">
+      {!ready && error ? <Banner kind="err"><span>{error}</span> <button type="button" className="btn sm" onClick={() => void retry()}>{t('fa.retry')}</button></Banner>
+        : ready ? <EmptyState title={t('agent.missing.title')} body={t('agent.missing.body')} action={<Link className="btn" href="/agents">{t('agent.missing.back')}</Link>} /> : null}
     </div>
   );
 
@@ -91,8 +84,7 @@ function Workspace({ id }: { id: string }) {
   ];
 
   return (
-    <div className={`ws ${swCollapsed ? 'sw-collapsed' : ''} ${swAnimate ? 'sw-anim' : ''}`}>
-      <AgentSwitcher activeId={id} collapsed={swCollapsed} onToggle={toggleSwitcher} />
+    <>
       <section className="ws-chat">
         <WorkspaceHeader
           back={{ href: '/', label: t('agent.backToColony') }}
@@ -178,6 +170,6 @@ function Workspace({ id }: { id: string }) {
         <ConfirmDialog title={t('agent.newConvTitle')} body={t('agent.newConvBody')} confirmLabel={t('agent.newConvStart')} onClose={() => setConfirm(null)}
           onConfirm={async () => { await api.post(`/agents/${id}/new-session`); await refresh(['agents']); toast(t('agent.newConvStarted')); }} />
       )}
-    </div>
+    </>
   );
 }

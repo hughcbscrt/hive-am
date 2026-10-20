@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PanelLeftClose, PanelLeftOpen, Plus, Search } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { PROVIDERS, ago } from '@/lib/meta';
@@ -26,6 +26,20 @@ export function AgentSwitcher({ activeId, collapsed = false, onToggle }: { activ
     return out.filter((g) => g.items.length);
   }, [agents, colonies, q, t]);
 
+  // Bring the active agent into view when the list mounts (arrival, reload, folding the list) or the active agent changes,
+  // once its row exists; the list is left alone when the row is already visible.
+  const listRef = useRef<HTMLDivElement>(null);
+  const shown = useRef('');
+  useEffect(() => {
+    const list = listRef.current, row = list?.querySelector<HTMLElement>('.sw-item[aria-current]');
+    const at = `${activeId}:${collapsed}`;
+    if (!list || !row || shown.current === at) return;
+    shown.current = at;
+    const l = list.getBoundingClientRect(), r = row.getBoundingClientRect();
+    if (r.top < l.top) list.scrollTop -= l.top - r.top;
+    else if (r.bottom > l.bottom) list.scrollTop += r.bottom - l.bottom;
+  });
+
   const toggleBtn = onToggle && (
     <button className="btn ghost icon sm" onClick={onToggle} aria-label={collapsed ? t('switcher.expand') : t('switcher.collapse')} title={collapsed ? t('switcher.expand') : t('switcher.collapse')} aria-expanded={!collapsed}>
       {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
@@ -37,7 +51,7 @@ export function AgentSwitcher({ activeId, collapsed = false, onToggle }: { activ
     return (
       <aside className="switcher mini" aria-label={t('nav.agents')}>
         <div className="switcher-head">{toggleBtn}<button className="btn ghost icon sm" onClick={() => setCreating(true)} aria-label={t('newAgent.title')} title={t('newAgent.title')}><Plus size={16} /></button></div>
-        <div className="switcher-list">
+        <div className="switcher-list" ref={listRef}>
           {groups.map((g) => (
             <div key={g.key} className="mini-group">
               <div className="mini-sep" title={`${g.name} · ${g.items.length}`} style={g.color ? { ['--c' as any]: g.color } : undefined} />
@@ -63,7 +77,7 @@ export function AgentSwitcher({ activeId, collapsed = false, onToggle }: { activ
           <button className="btn ghost icon sm" onClick={() => setCreating(true)} aria-label={t('newAgent.title')}><Plus size={16} /></button></div>
         <div className="search"><Search size={15} /><input className="input" placeholder={t('switcher.find')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('switcher.find')} /></div>
       </div>
-      <div className="switcher-list">
+      <div className="switcher-list" ref={listRef}>
         {groups.length === 0 && <p className="muted small" style={{ padding: 16 }}>{t('switcher.noMatch', { query: q })}</p>}
         {groups.map((g) => (
           <div key={g.key}>

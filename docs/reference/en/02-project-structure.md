@@ -85,6 +85,7 @@ hive-am/
     │   ├── globals.css       # ALL the styles (tokens, light/dark theme, components)
     │   ├── page.tsx          # Colony (honeycomb)
     │   ├── agents/page.tsx   # agent list
+    │   ├── agents/layout.tsx # agent switcher next to an agent's page
     │   ├── agents/[id]/page.tsx   # agent workspace (chat, changes, settings, notebook)
     │   ├── connections/page.tsx   # external connections
     │   ├── types/page.tsx    # agent types
@@ -201,7 +202,8 @@ There is no test framework: `server/scripts/test-*.ts` are standalone scripts (2
 | `app/layout.tsx` | Loads the fonts (Bricolage Grotesque, Hanken Grotesk, JetBrains Mono), wraps everything in `<Shell>` and includes an inline script that applies the saved theme and language before the first paint (no flash). |
 | `app/page.tsx` | **Colony** screen: honeycomb with colonies, relation lines, the selected agent's panel and recent delegations. |
 | `app/agents/page.tsx` | Filterable table of agents. |
-| `app/agents/[id]/page.tsx` | Agent switcher + chat + Changes tab + collapsible settings panel (configuration, notebook and sessions). |
+| `app/agents/layout.tsx` | On an agent's page, the grid with the agent switcher, kept mounted while switching agents. |
+| `app/agents/[id]/page.tsx` | Chat + Changes tab + collapsible settings panel (configuration, notebook and sessions). |
 | `app/connections/page.tsx` | **Connections** screen: cards of the external connections and their status. |
 | `app/types/page.tsx` | CRUD of types and creation of agents from a type. |
 | `app/skills/page.tsx` | CRUD of skills with markdown preview, usage count and estimated size. |

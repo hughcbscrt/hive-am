@@ -4,7 +4,7 @@ This document describes **what is shown** in the conversation with an agent, **w
 
 ## 10.1 Layout of the agent screen
 
-`app/agents/[id]/page.tsx` arranges two columns inside the main area, and a settings panel that **floats on top**:
+`app/agents/[id]/page.tsx` (inside `app/agents/layout.tsx`) arranges two columns inside the main area, and a settings panel that **floats on top**:
 
 ```
 ┌ sidebar ──────┬ agent switcher ─────┬ chat ─────────────────────────────────────┐
@@ -16,7 +16,7 @@ This document describes **what is shown** in the conversation with an agent, **w
 
 - The **settings** panel is hidden by default; the **Settings** button in the header shows it (a dot indicates unsaved changes). Its state is remembered in `localStorage` (`hive-cfg-open`).
 - The panel is `position: fixed` on the right: it **does not shrink the chat**, it is drawn on top with a shadow. It is 400 px wide by default. The expand button (next to *Hide*) takes it to **half the screen** and back; its left edge can also be dragged (or double-click to toggle). Minimum 340 px, maximum screen width − 80 px. The width is remembered in `localStorage` (`hive-cfg-width`).
-- The page is mounted with `key={id}`: when switching agent from the switcher all local state is reset (draft, tab, session being read).
+- The chat column (`Workspace`) is mounted with `key={id}`: when switching agent from the switcher all of its local state is reset (draft, tab, session being read). The switcher and the two-column grid come from `app/agents/layout.tsx`, above the `[id]` segment (the page itself is mounted again for every agent), so the switcher stays mounted and keeps its scroll position and its search text; on arrival (or reload) it scrolls just enough to show the current agent.
 
 ### Agent switcher (`AgentSwitcher`)
 

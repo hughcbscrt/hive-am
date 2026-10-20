@@ -4,7 +4,7 @@ Este documento describe **qué se muestra** en la conversación con un agente, *
 
 ## 10.1 Distribución de la pantalla del agente
 
-`app/agents/[id]/page.tsx` organiza dos columnas dentro del área principal, y un panel de ajustes que **flota encima**:
+`app/agents/[id]/page.tsx` (dentro de `app/agents/layout.tsx`) organiza dos columnas dentro del área principal, y un panel de ajustes que **flota encima**:
 
 ```
 ┌ barra lateral ┬ selector de agentes ┬ chat ─────────────────────────────────────┐
@@ -16,7 +16,7 @@ Este documento describe **qué se muestra** en la conversación con un agente, *
 
 - El panel de **ajustes** está oculto por defecto; el botón **Settings** de la cabecera lo muestra (un punto indica cambios sin guardar). Su estado se recuerda en `localStorage` (`hive-cfg-open`).
 - El panel es `position: fixed` a la derecha: **no encoge el chat**, se dibuja encima con sombra. Mide 400 px por defecto. El botón de ampliar (junto a *Hide*) lo lleva a la **mitad de la pantalla** y de vuelta; también se arrastra su borde izquierdo (o doble clic para alternar). Mínimo 340 px, máximo ancho de pantalla − 80 px. El ancho se recuerda en `localStorage` (`hive-cfg-width`).
-- La página se monta con `key={id}`: al cambiar de agente desde el selector se reinicia todo el estado local (borrador, pestaña, sesión en lectura).
+- La columna del chat (`Workspace`) se monta con `key={id}`: al cambiar de agente desde el selector se reinicia todo su estado local (borrador, pestaña, sesión en lectura). El selector y la rejilla de dos columnas vienen de `app/agents/layout.tsx`, por encima del segmento `[id]` (la página misma se vuelve a montar con cada agente), así que el selector sigue montado y conserva su posición de scroll y el texto de búsqueda; al llegar (o recargar) se desplaza lo justo para mostrar el agente actual.
 
 ### Selector de agentes (`AgentSwitcher`)
 
