@@ -79,6 +79,8 @@ The sidebar has these sections:
 
 At the bottom of the menu are the **Terminal** button (opens the terminal panel, [chapter 12](12-terminals.md)), the server status indicator and **Switch theme**.
 
+To give the screen more room, the panel button next to the hive-am name (**Collapse the menu**) folds the menu to a narrow column of icons. Hovering or focusing an icon shows its name, counts stay as small badges, and **EN** / **ES** stay one above the other. The same button (**Expand the menu**) opens it again. Your choice is remembered in the browser. On a narrow screen (under 760 px) the menu is a bar at the top with its labels, and it does not fold.
+
 ### Connection indicator
 
 Near the bottom of the menu, **Connected to server** appears with a green dot while the interface is talking to the server. If the server stops, the text changes to **Server offline. Retrying…** and the interface reconnects on its own. If you see that message, check [chapter 14](14-troubleshooting.md).

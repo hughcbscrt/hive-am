@@ -155,6 +155,7 @@ Las fuentes se cargan con `next/font/google` en `layout.tsx`, por lo que **la pr
 ### Responsivo y accesibilidad
 
 - Puntos de corte: **1100 px** (las columnas se apilan) y **760 px** (la barra lateral pasa a barra superior).
+- La barra lateral (`Shell.tsx`, `.rail`) se pliega de 220 px a 64 px con el botón de su cabecera (`aria-expanded`, `aria-label` *Contraer el menú* / *Expandir el menú*). El ancho es `--rail-w` en `.shell`; plegada, cada entrada conserva su etiqueta como `aria-label` (con el contador) y `title` (lo muestra el tooltip global), los contadores pasan a insignias (`99+` por encima de 99) y EN/ES se apilan. El estado se guarda en `localStorage` (`hive-am.railCollapsed`) y el script en línea de `layout.tsx` lo aplica como `data-rail` en `<html>` antes del primer pintado, así que al recargar nunca parpadea la barra ancha; el ancho solo se anima tras un clic (`.rail-anim`). Por debajo de 760 px el plegado se ignora y el botón se oculta.
 - Foco visible en todos los controles (`:focus-visible`), `aria-label` en botones de solo icono, `aria-pressed`/`aria-current`/`aria-selected` en controles de estado, `role="dialog"` en paneles y diálogos.
 - `prefers-reduced-motion` desactiva animaciones y transiciones.
 - Los diálogos atrapan y devuelven el foco; las pestañas, el árbol de archivos y las listas se manejan con teclado; el chat es un `role="log"`; las filas de tabla que abren algo son enfocables.

@@ -210,6 +210,7 @@ Solo preferencias de vista; si se borran, la interfaz funciona igual.
 | `hive-locale` | `en` \| `es` | `lib/i18n`: idioma de la interfaz (nunca se refleja en la URL) |
 | `hive-git-view` | JSON `{ theme, whitespace, tabSize }` | `lib/git/gitPrefs.ts`: tema, espacios visibles y tabulador del visor de código |
 | `hive-switcher-collapsed` | `1` \| `0` | `agents/[id]/page.tsx`: si la lista lateral de agentes está contraída |
+| `hive-am.railCollapsed` | `true` \| `false` | `Shell.tsx`: si la barra lateral principal está plegada a iconos (la aplica antes del primer pintado el script en línea de `layout.tsx`) |
 | `hive-am.switcher.folded` | arreglo JSON de ids | `AgentSwitcher.tsx`: los grupos de colonia plegados en la lista lateral de agentes del chat (ids de colonia y `free` para "Sin colonia") |
 | `hive-cfg-width` | número (px) | `agents/[id]/page.tsx`: ancho del panel de ajustes del agente (se arrastra, con `useResizableWidth`) |
 | `hive-am.drawerWidth` | número (px) | `Dialog.tsx` (`Drawer`): ancho de los paneles laterales (se arrastra, con `useResizableWidth`) |
