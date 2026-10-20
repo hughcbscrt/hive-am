@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- **The agent and agent-type forms are one component.** The types screen now renders the agent form (`AgentForm`) in type mode instead of its own copy of the fields, so a new agent field is written once. Nothing visible changes, and saving a type sends only the fields a type stores.
 - **The connection's people list is for direct messages, and each authorized group follows its own rule.** In the form it is now **People (direct messages)**, apart from **Groups** and **Allowed groups** (**Allowed channels** on Slack), each with its own help. The people list still talks in DMs and in groups that are not listed, but no longer opens a group limited to **Only these people**: only that group's members get in, and an empty member list admits nobody. If you already limited a group and someone on the people list talked there, add them to the group's list too. Rows wrap in a narrow drawer.
 - **Someone without access is told at every message aimed at the agent**, not only the first time, so the bot no longer looks dead. To keep a stranger from flooding a chat, it sends at most 5 notices per person and chat and 20 per chat in a minute, then stays silent. The notice of a limited chat now only points to the chat's members ("channel" on Slack).
 

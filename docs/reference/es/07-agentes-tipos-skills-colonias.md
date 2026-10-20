@@ -57,6 +57,7 @@ Un **tipo** es una plantilla: proveedor, modelo, prompt, permiso, rol, skills. P
 - Crear un agente "desde un tipo" **copia** sus valores (`draftFromType` en la interfaz, o `POST /api/types/:id/spawn`). Después el agente es independiente: editar el tipo **no** cambia a los agentes ya creados.
 - `type_id` queda como referencia para mostrar "N agentes usan este tipo".
 - Los tipos no se heredan por colonia ni intervienen en tiempo de ejecución.
+- El editor de tipos es el formulario de agente (`AgentForm` con `mode="type"`), así que un campo nuevo de agente se escribe una vez. El modo oculta lo que un tipo no guarda (carpeta, colonia y herencia, navegador, equipo, recursos) y conserva los textos propios de la pantalla de tipos; el nombre del tipo lo comprueba la pantalla, no `validate()`. Al guardar se envían solo los campos que guarda un tipo (`TYPE_FIELDS`, `typePayload`). Un campo nuevo que solo tenga el agente va bajo `!isType`.
 
 ## 7.3 Skills
 

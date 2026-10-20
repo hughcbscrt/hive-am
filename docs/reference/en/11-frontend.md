@@ -115,7 +115,7 @@ Utility hooks in `web/lib/hooks/`:
 | `FolderPicker` | Path field + folder explorer (uses `GET /api/fs/dirs`) |
 | `Toaster` / `useToast` | Transient notices: errors are announced (`role="alert"`), manual close, pause on hover or focus, identical notices are not repeated, at most 5 |
 | `PathPicker` | Folder or file picker; it shows loading and, if `GET /api/fs/dirs` fails, the error with a *Retry* button |
-| `AgentForm` | The single agent form (includes inheritance and *Team*) |
+| `AgentForm` | The single agent form (includes inheritance and *Team*); the types screen renders it with `mode="type"` |
 | `ColonyEditor` | Colony editor + inheritance dialog |
 | `NewAgentDrawer`, `AgentEditDrawer` | Create and edit agents in a side panel |
 
