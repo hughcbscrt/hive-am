@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-20
+
 ### Added
 
 - **Fold the main menu to icons.** A button next to the hive-am name folds the sidebar from 220 px to a 64 px column of icons, giving the chat and every other screen more room. Each icon keeps its name as a tooltip and for screen readers, counts stay as small badges and the EN/ES switch stays at hand. The choice is remembered and applied before the page paints, so a reload never flashes the wide menu. On narrow screens (under 760 px) the menu stays the top bar with its labels.
@@ -233,7 +235,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/hughcbscrt/hive-am/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/hughcbscrt/hive-am/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/hughcbscrt/hive-am/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/hughcbscrt/hive-am/compare/v1.2.2...v1.3.0
