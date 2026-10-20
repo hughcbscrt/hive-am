@@ -54,10 +54,10 @@ Startup sequence:
 
 ```sql
 UPDATE agents     SET status='idle'         WHERE status='running';
-UPDATE dispatches SET status='interrupted'  WHERE status='running';
+UPDATE dispatches SET status='interrupted', finished_at=<now>  WHERE status IN ('queued','running');
 ```
 
-The turn that was in flight is lost, but the native session is intact and the agent is free.
+The turn that was in flight is lost, but the native session is intact and the agent is free. Then `armDispatchNotices()` (`dispatches.ts`, next to `armWakeups()` in `index.ts`) tells each orchestrator about its background tasks that ended without being announced, the interrupted ones included ([9.3](09-orchestration-and-relations.md#93-flow-of-a-delegation)).
 
 ### 2. MCP server: `server/mcp/dispatch.mjs`
 
@@ -102,6 +102,7 @@ Each screen is a route under `web/app/`:
 | `HIVE_AM_TELEGRAM_TIMEOUT_MS` | `server/src/connections/telegram.ts` | `30000` | Timeout of each Telegram Bot API call, upload and download. |
 | `HIVE_AM_WAKE_RETRY_MS` | `server/src/wake.ts` | `5000` | Wait before retrying the delivery of a wake-up that failed (12 attempts, then it is dropped). |
 | `NEXT_DIST_DIR` | `web/next.config.mjs` | `.next` | Next's output folder; lets you run a second instance without overwriting the first. |
+| `HIVE_AM_DISPATCH_POLL_S` | `server/mcp/dispatch.mjs` | `25` | How long each `dispatch_status` call of a synchronous `dispatch` waits (1 to 60 s). Tests shorten it. |
 | `HIVE_AGENT_ID`, `HIVE_AM_API` | `server/mcp/dispatch.mjs` | — | Set by hive-am when it launches the MCP server (not configured by hand). |
 
 Default ports: **4400** (server) and **4401** (web).

@@ -19,18 +19,21 @@ An orchestrator can only delegate to the workers **connected directly to it**. I
 
 ## How an orchestrator delegates
 
-When an orchestrator has at least one worker connected, it gets two tools:
+When an orchestrator has at least one worker connected, it gets three tools:
 
 | Tool | What it does |
 |---|---|
 | `list_agents` | Returns the list of its direct workers, with name, description, provider and whether they are busy. |
-| `dispatch` | Sends a task to a worker by its exact name and waits for its final answer. |
+| `dispatch` | Sends a task to a worker by its exact name. By default it does not wait: it gets a task id and the answer reaches it later as a message. With `background: false` it waits for the final answer. |
+| `dispatch_status` | Tells the state of a task it delegated (queued, running, done, failed or interrupted) and, once finished, its result. It can wait up to a minute for the end. |
 
 What you should know:
 
 - **Every delegation opens a new native session of the worker.** The worker does not remember earlier delegations, so the orchestrator must include all the context in the task. Your direct conversation with that worker does not change.
-- **The orchestrator waits.** While the worker is busy, the orchestrator is blocked waiting for its answer.
-- **An agent handles one turn at a time.** If the worker is busy (with a message from you or another delegation), the task waits its turn in the queue.
+- **A delegation goes in the background by default.** The orchestrator gets a task id at once, can keep talking to you or delegate to other workers meanwhile, and when the worker finishes it receives a message *"Delegated task … to Backend finished (done). Result: …"* in the same place where you asked it (the web chat, or the same Telegram or Slack thread), and carries on from there.
+- **The result is not lost.** It is kept in hive-am, not in the call: if hive-am restarts while a worker is on a background task, the task is marked **interrupted** (it is not resumed) and the orchestrator is told so, to check the work and send it again if needed. A result is never sent twice. If the thread where it was asked no longer exists or is muted, the orchestrator can still read the result with `dispatch_status`.
+- **Limit:** an orchestrator can have at most 10 background tasks that have not finished; beyond that it is told to wait.
+- **An agent handles one turn at a time.** If the worker is busy (with a message from you or another delegation), the task waits its turn in the queue, marked **queued**.
 - **Different agents work in parallel.**
 - The orchestrator's team updates itself: if you connect or disconnect a worker, the orchestrator's next message already knows about it.
 
@@ -71,7 +74,7 @@ You can also use the **Disconnect** button in the side panel of the selected age
 
 ### In the chat
 
-When an orchestrator delegates, a **Delegate** row appears in its chat with the worker (**Subagent**), the **Task** and, when you open it, the **Output**: the worker's answer.
+When an orchestrator delegates, a **Delegate** row appears in its chat with the worker (**Subagent**), the **Task** and, when you open it, the **Output**: the worker's answer (for a background task, the task id; the answer arrives later as a new message starting with "Delegated task").
 
 ![Queen's chat with a Delegate row to Backend, its task and the output with Backend's answer, and a work plan table below](img/chat-delegacion.jpg)
 
@@ -91,7 +94,7 @@ The **Colony** screen draws the relations on the honeycomb.
 - Hover over an agent to highlight its connections. A moving line means a task is in progress.
 - The **?** icon next to the title explains how to read the map.
 - The cards at the top count agents, colonies, resources, orchestrators, working agents and **tasks in flight**.
-- The **Recent delegations** list shows the latest delegations: from whom to whom, the task, how long ago and its status.
+- The **Recent delegations** list shows the latest delegations: from whom to whom, the task, how long ago and its status: a pulsing dot while it runs, a hollow one while it waits for a busy worker (queued), green when done and red when it failed or was interrupted. Point at the dot to read the status.
 
 Click an agent to open its card.
 

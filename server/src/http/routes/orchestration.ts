@@ -1,10 +1,11 @@
 import { agents, dispatches } from '../../db.js';
+import { startTask, taskStatus } from '../../dispatches.js';
 import { dispatch, liveTurn, notifyAgentsChanged } from '../../runtime.js';
 import { agentOrFail } from '../../services/agents.js';
 import { body } from '../body.js';
 import { bad } from '../errors.js';
 import { route } from '../router.js';
-import { strList } from '../validate.js';
+import { strList, text } from '../validate.js';
 
 route('GET', '/api/orchestrators/:id/workers', ({ params }) => {
   const o = agentOrFail(params[0]);
@@ -17,9 +18,17 @@ route('PUT', '/api/orchestrators/:id/workers', async ({ req, params }) => {
   agents.setWorkers(o.id, worker_ids === undefined || worker_ids === null ? [] : strList(worker_ids)); notifyAgentsChanged();
   return agents.get(o.id);
 });
+// `background: true` returns at once and the orchestrator is told the result later; `poll: true` returns at once too, for a caller that waits
+// with /api/dispatch/status (the synchronous `dispatch` tool). With neither, the request is held until the worker answers, as it always was.
 route('POST', '/api/dispatch', async ({ req }) => {
-  const { from, agent, task } = await body(req);
+  const { from, agent, task, background, poll } = await body(req);
   if (!from || !agent || !task) throw bad('from, agent and task are required');
+  if (background === true || poll === true) return startTask(text(from), text(agent), text(task), background === true);
   try { return await dispatch(from as string, agent as string, task as string); } catch (e) { throw bad(e instanceof Error ? e.message : String(e)); }
+});
+route('POST', '/api/dispatch/status', async ({ req }) => {
+  const { from, id, wait_seconds } = await body(req);
+  if (!from) throw bad('from is required');
+  return taskStatus(text(from), text(id), wait_seconds);
 });
 route('GET', '/api/dispatches', () => dispatches.recent());

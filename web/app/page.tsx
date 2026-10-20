@@ -188,7 +188,7 @@ export default function Colony() {
   const objectsUp = objects.filter((o) => o.state.status === 'running').length;
   const queens = agents.filter((a) => a.role === 'orchestrator').length;
   const name = (id: string) => agents.find((a) => a.id === id)?.name ?? t('colony.removedAgent');
-  const tasksRunning = feed.filter((d) => d.status === 'running').length;
+  const tasksRunning = feed.filter((d) => d.status === 'running' || d.status === 'queued').length;
   const stats = [
     { id: 'agents', n: agents.length, label: t('stat.agents', { count: agents.length }), href: '/agents' },
     { id: 'colonies', n: colonies.length, label: t('stat.colonies', { count: colonies.length }) },
@@ -377,7 +377,7 @@ export default function Colony() {
         {feed.length === 0 ? <p className="muted small m0">{t('colony.recentEmpty')}</p> :
           <div className="recent-grid">{feed.slice(0, 6).map((d) => (
             <div key={d.id} className="feed-item">
-              <i className={`dot ${d.status === 'running' ? 'run' : d.status === 'done' ? 'ok' : 'err'}`} />
+              <i className={`dot ${d.status === 'running' ? 'run' : d.status === 'queued' ? 'wait' : d.status === 'done' ? 'ok' : 'err'}`} title={t(`colony.task.${d.status}`)} />
               <div>
                 <div className="feed-line">{agents.some((x) => x.id === d.from_id) ? <Link href={`/agents/${d.from_id}`} aria-label={t('cx.openAgent', { name: name(d.from_id) })}>{name(d.from_id)}</Link> : <b>{name(d.from_id)}</b>} → {agents.some((x) => x.id === d.to_id) ? <Link href={`/agents/${d.to_id}`} aria-label={t('cx.openAgent', { name: name(d.to_id) })}>{name(d.to_id)}</Link> : <b>{name(d.to_id)}</b>}</div>
                 <div className="muted small ellipsis">{d.task}</div>

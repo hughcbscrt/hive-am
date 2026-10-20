@@ -84,7 +84,8 @@ export interface SessionRow {
   usage: Usage; cost: number | null; tool_calls: number; model: string | null;
   kind: 'direct' | 'delegation'; from_name: string | null; task: string | null;
 }
-export interface Dispatch { id: string; from_id: string; to_id: string; task: string; status: string; result: string | null; created_at: number; finished_at: number | null }
+export type DispatchStatus = 'queued' | 'running' | 'done' | 'failed' | 'interrupted';
+export interface Dispatch { id: string; from_id: string; to_id: string; task: string; status: DispatchStatus; result: string | null; created_at: number; finished_at: number | null; mode?: 'sync' | 'background' }
 
 // ---- read-only git explorer ----
 export type GitChangeStatus = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflict' | 'typechange';

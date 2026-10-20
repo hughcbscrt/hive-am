@@ -54,10 +54,10 @@ Secuencia de arranque:
 
 ```sql
 UPDATE agents     SET status='idle'         WHERE status='running';
-UPDATE dispatches SET status='interrupted'  WHERE status='running';
+UPDATE dispatches SET status='interrupted', finished_at=<ahora>  WHERE status IN ('queued','running');
 ```
 
-El turno que estaba en vuelo se pierde, pero la sesión nativa está intacta y el agente queda libre.
+El turno que estaba en vuelo se pierde, pero la sesión nativa está intacta y el agente queda libre. Después `armDispatchNotices()` (`dispatches.ts`, junto a `armWakeups()` en `index.ts`) le avisa a cada orquestador de sus tareas en segundo plano que terminaron sin avisarse, incluidas las interrumpidas ([9.3](09-orquestacion-y-relaciones.md#93-flujo-de-una-delegación)).
 
 ### 2. Servidor MCP: `server/mcp/dispatch.mjs`
 
@@ -102,6 +102,7 @@ Cada pantalla es una ruta de `web/app/`:
 | `HIVE_AM_TELEGRAM_TIMEOUT_MS` | `server/src/connections/telegram.ts` | `30000` | Tiempo límite de cada llamada, subida y descarga de la API de Telegram. |
 | `HIVE_AM_WAKE_RETRY_MS` | `server/src/wake.ts` | `5000` | Espera antes de reintentar la entrega de un despertador que falló (12 intentos, luego se descarta). |
 | `NEXT_DIST_DIR` | `web/next.config.mjs` | `.next` | Carpeta de salida de Next; permite correr una segunda instancia sin pisar la primera. |
+| `HIVE_AM_DISPATCH_POLL_S` | `server/mcp/dispatch.mjs` | `25` | Cuánto espera cada llamada a `dispatch_status` de un `dispatch` síncrono (1 a 60 s). Las pruebas lo acortan. |
 | `HIVE_AGENT_ID`, `HIVE_AM_API` | `server/mcp/dispatch.mjs` | — | Las fija hive-am al lanzar el servidor MCP (no se configuran a mano). |
 
 Puertos por defecto: **4400** (servidor) y **4401** (web).

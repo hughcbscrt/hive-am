@@ -71,7 +71,7 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 2px; padding: 10px 0 0; font-size: var(--fs-small); color: var(--muted); } .rail-foot .nav { font-size: var(--fs-lead); } .rail-foot .conn { padding: 4px 10px; }
 .conn { display: flex; align-items: center; gap: 8px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
-.dot.ok { background: var(--ok); } .dot.err { background: var(--err); } .dot.run { background: var(--honey); animation: pulse 1.4s ease-in-out infinite; }
+.dot.ok { background: var(--ok); } .dot.err { background: var(--err); } .dot.run { background: var(--honey); animation: pulse 1.4s ease-in-out infinite; } .dot.wait { background: transparent; box-shadow: inset 0 0 0 2px var(--honey); }
 @keyframes pulse { 50% { opacity: .35; transform: scale(.8); } }
 
 .main { overflow-y: auto; min-width: 0; }

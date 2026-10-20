@@ -93,7 +93,7 @@ You can change the folder with the `HIVE_AM_HOME` environment variable.
 
 Conversations are not there: each CLI stores them in its own store (for example `~/.claude`). See [Sessions](07-sessions.md).
 
-What hive-am keeps of its own record does not grow for ever. Every six hours it forgets the messages of a channel conversation past the newest 500 once they are 30 days old, the delegations past the newest 200, the delegated conversations of an agent past the newest 50 once they have not been used for 90 days, and the conversations of the list that the CLI no longer has once they have not been used for 90 days (the one an agent is using now is never forgotten). Only hive-am's own list is trimmed: the conversations themselves, in each CLI, are never touched.
+What hive-am keeps of its own record does not grow for ever. Every six hours it forgets the messages of a channel conversation past the newest 500 once they are 30 days old, the delegations past the newest 200 (except a background task whose result has not reached its orchestrator yet), the delegated conversations of an agent past the newest 50 once they have not been used for 90 days, and the conversations of the list that the CLI no longer has once they have not been used for 90 days (the one an agent is using now is never forgotten). Only hive-am's own list is trimmed: the conversations themselves, in each CLI, are never touched.
 
 > **Note:** the database holds your prompts, skills and the agents' notebooks in plain text. The notebook rejects notes with credentials.
 

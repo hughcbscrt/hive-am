@@ -259,6 +259,18 @@ CREATE TABLE IF NOT EXISTS object_agents (
       addColumn(db, 'agent_types', "effort TEXT NOT NULL DEFAULT ''");
     },
   },
+  {
+    version: 9, name: 'dispatch-background',
+    up(db) {
+      // A delegation can run in the background: the orchestrator is told the result where it asked (`origin`, JSON of the chat thread, NULL for
+      // the web conversation) and `notified_at` records that the message was handed over, `read_at` that it read the result itself.
+      // Every existing row was a synchronous one, whose answer went back on the request: none of them is ever announced.
+      addColumn(db, 'dispatches', "mode TEXT NOT NULL DEFAULT 'sync'");
+      addColumn(db, 'dispatches', 'origin TEXT');
+      addColumn(db, 'dispatches', 'notified_at INTEGER');
+      addColumn(db, 'dispatches', 'read_at INTEGER');
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
