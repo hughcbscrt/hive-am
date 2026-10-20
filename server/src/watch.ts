@@ -129,7 +129,7 @@ async function noticeNow(w: Watch, reason: Reason): Promise<void> {
       ? (es ? `Apareció el archivo que esperabas (${dur}). Reviso el resultado…` : `The file you were waiting for appeared (${dur}). Checking the result…`)
       : (es ? `Terminó el proceso que esperabas (PID ${w.pid}, ${dur}). Reviso el resultado…` : `The process you were waiting for (PID ${w.pid}) has finished (${dur}). Checking the result…`);
     const msg = `🔔 ${who}${body}`;
-    const { externalId } = await adapter.send(thread.target, msg);
+    const { externalId } = await adapter.send(adapter.proactive?.(thread.target) ?? thread.target, msg);
     threadMessages.record(thread.id, 'out', externalId, { name: agents.get(w.agent_id)?.name }, msg);
   } catch (e) { console.warn(`[watch] the immediate notice failed: ${e instanceof Error ? e.message : e}`); }
 }

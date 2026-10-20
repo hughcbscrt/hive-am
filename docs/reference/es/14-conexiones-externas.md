@@ -1,6 +1,6 @@
-# 14. Conexiones externas (Telegram)
+# 14. Conexiones externas (Telegram y Slack)
 
-Una **conexión** vincula un agente de hive-am con una plataforma de mensajería para conversar con él desde ahí. Hoy existe el adaptador de **Telegram**; la estructura está pensada para añadir otros (Slack es el siguiente). Archivos: `server/src/connections/`, `server/mcp/dispatch.mjs`, `web/app/connections/page.tsx`, `web/components/ConnectionDrawer.tsx`.
+Una **conexión** vincula un agente de hive-am con una plataforma de mensajería para conversar con él desde ahí. Hay dos adaptadores, **Telegram** (14.6) y **Slack** (14.12); todo lo demás (router, hilos, comandos, archivos, secretos) es compartido. Archivos: `server/src/connections/`, `server/mcp/dispatch.mjs`, `web/app/connections/page.tsx`, `web/components/ConnectionDrawer.tsx`.
 
 ## 14.1 Idea central: una sola sesión
 
@@ -21,7 +21,7 @@ Telegram ─► TelegramAdapter ─► router ─► sendTurn(agente, prompt con
 1. El adaptador recibe el mensaje y lo convierte en un `Inbound` (id del mensaje, clave de hilo, usuario, texto, destino de respuesta).
 2. **Lista de permitidos:** si el usuario no está, se le responde **una sola vez** con su propio id y no se procesa nada.
 3. Se registra el hilo (`threads`) y el mensaje (`thread_messages`); un mensaje ya registrado (entrega repetida) se descarta.
-4. Comandos (`/stop`, `/status`, `/new`) se resuelven sin pasar por el agente.
+4. Comandos (`/stop`, `/status`, `/new`, `/help`, `/id`…) se resuelven sin pasar por el agente.
 5. Límites: texto de hasta 8000 caracteres y 20 mensajes por usuario y minuto (`config.rate_limit`).
 6. Si el agente está ocupado se avisa «En cola (N por delante)».
 7. Se llama a `sendTurn` con el **origen** (conexión, hilo, plataforma, lugar, usuario). Mientras trabaja se muestra «escribiendo…».
@@ -70,7 +70,11 @@ Los tokens nunca llegan al agente: el MCP llama a `POST /api/channel/reply` en e
 | `/stop` | Cualquier permitido | Aborta el turno en curso |
 | `/status` | Cualquier permitido | Agente, estado, carpeta y cola |
 | `/mute` · `/unmute` | Cualquier permitido | Silencia o reactiva al agente **en ese hilo** (14.6.1) |
-| `/new` | Solo administradores | Pide confirmación (`/new confirmar`) y reinicia la sesión compartida |
+| `/new` (alias `/clear`, `/reset`) | Solo administradores | Pide confirmación (`/new confirmar`) y reinicia la sesión compartida |
+| `/help` | Cualquier permitido | Lista los comandos |
+| `/id` | Cualquier permitido | Responde el id de quien escribe y el del chat, para que un administrador los añada |
+
+La lista es la misma en Telegram y en Slack (en Slack son comandos de barra: 14.12).
 
 ## 14.6 Telegram
 
@@ -91,9 +95,9 @@ Implementado con `fetch` plano contra la Bot API (sin dependencias nuevas), por 
 | `connections` | tipo, nombre, agente vinculado (`ON DELETE SET NULL`), `config` (token y opciones, JSON), `allowed` (`[{ id, name, admin }]`), activa |
 | `threads` | hilos conocidos: clave externa, título, destino de respuesta (JSON), último usuario y actividad. **Sin `session_id`** |
 | `thread_messages` | lo recibido y enviado por hilo; única por `(hilo, dirección, id externo)` para desduplicar; `files` guarda los archivos recibidos con cada mensaje |
-| `connection_cursor` | marca de agua del sondeo |
+| `connection_cursor` | marca de agua del sondeo (Telegram) |
 
-`config` opciones no secretas: `lang` (`es`/`en`, idioma de los avisos del bot), `on_silent`, `rate_limit`. La URL de la API (`api_base`) solo existe para pruebas.
+Claves secretas de `config`: `token` (Telegram), `bot_token` y `app_token` (Slack). Opciones no secretas: `lang` (`es`/`en`, idioma de los avisos del bot), `on_silent`, `rate_limit`. La URL de la API (`api_base`) solo existe para pruebas.
 
 ### 14.6.1 Grupos: autorización, escucha y silencio
 
@@ -249,21 +253,43 @@ Scripts en `server/scripts/` (usan una carpeta de datos temporal y agentes reale
 | `sim-groups.ts <proveedor> [modelo]` | Grupos contra una plataforma falsa: charla de un grupo no autorizado ignorada, aviso con el id del chat, charla no dirigida (una ráfaga = un turno `Addressed: no`, sin respuesta), mención por alias, petición de silencio (`channel_mute`), silencio efectivo (sin turno nuevo), vuelta a hablar y `/mute` · `/unmute`. |
 | `test-rate.ts` | El límite de despertares con ventana deslizante (sin modelo). |
 | `test-addressing.ts` / `sim-chatter.ts <proveedor> [modelo]` | A quién va un mensaje de grupo, con frases de chats reales (sin modelo); un grupo donde dos personas hablan y el agente se mantiene fuera salvo que lo llamen, por un error o por un peligro. |
-| `test-reactions.ts` | Reacciones: lo que Telegram permite (y los errores legibles) y la sección *Reactions* de la skill Chat channels, incluida su adición única a una biblioteca existente (sin modelo, sin red). |
+| `sim-slack.ts` | El adaptador de Slack contra un Slack falso (`fake-slack.ts`, Web API + Socket Mode): errores de token legibles, mensaje directo, hilo abierto sobre un mensaje del canal, respuesta dentro del hilo, bots y ediciones ignorados, comandos de barra, archivos de ida y vuelta, `mrkdwn`, 429, reacciones por nombre, renovación del socket y, a través del router: desconocido, `/help`, `/id`, `ts` repetido, `/mute`, `/reset`. Sin modelo, sin red. |
+| `test-reactions.ts` | Reacciones: lo que Telegram permite (y los errores legibles), la tabla emoji → nombre de Slack y la sección *Reactions* de la skill Chat channels, incluida su adición única a una biblioteca existente (sin modelo, sin red). |
 | `test-watch.ts` / `sim-watch.ts <proveedor> [modelo]` | `wake_when_done`: el vigilante ve terminar un proceso, aparecer un archivo marcador o agotarse el tiempo y rechaza entradas malas (sin modelo); el agente lanza un trabajo en segundo plano, lo vigila y reporta solo, tras un aviso inmediato. |
-| `test-format.ts` | Texto hacia Telegram: selector de emoji para emojis pelones, enlaces de mención, y que una mención no active el filtro de secretos. Sin modelo. |
+| `test-format.ts` | Texto hacia Telegram y Slack: selector de emoji para emojis pelones, `mrkdwn`, enlaces de mención, y que una mención no active el filtro de secretos. Sin modelo. |
 | `test-cron.ts` / `test-schedules.ts` | Análisis de cron, próximas ejecuciones con zonas horarias y horario de verano; validación de programas, límites, deduplicación, ejecuciones perdidas omitidas y pausa. Sin modelo. |
 | `sim-schedule.ts <proveedor> [modelo]` | El agente crea un programa recurrente desde un chat, corre varias veces solo, y el agente lo lista y lo cancela. |
 | `sim-wake.ts <proveedor> [modelo]` | El agente promete avisar después: agenda un aviso con `channel_wake` y, al llegar la hora, escribe sin que nadie se lo pida. |
 | `sim-secrets.ts <proveedor> [modelo]` | Un admin pide por chat el `.env`, el token del bot y la contraseña letra por letra: nada secreto debe llegar al chat. |
 | `bench-latency.ts <proveedor> [modelo] [rondas]` | Tiempo hasta la primera respuesta por un canal (para comparar proveedores y modelos). |
 | `fake-telegram.ts [puerto]` | Bot API falsa para pruebas manuales de la interfaz (`POST /_say`, `GET /_sent`). |
+| `fake-slack.ts [puerto]` | Slack falso para pruebas manuales de la interfaz: pon `api_base` en `http://127.0.0.1:<puerto>/api`, tokens `GOODxoxb` / `GOODxapp` (`POST /_say`, `POST /_command`, `GET /_sent`). |
 
 ## 14.11 Límites conocidos
 
 - El agente envía y recibe archivos, pero no transcribe audios ni analiza video.
 - Una conexión se vincula a **un** agente (para hablar con varios, se vincula un orquestador).
-- El adaptador de Slack no está implementado; la interfaz lo muestra como «pronto».
+- Slack se probó contra el Slack falso (`sim-slack.ts`), todavía no contra un workspace real.
+- En Slack un comando de barra no trae hilo: `/mute` escrito como comando de barra silencia la conversación a nivel de canal; para silenciar un hilo, escribe `@app /mute` dentro de él.
 - Los chats privados se probaron contra la Bot API real; los **grupos, temas y el modo `open`** solo contra la simulación.
 - Si un grupo se convierte en supergrupo cambia de id y hay que autorizarlo de nuevo.
 - En modo `open` cada ráfaga de charla cuesta un turno del agente: úsalo con un modelo económico o en grupos pequeños.
+
+## 14.12 Slack
+
+`server/src/connections/slack.ts`, registrado en `connections/index.ts`. `fetch` simple para la Web API y el paquete `ws` (ya era dependencia del servidor) para el socket.
+
+- **Transporte: Socket Mode.** `apps.connections.open` con el **token de la app** (`xapp-…`, permiso `connections:write`) devuelve una URL `wss://`; el adaptador se conecta, espera el `hello` de Slack y marca la conexión como `connected`. Cada trama (`events_api`, `slash_commands`) se **confirma primero** devolviendo su `envelope_id`, así un turno largo nunca hace que Slack la reenvíe. Cuando Slack manda `disconnect` (renueva el socket cada pocas horas) se abre un socket nuevo y el viejo se cierra solo después del nuevo `hello`. Un `ping` cada 30 s detecta un socket medio abierto; un socket caído se reconecta con esperas crecientes (hasta 30 s). Sin URL pública y sin signing secret: el socket ya está autenticado, así que el servidor puede correr en una laptop.
+- **Arranque:** `auth.test` valida el **token del bot** (`xoxb-…`). Motivos legibles: «Invalid bot token», «Invalid app token», el token del bot pegado en el campo del token de la app, un permiso que falta.
+- **A quién responde:** un mensaje directo siempre; en un canal solo si lo mencionan (`<@bot>`), si el mensaje es una respuesta dentro de un hilo que ya respondió (`parent_user_id` es el bot, o el hilo tiene un mensaje saliente en `thread_messages`), un comando o un alias; con `group_mode: open` también escucha la charla. Se ignoran los mensajes de bots, los suyos propios y los subtipos que no sean `file_share` / `thread_broadcast` (ediciones, borrados, ingresos). `message` y `app_mention` del mismo mensaje se deduplican por `ts`.
+- **Hilos:** una conversación es un **hilo** de Slack. La clave es `canal:thread_ts`; un mensaje en el timeline es su propia raíz (`canal:ts`). El destino lleva `thread: rootTs`, así la respuesta del agente **abre un hilo** sobre el mensaje, y las respuestas dentro de él caen en la misma clave. Un mensaje directo es plano (clave `canal`). Los **mensajes programados y proactivos** (wake-ups, programas, el aviso de `wake_when_done`) van al **canal**, no al hilo: `ChannelAdapter.proactive(target)` devuelve `{ chat }`, el router lo usa en `deliverScheduled` y el `Origin.target` del turno lo conserva para `channel_reply`, `channel_react` y `channel_send_file`.
+- **Comandos:** los mismos que en Telegram (14.5), los resuelve el router. Slack reserva algunos nombres (`/status`, `/mute`…), así que el adaptador acepta tres formas: el comando tal cual (`/new confirm`), con prefijo (`/hive-status`) o un solo comando con el nombre como primera palabra (`/hive status`). Slack no manda el hilo con un comando de barra: la respuesta va al canal o al mensaje directo. Dentro de un hilo, menciona a la app seguida del comando (`@app /mute`).
+- **Salida:** Markdown → `mrkdwn` (`format.ts`, `mdToSlackMrkdwn`): `*negrita*`, `_cursiva_`, `~tachado~`, código y bloques, enlaces `<url|texto>`, títulos como líneas en negrita, listas con `•`, citas; se escapan `&`, `<`, `>` y se conservan los tokens propios de Slack (`<@U…>`, `<#C…>`, `<!here>`). Se parte en 3500 caracteres, al menos 1 s entre mensajes de un canal y se respeta `Retry-After` en un 429.
+- **Indicador de trabajo:** ninguno. Slack no tiene «escribiendo…» para bots; `busy()` no hace nada.
+- **Reacciones:** `reactions.add` recibe nombres, así que `SLACK_REACTION_NAMES` traduce cada emoji a su nombre en Slack (`👍 → +1`, `🎉 → tada`); incluye todos los emojis de la lista de Telegram y otros comunes (✅ ❌ 🚀 😂 ⭐). También acepta `:nombre:`. Reaccionar dos veces no es error.
+- **Archivos recibidos:** llegan en el evento (`files[]`), así que no hay álbumes. La URL de descarga (`url_private_download`) se pide con el token del bot; si Slack responde con una página de login, el error dice que falta `files:read`.
+- **Archivos enviados:** `files.getUploadURLExternal` → POST de los bytes → `files.completeUploadExternal` con `channel_id`, `thread_ts` y la leyenda como `initial_comment`.
+- **Mención:** `<@U…>`. Los nombres de personas y canales se leen con `users.info` y `conversations.info` y se guardan en caché; sin `channels:read` el lugar se muestra como `#C…`.
+- **Prueba:** `auth.test`, luego `conversations.open` con cada id permitido y un saludo por mensaje directo.
+- **Interfaz:** el selector de plataforma crea una conexión de Slack con dos campos secretos (token del bot y token de la app, ambos en `SECRET_KEYS`), ids de miembro (`U…`) y de canal (`C…`) en vez de números, y los textos en términos de Slack (canales, hilos, comandos de barra). La plataforma no se puede cambiar una vez guardada.
+- **La app de Slack** (configuración en el manual de usuario, capítulo 9): Socket Mode activado; token de nivel de app con `connections:write`; permisos del bot `app_mentions:read`, `channels:history`, `groups:history`, `im:history`, `mpim:history`, `chat:write`, `reactions:write`, `files:read`, `files:write`, `users:read` y, para los nombres de canal, `channels:read`, `groups:read`; eventos `app_mention`, `message.channels`, `message.groups`, `message.im`, `message.mpim`; un comando de barra (`/hive`); App Home con la pestaña Messages activada.

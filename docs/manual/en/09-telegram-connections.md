@@ -1,6 +1,6 @@
-# Telegram connections
+# Telegram and Slack connections
 
-A connection links a hive-am agent to a Telegram bot so you can talk to it from your phone. Right now only Telegram exists; Slack appears as "soon". It works without a public URL: hive-am asks Telegram for new messages.
+A connection links a hive-am agent to a Telegram bot or a Slack app so you can talk to it from your phone or your workspace. Neither needs a public URL: hive-am asks Telegram for new messages, and opens its own connection to Slack. This chapter covers Telegram first; Slack has [its own section](#slack).
 
 ## How it works
 
@@ -116,5 +116,32 @@ A **Read-only** agent cannot reply through a channel. If you try, the panel warn
 - Messages from an external chat carry a header with their origin. In hive-am's web chat they appear as a channel bubble.
 
 > **Tip:** if you share the agent with people you do not fully trust, use minimal permissions.
+
+## Slack
+
+A Slack connection works like a Telegram one (same single conversation, same allow list, same commands, files and reactions) with Slack's own habits. It also needs **no public URL**: hive-am opens a connection to Slack (Socket Mode) from your machine, so it works with hive-am running on your laptop. The agent answers only while that machine is on and hive-am is running.
+
+### Create the Slack app
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps), **Create New App**, **From scratch**, give it a name and pick your workspace.
+2. **Socket Mode**: turn it on. Slack asks you to create an **app-level token**: give it the `connections:write` scope and copy it (`xapp-…`).
+3. **OAuth & Permissions**, **Bot Token Scopes**: add `app_mentions:read`, `channels:history`, `groups:history`, `im:history`, `mpim:history`, `chat:write`, `reactions:write`, `files:read`, `files:write`, `users:read`, `channels:read` and `groups:read`.
+4. **Event Subscriptions**: turn them on and, under **Subscribe to bot events**, add `app_mention`, `message.channels`, `message.groups`, `message.im` and `message.mpim`. With Socket Mode no Request URL is needed.
+5. **Slash Commands**: create one command, `/hive` (no URL needed with Socket Mode). You use it as `/hive status`, `/hive id`, `/hive new confirm`… Slack reserves names such as `/status` and `/mute`, which is why a single command is the simplest.
+6. **App Home**: under **Show Tabs**, turn on the **Messages tab** and tick "Allow users to send Slash commands and messages from the messages tab", so people can write to the app by DM.
+7. **Install App** to the workspace and copy the **Bot User OAuth Token** (`xoxb-…`).
+8. In each channel where you want it, invite the app: `/invite @your-app`.
+
+### Create the connection
+
+In **Connections**, **New connection**, choose **Slack** and paste both tokens: **Bot token** (`xoxb-…`) and **App token** (`xapp-…`). Fill in the agent and the allowed people with their **Slack member id** (`U…`: open the person's profile, ⋮ menu, **Copy member ID**). For whole channels, add their **channel id** (`C…`, at the bottom of the channel details). The platform of a saved connection cannot change.
+
+### How it behaves in Slack
+
+- **Threads.** Each conversation is a Slack thread. When someone writes to the agent in a channel, it answers **in a thread opened on that message**, and whoever keeps talking in that thread is talking to the agent (no need to mention it again). In a DM there are no threads.
+- **Scheduled messages and reminders go to the channel**, not into the thread where they were asked.
+- **No "typing…".** Slack has no such indicator for apps: nothing shows while the agent works, and the answer arrives when it is ready.
+- **Commands** are the same as on Telegram (`new`, `stop`, `status`, `mute`, `unmute`, `help`, `id`), through `/hive <command>`. Slack sends no thread with a slash command, so the answer goes to the channel; to mute a single thread, write `@your-app /mute` inside it.
+- **Reactions** use Slack's emoji; the agent can react with ✅, 🚀, 👀 and many more.
 
 Next: [Resources](10-resources.md)

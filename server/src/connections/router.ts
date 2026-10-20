@@ -37,9 +37,13 @@ const T = {
   newDone: { es: '🆕 Conversación nueva.', en: '🆕 New conversation.' },
   muted: { es: '🔇 Me quedo callado en este hilo. Menciónenme o respondan a un mensaje mío para que vuelva a hablar.', en: '🔇 I\'ll stay quiet in this thread. Mention me or reply to one of my messages to bring me back.' },
   unmuted: { es: '🔊 Listo, vuelvo a participar en este hilo.', en: '🔊 Done, I\'m back in this thread.' },
+  help: { es: 'Comandos: /new (o /clear, /reset) empieza una conversación nueva (solo administradores) · /stop detiene el turno en curso · /status estado del agente · /mute y /unmute me callan o me reactivan en este hilo · /id tu id y el de este chat · /help esta ayuda.', en: 'Commands: /new (or /clear, /reset) starts a new conversation (admins only) · /stop stops the turn in progress · /status the agent\'s state · /mute and /unmute silence me or bring me back in this thread · /id your id and this chat\'s · /help this help.' },
+  ids: (user: string, chat: string) => ({ es: `Tu id: ${user} · este chat: ${chat}`, en: `Your id: ${user} · this chat: ${chat}` }),
   notAllowedChat: (user: string, chat: string) => ({ es: `No tienes acceso. Para usarme aquí, añade tu id (${user}) o este chat (${chat}) en la conexión.`, en: `You don't have access. To use me here, add your id (${user}) or this chat (${chat}) to the connection.` }),
 };
 type Msg = { es: string; en: string };
+/** The same commands on every platform; these are other names for them. */
+const COMMAND_ALIASES: Record<string, string> = { clear: 'new', reset: 'new' };
 const say = (c: Connection, m: Msg) => (c.config.lang === 'en' ? m.en : m.es);
 
 const hits = new Map<string, number[]>();
@@ -109,7 +113,10 @@ export async function handleInbound(connectionId: string, adapter: ChannelAdapte
   }
 
   if (m.command) {
-    const { name, args } = m.command;
+    const { args } = m.command;
+    const name = COMMAND_ALIASES[m.command.name] ?? m.command.name;
+    if (name === 'help') { await reply(say(conn, T.help)); return; }
+    if (name === 'id') { await reply(say(conn, T.ids(m.userId, m.target.chat))); return; }
     if (name === 'stop') { await reply(say(conn, stopAgent(agent.id) ? T.stopped : T.nothingToStop)); return; }
     if (name === 'status') { await reply(say(conn, T.status(agent.name, liveTurn(agent.id) ? 'running' : agent.status, agent.effective.cwd, queueDepth(agent.id)))); return; }
     if (name === 'mute' || name === 'unmute') {
@@ -171,7 +178,7 @@ async function deliver(conn: Connection, adapter: ChannelAdapter, thread: Thread
   const unseen = threadMessages.unseen(thread.id, fresh.seen_id, msgId).map((r) => ({ name: r.user_name ?? r.user_id ?? '?', text: r.text as string, files: r.files ? parseJson<SavedFile[] | undefined>(r.files, undefined, `thread message ${r.id} files`) : undefined }));
   threads.markSeen(thread.id, msgId);
 
-  const origin: Origin = { connectionId: conn.id, threadId: thread.id, externalKey: m.externalKey, platform: conn.kind, place: m.place, userName: m.userName, userId: m.userId, group: !!m.group, mention: m.mention, addressed, replied: false, messageId: m.externalId, effort: validEffort(conn.config.effort) ? conn.config.effort : undefined };
+  const origin: Origin = { connectionId: conn.id, threadId: thread.id, externalKey: m.externalKey, platform: conn.kind, place: m.place, userName: m.userName, userId: m.userId, group: !!m.group, mention: m.mention, addressed, replied: false, messageId: m.externalId, target: m.target, effort: validEffort(conn.config.effort) ? conn.config.effort : undefined };
   if (addressed) await adapter.busy(m.target, 'working', m.externalId).catch(() => undefined);
   const startedAt = Date.now();
   let res = await sendTurn(agent.id, channelPrompt(conn.kind, m, { addressed, muted: fresh.muted, unseen }), 'user', undefined, undefined, origin);
@@ -201,10 +208,10 @@ async function deliver(conn: Connection, adapter: ChannelAdapter, thread: Thread
   }
 }
 
-/** A message the agent asked to receive later (a wake-up, a schedule): it reaches the agent like a message of that thread, so it can answer there. */
+/** A message the agent asked to receive later (a wake-up, a schedule): it reaches the agent like a message of that thread, so it can answer there (on Slack, in the channel: see `ChannelAdapter.proactive`). */
 export async function deliverScheduled(conn: Connection, adapter: ChannelAdapter, thread: Thread, text: string, mention?: { id: string; name: string }): Promise<void> {
   const m: Inbound = {
-    externalId: `sched-${Date.now()}`, externalKey: thread.external_key, userId: '', userName: 'hive-am (scheduled)', place: thread.title || 'chat', target: thread.target, addressed: true, text, mention,
+    externalId: `sched-${Date.now()}`, externalKey: thread.external_key, userId: '', userName: 'hive-am (scheduled)', place: thread.title || 'chat', target: adapter.proactive?.(thread.target) ?? thread.target, addressed: true, text, mention,
   };
   await deliver(conn, adapter, thread, m, threadMessages.lastId(thread.id), true, true);
 }

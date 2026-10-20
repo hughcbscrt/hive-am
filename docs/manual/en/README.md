@@ -22,7 +22,7 @@ For anyone who works with coding agents and wants more than a terminal: split ta
 6. [Types and skills](06-types-and-skills.md): agent templates and reusable knowledge.
 7. [Sessions](07-sessions.md): the real history of each agent and how to resume it.
 8. [Schedules](08-schedules.md): messages and reminders sent at a set time.
-9. [Connections (Telegram)](09-telegram-connections.md): talk to an agent from a Telegram bot.
+9. [Connections (Telegram and Slack)](09-telegram-connections.md): talk to an agent from a Telegram bot or a Slack app.
 10. [Resources](10-resources.md): servers, containers, HTTP requests, databases and clusters.
 11. [Changes explorer (git)](11-changes-explorer-git.md): see diffs and history, switch branches and make commits.
 12. [Terminals](12-terminals.md): the bottom panel with real shells and logs.

@@ -55,6 +55,8 @@ export const threads = {
       .run(id, connectionId, externalKey, info.title, JSON.stringify(info.target), info.user, t, t);
     return threads.get(id)!;
   },
+  /** The agent already wrote in this thread (Slack: people who keep talking in a thread it answered are talking to it). */
+  answered: (connectionId: string, externalKey: string) => !!db.prepare("SELECT 1 FROM threads t JOIN thread_messages m ON m.thread_id=t.id WHERE t.connection_id=? AND t.external_key=? AND m.direction='out' LIMIT 1").get(connectionId, externalKey),
   setMuted: (id: string, muted: boolean) => { db.prepare('UPDATE threads SET muted=? WHERE id=?').run(muted ? 1 : 0, id); },
   markSeen: (id: string, upTo: number) => { db.prepare('UPDATE threads SET seen_id=MAX(seen_id, ?) WHERE id=?').run(upTo, id); },
 };
