@@ -37,3 +37,30 @@ export function mdToTelegramHtml(md: string): string {
   s = s.replace(/^#{1,6}\s+(.+)$/gm, '<b>$1</b>');
   return s.replace(/\u0000(\d+)\u0000/g, (_m, i) => stash[Number(i)]);
 }
+
+/** Slack's three control characters; everything else goes as it is. */
+export const escapeSlack = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/**
+ * Markdown → Slack's `mrkdwn`: `*bold*`, `_italic_`, `~strike~`, code as it is, `<url|label>` links, headings as bold lines.
+ * Slack's own tokens the agent may write (`<@U123>`, `<#C123>`, `<!here>`, `<https://…|…>`) are kept; any other `&`, `<`, `>` is escaped.
+ */
+export function mdToSlackMrkdwn(md: string): string {
+  md = emojiPresentation(md);
+  const stash: string[] = [];
+  const keep = (s: string) => `\u0000${stash.push(s) - 1}\u0000`;
+  let s = md.replace(/```[^\n]*\n?([\s\S]*?)```/g, (_m, code) => keep(`\`\`\`\n${escapeSlack(code.replace(/\n$/, ''))}\n\`\`\``));
+  s = s.replace(/`([^`\n]+)`/g, (_m, code) => keep(`\`${escapeSlack(code)}\``));
+  s = s.replace(/<(?:[@#][A-Z0-9]+(?:\|[^>\n]*)?|![a-z]+(?:\^[A-Z0-9]+)?(?:\|[^>\n]*)?|(?:https?|mailto):[^\s|>]+(?:\|[^>\n]+)?)>/g, (t) => keep(t));
+  s = s.replace(/\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)/g, (_m, label, url) => keep(`<${url}|${escapeSlack(label).replace(/\|/g, '¦')}>`));
+  s = escapeSlack(s);
+  s = s.replace(/^#{1,6}\s+(.+)$/gm, (_m, h) => keep(`*${h.replace(/\*\*/g, '').trim()}*`));
+  s = s.replace(/(^|[\s(])\*([^*\n]+)\*(?=$|[\s).,!?:;])/gm, '$1_$2_');
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, (_m, b) => keep(`*${b}*`)).replace(/__([^_\n]+)__/g, (_m, b) => keep(`*${b}*`));
+  s = s.replace(/~~([^~\n]+)~~/g, '~$1~');
+  s = s.replace(/^(\s*)[-*]\s+/gm, '$1• ');
+  s = s.replace(/^&gt;\s?/gm, '> ');
+  // Stashed pieces can hold other stashed pieces (a link inside a heading): resolve until none is left.
+  for (let i = 0; i < 3 && s.includes('\u0000'); i++) s = s.replace(/\u0000(\d+)\u0000/g, (_m, n) => stash[Number(n)]);
+  return s;
+}

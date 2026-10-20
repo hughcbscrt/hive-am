@@ -13,7 +13,7 @@ const SHAPES: [RegExp, string][] = [
   [/\b\d{8,10}:[A-Za-z0-9_-]{30,}\b/, 'a Telegram bot token'],
   [/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/, 'an AWS access key'],
   [/\bgh[pousr]_[A-Za-z0-9]{30,}\b|\bgithub_pat_[A-Za-z0-9_]{30,}\b/, 'a GitHub token'],
-  [/\bxox[abprs]-[A-Za-z0-9-]{10,}\b/, 'a Slack token'],
+  [/\bxox[abprs]-[A-Za-z0-9-]{10,}\b|\bxapp-\d+-[A-Za-z0-9-]{10,}\b/, 'a Slack token'],
   [/\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}\b/, 'a Stripe key'],
   [/\bsk-[A-Za-z0-9_-]{32,}\b/, 'an API key'],
   [/\bAIza[0-9A-Za-z_-]{35}\b/, 'a Google API key'],

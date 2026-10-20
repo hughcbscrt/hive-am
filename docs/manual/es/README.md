@@ -22,7 +22,7 @@ Para quien trabaja con agentes de código y quiere más que una terminal: repart
 6. [Tipos y skills](06-tipos-y-skills.md): plantillas de agente y conocimientos reutilizables.
 7. [Sesiones](07-sesiones.md): el historial real de cada agente y cómo reanudarlo.
 8. [Programados](08-programados.md): mensajes y avisos que se envían a una hora definida.
-9. [Conexiones (Telegram)](09-conexiones-telegram.md): hablar con un agente desde un bot de Telegram.
+9. [Conexiones (Telegram y Slack)](09-conexiones-telegram.md): hablar con un agente desde un bot de Telegram o una app de Slack.
 10. [Recursos](10-recursos.md): servidores, contenedores, peticiones HTTP, bases de datos y clústeres.
 11. [Explorador de cambios (git)](11-explorador-de-cambios-git.md): ver diferencias, historial, ramas y hacer commits.
 12. [Terminales](12-terminales.md): el panel inferior con shells reales y logs.

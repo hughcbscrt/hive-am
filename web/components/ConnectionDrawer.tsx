@@ -7,11 +7,13 @@ import { ago } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n';
 import type { AllowedChat, AllowedUser, Connection, ConnectionThread, Provider } from '@/lib/types';
 import { PasswordInput } from './PasswordInput';
+import { SlackSetup } from './SlackSetup';
 import { Banner, CheckRow, ConfirmDialog, Drawer, Field, ModelField, Segmented, useToast } from './ui';
 import { useUnsavedGuard } from '@/lib/hooks/useUnsavedGuard';
 
 type Silent = 'notice' | 'send_text' | 'ignore';
 type GroupMode = 'mention' | 'open';
+type Kind = 'telegram' | 'slack';
 
 /** Create or edit a connection: which agent answers, who may talk to it, and the platform credentials. */
 export function ConnectionDrawer({ connection, onClose }: { connection?: Connection; onClose: () => void }) {
@@ -20,9 +22,12 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
   const toast = useToast();
   const editing = !!connection;
 
+  const [kind, setKind] = useState<Kind>(connection?.kind === 'slack' ? 'slack' : 'telegram');
+  const slack = kind === 'slack';
   const [name, setName] = useState(connection?.name ?? '');
   const [agentId, setAgentId] = useState(connection?.agent_id ?? '');
   const [token, setToken] = useState('');
+  const [appToken, setAppToken] = useState('');
   const [allowed, setAllowed] = useState<AllowedUser[]>(connection?.allowed ?? []);
   const [lang, setLang] = useState<'es' | 'en'>(connection?.config.lang === 'en' ? 'en' : 'es');
   const [silent, setSilent] = useState<Silent>(connection?.config.on_silent ?? 'notice');
@@ -35,19 +40,24 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
   const [enabled, setEnabled] = useState(connection?.enabled ?? true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [errs, setErrs] = useState<{ name?: string; agent?: string; token?: string }>({});
+  const [errs, setErrs] = useState<{ name?: string; agent?: string; token?: string; appToken?: string }>({});
   const [threads, setThreads] = useState<ConnectionThread[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [askClose, setAskClose] = useState(false);
   // Everything the form holds (the token is never shown back, so a typed one counts as an edit too), to tell when closing would lose something.
-  const snap = JSON.stringify([name, agentId, token, allowed, lang, silent, effort, groupMode, chats, aliases, files, vision, enabled]);
+  const snap = JSON.stringify([kind, name, agentId, token, appToken, allowed, lang, silent, effort, groupMode, chats, aliases, files, vision, enabled]);
   const first = useRef(snap); const dirty = snap !== first.current;
   useUnsavedGuard(dirty);
   const close = () => { if (dirty) setAskClose(true); else onClose(); };
 
   const agent = agents.find((a) => a.id === agentId);
   const perm = agent?.effective.permission;
-  const tokenHint = connection?.config.token?.set ? connection.config.token.hint : '';
+  const secretHint = (key: string) => (connection?.config[key]?.set ? connection.config[key].hint as string : '');
+  const tokenHint = secretHint(slack ? 'bot_token' : 'token');
+  const appTokenHint = secretHint('app_token');
+  // Telegram ids are numbers (groups start with -100); Slack's are letters and digits (U…, C…, D…).
+  const cleanUser = (v: string) => (slack ? v.toUpperCase().replace(/[^A-Z0-9]/g, '') : v.replace(/\D/g, ''));
+  const cleanChat = (v: string) => (slack ? v.toUpperCase().replace(/[^A-Z0-9]/g, '') : v.replace(/[^\d-]/g, ''));
 
   useEffect(() => { if (connection) api.get<ConnectionThread[]>(`/connections/${connection.id}/threads`).then(setThreads).catch(() => undefined); }, [connection]);
 
@@ -75,11 +85,15 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
     if (!name.trim()) e.name = t('conn.err.name');
     if (!agentId) e.agent = t('conn.err.agent');
     if (!editing && !token.trim()) e.token = t('conn.err.token');
+    if (!editing && slack && !appToken.trim()) e.appToken = t('conn.err.appToken');
     setErrs(e); setError('');
     if (Object.keys(e).length) return;
     setSaving(true);
-    const body = { kind: 'telegram', name: name.trim(), agent_id: agentId, enabled, allowed: allowed.filter((u) => u.id.trim()), config: {
-      ...(token.trim() ? { token: token.trim() } : {}), lang, on_silent: silent, effort, group_mode: groupMode, files, vision,
+    const secrets = slack
+      ? { ...(token.trim() ? { bot_token: token.trim() } : {}), ...(appToken.trim() ? { app_token: appToken.trim() } : {}) }
+      : { ...(token.trim() ? { token: token.trim() } : {}) };
+    const body = { kind, name: name.trim(), agent_id: agentId, enabled, allowed: allowed.filter((u) => u.id.trim()), config: {
+      ...secrets, lang, on_silent: silent, effort, group_mode: groupMode, files, vision,
       chats: chats.filter((c) => c.id.trim()), aliases: aliases.split(',').map((x) => x.trim()).filter(Boolean),
     } };
     try {
@@ -110,8 +124,11 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
         {error && <Banner kind="err">{error}</Banner>}
 
         <Field label={t('conn.kind')}>
-          <Segmented value="telegram" onChange={() => undefined} options={[{ id: 'telegram', label: t('conn.kind.telegram') }, { id: 'slack' as 'telegram', label: t('conn.kind.soon'), disabled: true }]} />
+          <Segmented<Kind> value={kind} onChange={setKind}
+            options={[{ id: 'telegram', label: t('conn.kind.telegram'), disabled: editing && slack }, { id: 'slack', label: t('conn.kind.slack'), disabled: editing && !slack }]} />
+          {editing && <p className="hint m0">{t('conn.kind.fixed')}</p>}
         </Field>
+        {slack && <SlackSetup name={name} open={!editing} />}
 
         <Field label={t('conn.name')} hint={t('conn.name.hint')} error={errs.name}>
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('conn.name.placeholder')} autoFocus={!editing} />
@@ -129,43 +146,48 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
         {agent && perm === 'bypassPermissions' && <Banner kind="honey">{t('conn.perm.full', { name: agent.name })}</Banner>}
         {agent && agent.provider === 'opencode' && <p className="hint m0">{t('conn.perm.opencode')}</p>}
 
-        <Field label={t('conn.token')} hint={t('conn.token.hint')} error={errs.token}>
-          <PasswordInput autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} placeholder={tokenHint ? t('conn.token.keep', { hint: tokenHint }) : '123456:ABC…'} />
+        <Field label={t('conn.token')} hint={t(slack ? 'conn.token.hint.slack' : 'conn.token.hint')} error={errs.token}>
+          <PasswordInput autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} placeholder={tokenHint ? t('conn.token.keep', { hint: tokenHint }) : slack ? 'xoxb-…' : '123456:ABC…'} />
         </Field>
+        {slack && (
+          <Field label={t('conn.appToken')} hint={t('conn.appToken.hint')} error={errs.appToken}>
+            <PasswordInput autoComplete="off" value={appToken} onChange={(e) => setAppToken(e.target.value)} placeholder={appTokenHint ? t('conn.token.keep', { hint: appTokenHint }) : 'xapp-…'} />
+          </Field>
+        )}
 
-        <Field label={t('conn.allowed')} hint={t('conn.allowed.hint')}>
+        <Field label={t('conn.allowed')} hint={t(slack ? 'conn.allowed.hint.slack' : 'conn.allowed.hint')}>
           <div className="stack-s">
             {allowed.length === 0 && <p className="hint m0">{t('conn.allowed.empty')}</p>}
             {allowed.map((u, i) => (
               <div key={i} className="row gap-s">
-                <input className="input mono fa-w150" value={u.id} onChange={(e) => setUser(i, { id: e.target.value.replace(/\D/g, '') })} placeholder={t('conn.allowed.id')} aria-label={t('conn.allowed.id')} />
+                <input className="input mono fa-w150" value={u.id} onChange={(e) => setUser(i, { id: cleanUser(e.target.value) })} placeholder={t(slack ? 'conn.allowed.id.slack' : 'conn.allowed.id')} aria-label={t(slack ? 'conn.allowed.id.slack' : 'conn.allowed.id')} />
                 <input className="input grow" value={u.name ?? ''} onChange={(e) => setUser(i, { name: e.target.value })} placeholder={t('conn.allowed.name')} aria-label={t('conn.allowed.name')} />
                 <span title={t('conn.allowed.adminHint')} className="nowrap"><CheckRow checked={!!u.admin} onChange={(v) => setUser(i, { admin: v })} label={t('conn.allowed.admin')} /></span>
                 <button className="btn ghost icon sm" onClick={() => setAllowed((l) => l.filter((_, j) => j !== i))} aria-label={t('conn.allowed.remove')} title={t('conn.allowed.remove')}><X size={15} /></button>
               </div>
             ))}
             <div><button className="btn sm" onClick={() => setAllowed((l) => [...l, { id: '' }])}><Plus size={14} />{t('conn.allowed.add')}</button></div>
-            <p className="hint m0">{t('conn.allowed.howto')}</p>
+            <p className="hint m0">{t(slack ? 'conn.allowed.howto.slack' : 'conn.allowed.howto')}</p>
           </div>
         </Field>
 
-        <Field label={t('conn.groups')}>
+        <Field label={t(slack ? 'conn.groups.slack' : 'conn.groups')}>
           <div className="stack-s fa-gap10">
-            <p className="hint m0">{t('conn.groups.hint')}</p>
+            <p className="hint m0">{t(slack ? 'conn.groups.hint.slack' : 'conn.groups.hint')}</p>
             <Segmented value={groupMode} onChange={setGroupMode} options={[{ id: 'mention', label: t('conn.mode.mention') }, { id: 'open', label: t('conn.mode.open') }]} />
-            <p className="hint m0">{t(`conn.mode.${groupMode}.hint`)}</p>
-            <div className="eyebrow">{t('conn.chats')}</div>
-            {chats.length === 0 && <p className="hint m0">{t('conn.chats.empty')}</p>}
+            <p className="hint m0">{t(slack ? `conn.mode.${groupMode}.hint.slack` : `conn.mode.${groupMode}.hint`)}</p>
+            <div className="eyebrow">{t(slack ? 'conn.chats.slack' : 'conn.chats')}</div>
+            {chats.length === 0 && <p className="hint m0">{t(slack ? 'conn.chats.empty.slack' : 'conn.chats.empty')}</p>}
             {chats.map((c, i) => (
               <div key={i} className="row gap-s">
-                <input className="input mono fa-w190" value={c.id} onChange={(e) => setChat(i, { id: e.target.value.replace(/[^\d-]/g, '') })} placeholder={t('conn.chats.id')} aria-label={t('conn.chats.id')} />
+                <input className="input mono fa-w190" value={c.id} onChange={(e) => setChat(i, { id: cleanChat(e.target.value) })} placeholder={t(slack ? 'conn.chats.id.slack' : 'conn.chats.id')} aria-label={t(slack ? 'conn.chats.id.slack' : 'conn.chats.id')} />
                 <input className="input grow" value={c.name ?? ''} onChange={(e) => setChat(i, { name: e.target.value })} placeholder={t('conn.chats.name')} aria-label={t('conn.chats.name')} />
                 <button className="btn ghost icon sm" onClick={() => setChats((l) => l.filter((_, j) => j !== i))} aria-label={t('conn.chats.remove')} title={t('conn.chats.remove')}><X size={15} /></button>
               </div>
             ))}
-            <div><button className="btn sm" onClick={() => setChats((l) => [...l, { id: '' }])}><Plus size={14} />{t('conn.chats.add')}</button></div>
-            <p className="hint m0">{t('conn.chats.hint')} {t('conn.chats.howto')}</p>
-            <Field label={t('conn.aliases')} hint={t('conn.aliases.hint')}>
+            <div><button className="btn sm" onClick={() => setChats((l) => [...l, { id: '' }])}><Plus size={14} />{t(slack ? 'conn.chats.add.slack' : 'conn.chats.add')}</button></div>
+            <p className="hint m0">{t(slack ? 'conn.chats.hint.slack' : 'conn.chats.hint')} {t(slack ? 'conn.chats.howto.slack' : 'conn.chats.howto')}</p>
+            <Field label={t('conn.aliases')} hint={t(slack ? 'conn.aliases.hint.slack' : 'conn.aliases.hint')}>
               <input className="input" value={aliases} onChange={(e) => setAliases(e.target.value)} placeholder={t('conn.aliases.placeholder')} />
             </Field>
           </div>

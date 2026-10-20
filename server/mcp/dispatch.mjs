@@ -106,7 +106,7 @@ const allTools = [
   {
     cap: 'channel',
     name: 'channel_react',
-    description: 'React with ONE emoji to the message you are handling (a thumbs-up to say "got it", a heart to say thanks). It is lighter than a reply and counts as your answer when nothing else needs saying. Each platform allows only some emoji (on Telegram a fixed list: 👍 👎 ❤ 🔥 👏 🎉 🙏 👌 👀 💯 🤔 😁 😢 ✍ 🫡 …); an emoji that is not allowed is refused and the error lists the ones you can use. Follow the "Chat channels" skill for when to react.',
+    description: 'React with ONE emoji to the message you are handling (a thumbs-up to say "got it", a heart to say thanks). It is lighter than a reply and counts as your answer when nothing else needs saying. Each platform allows only some emoji (on Telegram a fixed list: 👍 👎 ❤ 🔥 👏 🎉 🙏 👌 👀 💯 🤔 😁 😢 ✍ 🫡 …; on Slack a wider set, by emoji or as :name:); an emoji that is not allowed is refused and the error lists the ones you can use. Follow the "Chat channels" skill for when to react.',
     inputSchema: {
       type: 'object',
       properties: { emoji: { type: 'string', description: 'A single emoji, e.g. 👍.' } },

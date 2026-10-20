@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Slack connections.** A connection can now link an agent to a Slack app, with everything Telegram does: DMs and channels, the allow list (Slack member and channel ids), files in and out, reactions (by Slack name) and the shared single conversation. It runs over **Socket Mode**, so no public URL is needed and hive-am can stay on a laptop; the socket is refreshed and reconnected on its own, and a wrong token says which one. The agent answers **in a thread opened on the message** and keeps answering there; scheduled messages, reminders and the `wake_when_done` notice go to the channel. Replies are sent as `mrkdwn`. The connection form has a working platform selector, the two tokens and Slack's own words; the manual explains how to create the app. Tested against a fake Slack (`sim-slack.ts`).
+- **`/help` and `/id` commands, and `/clear` and `/reset` as other names for `/new`**, on Telegram and Slack alike. `/id` answers the sender's id and the chat's, so an admin can add them. On Slack they come as slash commands (`/hive status`, `/hive-status` or `/status`).
+
 ## [1.5.0] - 2026-10-19
 
 ### Added

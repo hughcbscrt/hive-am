@@ -1,6 +1,6 @@
-# Conexiones con Telegram
+# Conexiones con Telegram y Slack
 
-Una conexión vincula un agente de hive-am con un bot de Telegram para que converses con él desde tu teléfono. Hoy solo existe Telegram; Slack aparece como "pronto". Funciona sin URL pública: hive-am pregunta a Telegram por los mensajes nuevos.
+Una conexión vincula un agente de hive-am con un bot de Telegram o una app de Slack para que converses con él desde tu teléfono o tu workspace. Ninguna necesita URL pública: hive-am pregunta a Telegram por los mensajes nuevos y abre su propia conexión hacia Slack. Este capítulo cubre primero Telegram; Slack tiene [su propia sección](#slack).
 
 ## Cómo funciona
 
@@ -116,5 +116,32 @@ Un agente de **Solo lectura** no puede responder por un canal. Si lo intentas, e
 - Los mensajes de un chat externo llevan una cabecera con su origen. En el chat web de hive-am se ven como una burbuja de canal.
 
 > **Consejo:** si compartes el agente con personas en las que no confías del todo, usa permisos mínimos.
+
+## Slack
+
+Una conexión de Slack funciona como una de Telegram (la misma conversación única, la misma lista de permitidos, los mismos comandos, archivos y reacciones) con las costumbres propias de Slack. Tampoco necesita **URL pública**: hive-am abre una conexión hacia Slack (Socket Mode) desde tu máquina, así que funciona con hive-am corriendo en tu laptop. El agente solo responde mientras esa máquina está encendida y hive-am está corriendo.
+
+### Crear la app de Slack
+
+1. Entra a [api.slack.com/apps](https://api.slack.com/apps), **Create New App**, **From scratch**, ponle un nombre y elige tu workspace.
+2. **Socket Mode**: actívalo. Slack te pide crear un **token de nivel de app**: dale el permiso `connections:write` y cópialo (`xapp-…`).
+3. **OAuth & Permissions**, **Bot Token Scopes**: añade `app_mentions:read`, `channels:history`, `groups:history`, `im:history`, `mpim:history`, `chat:write`, `reactions:write`, `files:read`, `files:write`, `users:read`, `channels:read` y `groups:read`.
+4. **Event Subscriptions**: actívalas y, en **Subscribe to bot events**, añade `app_mention`, `message.channels`, `message.groups`, `message.im` y `message.mpim`. Con Socket Mode no hace falta Request URL.
+5. **Slash Commands**: crea un comando, `/hive` (sin URL con Socket Mode). Se usa como `/hive status`, `/hive id`, `/hive new confirmar`… Slack reserva nombres como `/status` y `/mute`, por eso lo más sencillo es un solo comando.
+6. **App Home**: en **Show Tabs**, activa la **pestaña Messages** y marca "Allow users to send Slash commands and messages from the messages tab", para que la gente pueda escribirle a la app por mensaje directo.
+7. **Install App** en el workspace y copia el **Bot User OAuth Token** (`xoxb-…`).
+8. En cada canal donde la quieras, invita a la app: `/invite @tu-app`.
+
+### Crear la conexión
+
+En **Conexiones**, **Nueva conexión**, elige **Slack** y pega los dos tokens: **Token del bot** (`xoxb-…`) y **Token de la app** (`xapp-…`). Completa el agente y las personas permitidas con su **id de miembro de Slack** (`U…`: abre el perfil de la persona, menú ⋮, **Copiar ID de miembro**). Para canales enteros, añade su **id de canal** (`C…`, al final de los detalles del canal). La plataforma de una conexión guardada no se puede cambiar.
+
+### Cómo se comporta en Slack
+
+- **Hilos.** Cada conversación es un hilo de Slack. Cuando alguien le escribe al agente en un canal, responde **en un hilo abierto sobre ese mensaje**, y quien siga hablando en ese hilo le está hablando al agente (no hace falta mencionarlo de nuevo). En un mensaje directo no hay hilos.
+- **Los mensajes programados y los recordatorios van al canal**, no al hilo donde se pidieron.
+- **Sin «escribiendo…».** Slack no tiene ese indicador para apps: no se muestra nada mientras el agente trabaja, y la respuesta llega cuando está lista.
+- **Los comandos** son los mismos que en Telegram (`new`, `stop`, `status`, `mute`, `unmute`, `help`, `id`), con `/hive <comando>`. Slack no manda el hilo con un comando de barra, así que la respuesta va al canal; para silenciar un solo hilo, escribe `@tu-app /mute` dentro de él.
+- **Las reacciones** usan los emojis de Slack; el agente puede reaccionar con ✅, 🚀, 👀 y muchos más.
 
 Siguiente: [Recursos](10-recursos.md)

@@ -1,4 +1,4 @@
-// Reactions of an agent in a chat: only the emoji Telegram allows, the error that says which ones, and the skill that explains them. No model, no network. Usage: HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-reactions.ts
+// Reactions of an agent in a chat: only the emoji Telegram allows (and Slack's emoji → name table), the error that says which ones, and the skill that explains them. No model, no network. Usage: HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-reactions.ts
 import './_guard.js';
 import { TELEGRAM_REACTIONS, TelegramAdapter } from '../src/connections/telegram.js';
 import { REACTIONS_SECTION, DEFAULT_SKILLS } from '../src/skills/defaults.js';
@@ -23,6 +23,13 @@ eq('the rude ones are left out', ['🖕', '🤬', '💩', '🤮', '😡'].some((
 reply = { ok: false, error_code: 400, description: 'Bad Request: REACTION_INVALID' };
 eq('a group that limits reactions gives a readable error', (await tryReact('🔥')).includes('does not accept'), true);
 eq('without a message there is nothing to react to', await (async () => { try { await adapter.react(to, '', '👍'); return 'ok'; } catch (e) { return (e as Error).message; } })(), 'There is no message to react to.');
+
+// Slack reacts by name: every emoji of its list has one, and none of the rude ones is there.
+const { SLACK_REACTION_NAMES, SLACK_REACTIONS } = await import('../src/connections/slack.js');
+eq('slack: every allowed emoji has a Slack name', SLACK_REACTIONS.filter((e) => !/^[a-z0-9_+-]+$/.test(SLACK_REACTION_NAMES[e] ?? '')), []);
+eq('slack: thumbs up, heart and tada by their names', [SLACK_REACTION_NAMES['👍'], SLACK_REACTION_NAMES['❤'], SLACK_REACTION_NAMES['🎉']], ['+1', 'heart', 'tada']);
+eq('slack: everything Telegram allows works on Slack too', TELEGRAM_REACTIONS.filter((e) => !SLACK_REACTIONS.includes(e)), []);
+eq('slack: the rude ones are left out', ['🖕', '🤬', '💩', '🤮', '😡'].some((e) => SLACK_REACTIONS.includes(e)), false);
 
 const skill = DEFAULT_SKILLS.find((s) => s.slug === 'channels')!.content;
 eq('the Chat channels skill carries the section', skill.includes(REACTIONS_SECTION) && skill.indexOf('## Reactions') < skill.indexOf('## Keeping quiet'), true);

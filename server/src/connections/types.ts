@@ -63,6 +63,8 @@ export interface ChannelAdapter {
   mention?(user: { id: string; name: string }): string;
   /** Checks the credentials and greets the allowed users; returns a one-line description (e.g. the bot's name). */
   test?(userIds: string[]): Promise<string>;
+  /** Where a message nobody just wrote goes (a reminder, a schedule, a notice), given the thread's target. Missing means the thread itself; on Slack it is the channel. */
+  proactive?(to: Target): Target;
 }
 
 export interface AllowedUser { id: string; name?: string; admin?: boolean }
@@ -107,6 +109,8 @@ export interface Origin {
   mentioned?: boolean;
   /** Platform id of the message being handled: what `channel_react` reacts to. */
   messageId?: string;
+  /** Where this turn's replies go; missing means the thread's own target (a scheduled message on Slack goes to the channel instead). */
+  target?: Target;
   /** Reasoning effort this connection asks for (`low`/`medium`/`high`); unset keeps each CLI's own default. */
   effort?: string;
 }

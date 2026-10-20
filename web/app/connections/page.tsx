@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Plug, Plus, Send } from 'lucide-react';
+import { Plug, Plus, Send, Slack } from 'lucide-react';
 import { useHiveData } from '@/lib/store';
 import { usePolling } from '@/lib/hooks/usePolling';
 import { ago } from '@/lib/meta';
@@ -36,7 +36,7 @@ export default function Connections() {
             return (
               <button key={c.id} type="button" className="card card-pad conncard" onClick={() => setEditing(c)}>
                 <div className="row gap-s">
-                  <Send size={16} aria-hidden /><b className="grow tl">{c.name}</b>
+                  {c.kind === 'slack' ? <Slack size={16} aria-hidden /> : <Send size={16} aria-hidden />}<b className="grow tl">{c.name}</b>
                   <span className="chip"><i className={`dot ${DOT[c.status.state]}`} />{t(`conn.status.${c.enabled ? c.status.state : 'stopped'}`)}</span>
                 </div>
                 {c.status.state === 'error' && c.enabled && <p className="small m0 tl fa-err">{c.status.detail}</p>}

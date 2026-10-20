@@ -113,7 +113,7 @@ export async function channelReply(agentId: string, text: string): Promise<{ sen
   }
   const leak = findSecret(text);
   if (leak) { console.warn(`[connections] blocked a reply of agent ${agentId}: it seemed to contain ${leak}`); throw new ChannelError(SECRET_REFUSAL(leak)); }
-  const { externalId } = await adapter.send(thread.target, text);
+  const { externalId } = await adapter.send(origin.target ?? thread.target, text);
   threadMessages.record(thread.id, 'out', externalId, { name: agents.get(agentId)?.name }, text);
   origin.replied = true;
   return { sent: true, parts: 1 };
@@ -130,7 +130,7 @@ export async function channelReact(agentId: string, emoji: unknown): Promise<{ r
   if (!adapter?.react) throw new ChannelError('This connection cannot react to messages. Answer with channel_reply instead.');
   const thread = threads.get(origin.threadId);
   if (!thread) throw new ChannelError('The thread no longer exists.');
-  try { await adapter.react(thread.target, origin.messageId, e); }
+  try { await adapter.react(origin.target ?? thread.target, origin.messageId, e); }
   catch (err) { throw new ChannelError(err instanceof Error ? err.message : 'The reaction failed'); }
   origin.replied = true;   // a reaction can be the whole answer ("ok", "thanks")
   return { reacted: true, emoji: e };
@@ -149,7 +149,7 @@ export async function channelSendFile(agentId: string, path: string, caption?: s
   const file = resolveSendable(agent, path);   // throws SendError with the reason
   const leak = findSecret(caption ?? '') ?? (TEXTUAL.test(file.name) && file.size <= 2 * 1024 * 1024 ? findSecret(readFileSync(file.path, 'utf8')) : null);
   if (leak) { console.warn(`[connections] blocked a file of agent ${agentId}: it seemed to contain ${leak}`); throw new ChannelError(SECRET_REFUSAL(leak).replace('the message', `the ${caption && findSecret(caption) ? 'caption' : 'file'}`)); }
-  const { externalId } = await adapter.sendFile(thread.target, file, caption?.trim() || undefined);
+  const { externalId } = await adapter.sendFile(origin.target ?? thread.target, file, caption?.trim() || undefined);
   threadMessages.record(thread.id, 'out', externalId, { name: agent.name }, `${caption?.trim() ? `${caption.trim()} ` : ''}[sent file: ${file.name}]`);
   origin.replied = true;
   return { sent: true, name: file.name, kind: file.kind };

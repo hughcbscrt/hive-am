@@ -33,6 +33,7 @@ have installed; it does not replace them and it never copies your conversations 
 - **Skills.** Ten skills ship with hive-am (all ordinary: edit or delete them). Assign them to an agent, a type or a colony, and choose per assignment whether they are **always** in the instructions or loaded **on demand** with a `skill_read` tool. Searchable picker with token weights.
 - **Notebook.** An agent can keep a persistent notebook of what it learns (no credentials, no duplicates, every note with its source). You can read and edit it from the agent's settings.
 - **Telegram.** Link a bot to an agent: private chats, groups and topics, one shared session across all of them. In groups the agent can listen to everything and speak only when it adds something; people can mute it per thread and bring it back.
+- **Slack.** The same over Socket Mode (no public URL): DMs and channels, the agent answers in a thread opened on the message, scheduled messages land in the channel, `/hive` slash commands.
 - **Files and images.** People send documents and photos to the agent; the agent sends files back. An optional image model can describe pictures for models that cannot see them.
 - **Permissions that hold.** *Read-only*, *Edit files* and *Full access* are enforced by the CLI itself in all three providers.
 - **Changes explorer.** A Git tab per agent: file tree with highlighting, diff viewer, history, commit, pull, push and branches.
@@ -115,14 +116,14 @@ Data lives in `~/.hive-am/hive-am.db` (override with `HIVE_AM_HOME`). The server
 In *Edit files* the agent cannot touch `.git` or private keys (`*.pem`, `*.key`) and cannot write outside its folder. Details and the
 few differences between providers are in [docs/06](docs/reference/en/06-providers.md) and [docs/12](docs/reference/en/12-operations-and-troubleshooting.md).
 
-## Connections (Telegram)
+## Connections (Telegram and Slack)
 
-1. Create a bot with @BotFather and copy its token.
-2. In **Connections**, add a Telegram connection, pick the agent that answers, and list the people (and groups) allowed to talk to it.
+1. Create a bot with @BotFather and copy its token, or create a Slack app with Socket Mode and copy its bot token (`xoxb-`) and app token (`xapp-`) ([manual, chapter 9](docs/manual/en/09-telegram-connections.md#slack)).
+2. In **Connections**, add a Telegram or Slack connection, pick the agent that answers, and list the people (and groups or channels) allowed to talk to it.
 3. Optional: set the group mode (`mention` or `open`), an alias, whether files are accepted, and an image model.
 
 The agent answers through a `channel_reply` tool: its plain text is never delivered. Only authorized people and groups reach it,
-checked on the server. The bot token is stored in `~/.hive-am/hive-am.db` and never returned by the API; see the note about it in
+checked on the server. Tokens are stored in `~/.hive-am/hive-am.db` and never returned by the API; see the note about it in
 [docs/14](docs/reference/en/14-external-connections.md).
 
 ## How it is built
