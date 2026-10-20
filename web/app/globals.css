@@ -606,7 +606,11 @@ button.switcher-group .pip { flex: none; width: 8px; height: 8px; border-radius:
 .switcher.mini .switcher-head { flex-direction: column; align-items: center; gap: 4px; padding: 10px 0; }
 .switcher.mini .switcher-list { padding: 6px 0 16px; display: flex; flex-direction: column; align-items: center; }
 .mini-group { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; }
-.mini-sep { width: 28px; height: 4px; border-radius: 4px; margin: 10px 0 6px; background: var(--c, var(--line-strong)); opacity: .85; }
+button.mini-sep { position: relative; display: flex; align-items: center; justify-content: center; gap: 2px; width: 52px; margin: 10px 0 2px; padding: 4px 2px 5px; border: 0; border-bottom: 3px solid var(--c, var(--line-strong)); border-radius: 6px 6px 3px 3px; background: none; font-family: inherit; font-size: var(--fs-micro); font-weight: 700; letter-spacing: .04em; color: var(--ink-2); cursor: pointer; }
+button.mini-sep:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 6%, transparent); } button.mini-sep:disabled { cursor: default; }
+button.mini-sep .chev { flex: none; color: var(--muted); transition: transform .15s; } button.mini-sep[aria-expanded='true'] .chev { transform: rotate(90deg); }
+button.mini-sep .ms-count { color: var(--muted); font-weight: 600; }
+button.mini-sep .pip { position: absolute; top: 1px; right: 1px; width: 7px; height: 7px; border-radius: 50%; background: var(--honey); animation: pulse 1.2s infinite; }
 .mini-group:first-child .mini-sep { margin-top: 2px; }
 .sw-item.mini { padding: 6px; width: 48px; justify-content: center; align-items: center; border-radius: 12px; }
 .sw-item.mini .sw-av .hex { --s: 34px; }

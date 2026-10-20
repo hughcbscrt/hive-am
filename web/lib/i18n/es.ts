@@ -298,6 +298,8 @@ export const es: Record<DictKey, string> = {
   "switcher.groupUnfold": "Desplegar {name}",
   "switcher.groupBusy_one": "{count} agente trabajando",
   "switcher.groupBusy_other": "{count} agentes trabajando",
+  "switcher.groupSize_one": "{name}, {count} agente",
+  "switcher.groupSize_other": "{name}, {count} agentes",
 
   // ---- queue ----
   "queue.count_one": "{count} en cola",

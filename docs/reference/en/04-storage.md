@@ -211,7 +211,7 @@ View preferences only; if they are deleted, the UI works the same.
 | `hive-git-view` | JSON `{ theme, whitespace, tabSize }` | `lib/git/gitPrefs.ts`: theme, visible whitespace and tab size of the code viewer |
 | `hive-switcher-collapsed` | `1` \| `0` | `agents/[id]/page.tsx`: whether the side agent list is collapsed |
 | `hive-am.railCollapsed` | `true` \| `false` | `Shell.tsx`: whether the main sidebar is folded to icons (applied before the first paint by the inline script of `layout.tsx`) |
-| `hive-am.switcher.folded` | JSON array of ids | `AgentSwitcher.tsx`: the colony groups folded in the chat's side agent list (colony ids and `free` for "No colony") |
+| `hive-am.switcher.folded` | JSON array of ids | `AgentSwitcher.tsx`: the colony groups folded in the chat's side agent list, full or collapsed (colony ids and `free` for "No colony") |
 | `hive-cfg-width` | number (px) | `agents/[id]/page.tsx`: width of the agent's settings panel (dragged, via `useResizableWidth`) |
 | `hive-am.drawerWidth` | number (px) | `Dialog.tsx` (`Drawer`): width of the side drawers (dragged, via `useResizableWidth`) |
 | `hive-obj-switcher-collapsed` | `1` \| `0` | `ObjectWorkspace.tsx`: whether the resources list is collapsed |

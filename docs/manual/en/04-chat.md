@@ -26,7 +26,7 @@ To the left of the conversation there is a list of all your agents, grouped by c
 - Each colony heading (and **No colony**) folds or unfolds its group with a click, or with Enter or Space. Orchestrators come first in each group. A folded group still shows the agent you are on, and a pulsing dot when one of its agents is working. Folded groups are remembered.
 - Use **Find an agent** to filter. While you search every group with a match is shown open; clearing the search brings back the groups you had folded.
 - Each agent shows its provider and how long ago it was active. While it works, the subtitle shows what it is doing live (for example "Thinking…" or a tool in progress).
-- The button in the list header collapses it to a narrow column with just the initials. Your choice is remembered.
+- The button in the list header collapses it to a narrow column with just the initials. It stays grouped by colony: each group starts with a short heading (the colony's initials, in its color, and how many agents it has; the full name on hover) that folds or unfolds it the same way, and what you fold there is folded in the full list too. Your choice is remembered.
 
 ## Send messages
 

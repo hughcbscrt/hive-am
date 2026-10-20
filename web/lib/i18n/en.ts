@@ -300,6 +300,8 @@ export const en = {
   "switcher.groupUnfold": "Unfold {name}",
   "switcher.groupBusy_one": "{count} agent working",
   "switcher.groupBusy_other": "{count} agents working",
+  "switcher.groupSize_one": "{name}, {count} agent",
+  "switcher.groupSize_other": "{name}, {count} agents",
 
   // ---- queue ----
   "queue.count_one": "{count} queued",
