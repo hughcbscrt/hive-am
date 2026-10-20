@@ -23,9 +23,10 @@ La flecha a la izquierda del nombre vuelve a la colonia.
 
 A la izquierda de la conversación hay una lista con todos tus agentes, agrupados por colonia. Sirve para saltar de uno a otro sin volver a la sección **Agentes**.
 
-- Usa **Buscar un agente** para filtrar.
+- El encabezado de cada colonia (y **Sin colonia**) pliega o despliega su grupo con un clic, o con Intro o Espacio. Los orquestadores salen primero en cada grupo. Un grupo plegado sigue mostrando el agente en el que estás, y un punto pulsante cuando alguno de sus agentes está trabajando. Los grupos plegados se recuerdan.
+- Usa **Buscar un agente** para filtrar. Mientras buscas, todo grupo con coincidencias se ve abierto; al borrar la búsqueda vuelven los grupos que tenías plegados.
 - Cada agente muestra su proveedor y cuánto hace que tuvo actividad. Mientras trabaja, el subtítulo muestra lo que está haciendo en vivo (por ejemplo "Thinking…" o una herramienta en curso).
-- El botón de la cabecera de la lista la contrae a una columna estrecha con solo las iniciales. Tu elección se recuerda.
+- El botón de la cabecera de la lista la contrae a una columna estrecha con solo las iniciales. Sigue agrupada por colonia: cada grupo empieza con un encabezado corto (las iniciales de la colonia, en su color, y cuántos agentes tiene; el nombre completo al pasar el mouse) que lo pliega o despliega igual, y lo que pliegas ahí queda plegado también en la lista completa. Tu elección se recuerda.
 
 ## Enviar mensajes
 

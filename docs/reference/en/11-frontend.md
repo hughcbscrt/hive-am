@@ -155,6 +155,7 @@ Fonts are loaded with `next/font/google` in `layout.tsx`, so **the first build n
 ### Responsive and accessibility
 
 - Breakpoints: **1100 px** (columns stack) and **760 px** (the sidebar becomes a top bar).
+- The sidebar (`Shell.tsx`, `.rail`) folds from 220 px to 64 px with its header button (`aria-expanded`, `aria-label` *Collapse the menu* / *Expand the menu*). The width is `--rail-w` on `.shell`; folded, each entry keeps its label as `aria-label` (with the count) and `title` (shown by the global tooltip), counts become badges (`99+` above 99) and EN/ES stack. The state is saved in `localStorage` (`hive-am.railCollapsed`) and the inline script of `layout.tsx` applies it as `data-rail` on `<html>` before the first paint, so a reload never flashes the wide sidebar; the width only animates after a click (`.rail-anim`). Under 760 px the folding is ignored and the button hidden.
 - Visible focus on all controls (`:focus-visible`), `aria-label` on icon-only buttons, `aria-pressed`/`aria-current`/`aria-selected` on state controls, `role="dialog"` on panels and dialogs.
 - `prefers-reduced-motion` disables animations and transitions.
 - Dialogs trap and return focus; tabs, the file tree and the lists are used with the keyboard; the chat is a `role="log"`; table rows that open something are focusable.

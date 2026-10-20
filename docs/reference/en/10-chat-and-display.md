@@ -4,7 +4,7 @@ This document describes **what is shown** in the conversation with an agent, **w
 
 ## 10.1 Layout of the agent screen
 
-`app/agents/[id]/page.tsx` arranges two columns inside the main area, and a settings panel that **floats on top**:
+`app/agents/[id]/page.tsx` (inside `app/agents/layout.tsx`) arranges two columns inside the main area, and a settings panel that **floats on top**:
 
 ```
 ┌ sidebar ──────┬ agent switcher ─────┬ chat ─────────────────────────────────────┐
@@ -16,13 +16,13 @@ This document describes **what is shown** in the conversation with an agent, **w
 
 - The **settings** panel is hidden by default; the **Settings** button in the header shows it (a dot indicates unsaved changes). Its state is remembered in `localStorage` (`hive-cfg-open`).
 - The panel is `position: fixed` on the right: it **does not shrink the chat**, it is drawn on top with a shadow. It is 400 px wide by default. The expand button (next to *Hide*) takes it to **half the screen** and back; its left edge can also be dragged (or double-click to toggle). Minimum 340 px, maximum screen width − 80 px. The width is remembered in `localStorage` (`hive-cfg-width`).
-- The page is mounted with `key={id}`: when switching agent from the switcher all local state is reset (draft, tab, session being read).
+- The chat column (`Workspace`) is mounted with `key={id}`: when switching agent from the switcher all of its local state is reset (draft, tab, session being read). The switcher and the two-column grid come from `app/agents/layout.tsx`, above the `[id]` segment (the page itself is mounted again for every agent), so the switcher stays mounted and keeps its scroll position and its search text; on arrival (or reload) it scrolls just enough to show the current agent.
 
 ### Agent switcher (`AgentSwitcher`)
 
-It can be **collapsed** with the button in its header (panel icon): it goes from 290 px to 68 px and leaves only each agent's **avatar with the initial**, grouped by colony with a small color bar. On hover, the *tooltip* shows the name and the provider; the current agent stays highlighted and those that are working keep their pulsing dot. Switching agent does not expand it and the choice is remembered (`hive-switcher-collapsed` in `localStorage`).
+It can be **collapsed** with the button in its header (panel icon): it goes from 290 px to 68 px and leaves only each agent's **avatar with the initial**, grouped by colony. Each group starts with a compact heading, a `<button>` with `aria-expanded` showing a chevron, the colony's initials (the first letters of its first two words, or its first two letters) over a bar of its color, and the count; its `aria-label` and tooltip carry the full name and the count. It folds the group exactly like the full list's heading and shares the saved state (`hive-am.switcher.folded`), with the same rules: orchestrators first, a folded group keeps the current agent and shows a pulsing dot when one of its agents is running, and every group with a match is open while the search has text. On hover, the *tooltip* shows the name and the provider; the current agent stays highlighted and those that are working keep their pulsing dot. Switching agent does not expand it and the choice is remembered (`hive-switcher-collapsed` in `localStorage`).
 
-Side list grouped by colony (and "No colony"), with search. Each agent shows:
+Side list grouped by colony (in the order of the colonies, then "No colony"; empty groups are hidden), with search. Inside each group orchestrators come first, then the rest in the order they arrive. Each group heading is a `<button>` with `aria-expanded` that folds the group; the folded groups are remembered (`hive-am.switcher.folded`, the colony ids and `free`; ids of deleted colonies are dropped on the next change). A folded group keeps the row of the current agent and shows a pulsing dot when one of its agents is running. While the search has text every group with a match is open, without touching what is saved. With no agents at all the list says "No agents yet". The collapsed (avatars) mode folds the same groups. Each agent shows:
 
 | Element | Source |
 |---|---|

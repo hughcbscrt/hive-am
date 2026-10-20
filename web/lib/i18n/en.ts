@@ -35,6 +35,8 @@ export const en = {
   "nav.connected": "Connected to server",
   "nav.offline": "Server offline. Retrying…",
   "nav.switchTheme": "Switch theme",
+  "nav.collapse": "Collapse the menu",
+  "nav.expand": "Expand the menu",
 
   // ---- lang ----
   "lang.label": "Language",
@@ -293,6 +295,13 @@ export const en = {
   "switcher.noDescription": "No description yet",
   "switcher.collapse": "Collapse the agent list",
   "switcher.expand": "Expand the agent list",
+  "switcher.empty": "No agents yet",
+  "switcher.groupFold": "Fold {name}",
+  "switcher.groupUnfold": "Unfold {name}",
+  "switcher.groupBusy_one": "{count} agent working",
+  "switcher.groupBusy_other": "{count} agents working",
+  "switcher.groupSize_one": "{name}, {count} agent",
+  "switcher.groupSize_other": "{name}, {count} agents",
 
   // ---- queue ----
   "queue.count_one": "{count} queued",

@@ -79,6 +79,8 @@ El menú lateral tiene estas secciones:
 
 Al final del menú están el botón **Terminal** (abre el panel de terminales, [capítulo 12](12-terminales.md)), el indicador de estado del servidor y **Cambiar tema**.
 
+Para dar más espacio a la pantalla, el botón de panel junto al nombre hive-am (**Contraer el menú**) pliega el menú a una columna estrecha de iconos. Al pasar el mouse o llevar el foco a un icono se ve su nombre, los contadores quedan como pequeñas insignias y **EN** / **ES** quedan uno encima del otro. El mismo botón (**Expandir el menú**) lo vuelve a abrir. Tu elección se recuerda en el navegador. En una pantalla estrecha (menos de 760 px) el menú es una barra superior con sus etiquetas y no se pliega.
+
 ### Indicador de conexión
 
 Junto al pie del menú aparece **Conectado al servidor** con un punto verde cuando la interfaz habla con el servidor. Si el servidor se detiene, el texto cambia a **Servidor sin conexión. Reintentando…** y la interfaz reconecta sola. Si ves ese aviso, consulta el [capítulo 14](14-problemas-frecuentes.md).

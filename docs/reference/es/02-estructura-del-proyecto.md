@@ -85,6 +85,7 @@ hive-am/
     │   ├── globals.css       # TODOS los estilos (tokens, tema claro/oscuro, componentes)
     │   ├── page.tsx          # Colony (panal)
     │   ├── agents/page.tsx   # listado de agentes
+    │   ├── agents/layout.tsx # selector de agentes junto a la página de un agente
     │   ├── agents/[id]/page.tsx   # espacio de trabajo del agente (chat, cambios, ajustes, cuaderno)
     │   ├── connections/page.tsx   # conexiones externas
     │   ├── types/page.tsx    # tipos de agente
@@ -201,7 +202,8 @@ No hay un framework de pruebas: `server/scripts/test-*.ts` son scripts independi
 | `app/layout.tsx` | Carga las fuentes (Bricolage Grotesque, Hanken Grotesk, JetBrains Mono), envuelve todo en `<Shell>` e incluye un script en línea que aplica el tema y el idioma guardados antes del primer pintado (sin parpadeo). |
 | `app/page.tsx` | Pantalla **Colony**: panal con colonias, líneas de relación, panel del agente seleccionado y delegaciones recientes. |
 | `app/agents/page.tsx` | Tabla filtrable de agentes. |
-| `app/agents/[id]/page.tsx` | Selector de agentes + chat + pestaña Cambios + panel de ajustes plegable (configuración, cuaderno y sesiones). |
+| `app/agents/layout.tsx` | En la página de un agente, la rejilla con el selector de agentes, que sigue montada al cambiar de agente. |
+| `app/agents/[id]/page.tsx` | Chat + pestaña Cambios + panel de ajustes plegable (configuración, cuaderno y sesiones). |
 | `app/connections/page.tsx` | Pantalla **Conexiones**: tarjetas de las conexiones externas y su estado. |
 | `app/types/page.tsx` | CRUD de tipos y creación de agentes a partir de un tipo. |
 | `app/skills/page.tsx` | CRUD de skills con vista previa markdown, conteo de uso y tamaño estimado. |

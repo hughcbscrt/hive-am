@@ -33,6 +33,8 @@ export const es: Record<DictKey, string> = {
   "nav.connected": "Conectado al servidor",
   "nav.offline": "Servidor sin conexión. Reintentando…",
   "nav.switchTheme": "Cambiar tema",
+  "nav.collapse": "Contraer el menú",
+  "nav.expand": "Expandir el menú",
 
   // ---- lang ----
   "lang.label": "Idioma",
@@ -291,6 +293,13 @@ export const es: Record<DictKey, string> = {
   "switcher.noDescription": "Aún sin descripción",
   "switcher.collapse": "Contraer la lista de agentes",
   "switcher.expand": "Expandir la lista de agentes",
+  "switcher.empty": "Aún no hay agentes",
+  "switcher.groupFold": "Plegar {name}",
+  "switcher.groupUnfold": "Desplegar {name}",
+  "switcher.groupBusy_one": "{count} agente trabajando",
+  "switcher.groupBusy_other": "{count} agentes trabajando",
+  "switcher.groupSize_one": "{name}, {count} agente",
+  "switcher.groupSize_other": "{name}, {count} agentes",
 
   // ---- queue ----
   "queue.count_one": "{count} en cola",

@@ -1,10 +1,11 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
-import { Boxes, MessageSquare, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, Server, SquareTerminal, Sun, Users, Plug } from 'lucide-react';
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
+import { Boxes, MessageSquare, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, PanelLeftClose, PanelLeftOpen, Server, SquareTerminal, Sun, Users, Plug } from 'lucide-react';
 import { usePersistentState } from '@/lib/hooks/usePersistentState';
 import { LAST_CHAT } from '@/lib/lastChat';
+import { RAIL_KEY } from '@/lib/rail';
 import { HiveProvider, useHive } from '@/lib/store';
 import { I18nProvider, LOCALES, useI18n } from '@/lib/i18n';
 import { Toaster } from './ui';
@@ -31,7 +32,8 @@ function LanguageSwitch() {
   );
 }
 
-function Nav() {
+/** The main rail. Folded (`collapsed`), it is a column of icons: each entry keeps its label as accessible name and tooltip. */
+function Nav({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const path = usePathname();
   const { t } = useI18n();
   const { agents, types, skills, connections, objects, connected } = useHive();
@@ -52,13 +54,19 @@ function Nav() {
   const running = agents.filter((a) => a.status === 'running').length;
   const [lastChat] = usePersistentState<string>(LAST_CHAT, '');
   const chatHref = agents.some((a) => a.id === lastChat) ? `/agents/${lastChat}` : agents[0] ? `/agents/${agents[0].id}` : '/chat';
+  // Folded, the label is hidden, so it becomes the accessible name (with the count) and the tooltip; a count shows as a badge.
+  const named = (label: string, count?: number) => (collapsed ? { 'aria-label': count !== undefined ? `${label}, ${count}` : label, title: label } : {});
+  const badge = (count: number) => <span className="count">{collapsed && count > 99 ? '99+' : count}</span>;
   const item = (href: string, label: string, icon: ReactNode, count?: number, on?: boolean) => {
     const active = on ?? (href === '/' ? path === '/' : path.startsWith(href));
-    return <Link key={label} href={href} className="nav" aria-current={active ? 'page' : undefined}>{icon}<span className="t">{label}</span>{count !== undefined && <span className="count">{count}</span>}</Link>;
+    return <Link key={label} href={href} className="nav" aria-current={active ? 'page' : undefined} {...named(label, count)}>{icon}<span className="t">{label}</span>{count !== undefined && badge(count)}</Link>;
   };
+  const fold = collapsed ? t('nav.expand') : t('nav.collapse');
   return (
     <nav className="rail" aria-label={t('nav.main')}>
-      <div className="brand"><HiveMark /><div>hive-am<small>{t('app.tagline')}</small></div></div>
+      <div className="brand"><HiveMark /><div className="brand-name">hive-am<small>{t('app.tagline')}</small></div>
+        <button type="button" className="btn ghost icon sm rail-fold" onClick={onToggle} aria-expanded={!collapsed} aria-label={fold} title={fold}>{collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
+      </div>
       <LanguageSwitch />
       {item(chatHref, t('nav.chat'), <MessageSquare size={18} />, undefined, path.startsWith('/agents/') || path === '/chat')}
       {item('/', t('nav.colony'), <Hexagon size={18} />, running || undefined)}
@@ -73,22 +81,27 @@ function Nav() {
       <div className="nav-label">{t('nav.history')}</div>
       {item('/sessions', t('nav.sessions'), <History size={18} />)}
       <div className="rail-foot">
-        <button type="button" className="nav" onClick={dock.toggle} aria-pressed={dock.open} title={`${t('dock.nav')} (Ctrl+\`)`}><SquareTerminal size={18} /><span className="t">{t('dock.nav')}</span>{dock.tabs.length > 0 && <span className="count">{dock.tabs.length}</span>}</button>
-        <div className="conn"><i className={`dot ${connected ? 'ok' : 'err'}`} />{connected ? t('nav.connected') : t('nav.offline')}</div>
-        <button type="button" className="nav" onClick={flip} aria-pressed={dark}>{dark ? <Sun size={18} /> : <Moon size={18} />}<span className="t">{t('nav.switchTheme')}</span></button>
+        <button type="button" className="nav" onClick={dock.toggle} aria-pressed={dock.open} {...named(t('dock.nav'), dock.tabs.length || undefined)} title={`${t('dock.nav')} (Ctrl+\`)`}><SquareTerminal size={18} /><span className="t">{t('dock.nav')}</span>{dock.tabs.length > 0 && badge(dock.tabs.length)}</button>
+        <div className="conn" title={collapsed ? (connected ? t('nav.connected') : t('nav.offline')) : undefined}><i className={`dot ${connected ? 'ok' : 'err'}`} /><span className="t">{connected ? t('nav.connected') : t('nav.offline')}</span></div>
+        <button type="button" className="nav" onClick={flip} aria-pressed={dark} {...named(t('nav.switchTheme'))}>{dark ? <Sun size={18} /> : <Moon size={18} />}<span className="t">{t('nav.switchTheme')}</span></button>
       </div>
     </nav>
   );
 }
 
 export function Shell({ children }: { children: ReactNode }) {
+  const [railCollapsed, setRailCollapsed, railLoaded] = usePersistentState<boolean>(RAIL_KEY, false);
+  useLayoutEffect(() => { if (railLoaded) document.documentElement.dataset.rail = railCollapsed ? 'collapsed' : 'open'; }, [railCollapsed, railLoaded]);
+  // The width only animates when the person folds or unfolds the rail, never while the saved choice is applied on arrival.
+  const [railAnimate, setRailAnimate] = useState(false);
+  const toggleRail = () => { setRailAnimate(true); setRailCollapsed(!railCollapsed); };
   return (
     <I18nProvider>
       <HiveProvider>
         <DockProvider>
           <Toaster>
             <Tooltips />
-            <div className="shell"><Nav /><main className="main">{children}</main></div>
+            <div className={`shell ${railAnimate ? 'rail-anim' : ''}`}><Nav collapsed={railCollapsed} onToggle={toggleRail} /><main className="main">{children}</main></div>
             <TerminalDock />
           </Toaster>
         </DockProvider>
