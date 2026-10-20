@@ -68,6 +68,13 @@ export function senderOf(c: Connection, m: Inbound): AllowedUser | undefined {
   const member = (Array.isArray(chat.members) ? chat.members : []).find((x) => x.id === m.userId);
   return member ? { id: m.userId, name: member.name ?? m.userName } : undefined;
 }
+/** Why senderOf said no, for the log: the ids the connection knows against the ones that arrived. */
+function denyReason(c: Connection, m: Inbound): string {
+  if (!m.group) return `user not in the people list (${c.allowed.length} listed)`;
+  const chat = chatsOf(c).find((x) => x.id === m.target.chat);
+  if (!chat) return `user not in the people list and chat is not authorized (authorized chats: ${chatsOf(c).map((x) => x.id).join(', ') || 'none'})`;
+  return `chat is restricted to its members and the user is not one (${chat.members?.length ?? 0} listed)`;
+}
 const aliasesOf = (c: Connection): string[] => (Array.isArray(c.config.aliases) ? c.config.aliases : []).map((a: unknown) => String(a).trim()).filter(Boolean);
 
 /** Group chatter that speaks TO the agent by one of its aliases counts as aimed at it, even without @mention. */
@@ -96,6 +103,7 @@ export async function handleInbound(connectionId: string, adapter: ChannelAdapte
   if (group && !addressed && conn.config.group_mode !== 'open') return;
 
   const user = senderOf(conn, m);
+  if (addressed || !user) console.log(`[access] ${conn.name}: ${group ? 'group' : 'dm'} chat=${m.target.chat} user=${m.userId} addressed=${addressed} -> ${user ? 'allowed' : 'denied: ' + denyReason(conn, m)}`);
   if (!user) {
     if (!addressed) return; // never answer strangers' chatter
     const key = group ? `${connectionId}:${m.userId}:${m.target.chat}` : `${connectionId}:${m.userId}`;
