@@ -707,6 +707,11 @@ export const es: Record<DictKey, string> = {
   "colony.helpLabel": "Ayuda: cómo leer este mapa",
   "colony.recent": "Delegaciones recientes",
   "colony.recentEmpty": "Cuando un orquestador le pasa una tarea a un worker, aparece aquí.",
+  "colony.task.queued": "En cola: espera a que el worker termine lo que está haciendo",
+  "colony.task.running": "En curso",
+  "colony.task.done": "Terminada",
+  "colony.task.failed": "Falló",
+  "colony.task.interrupted": "Interrumpida: hive-am se reinició mientras corría",
 
   // ---- agents ----
   "agents.subtitle": "Cada agente es un puntero a una sesión nativa del CLI. Cierra el navegador o pierde la luz: al reabrir un agente se reanuda su conversación real.",

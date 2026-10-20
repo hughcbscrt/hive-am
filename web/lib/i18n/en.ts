@@ -709,6 +709,11 @@ export const en = {
   "colony.helpLabel": "Help: how to read this map",
   "colony.recent": "Recent delegations",
   "colony.recentEmpty": "When an orchestrator hands a task to a worker, it shows up here.",
+  "colony.task.queued": "Queued: waiting for the worker to finish what it is doing",
+  "colony.task.running": "Running",
+  "colony.task.done": "Done",
+  "colony.task.failed": "Failed",
+  "colony.task.interrupted": "Interrupted: hive-am restarted while it ran",
 
   // ---- agents ----
   "agents.subtitle": "Each agent is a pointer to a native CLI session. Close the browser or lose power. Reopening an agent resumes its real conversation.",
