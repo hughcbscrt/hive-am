@@ -130,7 +130,7 @@ Junction table `colony_skills (colony_id, skill_id)` (`CASCADE`). Membership of 
 
 ### Table `agent_sessions`
 
-Log of the native sessions an agent has used. It feeds the Sessions tabs and screens. It is trimmed by `retentionPass` (`retention.ts`, at start and every six hours, next to the inbox cleaning): delegated sessions past the newest 50 of their agent and unused for 90 days, and direct ones unused for 90 days whose transcript the CLI no longer has (never the agent's current one), are removed. The same pass keeps the newest 500 `thread_messages` of each thread plus anything younger than 30 days, the newest 200 `dispatches` (one still running is never removed), and empties `thread_messages.files` after the inbox's 14 days. Only these rows go: the conversations stay in the CLI. Migration 5 adds `idx_dispatches_created` for it.
+Log of the native sessions an agent has used. It feeds the Sessions tabs and screens. It is trimmed by `retentionPass` (`retention.ts`, at start and every six hours, next to the inbox cleaning): delegated sessions past the newest 50 of their agent and unused for 90 days, and direct ones unused for 90 days whose transcript the CLI no longer has (never the agent's current one), are removed. The same pass keeps the newest 500 `thread_messages` of each thread plus anything younger than 30 days, the newest 200 `dispatches` (one still queued or running is never removed, nor a background one whose result was neither announced to the orchestrator nor read with `dispatch_status`), and empties `thread_messages.files` after the inbox's 14 days. Only these rows go: the conversations stay in the CLI. Migration 5 adds `idx_dispatches_created` for it.
 
 | Column | Notes |
 |---|---|
@@ -151,9 +151,13 @@ Delegation log: who asked what of whom.
 | `id` | UUID |
 | `from_id`, `to_id` | Orchestrator and worker (no foreign key: the record survives if an agent is deleted) |
 | `task` | Full task text |
-| `status` | `running` \| `done` \| `failed` \| `interrupted` |
+| `status` | `queued` (waiting behind the worker's other turns) \| `running` \| `done` \| `failed` \| `interrupted` |
 | `result` | The worker's final answer, trimmed to 20,000 characters |
 | `session_id` | The worker's native session where it ran (migration) |
+| `mode` | `sync` (the answer goes back to the tool call) or `background` (the orchestrator is told when it ends). Migration 9; older rows are `sync` |
+| `origin` | Background only: JSON with the chat thread where the orchestrator was asked (`connection_id`, `thread_id`, `req_id`, `req_name`); `NULL` for its web conversation |
+| `notified_at` | When the result of a background task was handed to the orchestrator (or given up on because there was nobody to tell) |
+| `read_at` | When the orchestrator read the finished result with `dispatch_status` |
 | `created_at`, `finished_at` | |
 
 ### Initial data (seed)

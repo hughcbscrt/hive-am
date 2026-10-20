@@ -130,7 +130,7 @@ Tabla puente `colony_skills (colony_id, skill_id)` (`CASCADE`). La pertenencia d
 
 ### Tabla `agent_sessions`
 
-Bitácora de las sesiones nativas que un agente ha usado. Alimenta las pestañas y pantallas de Sessions. La recorta `retentionPass` (`retention.ts`, al arrancar y cada seis horas, junto a la limpieza del buzón): se eliminan las sesiones delegadas que pasen de las 50 más nuevas de su agente y lleven 90 días sin usarse, y las directas sin uso en 90 días cuyo transcript la CLI ya no tiene (nunca la actual del agente). La misma pasada conserva los 500 `thread_messages` más nuevos de cada hilo y todo lo de menos de 30 días, los 200 `dispatches` más nuevos (uno que sigue en curso nunca se elimina) y vacía `thread_messages.files` pasados los 14 días del buzón. Solo se van esas filas: las conversaciones quedan en la CLI. La migración 5 añade `idx_dispatches_created` para esto.
+Bitácora de las sesiones nativas que un agente ha usado. Alimenta las pestañas y pantallas de Sessions. La recorta `retentionPass` (`retention.ts`, al arrancar y cada seis horas, junto a la limpieza del buzón): se eliminan las sesiones delegadas que pasen de las 50 más nuevas de su agente y lleven 90 días sin usarse, y las directas sin uso en 90 días cuyo transcript la CLI ya no tiene (nunca la actual del agente). La misma pasada conserva los 500 `thread_messages` más nuevos de cada hilo y todo lo de menos de 30 días, los 200 `dispatches` más nuevos (nunca uno que sigue en cola o en curso, ni uno en segundo plano cuyo resultado no se le avisó al orquestador ni se leyó con `dispatch_status`) y vacía `thread_messages.files` pasados los 14 días del buzón. Solo se van esas filas: las conversaciones quedan en la CLI. La migración 5 añade `idx_dispatches_created` para esto.
 
 | Columna | Notas |
 |---|---|
@@ -151,9 +151,13 @@ Registro de delegaciones: quién pidió qué a quién.
 | `id` | UUID |
 | `from_id`, `to_id` | Orquestador y worker (sin clave foránea: el registro sobrevive si se borra un agente) |
 | `task` | Texto completo de la tarea |
-| `status` | `running` \| `done` \| `failed` \| `interrupted` |
+| `status` | `queued` (espera detrás de otros turnos del worker) \| `running` \| `done` \| `failed` \| `interrupted` |
 | `result` | Respuesta final del worker, recortada a 20 000 caracteres |
 | `session_id` | Sesión nativa del worker donde se ejecutó (migración) |
+| `mode` | `sync` (la respuesta vuelve a la llamada de la herramienta) o `background` (se avisa al orquestador cuando termina). Migración 9; las filas anteriores son `sync` |
+| `origin` | Solo en segundo plano: JSON con el hilo de chat donde se le pidió al orquestador (`connection_id`, `thread_id`, `req_id`, `req_name`); `NULL` para su conversación web |
+| `notified_at` | Cuándo se le entregó al orquestador el resultado de una tarea en segundo plano (o se desistió porque no había a quién avisar) |
+| `read_at` | Cuándo el orquestador leyó el resultado terminado con `dispatch_status` |
 | `created_at`, `finished_at` | |
 
 ### Datos iniciales (seed)
