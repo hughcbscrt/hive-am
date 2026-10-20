@@ -12,6 +12,8 @@ import type { AllowedChat, AllowedUser, ChannelAdapter, Connection, Inbound, OnS
 const MAX_INPUT = 8000;
 const DEFAULT_RATE = 20; // messages per user per minute
 const DEFAULT_CHATTER_PER_MINUTE = 10; // times per minute that chatter nobody aimed at the agent may wake it, per thread
+const DENIED_PER_MINUTE = 5; // access notices per person and chat per minute, so a stranger can't make the bot spam a chat
+const DENIED_CHAT_PER_MINUTE = 20; // access notices per chat per minute, whoever asks
 /** Sent once when a turn aimed at the agent ended without a reply. */
 const NUDGE = '[hive:channel] System reminder: your last turn ended without calling `channel_reply`, so the person received nothing. If you had an answer, send it now with `channel_reply` (if the tool says it is unknown, call it again: it was still connecting). If you chose not to answer, say so in one short sentence with `channel_reply`.';
 import { validEffort } from '../efforts.js';
@@ -40,7 +42,9 @@ const T = {
   help: { es: 'Comandos: /new (o /clear, /reset) empieza una conversación nueva (solo administradores) · /stop detiene el turno en curso · /status estado del agente · /mute y /unmute me callan o me reactivan en este hilo · /id tu id y el de este chat · /help esta ayuda.', en: 'Commands: /new (or /clear, /reset) starts a new conversation (admins only) · /stop stops the turn in progress · /status the agent\'s state · /mute and /unmute silence me or bring me back in this thread · /id your id and this chat\'s · /help this help.' },
   ids: (user: string, chat: string) => ({ es: `Tu id: ${user} · este chat: ${chat}`, en: `Your id: ${user} · this chat: ${chat}` }),
   notAllowedChat: (user: string, chat: string) => ({ es: `No tienes acceso. Para usarme aquí, añade tu id (${user}) o este chat (${chat}) en la conexión.`, en: `You don't have access. To use me here, add your id (${user}) or this chat (${chat}) to the connection.` }),
-  notAllowedMember: (user: string, chat: string) => ({ es: `Este chat solo admite a personas de su lista. Para usarme aquí, añade tu id (${user}) a los miembros de este chat (${chat}) o a la lista de personas de la conexión.`, en: `This chat only admits the people on its list. To use me here, add your id (${user}) to this chat's members (${chat}) or to the connection's people list.` }),
+  notAllowedMember: (user: string, chat: string, slack: boolean) => slack
+    ? { es: `Este canal solo admite a personas de su lista. Para usarme aquí, añade tu id (${user}) a los miembros de este canal (${chat}).`, en: `This channel only admits the people on its list. To use me here, add your id (${user}) to this channel's members (${chat}).` }
+    : { es: `Este chat solo admite a personas de su lista. Para usarme aquí, añade tu id (${user}) a los miembros de este chat (${chat}).`, en: `This chat only admits the people on its list. To use me here, add your id (${user}) to this chat's members (${chat}).` },
 };
 type Msg = { es: string; en: string };
 /** The same commands on every platform; these are other names for them. */
@@ -54,26 +58,25 @@ function tooFast(connId: string, user: string, limit: number): boolean {
   arr.push(t); hits.set(key, arr);
   return arr.length > limit;
 }
-const told = new Set<string>(); // users already told how to get access (per chat in groups, since the notice names it), so strangers can't make us spam them
 
 const chatsOf = (c: Connection): AllowedChat[] => (Array.isArray(c.config.chats) ? c.config.chats : []);
 
-/** Who may talk: the connection's people list anywhere (with their admin flag); in a listed group, everyone in it or only its members. The chat is `target.chat`, so a restriction covers every topic and thread in it. */
+/** Who may talk: in a DM and in a group with no entry of its own, the connection's people list (with their admin flag); in a listed group, that group's own rule: everyone in it, or only its members (the people list does not open it, and an empty list admits nobody). A member keeps admin only if the people list gives it. The chat is `target.chat`, so a rule covers every topic and thread in it. */
 export function senderOf(c: Connection, m: Inbound): AllowedUser | undefined {
   const listed = c.allowed.find((u) => u.id === m.userId);
-  if (listed) return listed;
-  const chat = m.group ? chatsOf(c).find((x) => x.id === m.target.chat) : undefined;
-  if (!chat) return undefined;
-  if (chat.mode !== 'members') return { id: m.userId, name: m.userName };
+  if (!m.group) return listed;
+  const chat = chatsOf(c).find((x) => x.id === m.target.chat);
+  if (!chat) return listed;
+  if (chat.mode !== 'members') return listed ?? { id: m.userId, name: m.userName };
   const member = (Array.isArray(chat.members) ? chat.members : []).find((x) => x.id === m.userId);
-  return member ? { id: m.userId, name: member.name ?? m.userName } : undefined;
+  return member ? { id: m.userId, name: member.name ?? m.userName, ...(listed?.admin ? { admin: true } : {}) } : undefined;
 }
 /** Why senderOf said no, for the log: the ids the connection knows against the ones that arrived. */
 function denyReason(c: Connection, m: Inbound): string {
   if (!m.group) return `user not in the people list (${c.allowed.length} listed)`;
   const chat = chatsOf(c).find((x) => x.id === m.target.chat);
   if (!chat) return `user not in the people list and chat is not authorized (authorized chats: ${chatsOf(c).map((x) => x.id).join(', ') || 'none'})`;
-  return `chat is restricted to its members and the user is not one (${chat.members?.length ?? 0} listed)`;
+  return `chat is restricted to its members and the user is not one, the people list does not open it (${chat.members?.length ?? 0} listed)`;
 }
 const aliasesOf = (c: Connection): string[] => (Array.isArray(c.config.aliases) ? c.config.aliases : []).map((a: unknown) => String(a).trim()).filter(Boolean);
 
@@ -106,11 +109,13 @@ export async function handleInbound(connectionId: string, adapter: ChannelAdapte
   if (addressed || !user) console.log(`[access] ${conn.name}: ${group ? 'group' : 'dm'} chat=${m.target.chat} user=${m.userId} addressed=${addressed} -> ${user ? 'allowed' : 'denied: ' + denyReason(conn, m)}`);
   if (!user) {
     if (!addressed) return; // never answer strangers' chatter
-    const key = group ? `${connectionId}:${m.userId}:${m.target.chat}` : `${connectionId}:${m.userId}`;
-    if (told.has(key)) return;
-    told.add(key);
+    // Told at every message, so the bot never looks dead; capped per person and per chat (topics and threads share it) so nobody can make it flood a chat.
+    if (!allow(`denied:${connectionId}:${m.userId}:${m.target.chat}`, DENIED_PER_MINUTE) || !allow(`denied-chat:${connectionId}:${m.target.chat}`, DENIED_CHAT_PER_MINUTE)) {
+      console.log(`[access] ${conn.name}: notice withheld for user=${m.userId} chat=${m.target.chat} (too many from this person or chat)`);
+      return;
+    }
     const restricted = group && chatsOf(conn).some((c) => c.id === m.target.chat && c.mode === 'members');
-    await reply(say(conn, restricted ? T.notAllowedMember(m.userId, m.target.chat) : group ? T.notAllowedChat(m.userId, m.target.chat) : T.notAllowed(m.userId)));
+    await reply(say(conn, restricted ? T.notAllowedMember(m.userId, m.target.chat, conn.kind === 'slack') : group ? T.notAllowedChat(m.userId, m.target.chat) : T.notAllowed(m.userId)));
     return;
   }
 
