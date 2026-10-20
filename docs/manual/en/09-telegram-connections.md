@@ -25,18 +25,18 @@ A connection links a hive-am agent to a Telegram bot or a Slack app so you can t
 3. Enter a **Name**, a label for yourself (for example "Store bot").
 4. Under **Agent that answers**, choose the agent.
 5. Paste the **Bot token**.
-6. Add the people who can talk to it (next section).
+6. Add the people who can message it directly (next section).
 7. Click **Create connection**.
 
-![Edit connection panel with Telegram platform, name, agent Queen, hidden bot token, who can talk to it and group mode](img/conexion-editar.jpg)
+![Edit connection panel with Telegram platform, name, agent Queen, hidden bot token, people who can message it directly and group mode](img/conexion-editar.jpg)
 
-*The connection panel. Point at **Agent that answers**, **Bot token** (it shows only the end of the saved token), **Who can talk to it**, and at the bottom the **Delete connection**, **Send test**, **Cancel** and **Save** buttons.*
+*The connection panel. Point at **Agent that answers**, **Bot token** (it shows only the end of the saved token), **People (direct messages)**, and at the bottom the **Delete connection**, **Send test**, **Cancel** and **Save** buttons.*
 
 > **Note:** the token is stored on this machine and is never shown again. When editing, leave it empty to keep the current one.
 
-## Who can talk to it
+## People (direct messages)
 
-Only the people in the **Who can talk to it** list get an answer. Anyone else is only told their own Telegram id by the bot.
+The **People (direct messages)** list says who can message the bot privately. These people can also talk to it in groups that are **not** under **Allowed groups**; an allowed group follows its own rule (see [Groups](#groups)). Anyone else is only told their own Telegram id by the bot, at every message they send it.
 
 ### How to find a Telegram id
 
@@ -46,9 +46,11 @@ Only the people in the **Who can talk to it** list get an answer. Anyone else is
 4. In the connection panel click **Add person**, enter the **Telegram id** and, if you want, the **Name (optional)**.
 5. Click **Save**.
 
-Each person has an **Admin** checkbox: they can reset the shared conversation with `/new`. Use **Remove** to take someone off the list. If the list is empty, the bot answers nobody.
+Each person has an **Admin** checkbox: they can reset the shared conversation with `/new`. Use **Remove** to take someone off the list. If the list is empty, nobody can message it directly.
 
 ## Groups
+
+The form has three blocks: **People (direct messages)**, **Groups** (when it speaks and the names it answers to) and **Allowed groups** (which groups it admits, and who may talk in each).
 
 In a private chat the bot always answers. For groups and topics, the **Groups** section lets you choose **When it speaks in a group**:
 
@@ -57,12 +59,13 @@ In a private chat the bot always answers. For groups and topics, the **Groups** 
 | **Only when called** | Answers when it is mentioned with @, someone replies to one of its messages, uses a command or says its name |
 | **Listens and chimes in** | Reads everything that is written and speaks only when it has something useful to add |
 
-- **Allowed groups:** click **Add group** and enter the group id (it usually starts with `-100`). Any member of that group can talk to it without being in the people list, and the agent's permissions apply to everyone. To find the id, mention the bot in the group: it replies with the chat id.
+- **Allowed groups:** click **Add group** and enter the group id (it usually starts with `-100`). Each allowed group has its own rule, and the agent's permissions apply to everyone it lets in. To find the id, mention the bot in the group: it replies with the chat id. A group that is not listed only admits the people in **People (direct messages)**.
 - **Who can talk here:** under each allowed group choose **Everyone in it** (the default) or **Only these people**. With the second, add each person with **Add person** and their Telegram id (a number; anyone can see theirs with `/id` or by writing to the bot). Then:
-  - only those people, plus the ones in **Who can talk to it**, can talk to the agent in that group, in every topic. The people list still works in every group and keeps its admin flag; the group's people are never admins (`/new` stays for the people list);
-  - anyone else is ignored. If they call the agent, the bot tells them once that the group only admits its list, with their id and the group's, so you can add them;
+  - only those people can talk to the agent in that group, in every topic. **People (direct messages)** does not open it: someone on that list who should talk there must be added to the group's list too;
+  - someone on both lists keeps the **Admin** flag of **People (direct messages)** there, so they can use `/new`; the other people of the group are never admins;
+  - anyone else is ignored. If they call the agent, the bot answers **at every message** that the group only admits its list, with their id and the group's, so you can add them. To keep a stranger from flooding the group, it sends at most 5 of these notices per person and 20 per group in a minute, and then stays silent;
   - with **Listens and chimes in**, their messages are not read at all: they do not reach the agent even as context;
-  - with nobody listed, only the people in **Who can talk to it** can talk there;
+  - with nobody listed, nobody can talk there;
   - a private chat does not change: being on a group's list gives no access by private message.
 - **Names it answers to:** aliases separated by commas (for example "Morena, queen"). If someone writes one in a group, it counts as a mention.
 - **Telegram hides group messages** that do not mention the bot (privacy mode). To use **Listens and chimes in**, send `/setprivacy` to @BotFather and choose **Disable**, then add the bot to each group again.
@@ -140,7 +143,7 @@ A Slack connection works like a Telegram one (same single conversation, same all
 
 ### Create the connection
 
-In **Connections**, **New connection**, choose **Slack** and paste both tokens: **Bot token** (`xoxb-…`) and **App token** (`xapp-…`). Fill in the agent and the allowed people with their **Slack member id** (`U…`: open the person's profile, ⋮ menu, **Copy member ID**). For whole channels, add their **channel id** (`C…`, at the bottom of the channel details). A channel can also be limited to some people with **Only these people**, listing their member ids (`U…`, or `W…` on Enterprise Grid); it works as in [Telegram groups](#groups) and covers every thread of the channel. The platform of a saved connection cannot change.
+In **Connections**, **New connection**, choose **Slack** and paste both tokens: **Bot token** (`xoxb-…`) and **App token** (`xapp-…`). Fill in the agent and the allowed people with their **Slack member id** (`U…`: open the person's profile, ⋮ menu, **Copy member ID**). The form says **Channels** and **Allowed channels** instead of groups. For whole channels, add their **channel id** (`C…`, at the bottom of the channel details). A channel can also be limited to some people with **Only these people**, listing their member ids (`U…`, or `W…` on Enterprise Grid); it works as in [Telegram groups](#groups) (only that list, not even **People (direct messages)**, and nobody if it is empty) and covers every thread of the channel. The notice to someone without access is posted in the thread of their message, so the whole channel sees it; that is why it has the same limit of 5 per person and 20 per channel in a minute. The platform of a saved connection cannot change.
 
 ### How it behaves in Slack
 

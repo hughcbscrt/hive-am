@@ -25,18 +25,18 @@ Una conexión vincula un agente de hive-am con un bot de Telegram o una app de S
 3. Escribe un **Nombre**, una etiqueta para ti (por ejemplo "Bot de la tienda").
 4. En **Agente que responde**, elige el agente.
 5. Pega el **Token del bot**.
-6. Añade a las personas que pueden hablarle (siguiente sección).
+6. Añade a las personas que pueden escribirle por mensaje directo (siguiente sección).
 7. Pulsa **Crear conexión**.
 
-![Panel Editar conexión con plataforma Telegram, nombre, agente Reina, token del bot oculto, quién puede hablarle y modo de grupos](img/conexion-editar.jpg)
+![Panel Editar conexión con plataforma Telegram, nombre, agente Reina, token del bot oculto, personas que pueden escribirle por mensaje directo y modo de grupos](img/conexion-editar.jpg)
 
-*El panel de la conexión. Señala **Agente que responde**, **Token del bot** (muestra solo el final del token guardado), **Quién puede hablarle**, y abajo los botones **Eliminar conexión**, **Enviar prueba**, **Cancelar** y **Guardar**.*
+*El panel de la conexión. Señala **Agente que responde**, **Token del bot** (muestra solo el final del token guardado), **Personas (mensajes directos)**, y abajo los botones **Eliminar conexión**, **Enviar prueba**, **Cancelar** y **Guardar**.*
 
 > **Nota:** el token se guarda en esta máquina y no se vuelve a mostrar. Al editar, déjalo vacío para conservar el actual.
 
-## Quién puede hablarle
+## Personas (mensajes directos)
 
-Solo reciben respuesta las personas de la lista **Quién puede hablarle**. A cualquier otra persona, el bot solo le dice su propio id de Telegram.
+La lista **Personas (mensajes directos)** dice quién puede escribirle al bot por privado. Esas personas también pueden hablarle en los grupos que **no** están en **Grupos autorizados**; un grupo autorizado sigue su propia regla (ver [Grupos](#grupos)). A cualquier otra persona, el bot solo le dice su propio id de Telegram, en cada mensaje que le mande.
 
 ### Cómo averiguar un id de Telegram
 
@@ -46,9 +46,11 @@ Solo reciben respuesta las personas de la lista **Quién puede hablarle**. A cua
 4. En el panel de la conexión pulsa **Añadir persona**, escribe el **Id de Telegram** y, si quieres, el **Nombre (opcional)**.
 5. Pulsa **Guardar**.
 
-Cada persona tiene la casilla **Admin**: puede reiniciar la conversación compartida con `/new`. Con **Quitar** la eliminas de la lista. Si la lista está vacía, el bot no responde a nadie.
+Cada persona tiene la casilla **Admin**: puede reiniciar la conversación compartida con `/new`. Con **Quitar** la eliminas de la lista. Si la lista está vacía, nadie puede escribirle por mensaje directo.
 
 ## Grupos
+
+El formulario tiene tres bloques: **Personas (mensajes directos)**, **Grupos** (cuándo habla y los nombres con los que responde) y **Grupos autorizados** (qué grupos admite y quién puede hablar en cada uno).
 
 En un chat privado el bot siempre responde. Para grupos y temas, la sección **Grupos** te deja elegir **Cuándo habla en un grupo**:
 
@@ -57,12 +59,13 @@ En un chat privado el bot siempre responde. Para grupos y temas, la sección **G
 | **Solo si lo llaman** | Responde cuando lo mencionan con @, le responden a un mensaje suyo, usan un comando o dicen su nombre |
 | **Escucha todo y opina** | Lee todo lo que se escribe y habla solo cuando tiene algo útil que aportar |
 
-- **Grupos autorizados:** pulsa **Añadir grupo** y escribe el id del grupo (suele empezar por `-100`). Cualquier miembro de ese grupo puede hablarle sin estar en la lista de personas, y los permisos del agente aplican a todos. Para saber el id, menciona al bot en el grupo: responde con el id del chat.
+- **Grupos autorizados:** pulsa **Añadir grupo** y escribe el id del grupo (suele empezar por `-100`). Cada grupo autorizado tiene su propia regla, y los permisos del agente aplican a todos los que deja entrar. Para saber el id, menciona al bot en el grupo: responde con el id del chat. Un grupo que no está en la lista solo admite a las personas de **Personas (mensajes directos)**.
 - **Quién puede hablar aquí:** bajo cada grupo autorizado elige **Todos los miembros** (lo predeterminado) o **Solo estas personas**. Con la segunda, añade a cada persona con **Añadir persona** y su id de Telegram (un número; cada quien ve el suyo con `/id` o escribiéndole al bot). Entonces:
-  - solo esas personas, más las de **Quién puede hablarle**, pueden hablar con el agente en ese grupo, en todos sus temas. La lista de personas sigue valiendo en cualquier grupo y conserva su marca de administrador; las personas del grupo nunca son administradoras (`/new` sigue siendo de la lista de personas);
-  - a cualquier otra persona la ignora. Si llama al agente, el bot le avisa una vez de que el grupo solo admite a su lista, con su id y el del grupo, para que puedas añadirla;
+  - solo esas personas pueden hablar con el agente en ese grupo, en todos sus temas. **Personas (mensajes directos)** no lo abre: si alguien de esa lista debe hablar ahí, añádelo también a la lista del grupo;
+  - quien está en las dos listas conserva ahí la marca **Admin** de **Personas (mensajes directos)**, así que puede usar `/new`; las demás personas del grupo nunca son administradoras;
+  - a cualquier otra persona la ignora. Si llama al agente, el bot le responde **en cada mensaje** que el grupo solo admite a su lista, con su id y el del grupo, para que puedas añadirla. Para que un extraño no inunde el grupo, manda como máximo 5 de estos avisos por persona y 20 por grupo en un minuto, y después se calla;
   - con **Escucha todo y opina**, sus mensajes no se leen en absoluto: no llegan al agente ni como contexto;
-  - si la lista está vacía, solo pueden hablar ahí las personas de **Quién puede hablarle**;
+  - si la lista está vacía, nadie puede hablar ahí;
   - el chat privado no cambia: estar en la lista de un grupo no da acceso por mensaje privado.
 - **Nombres con los que responde:** alias separados por comas (por ejemplo "Morena, queen"). Si alguien escribe uno en un grupo, cuenta como una mención.
 - **Telegram oculta los mensajes de grupo** que no mencionan al bot (modo de privacidad). Para usar **Escucha todo y opina**, en @BotFather envía `/setprivacy` y elige **Disable**, y vuelve a añadir el bot a cada grupo.
@@ -140,7 +143,7 @@ Una conexión de Slack funciona como una de Telegram (la misma conversación ún
 
 ### Crear la conexión
 
-En **Conexiones**, **Nueva conexión**, elige **Slack** y pega los dos tokens: **Token del bot** (`xoxb-…`) y **Token de la app** (`xapp-…`). Completa el agente y las personas permitidas con su **id de miembro de Slack** (`U…`: abre el perfil de la persona, menú ⋮, **Copiar ID de miembro**). Para canales enteros, añade su **id de canal** (`C…`, al final de los detalles del canal). Un canal también se puede limitar a unas personas con **Solo estas personas**, con sus ids de miembro (`U…`, o `W…` en Enterprise Grid); funciona como en los [grupos de Telegram](#grupos) y abarca todos los hilos del canal. La plataforma de una conexión guardada no se puede cambiar.
+En **Conexiones**, **Nueva conexión**, elige **Slack** y pega los dos tokens: **Token del bot** (`xoxb-…`) y **Token de la app** (`xapp-…`). Completa el agente y las personas permitidas con su **id de miembro de Slack** (`U…`: abre el perfil de la persona, menú ⋮, **Copiar ID de miembro**). El formulario dice **Canales** y **Canales autorizados** en vez de grupos. Para canales enteros, añade su **id de canal** (`C…`, al final de los detalles del canal). Un canal también se puede limitar a unas personas con **Solo estas personas**, con sus ids de miembro (`U…`, o `W…` en Enterprise Grid); funciona como en los [grupos de Telegram](#grupos) (solo esa lista, ni siquiera **Personas (mensajes directos)**, y nadie si está vacía) y abarca todos los hilos del canal. El aviso a quien no tiene acceso se publica en el hilo de su mensaje, así que lo ve todo el canal; por eso tiene el mismo límite de 5 por persona y 20 por canal en un minuto. La plataforma de una conexión guardada no se puede cambiar.
 
 ### Cómo se comporta en Slack
 

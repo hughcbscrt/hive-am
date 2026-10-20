@@ -21,10 +21,10 @@ const show = (label: string) => console.log(`\n--- ${label}\n` + adapter.sent.ma
 let fail = 0;
 const check = (ok: boolean, what: string) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); if (!ok) fail++; };
 
-// A stranger is refused and told their id, once.
+// A stranger is refused and told their id, at every message.
 await adapter.say('general:t1', 'hello', 'stranger');
 await adapter.say('general:t1', 'hello again', 'stranger', 'in-x2');
-check(adapter.sent.length === 1 && adapter.sent[0].text.includes('stranger'), 'stranger is refused once with their id');
+check(adapter.sent.length === 2 && adapter.sent.every((s) => s.text.includes('stranger')), 'stranger is refused at each message with their id');
 adapter.sent.length = 0;
 
 await adapter.say('deploys:A', 'Remember my favorite fruit for later: PINEAPPLE. Answer with channel_reply, one short sentence.', 'maria');
