@@ -242,6 +242,12 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .fold > summary::-webkit-details-marker { display: none; }
 .fold > summary .chev { transition: transform .15s; margin-left: auto; color: var(--muted); }
 .fold[open] > summary .chev { transform: rotate(90deg); }
+.slack-setup { flex-shrink: 0; }
+.slack-setup .ss-body { padding: 10px 12px 12px; border-top: 1px solid var(--line); background: var(--surface); }
+.slack-setup .eyebrow { margin-top: 4px; }
+.ss-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; align-items: baseline; }
+.ss-list li { display: contents; }
+.ss-list code { white-space: nowrap; }
 .fold pre { margin: 0; padding: 10px 12px; border-top: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; max-height: 280px; overflow: auto; font-size: var(--fs-small); background: var(--surface); }
 .fold.err { border-color: color-mix(in srgb, var(--err) 40%, var(--line)); }
 .fold.think > summary { font-style: italic; font-weight: 500; }

@@ -7,6 +7,7 @@ import { ago } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n';
 import type { AllowedChat, AllowedUser, Connection, ConnectionThread, Provider } from '@/lib/types';
 import { PasswordInput } from './PasswordInput';
+import { SlackSetup } from './SlackSetup';
 import { Banner, CheckRow, ConfirmDialog, Drawer, Field, ModelField, Segmented, useToast } from './ui';
 import { useUnsavedGuard } from '@/lib/hooks/useUnsavedGuard';
 
@@ -127,6 +128,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
             options={[{ id: 'telegram', label: t('conn.kind.telegram'), disabled: editing && slack }, { id: 'slack', label: t('conn.kind.slack'), disabled: editing && !slack }]} />
           {editing && <p className="hint m0">{t('conn.kind.fixed')}</p>}
         </Field>
+        {slack && <SlackSetup name={name} open={!editing} />}
 
         <Field label={t('conn.name')} hint={t('conn.name.hint')} error={errs.name}>
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('conn.name.placeholder')} autoFocus={!editing} />
