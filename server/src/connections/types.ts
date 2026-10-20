@@ -68,8 +68,10 @@ export interface ChannelAdapter {
 }
 
 export interface AllowedUser { id: string; name?: string; admin?: boolean }
-/** A group the whole membership of which may talk to the agent (no need to list each person). */
-export interface AllowedChat { id: string; name?: string }
+/** A group the agent answers in. Missing `mode` (or `everyone`) lets its whole membership talk; `members` lets only the people listed (plus the connection's people list). */
+export interface AllowedChat { id: string; name?: string; mode?: 'everyone' | 'members'; members?: ChatMember[] }
+/** A person who may talk in one restricted chat. Never an admin. */
+export interface ChatMember { id: string; name?: string }
 export type GroupMode = 'mention' | 'open';
 export type OnSilent = 'notice' | 'send_text' | 'ignore';
 
