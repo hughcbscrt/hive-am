@@ -238,5 +238,5 @@ check(!dispatches.get('p-read') && !dispatches.get('p-told'), 'and removes the o
 mcp.kill();
 server.close();
 setDeliveryForTests(null);
-console.log(fail ? `\n${fail} FAILED` : '\nall passed');
+console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);
