@@ -24,13 +24,13 @@ When an orchestrator has at least one worker connected, it gets three tools:
 | Tool | What it does |
 |---|---|
 | `list_agents` | Returns the list of its direct workers, with name, description, provider and whether they are busy. |
-| `dispatch` | Sends a task to a worker by its exact name and waits for its final answer. With `background: true` it does not wait: it gets a task id and the answer reaches it later as a message. |
+| `dispatch` | Sends a task to a worker by its exact name. By default it does not wait: it gets a task id and the answer reaches it later as a message. With `background: false` it waits for the final answer. |
 | `dispatch_status` | Tells the state of a task it delegated (queued, running, done, failed or interrupted) and, once finished, its result. It can wait up to a minute for the end. |
 
 What you should know:
 
 - **Every delegation opens a new native session of the worker.** The worker does not remember earlier delegations, so the orchestrator must include all the context in the task. Your direct conversation with that worker does not change.
-- **The orchestrator waits, unless the task goes in the background.** A normal delegation keeps the orchestrator waiting for the answer, however long the worker takes (it no longer breaks at five minutes). For work that will probably take more than a few minutes, the orchestrator is told to delegate **in the background**: it gets a task id at once, can keep talking to you or delegate to other workers meanwhile, and when the worker finishes it receives a message *"Delegated task … to Backend finished (done). Result: …"* in the same place where you asked it (the web chat, or the same Telegram or Slack thread), and carries on from there.
+- **A delegation goes in the background by default.** The orchestrator gets a task id at once, can keep talking to you or delegate to other workers meanwhile, and when the worker finishes it receives a message *"Delegated task … to Backend finished (done). Result: …"* in the same place where you asked it (the web chat, or the same Telegram or Slack thread), and carries on from there.
 - **The result is not lost.** It is kept in hive-am, not in the call: if hive-am restarts while a worker is on a background task, the task is marked **interrupted** (it is not resumed) and the orchestrator is told so, to check the work and send it again if needed. A result is never sent twice. If the thread where it was asked no longer exists or is muted, the orchestrator can still read the result with `dispatch_status`.
 - **Limit:** an orchestrator can have at most 10 background tasks that have not finished; beyond that it is told to wait.
 - **An agent handles one turn at a time.** If the worker is busy (with a message from you or another delegation), the task waits its turn in the queue, marked **queued**.

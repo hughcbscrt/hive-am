@@ -34,7 +34,7 @@ hive-am está pensado como herramienta **local de un solo usuario**. Conviene co
 | 4 | **Turno en vuelo en un apagón** | Se pierde el turno a medias; la sesión queda intacta y el agente vuelve a `idle` al reiniciar. El mensaje hay que reenviarlo. |
 | 5 | **`PATCH` de agente valida la carpeta efectiva después de guardar** | Si dejas al agente sin carpeta efectiva, el cambio ya quedó guardado cuando se devuelve el error. |
 | 6 | **Lectura de historial sin caché** | `GET /api/sessions` y `…/stats` leen archivos completos en cada llamada; pueden tardar con sesiones enormes. |
-| 7 | **Delegación sin tiempo límite** | Un `dispatch` síncrono espera (con llamadas cortas a `dispatch_status`) mientras el worker trabaje; si el worker se cuelga, el orquestador sigue esperando hasta que su propio CLI se corta tras 10 minutos callado. Se puede usar *Stop* en el worker; el trabajo largo debe ir con `background: true`. |
+| 7 | **Delegación sin tiempo límite** | Un `dispatch` síncrono espera (con llamadas cortas a `dispatch_status`) mientras el worker trabaje; si el worker se cuelga, el orquestador sigue esperando hasta que su propio CLI se corta tras 10 minutos callado. Se puede usar *Stop* en el worker; `dispatch` va en segundo plano por defecto, así que usa `background: false` solo para tareas muy cortas. |
 | 8 | **`Stop` no vacía la cola** | Aborta el turno en curso; los mensajes ya encolados continúan. |
 | 9 | **Un turno a la vez por agente** | Incluye delegaciones: un worker ocupado hace esperar al orquestador. |
 | 10 | **Costos estimados** | Para Claude se usan precios de lista por familia; los modelos desconocidos no tienen costo. Los valores marcados con `≈` son aproximados. |

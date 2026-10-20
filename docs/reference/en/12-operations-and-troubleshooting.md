@@ -34,7 +34,7 @@ hive-am is meant as a **local, single-user tool**. It is worth knowing its reach
 | 4 | **Turn in flight during a blackout** | The half-done turn is lost; the session stays intact and the agent returns to `idle` on restart. The message has to be resent. |
 | 5 | **Agent `PATCH` validates the effective folder after saving** | If you leave the agent without an effective folder, the change was already saved when the error is returned. |
 | 6 | **History reading without cache** | `GET /api/sessions` and `…/stats` read whole files on every call; they can be slow with huge sessions. |
-| 7 | **Delegation without a time limit** | A synchronous `dispatch` waits (with short `dispatch_status` calls) as long as the worker runs; if the worker hangs, the orchestrator keeps waiting until its own CLI is cut after 10 minutes of silence. You can use *Stop* on the worker; long work should go with `background: true`. |
+| 7 | **Delegation without a time limit** | A synchronous `dispatch` waits (with short `dispatch_status` calls) as long as the worker runs; if the worker hangs, the orchestrator keeps waiting until its own CLI is cut after 10 minutes of silence. You can use *Stop* on the worker; `dispatch` goes in the background by default, so use `background: false` only for very short tasks. |
 | 8 | **`Stop` does not empty the queue** | It aborts the turn in progress; messages already queued continue. |
 | 9 | **One turn at a time per agent** | It includes delegations: a busy worker makes the orchestrator wait. |
 | 10 | **Estimated costs** | For Claude, list prices per family are used; unknown models have no cost. Values marked with `≈` are approximate. |

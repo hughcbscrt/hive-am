@@ -24,13 +24,13 @@ Cuando un orquestador tiene al menos un worker conectado, recibe tres herramient
 | Herramienta | Qué hace |
 |---|---|
 | `list_agents` | Le devuelve la lista de sus workers directos, con nombre, descripción, proveedor y si están ocupados. |
-| `dispatch` | Envía una tarea a un worker por su nombre exacto y espera su respuesta final. Con `background: true` no espera: recibe el id de la tarea y la respuesta le llega después como mensaje. |
+| `dispatch` | Envía una tarea a un worker por su nombre exacto. Por defecto no espera: recibe el id de la tarea y la respuesta le llega después como mensaje. Con `background: false` espera la respuesta final. |
 | `dispatch_status` | Dice el estado de una tarea que delegó (en cola, en curso, terminada, fallida o interrumpida) y, al terminar, su resultado. Puede esperar hasta un minuto a que termine. |
 
 Lo que debes saber:
 
 - **Cada delegación abre una sesión nativa nueva del worker.** El worker no recuerda delegaciones anteriores, así que el orquestador debe incluir todo el contexto en la tarea. Tu conversación directa con ese worker no cambia.
-- **El orquestador espera, salvo que la tarea vaya en segundo plano.** Una delegación normal deja al orquestador esperando la respuesta, tarde lo que tarde el worker (ya no se rompe a los cinco minutos). Para trabajo que probablemente tarde más de unos minutos, al orquestador se le indica que delegue **en segundo plano**: recibe enseguida el id de la tarea, puede seguir hablando contigo o delegar a otros workers mientras tanto, y cuando el worker termina le llega un mensaje *"Delegated task … to Backend finished (done). Result: …"* en el mismo sitio donde se lo pediste (el chat web, o el mismo hilo de Telegram o Slack), y sigue desde ahí.
+- **Una delegación va en segundo plano por defecto.** El orquestador recibe enseguida el id de la tarea, puede seguir hablando contigo o delegar a otros workers mientras tanto, y cuando el worker termina le llega un mensaje *"Delegated task … to Backend finished (done). Result: …"* en el mismo sitio donde se lo pediste (el chat web, o el mismo hilo de Telegram o Slack), y sigue desde ahí.
 - **El resultado no se pierde.** Se guarda en hive-am, no en la llamada: si hive-am se reinicia mientras un worker está con una tarea en segundo plano, la tarea queda **interrumpida** (no se reanuda) y al orquestador se le avisa, para que revise el trabajo y la vuelva a mandar si hace falta. Un resultado nunca se manda dos veces. Si el hilo donde se pidió ya no existe o está silenciado, el orquestador aún puede leer el resultado con `dispatch_status`.
 - **Límite:** un orquestador puede tener como mucho 10 tareas en segundo plano sin terminar; pasado eso se le pide que espere.
 - **Un agente hace un turno a la vez.** Si el worker está ocupado (con un mensaje tuyo u otra delegación), la tarea espera su turno en la cola, marcada **en cola**.

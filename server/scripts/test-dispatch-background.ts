@@ -83,16 +83,16 @@ await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clien
 const listed = await rpc('tools/list', {});
 check(['dispatch', 'dispatch_status'].every((n) => listed.result.tools.some((t: any) => t.name === n)) && !!listed.result.tools.find((t: any) => t.name === 'dispatch').inputSchema.properties.background, 'the MCP server offers dispatch (with background) and dispatch_status');
 const toolText = (m: any) => m.result?.content?.[0]?.text ?? '';
-const short = await rpc('tools/call', { name: 'dispatch', arguments: { agent: 'bg-w1', task: 'say:short answer' } });
+const short = await rpc('tools/call', { name: 'dispatch', arguments: { agent: 'bg-w1', task: 'say:short answer', background: false } });
 check(toolText(short) === 'short answer' && !short.result.isError, 'a short synchronous dispatch returns the text as before');
-const silent = await rpc('tools/call', { name: 'dispatch', arguments: { agent: 'bg-w1', task: 'empty' } });
+const silent = await rpc('tools/call', { name: 'dispatch', arguments: { agent: 'bg-w1', task: 'empty', background: false } });
 check(toolText(silent) === '(the subagent finished without a text answer)', 'an answer without text keeps the same fallback');
 polls = 0;
 const t2 = Date.now();
-const long = await rpc('tools/call', { name: 'dispatch', arguments: { agent: 'bg-w1', task: 'sleep:3500:after a long while' } });
+const long = await rpc('tools/call', { name: 'dispatch', arguments: { agent: 'bg-w1', task: 'sleep:3500:after a long while', background: false } });
 check(toolText(long) === 'after a long while' && Date.now() - t2 >= 3500, 'a worker that outlasts the poll window still returns its text');
 check(polls >= 3, `through several dispatch_status calls (${polls})`);
-const failedSync = await rpc('tools/call', { name: 'dispatch', arguments: { agent: 'bg-w1', task: 'fail:disk full' } });
+const failedSync = await rpc('tools/call', { name: 'dispatch', arguments: { agent: 'bg-w1', task: 'fail:disk full', background: false } });
 check(!!failedSync.result.isError && /failed/.test(toolText(failedSync)) && /disk full/.test(toolText(failedSync)), 'a failed synchronous task is an error that says why');
 
 // ---- 3 and 4. background: back at once, running, then done; dispatch_status waits, but never long ----
@@ -165,7 +165,7 @@ await until(() => dispatches.get(second.json.id)?.status === 'running');
 check(dispatches.get(first.json.id)?.status === 'done' && dispatches.get(second.json.id)?.status === 'running', 'it runs once the first one is done');
 await until(() => dispatches.get(second.json.id)?.status === 'done');
 check(!overlap, 'the two never ran together');
-const viaMcp = await rpc('tools/call', { name: 'dispatch', arguments: { agent: 'bg-w2', task: 'sleep:300:via mcp', background: true } });
+const viaMcp = await rpc('tools/call', { name: 'dispatch', arguments: { agent: 'bg-w2', task: 'sleep:300:via mcp' } });
 check(/^Task \S+ sent to bg-w2 \((running|queued)\)\. You will be woken with the result when it finishes; you can also ask with dispatch_status\.$/.test(toolText(viaMcp)), `the background dispatch tool says the id, the subagent and the state (${toolText(viaMcp)})`);
 
 // ---- 8. ownership ----

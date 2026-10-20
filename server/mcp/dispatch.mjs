@@ -24,13 +24,13 @@ const allTools = [
   {
     cap: 'dispatch',
     name: 'dispatch',
-    description: 'Send a self-contained task to one of your subagents and wait for its final answer. Every delegation starts a fresh conversation for the subagent, so include all the context it needs. For a task that will probably take more than a few minutes, set background: true: the call returns at once with a task id, and the answer arrives later as a message to you (you can also ask with dispatch_status).',
+    description: 'Send a self-contained task to one of your subagents. By default the call returns at once with a task id and the answer arrives later as a message to you (you can also ask with dispatch_status), so you can answer the person or delegate more meanwhile. Set background: false only for a very short task whose answer you need right now: the call then waits for the final answer. Every delegation starts a fresh conversation for the subagent, so include all the context it needs.',
     inputSchema: {
       type: 'object',
       properties: {
         agent: { type: 'string', description: 'Exact subagent name from list_agents' },
         task: { type: 'string', description: 'Full instructions for the subagent; include all context it needs.' },
-        background: { type: 'boolean', description: 'Return at once with a task id instead of waiting for the answer (default false). The result is sent to you as a message when the subagent finishes.' },
+        background: { type: 'boolean', description: 'Return at once with a task id (default true). The result is sent to you as a message when the subagent finishes. Set false to wait for the final answer in this call.' },
       },
       required: ['agent', 'task'],
       additionalProperties: false,
@@ -315,7 +315,7 @@ async function call(name, args) {
     return JSON.stringify(await r.json(), null, 2);
   }
   if (name === 'dispatch') {
-    const background = args.background === true;
+    const background = args.background !== false;
     const r = await fetch(`${API}/api/dispatch`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ from: FROM, agent: args.agent, task: args.task, background, poll: !background }),
