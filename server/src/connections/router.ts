@@ -40,6 +40,7 @@ const T = {
   help: { es: 'Comandos: /new (o /clear, /reset) empieza una conversación nueva (solo administradores) · /stop detiene el turno en curso · /status estado del agente · /mute y /unmute me callan o me reactivan en este hilo · /id tu id y el de este chat · /help esta ayuda.', en: 'Commands: /new (or /clear, /reset) starts a new conversation (admins only) · /stop stops the turn in progress · /status the agent\'s state · /mute and /unmute silence me or bring me back in this thread · /id your id and this chat\'s · /help this help.' },
   ids: (user: string, chat: string) => ({ es: `Tu id: ${user} · este chat: ${chat}`, en: `Your id: ${user} · this chat: ${chat}` }),
   notAllowedChat: (user: string, chat: string) => ({ es: `No tienes acceso. Para usarme aquí, añade tu id (${user}) o este chat (${chat}) en la conexión.`, en: `You don't have access. To use me here, add your id (${user}) or this chat (${chat}) to the connection.` }),
+  notAllowedMember: (user: string, chat: string) => ({ es: `Este chat solo admite a personas de su lista. Para usarme aquí, añade tu id (${user}) a los miembros de este chat (${chat}) o a la lista de personas de la conexión.`, en: `This chat only admits the people on its list. To use me here, add your id (${user}) to this chat's members (${chat}) or to the connection's people list.` }),
 };
 type Msg = { es: string; en: string };
 /** The same commands on every platform; these are other names for them. */
@@ -53,9 +54,20 @@ function tooFast(connId: string, user: string, limit: number): boolean {
   arr.push(t); hits.set(key, arr);
   return arr.length > limit;
 }
-const told = new Set<string>(); // users already told how to get access, so strangers can't make us spam them
+const told = new Set<string>(); // users already told how to get access (per chat in groups, since the notice names it), so strangers can't make us spam them
 
 const chatsOf = (c: Connection): AllowedChat[] => (Array.isArray(c.config.chats) ? c.config.chats : []);
+
+/** Who may talk: the connection's people list anywhere (with their admin flag); in a listed group, everyone in it or only its members. The chat is `target.chat`, so a restriction covers every topic and thread in it. */
+export function senderOf(c: Connection, m: Inbound): AllowedUser | undefined {
+  const listed = c.allowed.find((u) => u.id === m.userId);
+  if (listed) return listed;
+  const chat = m.group ? chatsOf(c).find((x) => x.id === m.target.chat) : undefined;
+  if (!chat) return undefined;
+  if (chat.mode !== 'members') return { id: m.userId, name: m.userName };
+  const member = (Array.isArray(chat.members) ? chat.members : []).find((x) => x.id === m.userId);
+  return member ? { id: m.userId, name: member.name ?? m.userName } : undefined;
+}
 const aliasesOf = (c: Connection): string[] => (Array.isArray(c.config.aliases) ? c.config.aliases : []).map((a: unknown) => String(a).trim()).filter(Boolean);
 
 /** Group chatter that speaks TO the agent by one of its aliases counts as aimed at it, even without @mention. */
@@ -83,12 +95,14 @@ export async function handleInbound(connectionId: string, adapter: ChannelAdapte
   // Group chatter is only heard when the connection is open to it.
   if (group && !addressed && conn.config.group_mode !== 'open') return;
 
-  const user: AllowedUser | undefined = conn.allowed.find((u) => u.id === m.userId)
-    ?? (group && chatsOf(conn).some((c) => c.id === m.target.chat) ? { id: m.userId, name: m.userName } : undefined);
+  const user = senderOf(conn, m);
   if (!user) {
     if (!addressed) return; // never answer strangers' chatter
-    const key = `${connectionId}:${m.userId}`;
-    if (!told.has(key)) { told.add(key); await reply(say(conn, group ? T.notAllowedChat(m.userId, m.target.chat) : T.notAllowed(m.userId))); }
+    const key = group ? `${connectionId}:${m.userId}:${m.target.chat}` : `${connectionId}:${m.userId}`;
+    if (told.has(key)) return;
+    told.add(key);
+    const restricted = group && chatsOf(conn).some((c) => c.id === m.target.chat && c.mode === 'members');
+    await reply(say(conn, restricted ? T.notAllowedMember(m.userId, m.target.chat) : group ? T.notAllowedChat(m.userId, m.target.chat) : T.notAllowed(m.userId)));
     return;
   }
 

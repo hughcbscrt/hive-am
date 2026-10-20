@@ -39,7 +39,9 @@ export interface Connection {
   id: string; kind: ChannelKind; name: string; agent_id: string | null; enabled: boolean; created_at: number;
   config: Record<string, any>; allowed: AllowedUser[]; status: ConnectionStatus; thread_count: number;
 }
-export interface AllowedChat { id: string; name?: string }
+/** An authorized group: everyone in it may talk, or (`mode: 'members'`) only the people listed plus the connection's people list. */
+export interface AllowedChat { id: string; name?: string; mode?: 'everyone' | 'members'; members?: ChatMember[] }
+export interface ChatMember { id: string; name?: string }
 export interface ConnectionThread { id: string; external_key: string; title: string; last_user: string | null; last_activity: number; created_at: number; muted: boolean }
 export type ScheduleRunStatus = 'delivered' | 'failed' | 'skipped_muted' | 'skipped_busy' | 'skipped_missed' | 'skipped_disabled' | 'skipped_reassigned';
 /** A recurring schedule (`cron`, `every`) or a pending one-shot wake-up (`once`) an agent set for itself. */

@@ -58,6 +58,12 @@ In a private chat the bot always answers. For groups and topics, the **Groups** 
 | **Listens and chimes in** | Reads everything that is written and speaks only when it has something useful to add |
 
 - **Allowed groups:** click **Add group** and enter the group id (it usually starts with `-100`). Any member of that group can talk to it without being in the people list, and the agent's permissions apply to everyone. To find the id, mention the bot in the group: it replies with the chat id.
+- **Who can talk here:** under each allowed group choose **Everyone in it** (the default) or **Only these people**. With the second, add each person with **Add person** and their Telegram id (a number; anyone can see theirs with `/id` or by writing to the bot). Then:
+  - only those people, plus the ones in **Who can talk to it**, can talk to the agent in that group, in every topic. The people list still works in every group and keeps its admin flag; the group's people are never admins (`/new` stays for the people list);
+  - anyone else is ignored. If they call the agent, the bot tells them once that the group only admits its list, with their id and the group's, so you can add them;
+  - with **Listens and chimes in**, their messages are not read at all: they do not reach the agent even as context;
+  - with nobody listed, only the people in **Who can talk to it** can talk there;
+  - a private chat does not change: being on a group's list gives no access by private message.
 - **Names it answers to:** aliases separated by commas (for example "Morena, queen"). If someone writes one in a group, it counts as a mention.
 - **Telegram hides group messages** that do not mention the bot (privacy mode). To use **Listens and chimes in**, send `/setprivacy` to @BotFather and choose **Disable**, then add the bot to each group again.
 
@@ -134,7 +140,7 @@ A Slack connection works like a Telegram one (same single conversation, same all
 
 ### Create the connection
 
-In **Connections**, **New connection**, choose **Slack** and paste both tokens: **Bot token** (`xoxb-…`) and **App token** (`xapp-…`). Fill in the agent and the allowed people with their **Slack member id** (`U…`: open the person's profile, ⋮ menu, **Copy member ID**). For whole channels, add their **channel id** (`C…`, at the bottom of the channel details). The platform of a saved connection cannot change.
+In **Connections**, **New connection**, choose **Slack** and paste both tokens: **Bot token** (`xoxb-…`) and **App token** (`xapp-…`). Fill in the agent and the allowed people with their **Slack member id** (`U…`: open the person's profile, ⋮ menu, **Copy member ID**). For whole channels, add their **channel id** (`C…`, at the bottom of the channel details). A channel can also be limited to some people with **Only these people**, listing their member ids (`U…`, or `W…` on Enterprise Grid); it works as in [Telegram groups](#groups) and covers every thread of the channel. The platform of a saved connection cannot change.
 
 ### How it behaves in Slack
 

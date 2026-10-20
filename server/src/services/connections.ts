@@ -8,13 +8,26 @@ import { bad, notFound } from '../http/errors.js';
 import type { Body } from '../http/body.js';
 import { CONNECTION_KINDS, isRecord, trimmed, validateConnection, type ConnConfig } from '../http/validate.js';
 
+/** Ids with an optional name: trimmed, de-duplicated, blanks dropped. */
+function cleanIds(list: unknown[]): { id: string; name?: string }[] {
+  const seen = new Set<string>();
+  return list
+    .map((c: unknown) => { const r = isRecord(c) ? c : {}; return { id: trimmed(r.id), name: r.name ? String(r.name).trim() : undefined }; })
+    .filter((c) => c.id && !seen.has(c.id) && seen.add(c.id));
+}
+/** One group's mode: `everyone` (or nothing) keeps the entry as `{ id, name }`; `members` keeps its cleaned list; anything else is left for validation to refuse. */
+function cleanChat(c: unknown) {
+  const r = isRecord(c) ? c : {};
+  const [chat] = cleanIds([r]);
+  if (!chat || r.mode === undefined || r.mode === null || r.mode === 'everyone') return chat;
+  if (r.mode !== 'members') return { ...chat, mode: r.mode, members: r.members };
+  return { ...chat, mode: 'members', members: Array.isArray(r.members) ? cleanIds(r.members) : r.members ?? [] };
+}
 /** Group ids and alias names from the form: trimmed, de-duplicated, blanks dropped. */
 function cleanGroupConfig(config: ConnConfig): ConnConfig {
   if (Array.isArray(config.chats)) {
     const seen = new Set<string>();
-    config.chats = config.chats
-      .map((c: unknown) => { const r = isRecord(c) ? c : {}; return { id: trimmed(r.id), name: r.name ? String(r.name).trim() : undefined }; })
-      .filter((c) => c.id && !seen.has(c.id) && seen.add(c.id));
+    config.chats = config.chats.map(cleanChat).filter((c) => c && !seen.has(c.id) && seen.add(c.id));
   }
   if (Array.isArray(config.aliases)) config.aliases = [...new Set(config.aliases.map((x: unknown) => String(x).trim()).filter(Boolean))];
   return config;

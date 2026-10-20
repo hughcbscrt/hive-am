@@ -42,6 +42,19 @@ export function validateColony(p: Body, partial = false): ColonyInput {
 }
 
 export type ConnConfig = Record<string, unknown>;
+const MAX_CHATS = 50;
+const MAX_CHAT_MEMBERS = 50;
+/** What a person's id looks like on each platform: Telegram user ids are positive numbers; Slack member ids are `U…` (or `W…` on Enterprise Grid). */
+const MEMBER_ID: Record<string, RegExp> = { telegram: /^\d+$/, slack: /^[UW][A-Z0-9]{2,}$/ };
+/** One authorized group: its mode, and when it only admits some people, who they are. */
+function validateChat(kind: string, c: unknown): void {
+  const r = isRecord(c) ? c : {};
+  if (r.mode !== undefined && r.mode !== 'everyone' && r.mode !== 'members') throw bad('chat mode must be everyone or members');
+  if (r.members === undefined) return;
+  if (!Array.isArray(r.members) || r.members.length > MAX_CHAT_MEMBERS) throw bad(`a chat can list at most ${MAX_CHAT_MEMBERS} members`);
+  const shape = MEMBER_ID[kind];
+  if (shape && r.members.some((m) => !shape.test(trimmed(isRecord(m) ? m.id : m)))) throw bad('member ids must be numbers on Telegram and start with U or W on Slack');
+}
 export const CONNECTION_KINDS = ['telegram', 'slack'] as const;
 const REQUIRED: Record<string, string[]> = { telegram: ['token'], slack: ['bot_token', 'app_token'] };
 export function validateConnection(kind: string, config: ConnConfig, agentId: string | null | undefined, enabled: boolean): void {
@@ -51,7 +64,8 @@ export function validateConnection(kind: string, config: ConnConfig, agentId: st
   if (config.on_silent !== undefined && !['notice', 'send_text', 'ignore'].includes(config.on_silent as string)) throw bad('on_silent must be notice, send_text or ignore');
   if (config.group_mode !== undefined && !['mention', 'open'].includes(config.group_mode as string)) throw bad('group_mode must be mention or open');
   if (config.vision !== undefined && config.vision !== null && !validVision(config.vision)) throw bad('vision must be { provider, model } or empty');
-  if (config.chats !== undefined && (!Array.isArray(config.chats) || config.chats.length > 50)) throw bad('chats must be a list of at most 50 groups');
+  if (config.chats !== undefined && (!Array.isArray(config.chats) || config.chats.length > MAX_CHATS)) throw bad(`chats must be a list of at most ${MAX_CHATS} groups`);
+  if (Array.isArray(config.chats)) for (const c of config.chats) validateChat(kind, c);
   if (config.aliases !== undefined && (!Array.isArray(config.aliases) || config.aliases.length > 10)) throw bad('aliases must be a list of at most 10 names');
   if (agentId) {
     const a = agents.get(agentId); if (!a) throw bad('That agent no longer exists');

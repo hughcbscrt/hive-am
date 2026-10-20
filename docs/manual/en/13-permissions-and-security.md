@@ -62,7 +62,7 @@ An agent linked to Telegram or Slack cannot be at **Read-only**: a read-only age
 Also, whoever can talk to it through the channel controls what the agent does with its permissions:
 
 - With **Full access**, anyone on the list of authorized people can make it run anything on your machine.
-- Authorizing a group gives that access to all of its members.
+- Authorizing a group gives that access to all of its members, including people who join later. To keep a group with **Full access**, choose **Only these people** under it and list who may talk there.
 - OpenCode ignores the permission setting in these cases, and can edit files and run commands whatever the setting says. The connection screen warns you about it.
 
 See [Connections](09-telegram-connections.md).
@@ -112,7 +112,7 @@ What hive-am keeps of its own record does not grow for ever. Every six hours it 
 2. Use **Read-only** for agents that review code or answer questions.
 3. Give each agent its own narrow folder, not your home folder.
 4. Review the changes in the **Changes** tab before you commit.
-5. With connections, authorize only people and groups you trust.
+5. With connections, authorize only people and groups you trust, and limit shared groups to **Only these people**.
 6. Do not put passwords or tokens in prompts, skills or notebooks.
 7. Do not expose hive-am's port to the network (for example with a tunnel) while there is no login.
 8. Back up `~/.hive-am/` if your setup matters to you.

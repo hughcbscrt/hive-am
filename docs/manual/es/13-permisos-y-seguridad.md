@@ -62,7 +62,7 @@ Un agente vinculado a Telegram o Slack no puede estar en **Solo lectura**: un ag
 Además, quien puede hablarle por el canal controla lo que el agente hace con sus permisos:
 
 - Con **Acceso total**, cualquiera de la lista de personas autorizadas puede hacer que ejecute lo que sea en tu máquina.
-- Autorizar un grupo da ese acceso a todos sus miembros.
+- Autorizar un grupo da ese acceso a todos sus miembros, también a quien entre después. Para tener un grupo con **Acceso total**, elige **Solo estas personas** bajo él y lista quién puede hablar ahí.
 - OpenCode ignora el ajuste de permisos en estos casos, y puede editar archivos y ejecutar comandos diga lo que diga la configuración. La pantalla de la conexión lo avisa.
 
 Ver [Conexiones](09-conexiones-telegram.md).
@@ -112,7 +112,7 @@ Lo que hive-am guarda de su propio registro no crece para siempre. Cada seis hor
 2. Usa **Solo lectura** para agentes que revisan código o hacen consultas.
 3. Dale a cada agente una carpeta propia y acotada, no tu carpeta personal.
 4. Revisa los cambios con la pestaña **Cambios** antes de hacer commit.
-5. Con conexiones, autoriza solo a personas y grupos de confianza.
+5. Con conexiones, autoriza solo a personas y grupos de confianza, y limita los grupos compartidos a **Solo estas personas**.
 6. No pongas contraseñas ni tokens en prompts, skills ni cuadernos.
 7. No expongas el puerto de hive-am a la red (por ejemplo con un túnel) mientras no haya inicio de sesión.
 8. Haz copia de `~/.hive-am/` si tu configuración te importa.

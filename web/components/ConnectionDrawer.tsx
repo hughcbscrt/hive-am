@@ -5,7 +5,7 @@ import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
 import { ago } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n';
-import type { AllowedChat, AllowedUser, Connection, ConnectionThread, Provider } from '@/lib/types';
+import type { AllowedChat, AllowedUser, ChatMember, Connection, ConnectionThread, Provider } from '@/lib/types';
 import { PasswordInput } from './PasswordInput';
 import { SlackSetup } from './SlackSetup';
 import { Banner, CheckRow, ConfirmDialog, Drawer, Field, ModelField, Segmented, useToast } from './ui';
@@ -14,6 +14,7 @@ import { useUnsavedGuard } from '@/lib/hooks/useUnsavedGuard';
 type Silent = 'notice' | 'send_text' | 'ignore';
 type GroupMode = 'mention' | 'open';
 type Kind = 'telegram' | 'slack';
+type ChatMode = 'everyone' | 'members';
 
 /** Create or edit a connection: which agent answers, who may talk to it, and the platform credentials. */
 export function ConnectionDrawer({ connection, onClose }: { connection?: Connection; onClose: () => void }) {
@@ -64,6 +65,8 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
   const eligible = useMemo(() => [...agents].sort((a, b) => a.name.localeCompare(b.name)), [agents]);
   const setUser = (i: number, p: Partial<AllowedUser>) => setAllowed((l) => l.map((u, j) => (j === i ? { ...u, ...p } : u)));
   const setChat = (i: number, p: Partial<AllowedChat>) => setChats((l) => l.map((c, j) => (j === i ? { ...c, ...p } : c)));
+  // Switching back to everyone keeps the list here (in case of a change of mind); the server drops it on save.
+  const setMembers = (i: number, f: (m: ChatMember[]) => ChatMember[]) => setChats((l) => l.map((c, j) => (j === i ? { ...c, members: f(c.members ?? []) } : c)));
   const toggleMute = async (th: ConnectionThread) => {
     try { await api.patch(`/connections/${connection!.id}/threads/${th.id}`, { muted: !th.muted }); setThreads((l) => l.map((x) => (x.id === th.id ? { ...x, muted: !th.muted } : x))); }
     catch (x) { toast(x instanceof Error ? x.message : String(x), 'err'); }
@@ -94,7 +97,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
       : { ...(token.trim() ? { token: token.trim() } : {}) };
     const body = { kind, name: name.trim(), agent_id: agentId, enabled, allowed: allowed.filter((u) => u.id.trim()), config: {
       ...secrets, lang, on_silent: silent, effort, group_mode: groupMode, files, vision,
-      chats: chats.filter((c) => c.id.trim()), aliases: aliases.split(',').map((x) => x.trim()).filter(Boolean),
+      chats: chats.filter((c) => c.id.trim()).map((c) => (c.members ? { ...c, members: c.members.filter((m) => m.id.trim()) } : c)), aliases: aliases.split(',').map((x) => x.trim()).filter(Boolean),
     } };
     try {
       if (connection) await api.patch(`/connections/${connection.id}`, body); else await api.post('/connections', body);
@@ -178,13 +181,38 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
             <p className="hint m0">{t(slack ? `conn.mode.${groupMode}.hint.slack` : `conn.mode.${groupMode}.hint`)}</p>
             <div className="eyebrow">{t(slack ? 'conn.chats.slack' : 'conn.chats')}</div>
             {chats.length === 0 && <p className="hint m0">{t(slack ? 'conn.chats.empty.slack' : 'conn.chats.empty')}</p>}
-            {chats.map((c, i) => (
-              <div key={i} className="row gap-s">
-                <input className="input mono fa-w190" value={c.id} onChange={(e) => setChat(i, { id: cleanChat(e.target.value) })} placeholder={t(slack ? 'conn.chats.id.slack' : 'conn.chats.id')} aria-label={t(slack ? 'conn.chats.id.slack' : 'conn.chats.id')} />
-                <input className="input grow" value={c.name ?? ''} onChange={(e) => setChat(i, { name: e.target.value })} placeholder={t('conn.chats.name')} aria-label={t('conn.chats.name')} />
-                <button className="btn ghost icon sm" onClick={() => setChats((l) => l.filter((_, j) => j !== i))} aria-label={t('conn.chats.remove')} title={t('conn.chats.remove')}><X size={15} /></button>
-              </div>
-            ))}
+            {chats.map((c, i) => {
+              const mode: ChatMode = c.mode === 'members' ? 'members' : 'everyone';
+              const members = c.members ?? [];
+              const memberId = t(slack ? 'conn.chats.member.id.slack' : 'conn.chats.member.id');
+              return (
+                <div key={i} className="stack-s fa-chat">
+                  <div className="row gap-s">
+                    <input className="input mono fa-w190" value={c.id} onChange={(e) => setChat(i, { id: cleanChat(e.target.value) })} placeholder={t(slack ? 'conn.chats.id.slack' : 'conn.chats.id')} aria-label={t(slack ? 'conn.chats.id.slack' : 'conn.chats.id')} />
+                    <input className="input grow" value={c.name ?? ''} onChange={(e) => setChat(i, { name: e.target.value })} placeholder={t('conn.chats.name')} aria-label={t('conn.chats.name')} />
+                    <button className="btn ghost icon sm" onClick={() => setChats((l) => l.filter((_, j) => j !== i))} aria-label={t('conn.chats.remove')} title={t('conn.chats.remove')}><X size={15} /></button>
+                  </div>
+                  <div className="row gap-s wrap">
+                    <span className="hint m0">{t('conn.chats.mode')}</span>
+                    <Segmented<ChatMode> value={mode} onChange={(v) => setChat(i, { mode: v })} options={[{ id: 'everyone', label: t('conn.chats.mode.everyone') }, { id: 'members', label: t('conn.chats.mode.members') }]} />
+                  </div>
+                  <p className="hint m0">{t(slack ? `conn.chats.mode.${mode}.hint.slack` : `conn.chats.mode.${mode}.hint`)}</p>
+                  {mode === 'members' && (
+                    <>
+                      {!members.some((m) => m.id.trim()) && <p className="hint warn m0">{t(slack ? 'conn.chats.mode.members.empty.slack' : 'conn.chats.mode.members.empty')}</p>}
+                      {members.map((m, k) => (
+                        <div key={k} className="row gap-s">
+                          <input className="input mono fa-w150" value={m.id} onChange={(e) => setMembers(i, (l) => l.map((x, j) => (j === k ? { ...x, id: cleanUser(e.target.value) } : x)))} placeholder={memberId} aria-label={memberId} />
+                          <input className="input grow" value={m.name ?? ''} onChange={(e) => setMembers(i, (l) => l.map((x, j) => (j === k ? { ...x, name: e.target.value } : x)))} placeholder={t('conn.chats.member.name')} aria-label={t('conn.chats.member.name')} />
+                          <button className="btn ghost icon sm" onClick={() => setMembers(i, (l) => l.filter((_, j) => j !== k))} aria-label={t('conn.chats.member.remove')} title={t('conn.chats.member.remove')}><X size={15} /></button>
+                        </div>
+                      ))}
+                      <div><button className="btn sm" onClick={() => setMembers(i, (l) => [...l, { id: '' }])}><Plus size={14} />{t('conn.chats.member.add')}</button></div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
             <div><button className="btn sm" onClick={() => setChats((l) => [...l, { id: '' }])}><Plus size={14} />{t(slack ? 'conn.chats.add.slack' : 'conn.chats.add')}</button></div>
             <p className="hint m0">{t(slack ? 'conn.chats.hint.slack' : 'conn.chats.hint')} {t(slack ? 'conn.chats.howto.slack' : 'conn.chats.howto')}</p>
             <Field label={t('conn.aliases')} hint={t(slack ? 'conn.aliases.hint.slack' : 'conn.aliases.hint')}>
