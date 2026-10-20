@@ -57,6 +57,7 @@ A **type** is a template: provider, model, prompt, permission, role, skills. Scr
 - Creating an agent "from a type" **copies** its values (`draftFromType` in the UI, or `POST /api/types/:id/spawn`). After that the agent is independent: editing the type does **not** change the agents already created.
 - `type_id` stays as a reference to show "N agents use this type".
 - Types are not inherited through colonies and play no part at run time.
+- The type editor is the agent form (`AgentForm` with `mode="type"`), so a new agent field is written once. The mode hides what a type does not store (folder, colony and inheritance, browser, team, resources) and keeps the types screen's own texts; the type's name is checked by the screen, not by `validate()`. Saving sends only the fields a type stores (`TYPE_FIELDS`, `typePayload`). A new agent-only field goes under `!isType`.
 
 ## 7.3 Skills
 

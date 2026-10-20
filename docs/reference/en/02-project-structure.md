@@ -105,7 +105,7 @@ hive-am/
     │   ├── HelpPopover.tsx   # help icon with popover
     │   ├── ConnectionDrawer.tsx   # create/edit a connection
     │   ├── agents/           # everything that creates or edits agents and colonies
-    │   │   ├── AgentForm.tsx          # the single agent form (create and edit)
+    │   │   ├── AgentForm.tsx          # the single agent form (create and edit), also the agent types form (`mode="type"`)
     │   │   ├── useAgentSettings.tsx   # save/discard/delete shared by the panels
     │   │   ├── NewAgentDrawer.tsx     # "new agent" wizard
     │   │   ├── AgentEditDrawer.tsx    # editing an agent in a side panel
@@ -210,7 +210,7 @@ There is no test framework: `server/scripts/test-*.ts` are standalone scripts (2
 | `components/Shell.tsx` | Side navigation, connection status, theme switch, `HiveProvider` and `Toaster`. |
 | `components/Dialog.tsx`, `ConfirmDialog.tsx`, `Tabs.tsx`, `Primitives.tsx`, `WorkspaceHeader.tsx`, `Toast.tsx`, `combobox.ts` | The base components; see [11.4](11-frontend.md#114-shared-components). `ui.tsx` re-exports them, so screens import everything from `@/components/ui`. |
 | `components/ui.tsx` | `Hex`, `ProviderBadge`, `StatusChip`, `RoleChip`, `Drawer`, `Modal`, `Field`, `Segmented`, `ProviderPicker`, `ModelField`, `PermissionField`, `SkillPicker`, `FolderPicker`, `Toaster`… |
-| `components/agents/*` | Forms and panels of agents and colonies (`AgentForm` is the shared form and handles inheritance from the colony); `NotebookPanel` edits the notebook. |
+| `components/agents/*` | Forms and panels of agents and colonies (`AgentForm` is the shared form of agents and agent types and handles inheritance from the colony); `NotebookPanel` edits the notebook. |
 | `components/chat/*` | `Chat` (memoized transcript, live turn, delegation card), `ToolCall` (each tool as a readable row), `UserBubble` and `StatsBar`. |
 | `components/git/*` | The **Changes** tab: `GitExplorer` (tree, file and diff viewer, history, stashes), `GitActions` (Fetch/Pull/Push/Commit, branches), `DiffView`, `ConflictResolver`, etc. |
 | `lib/store.tsx` | Global state, WebSocket and event reducer, with narrow hooks (`useHiveSelector`, `useLive`…), load error and retry. |

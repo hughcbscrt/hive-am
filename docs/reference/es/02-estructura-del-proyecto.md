@@ -105,7 +105,7 @@ hive-am/
     │   ├── HelpPopover.tsx   # icono de ayuda con popover
     │   ├── ConnectionDrawer.tsx   # crear/editar una conexión
     │   ├── agents/           # todo lo que crea o edita agentes y colonias
-    │   │   ├── AgentForm.tsx          # formulario único de agente (crear y editar)
+    │   │   ├── AgentForm.tsx          # formulario único de agente (crear y editar), también el de los tipos (`mode="type"`)
     │   │   ├── useAgentSettings.tsx   # guardar/descartar/borrar compartido por los paneles
     │   │   ├── NewAgentDrawer.tsx     # asistente "nuevo agente"
     │   │   ├── AgentEditDrawer.tsx    # edición de un agente en un panel lateral
@@ -210,7 +210,7 @@ No hay un framework de pruebas: `server/scripts/test-*.ts` son scripts independi
 | `components/Shell.tsx` | Navegación lateral, estado de conexión, cambio de tema, `HiveProvider` y `Toaster`. |
 | `components/Dialog.tsx`, `ConfirmDialog.tsx`, `Tabs.tsx`, `Primitives.tsx`, `WorkspaceHeader.tsx`, `Toast.tsx`, `combobox.ts` | Los componentes base; ver [11.4](11-frontend.md#114-componentes-compartidos). `ui.tsx` los reexporta, así que las pantallas importan todo de `@/components/ui`. |
 | `components/ui.tsx` | `Hex`, `ProviderBadge`, `StatusChip`, `RoleChip`, `Drawer`, `Modal`, `Field`, `Segmented`, `ProviderPicker`, `ModelField`, `PermissionField`, `SkillPicker`, `FolderPicker`, `Toaster`… |
-| `components/agents/*` | Formularios y paneles de agentes y colonias (`AgentForm` es el formulario compartido y maneja la herencia desde la colonia); `NotebookPanel` edita el cuaderno. |
+| `components/agents/*` | Formularios y paneles de agentes y colonias (`AgentForm` es el formulario compartido de agentes y tipos de agente y maneja la herencia desde la colonia); `NotebookPanel` edita el cuaderno. |
 | `components/chat/*` | `Chat` (transcripción memoizada, turno en vivo, tarjeta de delegación), `ToolCall` (cada herramienta como fila legible), `UserBubble` y `StatsBar`. |
 | `components/git/*` | La pestaña **Cambios**: `GitExplorer` (árbol, visor de archivos y diferencias, historial, stashes), `GitActions` (Fetch/Pull/Push/Commit, ramas), `DiffView`, `ConflictResolver`, etc. |
 | `lib/store.tsx` | Estado global, WebSocket y reductor de eventos, con hooks estrechos (`useHiveSelector`, `useLive`…), error de carga y reintento. |

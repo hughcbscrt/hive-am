@@ -115,7 +115,7 @@ Hooks de utilidad en `web/lib/hooks/`:
 | `FolderPicker` | Campo de ruta + explorador de carpetas (usa `GET /api/fs/dirs`) |
 | `Toaster` / `useToast` | Avisos transitorios: los errores se anuncian (`role="alert"`), cierre manual, pausa al pasar el puntero o con foco, los avisos idénticos no se repiten, máximo 5 |
 | `PathPicker` | Selector de carpeta o archivo; muestra la carga y, si `GET /api/fs/dirs` falla, el error con un botón *Reintentar* |
-| `AgentForm` | Formulario único de agente (incluye herencia y *Team*) |
+| `AgentForm` | Formulario único de agente (incluye herencia y *Team*); la pantalla de tipos lo usa con `mode="type"` |
 | `ColonyEditor` | Editor de colonias + diálogo de herencia |
 | `NewAgentDrawer`, `AgentEditDrawer` | Crear y editar agentes en panel lateral |
 
