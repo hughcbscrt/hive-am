@@ -98,6 +98,7 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
   try {
     s.controller = controller;
     s.live = { turnId, prompt, events: [], source, origin };
+    if (dispatchId) dispatches.setRunning(dispatchId);
     agents.setStatus(agentId, 'running');
     emit({ kind: 'turn_start', agentId, turnId, prompt, source, from, channel: origin && { platform: origin.platform, place: origin.place, user: origin.userName } });
     emit({ kind: 'status', agentId, status: 'running', queued: s.queued });
@@ -148,15 +149,27 @@ export function stopAgent(agentId: string, clearQueue = true): boolean {
   return true;
 }
 
-/** Orchestrator → worker delegation. Enforces the explicit assignment rule. */
-export async function dispatch(fromId: string, workerName: string, task: string): Promise<TurnResult> {
+export interface StartedDispatch { id: string; worker: Agent; done: Promise<TurnResult> }
+
+/**
+ * Orchestrator → worker delegation. Enforces the explicit assignment rule. The task is stored and queued on the worker at once; `done`
+ * settles when the worker's turn ends, after the row holds the result, so nothing depends on the caller still waiting for it.
+ */
+export function startDispatch(fromId: string, workerName: string, task: string, mode: 'sync' | 'background' = 'sync', origin: string | null = null): StartedDispatch {
   const from = agents.get(fromId);
   if (!from) throw new Error('Unknown orchestrator');
   const worker = agents.byName(workerName);
   if (!worker) throw new Error(`No agent named "${workerName}"`);
   if (!from.worker_ids.includes(worker.id)) throw new Error(`"${worker.name}" is not assigned to ${from.name}`);
-  const id = dispatches.start(from.id, worker.id, task);
-  const res = await sendTurn(worker.id, task, 'dispatch', from.id, id);
-  dispatches.finish(id, res.ok ? 'done' : 'failed', res.text || res.error || '');
-  return res;
+  const id = dispatches.start(from.id, worker.id, task, mode, origin);
+  const done = sendTurn(worker.id, task, 'dispatch', from.id, id).then((res) => {
+    dispatches.finish(id, res.ok ? 'done' : 'failed', res.text || res.error || '');
+    return res;
+  });
+  return { id, worker, done };
+}
+
+/** A delegation awaited to the end (the original blocking form, kept for callers that hold the request open). */
+export async function dispatch(fromId: string, workerName: string, task: string): Promise<TurnResult> {
+  return startDispatch(fromId, workerName, task).done;
 }

@@ -40,8 +40,10 @@ export function retentionPass({ now = Date.now() }: { now?: number } = {}): Rete
     // The record of a received file goes with the file.
     out.files = db.prepare('UPDATE thread_messages SET files=NULL WHERE files IS NOT NULL AND ts<?').run(now - RETENTION_DAYS * DAY).changes;
 
-    // Delegations: all but the newest KEEP_DISPATCHES (one that is still running is never one of them).
-    out.dispatches = db.prepare("DELETE FROM dispatches WHERE status<>'running' AND id IN (SELECT id FROM dispatches ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?)").run(KEEP_DISPATCHES).changes;
+    // Delegations: all but the newest KEEP_DISPATCHES. Never one that has not finished, nor a background one whose result nobody has had
+    // yet (not handed to the orchestrator, nor read with dispatch_status): that one stays until it is.
+    out.dispatches = db.prepare(`DELETE FROM dispatches WHERE status NOT IN ('queued','running') AND NOT (mode='background' AND notified_at IS NULL AND read_at IS NULL)
+      AND id IN (SELECT id FROM dispatches ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?)`).run(KEEP_DISPATCHES).changes;
 
     // Delegated conversations: past the newest KEEP_DELEGATIONS of their agent and not used for SESSION_FORGET_DAYS.
     out.sessions += db.prepare(`DELETE FROM agent_sessions WHERE kind='delegation' AND last_seen<? AND (agent_id, session_id) IN (

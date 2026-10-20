@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Minimal MCP stdio server for hive-am agents. Tool groups come from HIVE_CAPS:
-//   dispatch → list_agents, dispatch (orchestrators with a team)
+//   dispatch → list_agents, dispatch, dispatch_status (orchestrators with a team)
 //   channel  → channel_reply, channel_send_file, channel_react, channel_mute (agents linked to Telegram/Slack)
 //   wake     → wake_me, wake_when_done, schedule_create, schedule_list, schedule_cancel (agents with the Wake-ups skill: to be woken later in the same place)
 //   objects  → object_list, object_logs, object_action (agents with the Colony objects skill: the servers and containers of their colony)
@@ -11,6 +11,8 @@ import { createInterface } from 'node:readline';
 const API = process.env.HIVE_AM_API ?? 'http://127.0.0.1:4400';
 const FROM = process.env.HIVE_AGENT_ID;
 const CAPS = new Set((process.env.HIVE_CAPS ?? 'dispatch').split(',').filter(Boolean));
+// A synchronous dispatch waits with dispatch_status calls of this many seconds each, so no request lasts long enough to hit a client timeout.
+const POLL_S = Math.min(60, Math.max(1, Number(process.env.HIVE_AM_DISPATCH_POLL_S) || 25));
 
 const allTools = [
   {
@@ -22,14 +24,29 @@ const allTools = [
   {
     cap: 'dispatch',
     name: 'dispatch',
-    description: 'Send a self-contained task to one of your subagents and wait for its final answer. Every delegation starts a fresh conversation for the subagent, so include all the context it needs.',
+    description: 'Send a self-contained task to one of your subagents and wait for its final answer. Every delegation starts a fresh conversation for the subagent, so include all the context it needs. For a task that will probably take more than a few minutes, set background: true: the call returns at once with a task id, and the answer arrives later as a message to you (you can also ask with dispatch_status).',
     inputSchema: {
       type: 'object',
       properties: {
         agent: { type: 'string', description: 'Exact subagent name from list_agents' },
         task: { type: 'string', description: 'Full instructions for the subagent; include all context it needs.' },
+        background: { type: 'boolean', description: 'Return at once with a task id instead of waiting for the answer (default false). The result is sent to you as a message when the subagent finishes.' },
       },
       required: ['agent', 'task'],
+      additionalProperties: false,
+    },
+  },
+  {
+    cap: 'dispatch',
+    name: 'dispatch_status',
+    description: 'State of a task you delegated: queued, running, done, failed or interrupted, with the result once it has finished. With wait_seconds it waits up to that long for the end before answering.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'The task id that dispatch returned' },
+        wait_seconds: { type: 'number', minimum: 0, maximum: 60, description: 'Wait up to this many seconds (0 to 60, default 0) for the task to finish.' },
+      },
+      required: ['id'],
       additionalProperties: false,
     },
   },
@@ -281,6 +298,16 @@ const dbAnswer = (op, j) => {
   }
 };
 
+async function taskStatus(id, waitSeconds) {
+  const r = await fetch(`${API}/api/dispatch/status`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ from: FROM, id, wait_seconds: waitSeconds }),
+  });
+  const j = await r.json();
+  if (!r.ok) throw Object.assign(new Error(j.error ?? `dispatch_status failed (${r.status})`), { status: r.status });
+  return j;
+}
+
 async function call(name, args) {
   if (!tools.some((t) => t.name === name)) throw new Error(`Unknown tool ${name}`);
   if (name === 'list_agents') {
@@ -288,13 +315,29 @@ async function call(name, args) {
     return JSON.stringify(await r.json(), null, 2);
   }
   if (name === 'dispatch') {
+    const background = args.background === true;
     const r = await fetch(`${API}/api/dispatch`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ from: FROM, agent: args.agent, task: args.task }),
+      body: JSON.stringify({ from: FROM, agent: args.agent, task: args.task, background, poll: !background }),
     });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? `dispatch failed (${r.status})`);
-    return j.text || '(the subagent finished without a text answer)';
+    if (background) return `Task ${j.id} sent to ${j.agent} (${j.status}). You will be woken with the result when it finishes; you can also ask with dispatch_status.`;
+    // Wait for the end with short calls: the answer is read from the server's record, never from one long request.
+    for (let errors = 0; ;) {
+      let s;
+      try { s = await taskStatus(j.id, POLL_S); errors = 0; } catch (e) {
+        if (e.status || ++errors > 5) throw new Error(`${e.message}. The task ${j.id} goes on: ask for its result with dispatch_status.`);
+        await new Promise((ok) => setTimeout(ok, 2000));
+        continue;
+      }
+      if (s.status === 'done') return s.result;
+      if (s.status === 'failed' || s.status === 'interrupted') throw new Error(`${j.agent} did not finish the task (${s.status}): ${s.result}`);
+    }
+  }
+  if (name === 'dispatch_status') {
+    const s = await taskStatus(args.id, args.wait_seconds);
+    return `Task ${s.id} for ${s.agent}: ${s.status}.${s.note ? ` ${s.note}` : ''}${s.result !== undefined ? ` Result:\n${s.result}` : ' Not finished yet.'}`;
   }
   if (name === 'channel_reply') {
     const r = await fetch(`${API}/api/channel/reply`, {

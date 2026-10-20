@@ -33,7 +33,10 @@ interface LoadRow { skill_id: string; load: string }
 interface CountRow { skill_id: string; c: number }
 export interface SessionRow { agent_id: string; provider: Provider; session_id: string; cwd: string; first_seen: number; last_seen: number; kind: 'direct' | 'delegation'; from_id: string | null; task: string | null; from_name: string | null; permission: Permission | null }
 export interface SessionWithAgentRow extends SessionRow { agent_name: string; agent_role: Role }
-export interface DispatchRow { id: string; from_id: string; to_id: string; task: string; status: string; result: string | null; created_at: number; finished_at: number | null; session_id: string | null }
+export interface DispatchRow {
+  id: string; from_id: string; to_id: string; task: string; status: string; result: string | null; created_at: number; finished_at: number | null; session_id: string | null;
+  mode: 'sync' | 'background'; origin: string | null; notified_at: number | null; read_at: number | null;
+}
 
 // ---- skills ----
 export const skills = {
@@ -251,18 +254,30 @@ export const agents = {
 };
 
 // ---- dispatch log ----
+// A delegation is `queued` until the worker's turn starts (it waits behind the worker's other turns), then `running`, then `done`, `failed`
+// or `interrupted` (the server stopped while it was queued or running).
 export const dispatches = {
-  start(from: string, to: string, task: string) {
+  start(from: string, to: string, task: string, mode: 'sync' | 'background' = 'sync', origin: string | null = null) {
     const id = uid();
-    q('INSERT INTO dispatches (id, from_id, to_id, task, status, result, created_at, finished_at) VALUES (?,?,?,?,?,NULL,?,NULL)').run(id, from, to, task, 'running', now());
+    q('INSERT INTO dispatches (id, from_id, to_id, task, status, result, created_at, finished_at, mode, origin) VALUES (?,?,?,?,?,NULL,?,NULL,?,?)').run(id, from, to, task, 'queued', now(), mode, origin);
     return id;
   },
+  get: (id: string) => q('SELECT * FROM dispatches WHERE id=?').get(id) as DispatchRow | undefined,
+  setRunning: (id: string) => q("UPDATE dispatches SET status='running' WHERE id=? AND status='queued'").run(id),
   setSession: (id: string, sessionId: string) => q('UPDATE dispatches SET session_id=? WHERE id=?').run(sessionId, id),
   finish: (id: string, status: string, result: string) =>
     q('UPDATE dispatches SET status=?, result=?, finished_at=? WHERE id=?').run(status, result.slice(0, 20000), now(), id),
+  markNotified: (id: string) => q('UPDATE dispatches SET notified_at=? WHERE id=? AND notified_at IS NULL').run(now(), id),
+  markRead: (id: string) => q('UPDATE dispatches SET read_at=? WHERE id=? AND read_at IS NULL').run(now(), id),
+  /** Background tasks of an orchestrator that have not finished yet. */
+  unfinished: (from: string) => (q("SELECT COUNT(*) AS n FROM dispatches WHERE from_id=? AND mode='background' AND status IN ('queued','running')").get(from) as { n: number }).n,
+  /** Finished background tasks whose result was not handed to the orchestrator yet. */
+  undelivered: () => q("SELECT * FROM dispatches WHERE mode='background' AND status NOT IN ('queued','running') AND notified_at IS NULL ORDER BY created_at").all() as DispatchRow[],
+  /** At startup nothing is running any more: what was queued or running is interrupted (a task is never resumed). */
+  interruptLeftovers: () => q("UPDATE dispatches SET status='interrupted', finished_at=? WHERE status IN ('queued','running')").run(now()).changes,
   recent: (limit = 50) => q('SELECT * FROM dispatches ORDER BY created_at DESC LIMIT ?').all(limit) as DispatchRow[],
 };
 
 // Agents left 'running' by a crash/blackout are simply idle again: their session is intact on disk.
 q("UPDATE agents SET status='idle' WHERE status='running'").run();
-q("UPDATE dispatches SET status='interrupted' WHERE status='running'").run();
+dispatches.interruptLeftovers();

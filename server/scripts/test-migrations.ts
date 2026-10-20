@@ -83,6 +83,8 @@ check(a1.name === 'alpha' && a1.cwd === '/tmp/a' && a1.skill_ids.length === 2 &&
 check(a1.status === 'idle', 'an agent left running by the old process is idle again');
 check(agents.sessions('a1')[0]?.session_id === 'sess-1' && agents.sessions('a1')[0]?.kind === 'direct', 'its session pointer survives with the default kind');
 check(dispatches.recent()[0]?.status === 'interrupted', 'a dispatch left running is marked interrupted');
+const d1 = dispatches.get('d1');
+check(d1?.mode === 'sync' && d1.origin === null && d1.notified_at === null && d1.read_at === null && dispatches.undelivered().length === 0, 'an old dispatch is a synchronous one, and is never announced');
 check(colonies.get('c1')?.name === 'Hive' && colonies.get('c1')?.inherit.cwd === true, 'a colony keeps its data and gets default inheritance');
 check(connections.get('k1')?.name === 'bot' && threads.get('th1')?.muted === false && threadMessages.recent('th1')[0]?.text === 'hello', 'connections, threads and messages survive');
 check((db.prepare("SELECT note FROM agent_wakeups WHERE id='w1'").get() as { note: string }).note === 'check', 'a pending wake-up survives');
@@ -96,7 +98,7 @@ const rowsBefore = JSON.stringify(db.prepare('SELECT * FROM agents').all());
 db.pragma('user_version = 0'); migrate(db);   // as if the version mark were lost: every migration must be a harmless no-op
 check(JSON.stringify(db.prepare('SELECT * FROM agents').all()) === rowsBefore && skills.list().length === 3, 're-running every migration over live data changes nothing');
 const mem = new Database(':memory:');
-check(migrate(mem).join() === '1,2,3,4,5,6,7,8' && mem.pragma('user_version', { simple: true }) === SCHEMA_VERSION, 'a fresh database is built by the same migrations');
+check(migrate(mem).join() === '1,2,3,4,5,6,7,8,9' && mem.pragma('user_version', { simple: true }) === SCHEMA_VERSION, 'a fresh database is built by the same migrations');
 check(mem.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_dispatches_created'").get() !== undefined && !!db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_dispatches_created'").get(), 'the dispatch index exists in a fresh and in an upgraded database');
 const tablesOf = (d: Database.Database) => (d.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as { name: string }[]).map((r) => r.name).filter((n) => n !== 'sqlite_sequence').join();
 check(tablesOf(mem) === tablesOf(db), 'fresh and migrated databases have the same tables');
