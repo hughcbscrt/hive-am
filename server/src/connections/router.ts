@@ -187,7 +187,7 @@ async function deliver(conn: Connection, adapter: ChannelAdapter, thread: Thread
   const reply = (text: string) => adapter.send(m.target, text).catch(() => undefined);
   const fresh = threads.get(thread.id) ?? thread;
 
-  if (m.text.length > MAX_INPUT) { if (addressed) await reply(say(conn, T.tooLong)); return; }
+  if (!scheduled && m.text.length > MAX_INPUT) { if (addressed) await reply(say(conn, T.tooLong)); return; }
   if (tooFast(conn.id, m.userId, Number(conn.config.rate_limit) || DEFAULT_RATE)) { if (addressed) await reply(say(conn, T.rate)); return; }
 
   const ahead = queueDepth(agent.id) + (liveTurn(agent.id) ? 1 : 0);
