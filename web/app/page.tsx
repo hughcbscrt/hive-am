@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Boxes, Copy, Hexagon, Maximize2, Minus, Plus, RotateCcw, Settings2, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { useHiveData } from '@/lib/store';
+import { useAttention } from '@/lib/attention';
+import { dotState } from '@/lib/attentionRules';
 import { usePersistentState } from '@/lib/hooks/usePersistentState';
 import { api } from '@/lib/api';
 import { CLUSTER_COLOR, PROVIDERS, ago, shortPath } from '@/lib/meta';
@@ -95,6 +97,9 @@ function layout(agents: Agent[], colonies: Colony[], objects: ObjectView[], plac
 export default function Colony() {
   const { t } = useI18n();
   const { agents, colonies, objects, dispatches: feed, ready, error, retry, refresh } = useHiveData();
+  const { unread } = useAttention();
+  // The same dot as the side list: working, needs attention, finished unread (the cell's label says it in words).
+  const dotOf = (a: Agent) => dotState(a.status, unread[a.id]);
   const toast = useToast();
   const [sel, setSel] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -286,10 +291,10 @@ export default function Colony() {
                         onMouseEnter={() => setHover(a.id)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(a.id)} onBlur={() => setHover(null)}
                         style={{ ...style, ['--c' as any]: PROVIDERS[a.provider].color }} aria-pressed={sel === a.id}
                         {...(c.colony ? {} : { ...dragProps(a.id, cell.x, cell.y, { x: W / 2, y: H / 2 }), onKeyDown: (e: React.KeyboardEvent) => keyMove(e, a.id, cell.x, cell.y, { x: W / 2, y: H / 2 }), title: t('cx.moveHint') })}
-                        onClick={() => { if (!swallow.current) setSel(a.id === sel ? null : a.id); }} aria-label={`${a.name}, ${t(`role.${a.role}`)}, ${PROVIDERS[a.provider].short}, ${t(`status.${a.status}`)}`}>
+                        onClick={() => { if (!swallow.current) setSel(a.id === sel ? null : a.id); }} aria-label={`${a.name}, ${t(`role.${a.role}`)}, ${PROVIDERS[a.provider].short}, ${t(`status.${a.status}`)}${dotOf(a) === 'unread' ? `, ${t('attn.state.doneUnread')}` : dotOf(a) === 'err' && a.status !== 'error' ? `, ${t('status.error')}` : ''}`}>
                         <span className="shape" />
                         <span className="label"><b>{a.name}</b><small>{PROVIDERS[a.provider].short}</small></span>
-                        {a.status !== 'idle' && <span className={`pip ${a.status === 'error' ? 'err' : ''}`} />}
+                        {dotOf(a) && <span className={`pip ${dotOf(a) === 'running' ? '' : dotOf(a)}`} />}
                         {(managedBy(a.id).length > 0 || cloneOf(a)) && (
                           <span className={`ltag top ${managedBy(a.id).length > 0 ? 'mgr' : 'clone'}`}
                             title={[cloneOf(a) ? t('agent.cloneOf', { name: cloneOf(a)! }) : '', managedBy(a.id).length > 0 ? t('colony.manages', { names: managedBy(a.id).map((x) => x.name).join(', ') }) : ''].filter(Boolean).join(' · ')}>

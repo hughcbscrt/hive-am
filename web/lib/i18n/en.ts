@@ -1975,6 +1975,38 @@ export const en = {
   "cx.openAgent": "Open {name}",
   "cx.moveHint": "Arrow keys move it (Shift for bigger steps)",
 
+  // ---- unread notices and the Activity panel ----
+  "attn.nav": "Activity",
+  "attn.navUnread_one": "Activity, {count} unread",
+  "attn.navUnread_other": "Activity, {count} unread",
+  "attn.panel.label": "Agent activity",
+  "attn.unread.head": "Unread",
+  "attn.running.head": "Now",
+  "attn.markAll": "Mark all as read",
+  "attn.markOne": "Mark {name} as read",
+  "attn.state.done": "Finished",
+  "attn.state.doneUnread": "Finished, unread",
+  "attn.row.done": "Finished · {when}",
+  "attn.row.error": "Needs attention · {when}",
+  "attn.line.done": "Finished: {text}",
+  "attn.empty.title": "All caught up",
+  "attn.empty.body": "When an agent finishes while you are looking elsewhere, it shows up here.",
+  "attn.runningEmpty": "No agent is working right now.",
+  "attn.delegated_one": "Delegated to {to}: {task}",
+  "attn.delegated_other": "Delegated {count} tasks: {names}",
+  "attn.queuedTag": "queued",
+  "attn.group.unread_one": "{count} unread",
+  "attn.group.unread_other": "{count} unread",
+  "attn.running.count_one": "{count} working",
+  "attn.running.count_other": "{count} working",
+  "attn.announce.done": "{name} finished",
+  "attn.announce.error": "{name} needs attention",
+  "attn.noUnread": "Nothing unread",
+  "attn.notify.label": "Browser notifications",
+  "attn.notify.hint": "Only when this tab is in the background. Off by default.",
+  "attn.notify.denied": "Blocked by the browser. Allow notifications for this site in its settings.",
+  "attn.notify.unsupported": "Not available here. The browser needs https or localhost.",
+
 };
 
 export type DictKey = keyof typeof en;

@@ -77,9 +77,25 @@ The sidebar has these sections:
 - **History**
   - **Sessions**: the conversations of all your agents ([chapter 7](07-sessions.md)).
 
-At the bottom of the menu are the **Terminal** button (opens the terminal panel, [chapter 12](12-terminals.md)), the server status indicator and **Switch theme**, with the installed hive-am version (for example `v1.7.0`) under it. It is hidden on narrow screens.
+At the bottom of the menu are the **Activity** button (notices of finished agents, see below), the **Terminal** button (opens the terminal panel, [chapter 12](12-terminals.md)), the server status indicator and **Switch theme**, with the installed hive-am version (for example `v1.7.0`) under it. It is hidden on narrow screens.
 
 To give the screen more room, the panel button next to the hive-am name (**Collapse the menu**) folds the menu to a narrow column of icons. Hovering or focusing an icon shows its name, counts stay as small badges, and **EN** / **ES** stay one above the other. The same button (**Expand the menu**) opens it again. Your choice is remembered in the browser. On a narrow screen (under 760 px) the menu is a bar at the top with its labels, and it does not fold.
+
+### Activity: what finished while you were elsewhere
+
+When an agent finishes a reply while you are not looking at its chat (you are on another screen, on another agent, or the tab is in the background), it leaves a **notice**: a green dot on its avatar (red when it needs attention) in the side list of the chat and on the Colony map, and a number on the **Activity** button. Activity is the first button at the bottom of the menu, right above **Terminal**; its badge counts the agents with something unread (green, or red when one of them failed; `99+` from 100). The browser tab says it too: `(3) hive-am`.
+
+Click **Activity** to open its panel:
+
+- **Unread**: one row per agent, the most recent first, with its colony, **Finished** or **Needs attention**, how long ago and the first words of its last reply. Click a row to open that chat, or the **×** to mark it as read. **Mark all as read** clears the list.
+- **Now**: the agents working right now and the orchestrators waiting for a delegation, with what each one is doing.
+- **Browser notifications**: off by default. Switch it on to get a system notification when an agent finishes while this tab is in the background or without focus; the browser asks for permission only then. Clicking the notification opens that agent. If the browser blocks notifications for the site, the switch is disabled and says so.
+
+A notice is cleared when you open that agent's chat with the tab visible. Only one is kept per agent (a newer one replaces it), notices older than 7 days are dropped, and so are those of deleted agents. A worker that finishes a delegation fine does not leave a notice (its orchestrator does when it gets the result); a failed delegation does.
+
+> **Note:** notices live only in this browser (`localStorage`), together with a short excerpt of each reply (up to 140 characters). **Mark all as read** deletes those excerpts. hive-am only notices the turns that end while one of its tabs is open; for anything older, look at **Sessions**.
+
+The panel opens upwards next to the menu and closes with **Esc**, with a click outside or by tabbing out of it. On a narrow screen the Activity button stays at the right end of the top bar and the panel opens as a sheet at the bottom.
 
 ### Connection indicator
 

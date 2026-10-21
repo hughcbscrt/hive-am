@@ -7,6 +7,9 @@ import { usePersistentState } from '@/lib/hooks/usePersistentState';
 import { PROVIDERS, ago } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n/index';
 import { activity } from '@/lib/activity';
+import { useAttention } from '@/lib/attention';
+import { dotState } from '@/lib/attentionRules';
+import { StatePip } from './StatePip';
 import { useAgentCard } from './AgentCard';
 import type { Agent } from '@/lib/types';
 import { Hex } from '@/components/ui';
@@ -16,6 +19,7 @@ import { Copy } from 'lucide-react';
 export function AgentSwitcher({ activeId, collapsed = false, onToggle }: { activeId: string; collapsed?: boolean; onToggle?: () => void }) {
   const { t } = useI18n();
   const { agents, colonies, live, ready } = useHive();
+  const { unread } = useAttention();
   const card = useAgentCard();
   const [q, setQ] = useState('');
   const [creating, setCreating] = useState(false);
@@ -79,7 +83,7 @@ export function AgentSwitcher({ activeId, collapsed = false, onToggle }: { activ
                 </button>
                 {visible(g.items, open).map((a) => (
                   <Link key={a.id} href={`/agents/${a.id}`} className="sw-item mini" aria-current={a.id === activeId ? 'page' : undefined} aria-label={a.cloned_from && agents.some((x) => x.id === a.cloned_from) ? `${a.name}, ${t('agent.cloneOf', { name: agents.find((x) => x.id === a.cloned_from)!.name })}` : a.name} {...card.bind(a.id)}>
-                    <span className="sw-av"><Hex agent={a} />{a.status !== 'idle' && <i className={`pip ${a.status === 'error' ? 'err' : ''}`} />}</span>
+                    <span className="sw-av"><Hex agent={a} /><StatePip state={dotState(a.status, unread[a.id])} /></span>
                   </Link>
                 ))}
               </div>
@@ -97,7 +101,7 @@ export function AgentSwitcher({ activeId, collapsed = false, onToggle }: { activ
     const act = activity(live[a.id]);
     return (
       <Link key={a.id} href={`/agents/${a.id}`} className="sw-item" aria-current={a.id === activeId ? 'page' : undefined} {...card.bind(a.id)}>
-        <span className="sw-av"><Hex agent={a} />{a.status !== 'idle' && <i className={`pip ${a.status === 'error' ? 'err' : ''}`} />}</span>
+        <span className="sw-av"><Hex agent={a} /><StatePip state={dotState(a.status, unread[a.id])} /></span>
         <span className="sw-body">
           <span className="sw-top"><b>{a.name}</b>{a.role === 'orchestrator' && <em>{t('role.orchestrator')}</em>}{a.cloned_from && agents.some((x) => x.id === a.cloned_from) && <em className="clone" title={t('agent.cloneOf', { name: agents.find((x) => x.id === a.cloned_from)!.name })}><Copy size={9} aria-hidden />{agents.find((x) => x.id === a.cloned_from)!.name}</em>}</span>
           <span className={`sw-sub ${act ? 'live' : a.description ? '' : 'blank'}`}>{act ?? (a.status === 'error' ? t('status.error') : a.description || t('switcher.noDescription'))}</span>

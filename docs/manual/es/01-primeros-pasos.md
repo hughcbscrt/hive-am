@@ -77,9 +77,25 @@ El menú lateral tiene estas secciones:
 - **Historial**
   - **Sesiones**: las conversaciones de todos los agentes ([capítulo 7](07-sesiones.md)).
 
-Al final del menú están el botón **Terminal** (abre el panel de terminales, [capítulo 12](12-terminales.md)), el indicador de estado del servidor y **Cambiar tema**, con la versión de hive-am instalada (por ejemplo `v1.7.0`) debajo. En pantallas estrechas no se muestra.
+Al final del menú están el botón **Actividad** (avisos de agentes que terminaron, ver más abajo), el botón **Terminal** (abre el panel de terminales, [capítulo 12](12-terminales.md)), el indicador de estado del servidor y **Cambiar tema**, con la versión de hive-am instalada (por ejemplo `v1.7.0`) debajo. En pantallas estrechas no se muestra.
 
 Para dar más espacio a la pantalla, el botón de panel junto al nombre hive-am (**Contraer el menú**) pliega el menú a una columna estrecha de iconos. Al pasar el mouse o llevar el foco a un icono se ve su nombre, los contadores quedan como pequeñas insignias y **EN** / **ES** quedan uno encima del otro. El mismo botón (**Expandir el menú**) lo vuelve a abrir. Tu elección se recuerda en el navegador. En una pantalla estrecha (menos de 760 px) el menú es una barra superior con sus etiquetas y no se pliega.
+
+### Actividad: lo que terminó mientras mirabas otra cosa
+
+Cuando un agente termina una respuesta y no estás mirando su chat (estás en otra pantalla, en otro agente o la pestaña está en segundo plano), deja un **aviso**: un punto verde en su avatar (rojo si necesita atención) en la lista lateral del chat y en el mapa de Colonia, y un número en el botón **Actividad**. Actividad es el primer botón del pie del menú, justo encima de **Terminal**; su insignia cuenta los agentes con algo sin leer (verde, o roja si alguno falló; `99+` a partir de 100). La pestaña del navegador también lo dice: `(3) hive-am`.
+
+Haz clic en **Actividad** para abrir su panel:
+
+- **Sin leer**: una fila por agente, la más reciente arriba, con su colonia, **Terminó** o **Necesita atención**, hace cuánto y las primeras palabras de su última respuesta. Haz clic en una fila para abrir ese chat, o en la **×** para marcarla como leída. **Marcar todo como leído** vacía la lista.
+- **Ahora**: los agentes que trabajan en este momento y los orquestadores que esperan una delegación, con lo que hace cada uno.
+- **Avisos del navegador**: desactivados por defecto. Actívalos para recibir una notificación del sistema cuando un agente termine con esta pestaña en segundo plano o sin foco; el navegador pide permiso solo entonces. Un clic en la notificación abre ese agente. Si el navegador bloquea las notificaciones del sitio, el interruptor queda deshabilitado y lo explica.
+
+Un aviso se borra al abrir el chat de ese agente con la pestaña visible. Se guarda uno por agente (uno nuevo reemplaza al anterior), los de más de 7 días se eliminan y también los de agentes borrados. Un trabajador que termina bien una delegación no deja aviso (lo deja su orquestador cuando recibe el resultado); una delegación que falla, sí.
+
+> **Nota:** los avisos se guardan solo en este navegador (`localStorage`), junto con un extracto corto de cada respuesta (hasta 140 caracteres). **Marcar todo como leído** borra esos extractos. hive-am solo detecta los turnos que terminan mientras alguna de sus pestañas está abierta; para lo anterior, mira **Sesiones**.
+
+El panel se abre hacia arriba junto al menú y se cierra con **Esc**, con un clic fuera o al salir de él con Tab. En una pantalla estrecha el botón Actividad queda fijo en el extremo derecho de la barra superior y el panel se abre como una hoja en la parte de abajo.
 
 ### Indicador de conexión
 
