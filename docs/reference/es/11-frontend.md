@@ -12,7 +12,8 @@ Todas las pantallas en un solo sitio. Solo lee el store (`useHiveData()`, que no
 - **Ahora:** solo lo que vale más de cero, en este orden: agentes trabajando (a `/agents`), avisos sin leer (abre el panel Actividad), delegaciones `queued` o `running` (a `#recent`) y conexiones cuyo `status.state` es `error` (a `/connections`). Con todo a cero, una línea de calma.
 - **Tarjetas:** tres grupos (`HOME_GROUPS` de `lib/sections.ts`): Trabajo (Chat, Agentes, Colonia, Relaciones), Operación (Recursos, Programados, Conexiones) y Biblioteca e historial (Tipos de agente, Skills, Sesiones). Cada tarjeta es un solo enlace con el icono de la pantalla (`components/sectionIcons.tsx`), el nombre, una descripción y un número cuando el cliente lo tiene: el nombre del último chat, totales, los agentes trabajando (o las colonias) en Colonia, y una línea roja con las conexiones en error. Relaciones, Programados y Sesiones no llevan número (el store no los tiene).
 - **Estados:** diez esqueletos con `role="status"` mientras carga; con error, un aviso con *Reintentar* y las tarjetas sin números (siguen navegando); sin agentes, una tarjeta de bienvenida que abre `NewAgentDrawer`.
-- **Delegaciones recientes:** el mismo feed que Colony (`components/RecentDelegations.tsx`).
+- **Delegaciones recientes:** el mismo feed que Colony (`components/RecentDelegations.tsx`), recortado a `HOME_FEED` (3, una fila de su rejilla) en vez de seis, con un enlace **Ver todas** a `/colony#recent`.
+- **Altura:** en escritorio (más de 760 px de ancho) Inicio tiene márgenes más justos que otras páginas (`.page.home`, 20 px abajo en vez de 60) y oculta su subtítulo en ventanas de 760 px de alto o menos, para caber en 1366x768 con datos y una conexión con error.
 
 ### Colony (`/colony`, `app/colony/page.tsx`)
 

@@ -12,7 +12,8 @@ Every screen in one place. It reads only the store (`useHiveData()`, which does 
 - **Now:** only what is above zero, in this order: agents working (to `/agents`), unread notices (opens the Activity panel), delegations `queued` or `running` (to `#recent`) and connections whose `status.state` is `error` (to `/connections`). With everything at zero, one quiet line.
 - **Cards:** three groups (`HOME_GROUPS` of `lib/sections.ts`): Work (Chat, Agents, Colony, Relations), Operate (Resources, Schedules, Connections) and Library and history (Agent types, Skills, Sessions). Each card is one link with the screen's icon (`components/sectionIcons.tsx`), name, a description and a number when the client has one: the last chat's name, totals, the agents working (or the colonies) for Colony, and a red line with the connections in error. Relations, Schedules and Sessions have none (the store does not hold them).
 - **States:** ten skeletons with `role="status"` while loading; with an error, a banner with *Retry* and the cards without numbers (they still navigate); with no agents, a welcome card that opens `NewAgentDrawer`.
-- **Recent delegations:** the same feed as Colony (`components/RecentDelegations.tsx`).
+- **Recent delegations:** the same feed as Colony (`components/RecentDelegations.tsx`), cut to `HOME_FEED` (3, one row of its grid) instead of six, with a **View all** link to `/colony#recent`.
+- **Height:** on the desktop (over 760 px wide) Home has tighter spacing than other pages (`.page.home`, 20 px at the bottom instead of 60) and hides its subtitle on windows up to 760 px tall, so it fits 1366x768 with data and a connection error.
 
 ### Colony (`/colony`, `app/colony/page.tsx`)
 

@@ -92,7 +92,7 @@ Después vienen las diez secciones como tarjetas, en tres grupos:
 - **Operación**: Recursos, Programados y Conexiones (en rojo, cuántas tienen un error).
 - **Biblioteca e historial**: Tipos de agente, Skills y Sesiones.
 
-Las tarjetas muestran los totales que hive-am ya tiene, y ninguno en Relaciones, Programados y Sesiones. Al final están las seis últimas delegaciones, como en la pantalla Colonia. Si aún no hay agentes, una tarjeta arriba ofrece **Crear un agente**. Si los datos no se pueden cargar, un mensaje ofrece **Reintentar** y las tarjetas siguen abriendo sus secciones.
+Las tarjetas muestran los totales que hive-am ya tiene, y ninguno en Relaciones, Programados y Sesiones. Al final están las tres últimas delegaciones; **Ver todas** abre la pantalla Colonia, que muestra seis. Si aún no hay agentes, una tarjeta arriba ofrece **Crear un agente**. Si los datos no se pueden cargar, un mensaje ofrece **Reintentar** y las tarjetas siguen abriendo sus secciones.
 
 Para dar más espacio a la pantalla, el botón de panel junto al nombre hive-am (**Contraer el menú**) pliega el menú a una columna estrecha de iconos. Al pasar el mouse o llevar el foco a un icono se ve su nombre, los contadores quedan como pequeñas insignias y **EN** / **ES** quedan uno encima del otro. El mismo botón (**Expandir el menú**) lo vuelve a abrir. Tu elección se recuerda en el navegador. En una pantalla estrecha (menos de 760 px) el menú es una barra superior con sus etiquetas y no se pliega.
 

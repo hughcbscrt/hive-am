@@ -92,7 +92,7 @@ Then come the ten sections as cards, in three groups:
 - **Operate**: Resources, Schedules and Connections (in red, how many have an error).
 - **Library and history**: Agent types, Skills and Sessions.
 
-The cards show the totals hive-am already has, and nothing for Relations, Schedules and Sessions. At the bottom are the six latest delegations, as in the Colony screen. With no agents yet, a card on top offers **Create an agent**. If the data cannot be loaded, a message offers **Retry** and the cards still open their sections.
+The cards show the totals hive-am already has, and nothing for Relations, Schedules and Sessions. At the bottom are the three latest delegations; **View all** opens the Colony screen, which lists six. With no agents yet, a card on top offers **Create an agent**. If the data cannot be loaded, a message offers **Retry** and the cards still open their sections.
 
 To give the screen more room, the panel button next to the hive-am name (**Collapse the menu**) folds the menu to a narrow column of icons. Hovering or focusing an icon shows its name, counts stay as small badges, and **EN** / **ES** stay one above the other. The same button (**Expand the menu**) opens it again. Your choice is remembered in the browser. On a narrow screen (under 760 px) the menu is a bar at the top with its labels, and it does not fold.
 
