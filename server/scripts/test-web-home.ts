@@ -3,7 +3,7 @@
 // Usage: HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-web-home.ts
 import './_guard.js';
 import { homeModel, type HomeInput, type HomeView } from '../../web/lib/homeModel.ts';
-import { HOME_GROUPS, SECTIONS } from '../../web/lib/sections.ts';
+import { HOME_GROUPS, MENU_IDS, MIGRATION, MORE_IDS, SECTIONS } from '../../web/lib/sections.ts';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `got ${JSON.stringify(got)} want ${JSON.stringify(want)}`); if (!ok) fail++; };
 
@@ -66,4 +66,14 @@ eq('pills: only a delegation in progress', homeModel(input({ agents: [ag('a')], 
 eq('pills: only a connection error, with no agents', homeModel(input({ connections: [conn('error')] })).pills.map((p) => p.id), ['errors']);
 eq('pills: stopped and connecting are not errors', homeModel(input({ connections: [conn('stopped'), conn('connecting')] })).pills, []);
 eq('Connections with no error carries none', card(homeModel(input({ connections: [conn('connected')] })), 'connections')?.errors, undefined);
+
+// where every screen lives
+eq('menu: six entries, in order', MENU_IDS, ['home', 'chat', 'colony', 'resources', 'agents', 'schedules']);
+eq('more: the five out of the menu', MORE_IDS, ['relations', 'connections', 'types', 'skills', 'sessions']);
+eq('every screen is in the menu or under More, once', [...MENU_IDS, ...MORE_IDS].sort(), SECTIONS.map((s) => s.id).sort());
+eq('hrefs are unique', new Set(SECTIONS.map((s) => s.href)).size, SECTIONS.length);
+eq('only Home is at /, the map at /colony', [SECTIONS.filter((s) => s.href === '/').map((s) => s.id), SECTIONS.find((s) => s.id === 'colony')?.href], [['home'], '/colony']);
+eq('every card but Home has a description', SECTIONS.filter((s) => s.id !== 'home').every((s) => s.descKey !== null), true);
+eq('migration: the ten old entries, each to a screen that exists', [MIGRATION.length, MIGRATION.every((m) => SECTIONS.some((s) => s.id === m.id))], [10, true]);
+eq('migration: what left the menu is under More and in a Home group', MIGRATION.every((m) => (m.now === 'menu') === MENU_IDS.includes(m.id) && HOME_GROUPS.some((g) => g.ids.includes(m.id))), true);
 console.log(fail ? `${fail} FAILED` : 'ALL PASSED'); process.exit(fail ? 1 : 0);

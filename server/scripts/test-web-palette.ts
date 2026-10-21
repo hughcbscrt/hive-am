@@ -34,6 +34,7 @@ eq('with notices the unread actions show', ids(r, 'actions'), ['x:activity', 'x:
 eq('empty query: More sections holds the five out of the menu, in order', ids(r, 'more'), MORE_IDS.map((id) => `s:${id}`));
 eq('empty query: More sections is Relations, Connections, Agent types, Skills and Sessions', MORE_IDS, ['relations', 'connections', 'types', 'skills', 'sessions']);
 eq('empty query: Go to lists only the menu screens, no repeats', ids(r, 'screens'), MENU_IDS.map((id) => `s:${id}`));
+eq('Go to: Home first, Colony at /colony', [goTo[0].id, goTo.find((g) => g.id === 'colony')?.href], ['home', '/colony']);
 eq('empty query: More sections comes before Agents', r.sections.findIndex((s) => s.id === 'more') < r.sections.findIndex((s) => s.id === 'agents'), true);
 
 // no notices
@@ -88,6 +89,9 @@ for (const [lang, dict] of [['en', en], ['es', es]] as const) {
     for (const query of [label(es, id), label(en, id), ...SECTIONS.find((s) => s.id === id)!.keywords]) {
       eq(`${lang} interface: "${query}" finds ${id} first`, ids(paletteSections(input({ query, goTo: goToIn(dict), actions: actionsIn(dict) })), 'screens')?.[0], `s:${id}`);
     }
+  }
+  for (const query of [label(es, 'home'), label(en, 'home'), ...SECTIONS.find((s) => s.id === 'home')!.keywords]) {
+    eq(`${lang} interface: "${query}" finds home first`, ids(paletteSections(input({ query, goTo: goToIn(dict) })), 'screens')?.[0], 's:home');
   }
   // the searches of the design, with Enter on the first screen
   const searches: [string, string][] = [['skills', 'skills'], ['sesiones', 'sessions'], ['sessions', 'sessions'], ['conexiones', 'connections'], ['telegram', 'connections'], ['tipos', 'types'], ['types', 'types'], ['relaciones', 'relations'], ['grafo', 'relations'], ['habilidades', 'skills'], ['historial', 'sessions']];

@@ -102,7 +102,7 @@ function Screen({ object: o }: { object: ObjectView }) {
   return (
     <section className="ws-chat">
       <WorkspaceHeader
-        back={{ href: '/', label: t('ow.back') }}
+        back={{ href: '/colony', label: t('ow.back') }}
         avatar={<span className="obj-ico" style={{ ['--c' as never]: color }}><Icon size={22} /></span>}
         title={o.name}
         meta={<>

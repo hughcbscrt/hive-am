@@ -1,14 +1,16 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Bell, Boxes, MessageSquare, Search, CalendarClock, Globe, Hexagon, History, Library, Moon, Network, PanelLeftClose, PanelLeftOpen, Server, SquareTerminal, Sun, Users, Plug } from 'lucide-react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Bell, Search, Globe, Moon, PanelLeftClose, PanelLeftOpen, SquareTerminal, Sun } from 'lucide-react';
 import { usePersistentState } from '@/lib/hooks/usePersistentState';
 import { LAST_CHAT, chatHref as chatTarget } from '@/lib/lastChat';
 import { flipTheme } from '@/lib/theme';
 import { useHotkeys, useIsMac } from '@/lib/hotkeys';
 import { keysText } from '@/lib/hotkeyRules';
 import { RAIL_KEY } from '@/lib/rail';
+import { sectionById, type SectionId } from '@/lib/sections';
+import { ShellCommandsContext, type ShellCommands } from '@/lib/shellCommands';
 import { HiveProvider, useHiveData } from '@/lib/store';
 import { AttentionProvider, useActivityPanel, useAttention } from '@/lib/attention';
 import { badgeOf } from '@/lib/attentionRules';
@@ -20,6 +22,7 @@ import { TerminalDock } from './dock/TerminalDock';
 import { ActivityPanel } from './ActivityPanel';
 import { CommandPalette } from './CommandPalette';
 import { ShortcutsSheet } from './ShortcutsSheet';
+import { SECTION_ICON } from './sectionIcons';
 import { useRouter } from 'next/navigation';
 
 const VERSION = process.env.NEXT_PUBLIC_HIVE_AM_VERSION ?? '';
@@ -63,7 +66,9 @@ function Nav({ collapsed, onToggle, onOpenPalette, mac }: { collapsed: boolean; 
   // Folded, the label is hidden, so it becomes the accessible name (with the count) and the tooltip; a count shows as a badge.
   const named = (label: string, count?: number) => (collapsed ? { 'aria-label': count !== undefined ? `${label}, ${count}` : label, title: label } : {});
   const badge = (count: number) => <span className="count">{collapsed && count > 99 ? '99+' : count}</span>;
-  const item = (href: string, label: string, icon: ReactNode, count?: number, on?: boolean, countLabel?: string) => {
+  const item = (id: SectionId, count?: number, on?: boolean, countLabel?: string) => {
+    const s = sectionById(id), Icon = SECTION_ICON[id], label = t(s.labelKey), icon = <Icon size={18} />;
+    const href = id === 'chat' ? chatHref : s.href;
     const active = on ?? (href === '/' ? path === '/' : path.startsWith(href));
     // A count that needs words (Colony counts the agents working) names it the same way folded or not.
     const names = countLabel ? { 'aria-label': `${label}, ${countLabel}`, title: `${label}, ${countLabel}` } : named(label, count);
@@ -73,25 +78,26 @@ function Nav({ collapsed, onToggle, onOpenPalette, mac }: { collapsed: boolean; 
   const paletteKeys = keysText(['Mod', 'K'], mac);
   return (
     <nav className="rail" aria-label={t('nav.main')}>
-      <div className="brand"><HiveMark /><div className="brand-name">hive-am<small>{t('app.tagline')}</small></div>
+      <div className="brand"><Link href="/" className="brand-link" aria-label={`hive-am, ${t('nav.home')}`}><HiveMark /><div className="brand-name">hive-am<small>{t('app.tagline')}</small></div></Link>
         <button type="button" className="btn ghost icon sm rail-fold" onClick={onToggle} aria-expanded={!collapsed} aria-label={fold} title={fold}>{collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
       </div>
       <LanguageSwitch />
       <button type="button" className="nav" onClick={onOpenPalette} aria-haspopup="dialog" {...(collapsed ? { 'aria-label': t('cmd.navHint', { keys: paletteKeys }), title: t('cmd.navHint', { keys: paletteKeys }) } : {})}>
         <Search size={18} /><span className="t">{t('cmd.nav')}</span><kbd className="nav-kbd" aria-hidden>{paletteKeys}</kbd>
       </button>
-      {item(chatHref, t('nav.chat'), <MessageSquare size={18} />, undefined, path.startsWith('/agents/') || path === '/chat')}
-      {item('/', t('nav.colony'), <Hexagon size={18} />, running || undefined, undefined, running ? t('attn.running.count', { count: running }) : undefined)}
-      {item('/resources', t('nav.objects'), <Server size={18} />, objects.length || undefined)}
-      {item('/agents', t('nav.agents'), <Users size={18} />, agents.length, path === '/agents')}
-      {item('/relations', t('nav.relations'), <Network size={18} />)}
-      {item('/connections', t('nav.connections'), <Plug size={18} />, connections.length || undefined)}
-      {item('/schedules', t('nav.schedules'), <CalendarClock size={18} />)}
+      {item('home')}
+      {item('chat', undefined, path.startsWith('/agents/') || path === '/chat')}
+      {item('colony', running || undefined, undefined, running ? t('attn.running.count', { count: running }) : undefined)}
+      {item('resources', objects.length || undefined)}
+      {item('agents', agents.length, path === '/agents')}
+      {item('relations')}
+      {item('connections', connections.length || undefined)}
+      {item('schedules')}
       <div className="nav-label">{t('nav.library')}</div>
-      {item('/types', t('nav.types'), <Boxes size={18} />, types.length)}
-      {item('/skills', t('nav.skills'), <Library size={18} />, skills.length)}
+      {item('types', types.length)}
+      {item('skills', skills.length)}
       <div className="nav-label">{t('nav.history')}</div>
-      {item('/sessions', t('nav.sessions'), <History size={18} />)}
+      {item('sessions')}
       <div className="rail-foot">
         <ActivityButton collapsed={collapsed} />
         <button type="button" className="nav" onClick={dock.toggle} aria-pressed={dock.open} {...named(t('dock.nav'), dock.tabs.length || undefined)} title={`${t('dock.nav')} (Ctrl+\`)`}><SquareTerminal size={18} /><span className="t">{t('dock.nav')}</span>{dock.tabs.length > 0 && badge(dock.tabs.length)}</button>
@@ -151,6 +157,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const [palette, setPalette] = useState(false);
   const [sheet, setSheet] = useState(false);
   const mac = useIsMac();
+  const commands = useMemo<ShellCommands>(() => ({ openPalette: () => setPalette(true), openShortcuts: () => setSheet(true) }), []);
   return (
     <I18nProvider>
       <HiveProvider>
@@ -158,7 +165,9 @@ export function Shell({ children }: { children: ReactNode }) {
           <AttentionProvider>
             <Toaster>
               <Tooltips />
-              <div className={`shell ${railAnimate ? 'rail-anim' : ''}`}><Nav collapsed={railCollapsed} onToggle={toggleRail} onOpenPalette={() => setPalette(true)} mac={mac} /><main className="main">{children}</main></div>
+              <ShellCommandsContext.Provider value={commands}>
+                <div className={`shell ${railAnimate ? 'rail-anim' : ''}`}><Nav collapsed={railCollapsed} onToggle={toggleRail} onOpenPalette={commands.openPalette} mac={mac} /><main className="main">{children}</main></div>
+              </ShellCommandsContext.Provider>
               <Commands palette={palette} setPalette={setPalette} sheet={sheet} setSheet={setSheet} collapsed={railCollapsed} onToggleRail={toggleRail} mac={mac} />
               <TerminalDock />
             </Toaster>
