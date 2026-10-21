@@ -79,6 +79,8 @@ export function clampText(s: string): string {
   return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
 }
 export const canAdd = (list: DiffComment[]): boolean => list.length < MAX_COMMENTS;
+/** Some line takes a comment: a cut-off diff takes none in its last hunk, which may be incomplete. */
+export const hasCommentable = (parsed: Pick<ParsedDiff, 'hunks'>, cutOff: boolean): boolean => parsed.hunks.length > (cutOff ? 1 : 0);
 
 export function makeComment(path: string, lines: DiffLine[], text: string, now: number, id: string): DiffComment {
   return {

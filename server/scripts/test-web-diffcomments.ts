@@ -2,7 +2,7 @@
 // and the exact message the agent gets, in English and Spanish. No model, no browser. Usage: HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-web-diffcomments.ts
 import './_guard.js';
 import { parseDiff, type DiffLine } from '../../web/lib/git/diff.ts';
-import { MAX_CHARS, MAX_COMMENTS, buildMessage, canAdd, cite, clampText, makeComment, markGone, pruneComments, reanchor, sortForMessage, type DiffComment } from '../../web/lib/git/diffComments.ts';
+import { MAX_CHARS, MAX_COMMENTS, buildMessage, canAdd, cite, hasCommentable, clampText, makeComment, markGone, pruneComments, reanchor, sortForMessage, type DiffComment } from '../../web/lib/git/diffComments.ts';
 import { setCurrentLocale, translate } from '../../web/lib/i18n/core.ts';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `\n  got  ${JSON.stringify(got)}\n  want ${JSON.stringify(want)}`); if (!ok) fail++; };
@@ -28,6 +28,10 @@ eq('cite: a deleted file cites old numbers, removed', cite(deleted.hunks[0].line
 eq('clampText: 1000 characters', clampText('a'.repeat(1500)).length, MAX_CHARS);
 eq('clampText: never half an emoji', clampText('a'.repeat(999) + '🐝🐝').length, 999);
 const list = (n: number) => Array.from({ length: n }, (_, i) => makeComment(`p${i}`, pick(3, 3), 'x', NOW, `c${i}`));
+eq('hasCommentable: a whole diff takes comments', hasCommentable(one, false), true);
+eq('hasCommentable: a cut-off diff of one hunk takes none', hasCommentable(one, true), false);
+eq('hasCommentable: a cut-off diff of two hunks takes them in the first', hasCommentable({ hunks: [...one.hunks, ...one.hunks] }, true), true);
+eq('hasCommentable: no hunks take none', hasCommentable({ hunks: [] }, false), false);
 eq('canAdd: 24 yes', canAdd(list(24)), true);
 eq('canAdd: 25 no', canAdd(list(MAX_COMMENTS)), false);
 const wide = diff(['@@ -1,3 +1,4 @@', ...Array.from({ length: 4 }, (_, i) => `+${String(i).repeat(200)}`)].join('\n'));

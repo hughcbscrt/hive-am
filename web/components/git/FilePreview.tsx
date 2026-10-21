@@ -14,6 +14,7 @@ import { CopyBtn } from '@/components/chat/ToolCall';
 import { RefPicker } from './RefPicker';
 import { RefFile } from './RefFile';
 import { DiffView } from './DiffView';
+import { hasCommentable } from '@/lib/git/diffComments';
 import type { DiffCommentsCtl } from './DiffComments';
 import { FileView } from './FileView';
 
@@ -60,6 +61,8 @@ export function FilePreview({ agent, path, ignored = false, change, stamp, refs,
   // "Go to the comment" from the Review list: the Unified diff, where comments are drawn.
   useEffect(() => { if (commentFocus && change) { setAtRef(null); setView('diff'); setLayout('unified'); } }, [commentFocus?.key]); // eslint-disable-line react-hooks/exhaustive-deps
   const commentable = !!comments && view === 'diff' && !!change && !!parsed && !parsed.binary && parsed.hunks.length > 0;
+  // The hints only where a line takes a comment (a cut-off diff of one hunk has none).
+  const hinted = commentable && !!parsed && !atRef && hasCommentable(parsed, !!diff?.truncated);
   const fileComments = useMemo(() => (comments ? comments.items.filter((c) => c.path === path) : []), [comments?.items, path]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The File view marks what changed since the last commit. New files are all added; for the rest, read the diff.
@@ -103,12 +106,12 @@ export function FilePreview({ agent, path, ignored = false, change, stamp, refs,
           <div className="gx-ptl">
             {(change || isMd) && <Segmented value={view} onChange={setView} options={[...(change ? [{ id: 'diff' as const, label: t('git.view.diff') }] : []), ...(isMd ? [{ id: 'preview' as const, label: t('git.view.preview') }] : []), { id: 'file' as const, label: t(isMd ? 'git.view.source' : 'git.view.file') }]} />}
             {view === 'diff' && change && <Segmented value={layout} onChange={setLayout} options={[{ id: 'unified', label: t('git.layout.unified') }, { id: 'split', label: t('git.layout.split') }]} />}
-            {commentable && layout === 'unified' && !atRef && <span className="dc-hint"><span className="fine">{t('diffc.hint')}</span><span className="coarse">{t('diffc.hint.touch')}</span></span>}
+            {hinted && layout === 'unified' && <span className="dc-hint"><span className="fine">{t('diffc.hint')}</span><span className="coarse">{t('diffc.hint.touch')}</span></span>}
           </div>
         </div>
       </header>
       {change?.oldPath && <div className="gx-banner">{t('git.renamedFrom', { path: change.oldPath })}</div>}
-      {commentable && layout === 'split' && !atRef && <div className="gx-banner row gap-s"><span className="grow">{t('diffc.splitHint')}</span><button type="button" className="btn sm" onClick={() => setLayout('unified')}>{t('diffc.splitHint.go')}</button></div>}
+      {hinted && layout === 'split' && <div className="gx-banner row gap-s"><span className="grow">{t('diffc.splitHint')}</span><button type="button" className="btn sm" onClick={() => setLayout('unified')}>{t('diffc.splitHint.go')}</button></div>}
       {atRef && <div className="gx-banner row gap-s"><span className="grow">{t('git.file.atRef', { ref: atRef })}</span><button className="btn sm" onClick={() => setAtRef(null)}>{t('git.file.backToCurrent')}</button></div>}
       {atRef ? <RefFile agent={agent} gitRef={atRef} path={change?.oldPath && atRef ? change.oldPath : path} toolbar={false} /> : <div className="gx-body">
         {err ? <p className="gx-note err">{err}</p> : busy && !parsed && !file ? <p className="gx-note">{t('git.loading')}</p> : view === 'diff' && change ? (
