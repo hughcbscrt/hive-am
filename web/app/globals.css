@@ -1635,6 +1635,7 @@ kbd { display: inline-block; min-width: 20px; padding: 0 5px; border: 1px solid 
 .cmdk-opt[aria-selected='true'] { background: var(--surface-2); box-shadow: inset 0 0 0 2px var(--honey); }
 .cmdk-opt .sw-av .hex { --s: 28px; } .cmdk-opt .sw-av .pip { border-color: var(--surface); }
 .cmdk-txt { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; overflow: hidden; white-space: nowrap; } .cmdk-txt b { overflow: hidden; text-overflow: ellipsis; font-weight: 600; } .cmdk-txt small { color: var(--muted); font-size: var(--fs-caption); overflow: hidden; text-overflow: ellipsis; }
+.cmdk-ico { flex: none; width: 28px; display: grid; place-items: center; color: var(--muted); }
 .cmdk-meta { flex: none; color: var(--ink-2); font-size: var(--fs-caption); } kbd.cmdk-meta { color: var(--ink-2); }
 .cmdk-more, .cmdk-empty { margin: 4px 10px 8px; color: var(--muted); font-size: var(--fs-hint); }
 .cmdk-empty { padding: 18px 0; text-align: center; }

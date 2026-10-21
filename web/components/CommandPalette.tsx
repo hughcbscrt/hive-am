@@ -9,6 +9,7 @@ import { paletteSections, type GoTo, type PaletteAction, type PaletteItem, type 
 import { HOTKEYS, keysText } from '@/lib/hotkeyRules';
 import { usePersistentState } from '@/lib/hooks/usePersistentState';
 import { LAST_CHAT, chatHref } from '@/lib/lastChat';
+import { SECTIONS } from '@/lib/sections';
 import { flipTheme } from '@/lib/theme';
 import { useDock } from '@/lib/dock';
 import { useI18n } from '@/lib/i18n';
@@ -16,8 +17,9 @@ import { PROVIDERS, ago } from '@/lib/meta';
 import type { MessageKey } from '@/lib/i18n';
 import { Banner, Dialog, Hex, useCombobox } from './ui';
 import { StatePip } from './agents/StatePip';
+import { SECTION_ICON } from './sectionIcons';
 
-const SECTION_LABEL: Record<PaletteSection['id'], MessageKey> = { unread: 'attn.unread.head', agents: 'nav.agents', screens: 'cmd.group.screens', actions: 'cmd.group.actions' };
+const SECTION_LABEL: Record<PaletteSection['id'], MessageKey> = { unread: 'attn.unread.head', more: 'cmd.group.more', agents: 'nav.agents', screens: 'cmd.group.screens', actions: 'cmd.group.actions' };
 const ACTION_KEYS: Record<string, string> = { jumpUnread: 'unread', rail: 'rail', terminal: 'terminal', shortcuts: 'help' };
 
 /**
@@ -36,13 +38,7 @@ export function CommandPalette({ onClose, collapsed, mac, onToggleRail, onShortc
   const [active, setActive] = useState(0);
   const titleId = useId();
 
-  const goTo: GoTo[] = [
-    { id: 'chat', label: t('nav.chat'), href: chatHref(agents, lastChat) }, { id: 'colony', label: t('nav.colony'), href: '/' },
-    { id: 'resources', label: t('nav.objects'), href: '/resources' }, { id: 'agents', label: t('nav.agents'), href: '/agents' },
-    { id: 'relations', label: t('nav.relations'), href: '/relations' }, { id: 'connections', label: t('nav.connections'), href: '/connections' },
-    { id: 'schedules', label: t('nav.schedules'), href: '/schedules' }, { id: 'types', label: t('nav.types'), href: '/types' },
-    { id: 'skills', label: t('nav.skills'), href: '/skills' }, { id: 'sessions', label: t('nav.sessions'), href: '/sessions' },
-  ];
+  const goTo: GoTo[] = SECTIONS.map((s) => ({ id: s.id, label: t(s.labelKey), href: s.id === 'chat' ? chatHref(agents, lastChat) : s.href, keywords: s.keywords, more: s.more }));
   const actions: PaletteAction[] = [
     { id: 'activity', label: t('cmd.act.activity') }, { id: 'jumpUnread', label: t('cmd.act.jumpUnread'), needsUnread: true },
     { id: 'markAll', label: t('attn.markAll'), needsUnread: true }, { id: 'rail', label: collapsed ? t('nav.expand') : t('nav.collapse') },
@@ -95,7 +91,13 @@ export function CommandPalette({ onClose, collapsed, mac, onToggleRail, onShortc
         <span className="cmdk-meta">{item.kind === 'unread' ? t(item.notice.kind === 'error' ? 'attn.row.error' : 'attn.row.done', { when: ago(item.notice.at) }) : stateText(state)}</span>
       </>);
     }
-    if (item.kind === 'screen') return <span className="cmdk-txt"><b>{item.goTo.label}</b></span>;
+    if (item.kind === 'screen') {
+      const Icon = SECTION_ICON[item.goTo.id as keyof typeof SECTION_ICON];
+      return (<>
+        {Icon && <span className="cmdk-ico" aria-hidden><Icon size={17} /></span>}
+        <span className="cmdk-txt"><b>{item.goTo.label}</b>{item.via && <small>· {item.via}</small>}</span>
+      </>);
+    }
     const def = HOTKEYS.find((h) => h.id === ACTION_KEYS[item.action.id]);
     return (<>
       <span className="cmdk-txt"><b>{item.action.label}</b></span>
