@@ -74,11 +74,11 @@ If the process ends without a `result` event, a plain `done` is emitted.
 
 ## 6.4 OpenCode (`providers/opencode.ts`)
 
-**Command** (the prompt goes as the **last argument, after `--`**, so a message that begins with a dash is never read as a flag):
+**Command** (the prompt goes as the **last argument**; one that begins with a dash gets a space in front so it is never read as a flag. Not `--`: OpenCode 2.x hands what follows it over twice and the model received every message twice):
 
 ```bash
 opencode run --standalone --format json --thinking --auto \
-  [-s <session_id>] [-m <provider/model>] -- "<prompt (with preamble if applicable)>"
+  [-s <session_id>] [-m <provider/model>] "<prompt (with preamble if applicable)>"
 ```
 
 | Aspect | Behavior |
@@ -107,7 +107,7 @@ When the stream ends, `done` is emitted.
 
 ## 6.5 Kiro (`providers/kiro.ts`)
 
-**Command** (prompt as the last argument, after `--`):
+**Command** (prompt as the last argument, with the same leading-space rule as OpenCode):
 
 ```bash
 kiro-cli chat --no-interactive --output-format stream-json \

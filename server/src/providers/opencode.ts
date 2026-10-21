@@ -7,7 +7,7 @@ const INBOX_ROOT = join(DATA_DIR, 'inbox');
 import { spawnJson, StalledError } from './spawn.js';
 import { dispatchMcpConfigOpencode } from '../mcp-config.js';
 import { opencodeSessionDir } from '../history/opencode.js';
-import { withInstructions } from './preamble.js';
+import { asPositional, withInstructions } from './preamble.js';
 import { contextWindow } from '../context.js';
 import { learnOpencodeWindows, opencodeServer, stopOpencodeServer, type ServerAccess } from './opencode-server.js';
 
@@ -85,8 +85,8 @@ export async function* runOpencode(o: TurnOptions): AsyncGenerator<StreamEvent> 
   if (!contextWindow('opencode', agent.model)) void learnOpencodeWindows(agent.cwd, access);
   if (access) { args.splice(1, 0, '--server', access.url); env.OPENCODE_SERVER_PASSWORD = access.password; }
   else if (has('--standalone')) args.splice(1, 0, '--standalone');      // 1.x always runs its own server
-  // After `--` so a message that begins with a dash is the prompt and never an option; nothing may be pushed after it.
-  args.push('--', prompt);
+  // The prompt goes last; asPositional keeps a leading dash from being read as an option (see preamble.ts).
+  args.push(asPositional(prompt));
   // Stopping a turn must really stop the model: a client that is killed would leave the server working on, so the server goes down with it.
   if (access) o.signal.addEventListener('abort', () => stopOpencodeServer(agent.id), { once: true });
 

@@ -74,7 +74,7 @@ Si el proceso termina sin evento `result`, se emite un `done` simple.
 
 ## 6.4 OpenCode (`providers/opencode.ts`)
 
-**Comando** (el prompt va como **último argumento, después de `--`**, así un mensaje que empieza con guion nunca se lee como opción):
+**Comando** (el prompt va como **último argumento**; si empieza con guion lleva un espacio delante para que nunca se lea como opción. No `--`: OpenCode 2.x entrega dos veces lo que va después y el modelo recibía cada mensaje duplicado):
 
 ```bash
 opencode run --standalone --format json --thinking --auto \
@@ -107,7 +107,7 @@ Al terminar el stream se emite `done`.
 
 ## 6.5 Kiro (`providers/kiro.ts`)
 
-**Comando** (prompt como último argumento, después de `--`):
+**Comando** (prompt como último argumento, con la misma regla del espacio inicial que OpenCode):
 
 ```bash
 kiro-cli chat --no-interactive --output-format stream-json \

@@ -1,4 +1,5 @@
-// How OpenCode and Kiro receive the prompt: always after `--`, byte for byte, and a CLI that prints only prose is an error.
+// How OpenCode and Kiro receive the prompt: once, as the last argument (a leading dash gets a space so it is no option; `--` made OpenCode 2.x send it twice),
+// how a history read back drops the duplicated copies, and a CLI that prints only prose is an error.
 //   HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-provider-args.ts
 import './_guard.js';
 import { mkdtempSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
@@ -33,10 +34,22 @@ for (const [name, fn] of [['opencode', runOpencode], ['kiro', runKiro]] as const
   for (const prompt of ['- haz esto', '--flag', 'dijo "hola" \'x\'\n- second line']) {
     check(await run(fn, prompt) === '', `${name}: a normal turn still works (${JSON.stringify(prompt.slice(0, 12))})`);
     const a = lastArgs();
-    check(a.endsWith(`--\n${prompt}\n`), `${name}: ${JSON.stringify(prompt.slice(0, 12))} arrives whole and after --`);
+    const sent = prompt.startsWith('-') ? ` ${prompt}` : prompt;
+    check(a.endsWith(`\n${sent}\n`) && !a.includes('--\n') && a.split(prompt).length === 2, `${name}: ${JSON.stringify(prompt.slice(0, 12))} arrives once, last, without --`);
   }
   install('usage');
   const msg = await run(fn, '- hola');
   check(/produced no events/.test(msg) && /Usage: stub/.test(msg), `${name}: a CLI that prints only its usage ends the turn as an error`);
 }
+
+const { stripInstructions } = await import('../src/providers/preamble.js');
+const blk = '<instructions>\nrules\n</instructions>\n\n';
+const cases: [string, string, string][] = [
+  ['first turn', `${blk}hola`, 'hola'],
+  ['duplicated first turn', `${blk}1 comentario\n  > + x" "${blk}1 comentario\n  > + x`, '1 comentario\n  > + x'],
+  ['duplicated later turn', 'hola" "hola', 'hola'],
+  ['two different quoted parts stay', 'dijo "a" "b"', 'dijo "a" "b"'],
+  ['plain', 'uno', 'uno'],
+];
+for (const [what, input, want] of cases) check(stripInstructions(input) === want, `history: ${what}`);
 process.exit(fail ? 1 : 0);
