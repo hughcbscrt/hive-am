@@ -937,7 +937,7 @@ button.mini-sep .pip.unread { right: auto; left: 1px; background: var(--ok); ani
 .dc-hint { color: var(--muted); font-size: var(--fs-caption); } .dc-hint .coarse { display: none; }
 @media (pointer: coarse), (max-width: 760px) { .dc-hint .fine { display: none; } .dc-hint .coarse { display: inline; } }
 .dc-selbar { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: var(--fs-ui); }
-.dc-selbar .btn { min-height: 44px; }
+.dc-selbar .btn.sm { min-height: 44px; }
 .dc-tabcount { display: inline-flex; align-items: center; gap: 3px; background: var(--surface-2); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
 /* The bar under the explorer: count, Review, Discard all, Send. */
 .dc-bar { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font-size: var(--fs-ui); }
@@ -960,10 +960,11 @@ button.mini-sep .pip.unread { right: auto; left: 1px; background: var(--ok); ani
 .dc-msg { margin: 0; max-height: 200px; overflow: auto; padding: 8px 12px; border-top: 1px solid var(--line); white-space: pre-wrap; font-size: var(--fs-caption); }
 @media (pointer: coarse), (max-width: 760px) {
   .vl-peek.dc-editor { position: fixed; left: 8px; right: 8px; bottom: calc(8px + var(--dc-kb, 0px) + env(safe-area-inset-bottom)); width: auto; max-height: 60vh; margin: 0; overflow-y: auto; z-index: var(--z-card); }
-  .dc-text { font-size: 16px; } .dc-ed-body .btn, .dc-bar .btn { min-height: 44px; }
+  .dc-text { font-size: 16px; } .dc-ed-body .btn.sm, .dc-bar .btn.sm, .dc-bar .btn.icon.sm { min-height: 44px; }
   .dc-list { position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); max-height: 70vh; z-index: var(--z-card); box-shadow: var(--shadow); }
 }
-@media (max-width: 760px) { .dc-acts { width: 100%; } .dc-send { flex: 1; } }
+/* On a phone the explorer can be wider than the screen: the bar keeps to the part that shows (`--dc-vw`) and stays at its left edge. */
+@media (max-width: 760px) { .dc-bar { position: sticky; left: 0; box-sizing: border-box; width: var(--dc-vw, 100%); max-width: 100%; } .dc-acts { width: 100%; } .dc-send { flex: 1; } }
 
 /* files git ignores: shown, but quiet */
 .gx-row.ignored { opacity: .55; } .gx-row.ignored:hover, .gx-row.ignored.sel { opacity: .9; } .gx-row.ignored .nm { font-style: italic; }

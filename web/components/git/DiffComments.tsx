@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { MessageSquare, Pencil, Send, Trash2, X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { MAX_CHARS, MAX_COMMENTS, anchorLine, buildMessage, rangeLabel, type DiffComment } from '@/lib/git/diffComments';
@@ -107,6 +107,22 @@ type Sent = { queued: boolean; name: string } | null;
  * The foot of the Changes tab while there are comments: how many, the Review list, Discard all and the one button that sends them
  * all to the agent as a single chat message. Comments are only deleted once the server accepted the message.
  */
+/** How wide the scroller holding the bar shows (the explorer can be wider than a phone), as `--dc-vw` for the bar's style. */
+function useShownWidth(): [(el: HTMLElement | null) => void, CSSProperties | undefined] {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const [w, setW] = useState<number>();
+  useEffect(() => {
+    if (!el) return;
+    let box = el.parentElement;
+    while (box && !/auto|scroll|hidden/.test(getComputedStyle(box).overflowX)) box = box.parentElement;
+    const scroller = box ?? document.documentElement;
+    const measure = () => setW(scroller.clientWidth);
+    const ro = new ResizeObserver(measure); ro.observe(scroller); measure();
+    return () => ro.disconnect();
+  }, [el]);
+  return [setEl, w ? { ['--dc-vw' as never]: `${w}px` } : undefined];
+}
+
 export function DiffCommentsBar({ ctl, sending, setSending, onGoTo }: { ctl: DiffCommentsCtl; sending: boolean; setSending: (v: boolean) => void; onGoTo: (c: DiffComment, edit: boolean) => void }) {
   const { t } = useI18n();
   const { items } = ctl;
@@ -118,6 +134,7 @@ export function DiffCommentsBar({ ctl, sending, setSending, onGoTo }: { ctl: Dif
   const [said, say] = useSay();
   const reviewBtn = useRef<HTMLButtonElement>(null), errBox = useRef<HTMLDivElement>(null);
   const listId = useId();
+  const [barRef, barStyle] = useShownWidth();
 
   useEffect(() => { if (!sent) return; const h = setTimeout(() => setSent(null), 8000); return () => clearTimeout(h); }, [sent]);
   useEffect(() => { if (error) errBox.current?.focus(); }, [error]);
@@ -138,7 +155,7 @@ export function DiffCommentsBar({ ctl, sending, setSending, onGoTo }: { ctl: Dif
   if (!items.length) {
     if (!sent) return region;
     return (
-      <div className="dc-bar done" role="region" aria-label={t('diffc.bar.label')}>
+      <div ref={barRef} style={barStyle} className="dc-bar done" role="region" aria-label={t('diffc.bar.label')}>
         {region}
         <div className="dc-sent" role="status">
           <span className="grow">{t(sent.queued ? 'diffc.sentQueued' : 'diffc.sent', { name: sent.name })}</span>
@@ -154,7 +171,7 @@ export function DiffCommentsBar({ ctl, sending, setSending, onGoTo }: { ctl: Dif
   const byFile = [...files].sort().map((p) => ({ path: p, list: items.filter((c) => c.path === p).sort((a, b) => anchorLine(a) - anchorLine(b)) }));
   const closeList = () => { setOpen(false); reviewBtn.current?.focus(); };
   return (
-    <div className="dc-bar" role="region" aria-label={t('diffc.bar.label')}>
+    <div ref={barRef} style={barStyle} className="dc-bar" role="region" aria-label={t('diffc.bar.label')}>
       {region}
       {open && (
         <div id={listId} className="dc-list" role="group" aria-label={t('diffc.review.title')} inert={sending} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); closeList(); } }}>
