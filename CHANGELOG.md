@@ -6,16 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-21
+
 ### Added
 
 - **Unread notices and the Activity panel.** When an agent finishes a reply while you are not looking at its chat, it leaves a notice: a green dot on its avatar (red when it needs attention) in the chat's side list and on the Colony map, a badge on the new **Activity** button at the bottom of the menu (right above **Terminal**, green or red, `99+` from 100) and the count in the tab title (`(3) hive-am`). The Activity panel lists the unread notices (colony, result, how long ago and an excerpt of the reply) with **Mark all as read** and a **×** per row, and a **Now** section with the agents working and the orchestrators waiting for a delegation. Opening the agent's chat with the tab visible clears its notice. One notice per agent, kept in this browser (`hive-am.unread`, with excerpts of up to 140 characters) and shared between tabs; older than 7 days or of deleted agents, they go. Optional browser notifications (off by default, permission asked only when switched on) fire while the tab is in the background. A worker that finishes a delegation fine leaves no notice; a failed one does. Only turns that end while a hive-am tab is open are noticed.
-
 - **What each agent is doing, in the chat's side list.** The line under an agent's name now says whom an orchestrator is waiting for ("Delegated to Reviewer: check the diff", "(queued)" while it has not started; "Delegated 3 tasks: Reviewer, Tester, Docs"), what it is doing live, "Finished: …" with the start of an unread reply, or "Needs attention". Colony headings show how many agents have something unread, folded or not, and the collapsed list carries the same dots, with the state in each avatar's accessible name.
-
 - **Command palette and keyboard shortcuts.** **Jump to…** at the top of the menu, or **Ctrl K** (**⌘ K** on a Mac) from anywhere, opens a palette that lists the unread agents, every agent (working first, then your last chat), the screens and actions (show activity, jump to the latest unread, mark all as read, fold the menu, theme, language, terminal, shortcuts). It filters by name, colony, description, provider and model, ignoring capitals and accents. New shortcuts: **Ctrl B** folds the menu, **Ctrl .** opens the latest unread agent and **?** lists every shortcut. On a Mac only **⌘** counts. They keep away from terminals and the Markdown, code and query editors, which keep their own keys, and from text fields for **?**.
-
 - **Comment on diff lines and send them to the agent.** In the Changes tab, in the Unified diff of the current changes, click a line number (drag or Shift+click for several lines, or use the keyboard: arrows, Shift, C) to write a comment in a small editor under the lines. Comments pile up per agent across files, marked in the margin with a bubble, and a bar at the bottom counts them, lists them (**Review**, with the exact message and a copy button) and sends them all as one chat message ("3 comments on your changes:", each as `path:line: comment` with up to three quoted lines of code), queued if the agent is working. They are deleted only once the server accepted the message. When the agent edits the file a comment follows its lines, or is marked **Outdated** and still sent with the code you saw. Up to 25 comments of 1000 characters per agent, kept in this browser (`hive-am.diffc.<agentId>`, 30 days). The Changes tab shows how many are pending.
-
 - **Home page.** `/` is now **Home**: a search button that opens the command palette and a **Keyboard shortcuts** button, a row with what is happening now (agents working, unread notices, delegations in progress, connections with an error; only what is not zero), the ten screens as cards in three groups (Work; Operate; Library and history) with the numbers hive-am already has, and the three latest delegations with **View all** (the Colony screen keeps six). It fits a 1366x768 window with data. With no agents it offers to create one; if loading fails, the cards still open their screens. The hive-am logo and the new **Home** menu entry lead there.
 - **More ways to reach every screen.** With nothing typed, the command palette lists **More sections** (Relations, Connections, Agent types, Skills, Sessions) before the first five agents. Screens are also found by English and Spanish words ("telegram", "slack", "history", "sesiones", "templates"…), the matching word shown next to the name, and every row carries the screen's menu icon. Relations, Connections, Agent types, Skills and Sessions show a **‹ Home** link above their title.
 - **Keyboard shortcuts in sight.** Besides **?** and the palette action, the shortcuts sheet opens from a keyboard icon next to **EN** / **ES** at the top of the menu and from the **Keyboard shortcuts** button of Home.
@@ -269,7 +267,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/hughcbscrt/hive-am/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/hughcbscrt/hive-am/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/hughcbscrt/hive-am/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/hughcbscrt/hive-am/compare/v1.5.0...v1.6.0
