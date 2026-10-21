@@ -524,6 +524,9 @@ button.switcher-group:hover:not(:disabled) { background: color-mix(in srgb, var(
 button.switcher-group .chev { flex: none; color: var(--muted); transition: transform .15s; } button.switcher-group[aria-expanded='true'] .chev { transform: rotate(90deg); }
 button.switcher-group span.sg-name { margin-left: 0; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } button.switcher-group .sg-count { color: var(--muted); }
 button.switcher-group .pip { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--honey); animation: pulse 1.2s infinite; }
+button.switcher-group .sg-unread { flex: none; display: inline-flex; align-items: center; gap: 4px; margin-left: auto; padding: 0 6px; border-radius: 99px; background: var(--surface); color: var(--ink-2); font-size: var(--fs-micro); font-weight: 700; letter-spacing: 0; line-height: 16px; }
+button.switcher-group .sg-unread i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); } button.switcher-group .sg-unread.err i { background: var(--err); }
+button.switcher-group .sg-unread + .sg-count { margin-left: 4px; }
 .sw-item { display: flex; gap: 10px; padding: 9px 8px; border-radius: 10px; align-items: flex-start; } .sw-item:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
 .sw-item[aria-current='page'] { background: var(--surface); box-shadow: var(--shadow); }
 .sw-av { position: relative; flex: none; } .sw-av .hex { --s: 34px; } .sw-av .pip { position: absolute; top: -1px; right: -2px; width: 10px; height: 10px; border-radius: 50%; background: var(--honey); border: 2px solid var(--bg-deep); animation: pulse 1.2s infinite; } .sw-av .pip.err { background: var(--err); animation: none; }
@@ -535,8 +538,10 @@ button.switcher-group .pip { flex: none; width: 8px; height: 8px; border-radius:
 .sw-top em.clone { display: inline-flex; align-items: center; gap: 3px; min-width: 0; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; letter-spacing: 0; color: #5b4bc4; background: color-mix(in srgb, #6a5acd 12%, var(--surface)); }
 .sw-top em { font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: color-mix(in srgb, var(--honey) 40%, var(--ink)); background: var(--honey-soft); padding: 1px 6px; border-radius: 99px; flex: none; }
 .sw-sub { font-size: var(--fs-hint); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sw-sub.empty { color: var(--muted); font-style: italic; }
-.sw-sub.live { color: color-mix(in srgb, var(--honey) 55%, var(--ink)); font-weight: 600; }
-.sw-meta { display: flex; align-items: center; gap: 5px; font-size: var(--fs-caption); color: var(--muted); } .sw-meta i { width: 8px; height: 9px; clip-path: polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); flex: none; } .sw-ago { margin-left: auto; white-space: nowrap; }
+/* What it does now (a delegation, a live step) in the ink of the text, bold: the dot says the state, not the color (7.2:1 on the list). */
+.sw-sub.live, .sw-sub.deleg { color: var(--ink-2); font-weight: 600; } .sw-sub.done { color: var(--ink-2); font-weight: 500; }
+/* One line always (a long model name is cut before the time), so every row keeps the same height whatever it says. */
+.sw-meta { display: flex; align-items: center; gap: 5px; font-size: var(--fs-caption); color: var(--muted); white-space: nowrap; overflow: hidden; min-width: 0; } .sw-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .sw-meta i { width: 8px; height: 9px; clip-path: polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); flex: none; } .sw-ago { flex: none; margin-left: auto; padding-left: 6px; white-space: nowrap; }
 .ws-head .btn .dot { margin-left: 2px; }
 .delegation-card { border: 1px dashed color-mix(in srgb, var(--honey) 60%, var(--line)); background: var(--honey-soft); border-radius: 12px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-ui-lg); }
 .delegation-card .head { display: flex; gap: 8px; align-items: center; font-weight: 700; } .delegation-card p { margin: 0; color: var(--ink-2); white-space: pre-wrap; word-break: break-word; }
@@ -649,6 +654,7 @@ button.mini-sep:hover:not(:disabled) { background: color-mix(in srgb, var(--ink)
 button.mini-sep .chev { flex: none; color: var(--muted); transition: transform .15s; } button.mini-sep[aria-expanded='true'] .chev { transform: rotate(90deg); }
 button.mini-sep .ms-count { color: var(--muted); font-weight: 600; }
 button.mini-sep .pip { position: absolute; top: 1px; right: 1px; width: 7px; height: 7px; border-radius: 50%; background: var(--honey); animation: pulse 1.2s infinite; }
+button.mini-sep .pip.unread { right: auto; left: 1px; background: var(--ok); animation: none; } button.mini-sep .pip.unread.err { background: var(--err); }
 .mini-group:first-child .mini-sep { margin-top: 2px; }
 .sw-item.mini { padding: 6px; width: 48px; justify-content: center; align-items: center; border-radius: 12px; }
 .sw-item.mini .sw-av .hex { --s: 34px; }

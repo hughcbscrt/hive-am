@@ -2,9 +2,11 @@
 // Usage: HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-web-attention.ts
 import './_guard.js';
 import {
-  MAX_AGE_MS, SNIPPET_MAX, addNotice, badgeOf, dotState, markAll, markRead, orderedNotices, pruneUnread, shouldPrune, shouldRecord, snippetOf, tabTitle, turnEnd,
-  type TurnLike, type Unread,
+  MAX_AGE_MS, SNIPPET_MAX, addNotice, badgeOf, dotState, markAll, markRead, orderedNotices, pruneUnread, shouldPrune, shouldRecord, snippetOf, statusLine, tabTitle, turnEnd,
+  type StatusInput, type TurnLike, type Unread,
 } from '../../web/lib/attentionRules.ts';
+import { setCurrentLocale, translate } from '../../web/lib/i18n/core.ts';
+import type { Dispatch } from '../../web/lib/types.ts';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `got ${JSON.stringify(got)} want ${JSON.stringify(want)}`); if (!ok) fail++; };
 
@@ -85,5 +87,28 @@ eq('dot: error status beats unread', dotState('error', done), 'err');
 eq('dot: error notice on an idle agent', dotState('idle', failed), 'err');
 eq('dot: done and idle is unread', dotState('idle', done), 'unread');
 eq('dot: nothing', dotState('idle'), null);
+
+// statusLine, with the real catalogues
+const names: Record<string, string> = { w1: 'Reviewer', w2: 'Tester', w3: 'Docs' };
+const disp = (id: string, to: string, at: number, status: Dispatch['status'] = 'running', task = 'Check the diff'): Dispatch => ({ id, from_id: 'o', to_id: to, task, status, result: null, created_at: at, finished_at: null });
+const line = (over: Partial<StatusInput> = {}) => statusLine({ agent: { id: 'o', status: 'idle', description: 'Plans the work' }, dispatches: [], nameOf: (id) => names[id], activity: null, ...over }, translate);
+setCurrentLocale('en');
+eq('line: one delegation', line({ dispatches: [disp('d1', 'w1', 1)] }), { kind: 'deleg', text: 'Delegated to Reviewer: Check the diff' });
+eq('line: one queued delegation says so', line({ dispatches: [disp('d1', 'w1', 1, 'queued')] }).text, 'Delegated to Reviewer: Check the diff (queued)');
+eq('line: three, oldest first', line({ dispatches: [disp('d3', 'w3', 3), disp('d1', 'w1', 1), disp('d2', 'w2', 2)] }).text, 'Delegated 3 tasks: Reviewer, Tester, Docs');
+eq('line: names are not repeated', line({ dispatches: [disp('d1', 'w1', 1), disp('d2', 'w1', 2), disp('d3', 'w2', 3)] }).text, 'Delegated 3 tasks: Reviewer, Tester');
+eq('line: a task on several lines becomes one', line({ dispatches: [disp('d1', 'w1', 1, 'running', 'Review\n\n  the   diff\n')] }).text, 'Delegated to Reviewer: Review the diff');
+eq('line: a target that no longer exists is left out', line({ dispatches: [disp('d1', 'gone', 1), disp('d2', 'w2', 2)] }).text, 'Delegated to Tester: Check the diff');
+eq('line: finished and other agents\' delegations do not count', line({ dispatches: [disp('d1', 'w1', 1, 'done'), { ...disp('d2', 'w2', 2), from_id: 'x' }], activity: 'Running Read' }), { kind: 'live', text: 'Running Read' });
+eq('line: unread with an excerpt', line({ notice: { kind: 'done', at: NOW, snippet: 'Merged.' } }), { kind: 'done', text: 'Finished: Merged.' });
+eq('line: unread without an excerpt', line({ notice: { kind: 'done', at: NOW, snippet: '' } }).text, 'Finished');
+eq('line: error status', line({ agent: { id: 'o', status: 'error', description: 'x' } }), { kind: 'error', text: 'Needs attention' });
+eq('line: the description', line(), { kind: 'desc', text: 'Plans the work' });
+eq('line: no description', line({ agent: { id: 'o', status: 'idle', description: '' } }).text, 'No description yet');
+setCurrentLocale('es');
+eq('line es: one delegation', line({ dispatches: [disp('d1', 'w1', 1, 'queued')] }).text, 'Delegó a Reviewer: Check the diff (en cola)');
+eq('line es: several', line({ dispatches: [disp('d1', 'w1', 1), disp('d2', 'w2', 2)] }).text, 'Delegó 2 tareas: Reviewer, Tester');
+eq('line es: unread', line({ notice: { kind: 'done', at: NOW, snippet: 'Listo.' } }).text, 'Terminó: Listo.');
+setCurrentLocale('en');
 
 console.log(fail ? `${fail} FAILED` : 'ALL PASSED'); process.exit(fail ? 1 : 0);
