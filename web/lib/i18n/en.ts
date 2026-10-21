@@ -35,6 +35,7 @@ export const en = {
   "nav.connected": "Connected to server",
   "nav.offline": "Server offline. Retrying…",
   "nav.switchTheme": "Switch theme",
+  "nav.version": "hive-am version {version}",
   "nav.collapse": "Collapse the menu",
   "nav.expand": "Expand the menu",
 

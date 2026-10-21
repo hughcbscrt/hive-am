@@ -77,7 +77,7 @@ The sidebar has these sections:
 - **History**
   - **Sessions**: the conversations of all your agents ([chapter 7](07-sessions.md)).
 
-At the bottom of the menu are the **Terminal** button (opens the terminal panel, [chapter 12](12-terminals.md)), the server status indicator and **Switch theme**.
+At the bottom of the menu are the **Terminal** button (opens the terminal panel, [chapter 12](12-terminals.md)), the server status indicator and **Switch theme**, with the installed hive-am version (for example `v1.7.0`) under it. It is hidden on narrow screens.
 
 To give the screen more room, the panel button next to the hive-am name (**Collapse the menu**) folds the menu to a narrow column of icons. Hovering or focusing an icon shows its name, counts stay as small badges, and **EN** / **ES** stay one above the other. The same button (**Expand the menu**) opens it again. Your choice is remembered in the browser. On a narrow screen (under 760 px) the menu is a bar at the top with its labels, and it does not fold.
 

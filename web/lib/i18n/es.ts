@@ -33,6 +33,7 @@ export const es: Record<DictKey, string> = {
   "nav.connected": "Conectado al servidor",
   "nav.offline": "Servidor sin conexión. Reintentando…",
   "nav.switchTheme": "Cambiar tema",
+  "nav.version": "Versión de hive-am {version}",
   "nav.collapse": "Contraer el menú",
   "nav.expand": "Expandir el menú",
 

@@ -145,6 +145,7 @@ Definidos en `:root` y redefinidos para el tema oscuro (un solo bloque oscuro, `
 
 - Atributo `data-theme` en `<html>`: `light` o `dark`. Un script en línea de `layout.tsx` lo fija (y `lang`) **antes del primer pintado** a partir de `localStorage` o, sin elección guardada, de `prefers-color-scheme` (que sigue observando), así una página oscura nunca parpadea en claro.
 - El botón **Switch theme** (barra lateral, con `aria-pressed`) alterna y guarda la elección en `localStorage` (`hive-theme`).
+- Debajo, el menú muestra la versión (`v1.7.0`, `.rail-ver`). `web/next.config.mjs` la lee de `web/package.json` (que `make release` sube junto con las demás) y la fija al compilar como `NEXT_PUBLIC_HIVE_AM_VERSION`; sin versión no muestra nada. Oculta por debajo de 760px.
 - El contraste de `--muted` y `--ok` se subió para cumplir 4,5:1 en texto en el tema claro.
 - Las iniciales de los hexágonos son oscuras en tema oscuro para mantener el contraste.
 
