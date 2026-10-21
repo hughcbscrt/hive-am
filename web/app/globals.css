@@ -983,6 +983,18 @@ button.mini-sep .pip.unread { right: auto; left: 1px; background: var(--ok); ani
 .bubble.channel .chhead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: var(--fs-caption); color: var(--muted); margin-bottom: 4px; }
 .bubble.channel .chhead b { color: var(--ink-2); }
 .bubble.channel .chhead .chfrom { margin-left: auto; font-weight: 600; color: var(--ink-2); }
+.bubble.diffcard { white-space: normal; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.bubble.diffcard .chhead { display: flex; align-items: center; gap: 6px; font-size: var(--fs-caption); color: var(--muted); }
+.bubble.diffcard .chhead b { color: var(--ink-2); font-weight: 600; }
+.bubble.diffcard .dcc { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; border-top: 1px solid var(--line); }
+.bubble.diffcard .dcc:first-of-type { border-top: 0; padding-top: 0; }
+.bubble.diffcard .dcc-where { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: var(--fs-small); }
+.bubble.diffcard .dcc-where code { color: var(--ink-2); word-break: break-all; }
+.bubble.diffcard .dcc-text { white-space: pre-wrap; word-break: break-word; }
+.bubble.diffcard .dcc-code { margin: 0; padding: 6px 8px; border-radius: 8px; background: var(--surface-2, rgba(127,127,127,.15)); font-size: var(--fs-small); overflow-x: auto; white-space: pre; }
+.bubble.diffcard .dcc-code .add { color: var(--ok, #3fb950); }
+.bubble.diffcard .dcc-code .del { color: var(--err, #f85149); }
+.bubble.diffcard .dcc-code .more { color: var(--muted); }
 .bubble.channel .chbody { white-space: pre-wrap; word-break: break-word; }
 .bubble.channel .chfiles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .bubble.channel .chfile { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 8px; background: var(--surface-2, rgba(127,127,127,.15)); font-size: var(--fs-small); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .bubble.channel .chfile i { color: var(--muted); font-style: normal; }

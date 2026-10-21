@@ -163,3 +163,38 @@ export function buildMessage(comments: DiffComment[], t: Translate): string {
   });
   return out.join('\n');
 }
+
+export interface ParsedComment { path: string; range: string; marks: string; text: string; quote: string[]; more: string }
+export interface ParsedMessage { head: string; comments: ParsedComment[] }
+
+const HEAD = /^\d+ (?:comments?|comentarios?) (?:on your changes|sobre tus cambios):$/;
+const ITEM = /^(\d+)\. (.+?):(\d+(?:-\d+)?)(?: \(([^)]*)\))?: (.*)$/;
+
+/**
+ * The inverse of buildMessage, for drawing it in the chat as a card. Null when the text is not that message, so anything
+ * else (or a message that was edited by hand) is shown as the plain text it is. Understands both interface languages.
+ */
+export function parseMessage(text: string): ParsedMessage | null {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  if (!HEAD.test(lines[0] ?? '')) return null;
+  const comments: ParsedComment[] = [];
+  let cur: ParsedComment | null = null;
+  let inCode = false;
+  for (const l of lines.slice(1)) {
+    const m = ITEM.exec(l);
+    if (m && Number(m[1]) === comments.length + 1) {
+      cur = { path: m[2], range: m[3], marks: m[4] ?? '', text: m[5], quote: [], more: '' };
+      inCode = false;
+      comments.push(cur);
+      continue;
+    }
+    if (!cur) continue;                       // the legend lines between the head and the first comment
+    if (l.startsWith(INDENT + '> ')) {
+      const q = l.slice(INDENT.length + 2);
+      if (q.startsWith('…')) cur.more = q; else cur.quote.push(q);
+    } else if (l === `${INDENT}Code:` || l === `${INDENT}Código:`) inCode = true;
+    else if (!inCode) cur.text += '\n' + (l.startsWith(INDENT) ? l.slice(INDENT.length) : l);
+  }
+  if (!comments.length || comments.some((c) => !c.quote.length)) return null;
+  return { head: lines[0].slice(0, -1), comments: comments.map((c) => ({ ...c, text: c.text.trim() })) };
+}

@@ -89,6 +89,7 @@ In the **Diff** tab of a changed file, in the **Unified** view, you can leave co
 With the keyboard, Tab to the diff and move with **↑** / **↓** (**Shift** to extend), **Home**, **End** and **Page Up/Down**; **C** or **Enter** opens the editor. On a touch screen tap a line, tap another in the same block to take the range, then **Comment** in the bar under the diff.
 
 The message starts with "N comments on your changes:" and lists each comment as `path:line: comment` (or `path:88-91`), with up to three lines of the code it refers to. Line numbers are those of the file as it is now; a comment on lines that were only removed is marked **removed** and uses their old numbers. Comments are in the language of the interface when you send them, and the message has no instruction of its own: what you wrote is what the agent reads.
+In the chat the message appears as a card: the count at the top and, for each comment, the file and line, what you wrote and the quoted code in a block.
 
 If the agent changes the file, a comment follows its lines when they are still there (its line number is updated). When they are no longer there, or the file leaves the changes (reverted or committed), the comment is marked **Outdated**; it is not deleted, and it is sent with the code you saw.
 

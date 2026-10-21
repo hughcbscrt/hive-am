@@ -1,7 +1,7 @@
 import { learnEfforts } from '../efforts.js';
 import type { StreamEvent, TurnOptions } from '../types.js';
 import { spawnJson } from './spawn.js';
-import { withInstructions } from './preamble.js';
+import { asPositional, withInstructions } from './preamble.js';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -37,8 +37,8 @@ export async function* runKiro(o: TurnOptions): AsyncGenerator<StreamEvent> {
   if (agent.model) args.push('--model', agent.model);
   if (o.effort) args.push('--effort', o.effort);
   const prompt = withInstructions(o.prompt, o.instructions, !!agent.session_id, o.refreshInstructions);
-  // After `--` so a message that begins with a dash is the prompt and never an option; nothing may be pushed after it.
-  args.push('--', prompt);
+  // The prompt goes last; asPositional keeps a leading dash from being read as an option (see preamble.ts).
+  args.push(asPositional(prompt));
 
   let sawSession = false;
   const open = new Set<string>();
