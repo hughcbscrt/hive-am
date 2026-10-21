@@ -25,10 +25,8 @@ export const es: Record<DictKey, string> = {
   "cres.mine": "De este agente ({a1})",
   "nav.agents": "Agentes",
   "nav.relations": "Relaciones",
-  "nav.library": "Biblioteca",
   "nav.types": "Tipos de agente",
   "nav.skills": "Skills",
-  "nav.history": "Historial",
   "nav.sessions": "Sesiones",
   "nav.connected": "Conectado al servidor",
   "nav.offline": "Servidor sin conexión. Reintentando…",
@@ -37,6 +35,8 @@ export const es: Record<DictKey, string> = {
   "nav.collapse": "Contraer el menú",
   "nav.expand": "Expandir el menú",
   "nav.home": "Inicio",
+  "nav.connectedShort": "Conectado",
+  "nav.moreHint": "Skills, Sesiones, Conexiones y más: en {home} o con {keys}.",
 
   // ---- home ----
   "home.title": "Inicio",

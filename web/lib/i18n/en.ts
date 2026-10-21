@@ -27,10 +27,8 @@ export const en = {
   "cres.mine": "This agent ({a1})",
   "nav.agents": "Agents",
   "nav.relations": "Relations",
-  "nav.library": "Library",
   "nav.types": "Agent types",
   "nav.skills": "Skills",
-  "nav.history": "History",
   "nav.sessions": "Sessions",
   "nav.connected": "Connected to server",
   "nav.offline": "Server offline. Retrying…",
@@ -39,6 +37,8 @@ export const en = {
   "nav.collapse": "Collapse the menu",
   "nav.expand": "Expand the menu",
   "nav.home": "Home",
+  "nav.connectedShort": "Connected",
+  "nav.moreHint": "Skills, Sessions, Connections and more: in {home} or with {keys}.",
 
   // ---- home ----
   "home.title": "Home",
