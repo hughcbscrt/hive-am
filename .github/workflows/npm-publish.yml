@@ -1,0 +1,74 @@
+# Publishes hive-am to npm when a GitHub release is published.
+# The release tag must match the version in package.json (vX.Y.Z), as `make release` leaves it.
+# A pre-release goes out with the npm tag `next`; a normal release with `latest`.
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (vX.Y.Z)
+        required: true
+
+permissions:
+  contents: read
+  id-token: write   # npm trusted publishing and provenance
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      NPM_TAG: ${{ github.event.release.prerelease && 'next' || 'latest' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@latest
+
+      - name: Check the tag matches the version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::The tag $TAG does not match package.json version $version."
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Skip if already published
+        id: published
+        run: |
+          if npm view "hive-am@$VERSION" version >/dev/null 2>&1; then
+            echo "::notice::hive-am@$VERSION is already on npm; nothing to publish."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.published.outputs.skip != '1'
+        run: npm ci
+
+      - if: steps.published.outputs.skip != '1'
+        run: npm run typecheck
+
+      - if: steps.published.outputs.skip != '1'
+        run: npm run npm:build
+
+      - if: steps.published.outputs.skip != '1'
+        name: Publish
+        working-directory: dist/npm
+        run: npm publish --access public --provenance --tag "$NPM_TAG"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

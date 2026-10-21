@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Publish to npm from a GitHub release.** Publishing a release on GitHub now builds and publishes that version to npm through GitHub Actions (`.github/workflows/npm-publish.yml`), with provenance. Pre-releases go out with the npm tag `next`. The tag must match the version in `package.json`, and a version already on npm is skipped.
+
 ## [1.7.0] - 2026-10-21
 
 ### Added

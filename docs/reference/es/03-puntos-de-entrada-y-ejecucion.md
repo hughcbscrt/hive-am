@@ -166,6 +166,8 @@ make npm-publish                    # construye y publica (NPM_TAG=next para una
 
 `make npm-build` arma el paquete en `dist/npm` (ignorado por git): el servidor compilado a JavaScript (`server/dist`), el script MCP, la interfaz web ya construida (`web/.next`), el lanzador `hive-am` (`bin/hive-am.mjs`) y un `package.json` con solo las dependencias de ejecución. `make npm-publish` antes comprueba que hayas iniciado sesión en npm, que esa versión no esté ya publicada y que `HEAD` sea el tag `vX.Y.Z` con el árbol limpio (`FORCE=1` omite lo último).
 
+**Desde un release de GitHub.** `.github/workflows/npm-publish.yml` hace lo mismo en GitHub Actions cuando se publica un release: descarga el tag del release, comprueba que sea `v` más la versión de `package.json`, no hace nada si esa versión ya está en npm, y corre `npm ci`, `npm run typecheck`, `npm run npm:build` y `npm publish` desde `dist/npm` con procedencia (provenance). Un release marcado como pre-release se publica con la etiqueta de npm `next`; los demás, con `latest`. También se puede lanzar a mano desde la pestaña Actions indicando el tag. Se autentica con la publicación de confianza de npm (trusted publishing, configurada en npmjs.com para este repositorio y este archivo de workflow) o, si no está configurada, con el secreto `NPM_TOKEN` del repositorio.
+
 Ya publicado, `npx hive-am` (o `npm install -g hive-am` y `hive-am`) arranca el servidor y la interfaz. **Limitación de la versión empaquetada:** la API usa siempre el puerto 4400 (la interfaz está construida para hablar con él); solo se puede cambiar el de la interfaz, con `HIVE_AM_WEB_PORT`.
 
 ### El launcher (`hive-am`)
