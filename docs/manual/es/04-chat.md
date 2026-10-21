@@ -80,6 +80,20 @@ A la derecha de cada fila ves metadatos: el número de líneas de salida, la dur
 
 Cada fila se abre o se cierra con un clic. Para hacerlo con todas a la vez, usa el enlace **Expandir todas las herramientas** (que pasa a **Contraer todas las herramientas**) en la esquina inferior derecha, bajo la caja de texto.
 
+### Vista normal y compacta
+
+Bajo la caja de texto, junto a **Expandir todas las herramientas**, el selector **Normal / Compacto** cambia cómo se ven los pasos del agente. La elección se recuerda en este navegador y vale para el chat de todos los agentes (y para las transcripciones de la página **Sesiones**). **Normal** es la vista por defecto: una fila por paso, como se describe arriba.
+
+En **Compacto** cada paso es una píldora pequeña con un icono gris, en la misma fila que el nombre del agente:
+
+- El razonamiento, los comandos de shell, los archivos leídos, escritos o editados, las búsquedas, la web, las herramientas de `hive` (responder, enviar archivo, skill, silencio, delegar, equipo), los subagentes, el plan, el navegador y cualquier otra herramienta tienen cada uno su píldora con una etiqueta corta (el comando, el nombre del archivo, el agente...). Pasa el ratón o el foco por una píldora para ver el comando o la ruta completos.
+- Haz clic en una píldora para abrir su detalle bajo la fila (el mismo comando, salida, botones de copiar y diff que en Normal); otro clic lo cierra. Puedes tener varias abiertas a la vez.
+- Las respuestas anteriores se pliegan en una sola píldora resumen como `3 pasos · 1 herramienta · 4.9s`. Haz clic en ella para ver las píldoras de esa respuesta. La última respuesta muestra sus píldoras; mientras el agente trabaja, todas las respuestas guardadas se pliegan y la que se está escribiendo muestra las suyas.
+- Un paso fallido tiene el borde rojo y dice `salida N` o `falló`. Una píldora resumen que esconde un paso fallido también se tiñe de rojo y dice cuántos fallaron.
+- Una herramienta en curso conserva el borde miel, el contador y el punto que late.
+- **Archivos modificados (N)** es una píldora con las líneas añadidas y quitadas; se ve aunque su respuesta esté plegada y abre la misma lista de archivos y cambios.
+- **Expandir todas las herramientas** abre todas las píldoras y despliega todos los resúmenes; **Contraer todas las herramientas** las cierra y los pliega.
+
 ### Proceso de razonamiento
 
 Si el agente expone su razonamiento, aparece una fila plegable **Proceso de razonamiento** antes de sus acciones. Ábrela para leerlo.
