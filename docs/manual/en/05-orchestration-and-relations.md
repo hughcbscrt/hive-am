@@ -39,7 +39,7 @@ What you should know:
 
 ## Connecting and disconnecting workers
 
-Open **Relations** in the side menu. You will see one hexagon per agent. Orchestrators have a dot at the bottom and workers have one at the top.
+Open **Relations** from its card in Home (group **Work**) or with **Ctrl K** (type "relations" or "graph"). You will see one hexagon per agent. Orchestrators have a dot at the bottom and workers have one at the top.
 
 ![Relations canvas with Queen at the top connected by green lines to Backend, Frontend and QA; Guardian sits on the right, unconnected](img/relaciones.jpg)
 

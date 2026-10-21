@@ -76,13 +76,14 @@ Details in [document 9](09-orchestration-and-relations.md).
 
 - `HiveProvider` (`lib/store.tsx`): loads agents, types, skills, colonies and providers, and opens the WebSocket.
 - `Toaster` (notifications).
-- The side navigation bar.
+- The side navigation bar (six entries; the palette and the shortcuts sheet are shared with the pages through `ShellCommands`, `lib/shellCommands.tsx`).
 
 Each screen is a route under `web/app/`:
 
 | Route | File |
 |---|---|
-| `/` | `app/page.tsx` (Colony) |
+| `/` | `app/page.tsx` (Home) |
+| `/colony` | `app/colony/page.tsx` (Colony) |
 | `/agents` | `app/agents/page.tsx` |
 | `/agents/<id>` | `app/agents/[id]/page.tsx` |
 | `/types` | `app/types/page.tsx` |

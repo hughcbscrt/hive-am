@@ -221,7 +221,7 @@ finished: { [agentId]: number }      // contador de turnos terminados
 | `turn_start` de una delegación, `status` `idle` / `error` | Recarga de `dispatches` con espera, para que el feed *Reciente* se mantenga al día sin sondeo. |
 | Cierre del socket | `connected = false`; reintenta con espera exponencial: `min(8000, 800 · 2^n)` ms. |
 
-Un mensaje mal formado se ignora (no rompe el manejador del socket). El estado de conexión se muestra al pie de la barra lateral ("Connected to server" / "Server offline. Retrying…").
+Un mensaje mal formado se ignora (no rompe el manejador del socket). El estado de conexión se muestra al pie de la barra lateral, junto a la versión ("Connected", con "Connected to server" como tooltip / "Server offline. Retrying…").
 
 `useHive()` conserva su forma de siempre, pero los componentes calientes leen porciones más estrechas para que cada token del stream no los vuelva a renderizar: `useHiveSelector(select)`, `useHiveData()` (todo menos `live` y `finished`), `useLive(agentId)`, `useFinished(agentId)`, `useAgent(id)` y `useHiveActions()`. El cliente `api.ts` lanza `ApiError` (con `status`), y cada método acepta un último argumento `{ signal, timeoutMs }`; `isAbort(e)` reconoce una llamada cancelada.
 

@@ -6,7 +6,7 @@ No reemplaza a esos programas: ejecuta los que tienes instalados y nunca copia t
 
 ![El mapa de la colonia de ejemplo con dos colonias, agentes y recursos](img/colonia-mapa.jpg)
 
-*La pantalla principal, Colonia: cada hexágono es un agente o un recurso, y cada área con contorno es una colonia.*
+*El mapa de la colonia: cada hexágono es un agente o un recurso, y cada área con contorno es una colonia.*
 
 ## Para quién es
 
@@ -14,7 +14,7 @@ Para quien trabaja con agentes de código y quiere más que una terminal: repart
 
 ## Índice
 
-1. [Primeros pasos](01-primeros-pasos.md): requisitos, cómo arrancar hive-am, recorrido de la interfaz y tu primer agente.
+1. [Primeros pasos](01-primeros-pasos.md): requisitos, cómo arrancar hive-am, recorrido de la interfaz (Inicio y el menú) y tu primer agente.
 2. [La colonia](02-la-colonia.md): el mapa de hexágonos, las estadísticas, las colonias y lo que comparten con sus agentes.
 3. [Agentes](03-agentes.md): crear, configurar y administrar agentes.
 4. [Chat](04-chat.md): conversar con un agente y entender lo que muestra la conversación.

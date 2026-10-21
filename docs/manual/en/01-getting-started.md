@@ -58,26 +58,41 @@ Everything is stored in `~/.hive-am` (the database is `~/.hive-am/hive-am.db`). 
 
 ## Tour of the interface
 
-![The Colony screen with the sidebar menu on the left](img/colonia-mapa.jpg)
+![The colony map](img/colonia-mapa.jpg)
 
-*The Colony screen. On the left, the sidebar with all the sections. At the bottom left, the **Terminal** button, the connection indicator and **Switch theme**.*
+*The colony map, with the menu on the left.*
 
-The sidebar has these sections:
+The side menu has six entries:
 
-- **Main**
-  - **Colony**: the map with your agents and resources ([chapter 2](02-the-colony.md)).
-  - **Resources**: servers, containers, HTTP requests and clusters ([chapter 10](10-resources.md)).
-  - **Agents**: the list of all your agents and their workspace ([chapter 3](03-agents.md)).
-  - **Relations**: the canvas where you connect orchestrators with workers ([chapter 5](05-orchestration-and-relations.md)).
-  - **Connections**: links with Telegram ([chapter 9](09-telegram-connections.md)).
-  - **Schedules**: messages sent at a set time ([chapter 8](08-schedules.md)).
-- **Library**
-  - **Agent types**: agent templates.
-  - **Skills**: reusable knowledge ([chapter 6](06-types-and-skills.md)).
-- **History**
-  - **Sessions**: the conversations of all your agents ([chapter 7](07-sessions.md)).
+- **Home**: every section of hive-am as a card, what is happening now and the latest delegations (see below). The hive-am logo also takes you there.
+- **Chat**: your last conversation ([chapter 4](04-chat.md)).
+- **Colony**: the map with your agents and resources ([chapter 2](02-the-colony.md)).
+- **Resources**: servers, containers, HTTP requests and clusters ([chapter 10](10-resources.md)).
+- **Agents**: the list of all your agents and their workspace ([chapter 3](03-agents.md)).
+- **Schedules**: messages sent at a set time ([chapter 8](08-schedules.md)).
 
-At the bottom of the menu are the **Activity** button (notices of finished agents, see below), the **Terminal** button (opens the terminal panel, [chapter 12](12-terminals.md)), the server status indicator and **Switch theme**, with the installed hive-am version (for example `v1.7.0`) under it. It is hidden on narrow screens.
+Five sections are not in the menu. Open them from **Home** or with **Ctrl K** (**⌘ K** on a Mac); a line under the entries reminds you:
+
+- **Relations**: the canvas where you connect orchestrators with workers ([chapter 5](05-orchestration-and-relations.md)).
+- **Connections**: links with Telegram and Slack ([chapter 9](09-telegram-connections.md)).
+- **Agent types**: agent templates, and **Skills**: reusable knowledge ([chapter 6](06-types-and-skills.md)).
+- **Sessions**: the conversations of all your agents ([chapter 7](07-sessions.md)).
+
+Each of them shows a **‹ Home** link above its title to go back.
+
+At the bottom of the menu are the **Activity** button (notices of finished agents, see below), the **Terminal** button (opens the terminal panel, [chapter 12](12-terminals.md)), the server status with the installed hive-am version (for example `v1.7.0`) on the same row, and **Switch theme**. The keyboard icon next to **EN** / **ES**, at the top, opens the list of shortcuts.
+
+### Home
+
+Home (`/`) is the first screen. At the top, **Search agents, sections and actions** opens the command palette and **Keyboard shortcuts** opens the list of shortcuts. Under them, a row says what is happening now, showing only what is not zero: the agents working (opens **Agents**), the unread notices (opens **Activity**), the delegations in progress (scrolls down to them) and the connections with an error (opens **Connections**). When there is nothing, it says that all is quiet.
+
+Then come the ten sections as cards, in three groups:
+
+- **Work**: Chat (with the name of your last chat), Agents, Colony (the agents working, or how many colonies you have) and Relations.
+- **Operate**: Resources, Schedules and Connections (in red, how many have an error).
+- **Library and history**: Agent types, Skills and Sessions.
+
+The cards show the totals hive-am already has, and nothing for Relations, Schedules and Sessions. At the bottom are the six latest delegations, as in the Colony screen. With no agents yet, a card on top offers **Create an agent**. If the data cannot be loaded, a message offers **Retry** and the cards still open their sections.
 
 To give the screen more room, the panel button next to the hive-am name (**Collapse the menu**) folds the menu to a narrow column of icons. Hovering or focusing an icon shows its name, counts stay as small badges, and **EN** / **ES** stay one above the other. The same button (**Expand the menu**) opens it again. Your choice is remembered in the browser. On a narrow screen (under 760 px) the menu is a bar at the top with its labels, and it does not fold.
 
@@ -99,7 +114,7 @@ The panel opens upwards next to the menu and closes with **Esc**, with a click o
 
 ### Connection indicator
 
-Near the bottom of the menu, **Connected to server** appears with a green dot while the interface is talking to the server. If the server stops, the text changes to **Server offline. Retrying…** and the interface reconnects on its own. If you see that message, check [chapter 14](14-troubleshooting.md).
+Near the bottom of the menu, **Connected** appears with a green dot while the interface is talking to the server (hover it to read **Connected to server**). If the server stops, the text changes to **Server offline. Retrying…** and the interface reconnects on its own. If you see that message, check [chapter 14](14-troubleshooting.md).
 
 ### Language
 
@@ -113,7 +128,7 @@ The **EN** / **ES** selector at the top of the menu changes the interface langua
 
 ### Light and dark theme
 
-Click **Switch theme** (at the bottom of the sidebar) to toggle between the light and dark themes. Your choice is saved in the browser. With no saved choice, hive-am follows your system preference.
+Click **Switch theme** (at the bottom of the menu) to toggle between the light and dark themes. Your choice is saved in the browser. With no saved choice, hive-am follows your system preference.
 
 ![The Colony screen in the dark theme](img/tema-oscuro.jpg)
 
@@ -121,14 +136,17 @@ Click **Switch theme** (at the bottom of the sidebar) to toggle between the ligh
 
 ### Command palette and shortcuts
 
-**Jump to…**, right under **EN** / **ES** at the top of the menu, opens the command palette; so does **Ctrl K** (**⌘ K** on a Mac) from anywhere. Type to filter, move with **↑** / **↓** and open with **Enter**; **Esc** (or **Ctrl K** again) closes it. With nothing typed it lists, in this order:
+**Jump to…**, right under **EN** / **ES** at the top of the menu, opens the command palette; so do **Ctrl K** (**⌘ K** on a Mac) from anywhere and the search button of Home. Type to filter, move with **↑** / **↓** and open with **Enter**; **Esc** (or **Ctrl K** again) closes it. With nothing typed it lists, in this order:
 
 - **Unread**: the agents with a notice, the most recent first.
-- **Agents**: all of them, the ones working first, then your last chat, then the most recently active (up to 50: keep typing to narrow the list).
+- **More sections**: Relations, Connections, Agent types, Skills and Sessions, the sections that are not in the menu.
+- **Agents**: the first five, the ones working first, then your last chat, then the most recently active (keep typing to find the rest).
 - **Go to**: the screens of the menu.
 - **Actions**: show activity, jump to the latest unread, mark all as read, collapse or expand the menu, switch theme, switch language, show or hide the terminal and the list of shortcuts.
 
-The filter looks at the name, colony, description, provider and model, without caring about capitals or accents ("agil" finds "Ágil").
+When you type, **More sections** goes away, **Agents** shows up to 50 and **Go to** lists every section. The filter looks at the name, colony, description, provider and model, without caring about capitals or accents ("agil" finds "Ágil"). Sections are also found by other words, in English and in Spanish: "telegram" or "slack" find Connections, "history" or "sesiones" find Sessions, "templates" finds Agent types. When a section was found by one of those words, the word shows next to its name.
+
+The list of shortcuts opens with **?**, with the keyboard icon at the top of the menu, with the **Keyboard shortcuts** button of Home and with the action of the palette.
 
 | Keys | What it does |
 |---|---|
@@ -146,7 +164,7 @@ On a Mac only **⌘** works (Ctrl stays for the terminal). The first three work 
 
 You are going to create an agent, give it a working folder and send it a message.
 
-1. Go to **Colony**, click **New** (top right) and choose **New agent**. You can also click **Add agent** on the dotted hexagon of a colony: that way the agent is created inside that colony.
+1. Go to **Colony** in the menu, click **New** (top right) and choose **New agent**. You can also click **Add agent** on the dotted hexagon of a colony: that way the agent is created inside that colony.
 2. Choose how to start:
    - A **type** from the list: it fills in provider, model, instructions and skills for you.
    - **Blank agent** ("Configure everything yourself."): you start with nothing.

@@ -1,10 +1,10 @@
 # Tipos de agente y skills
 
-Esta es la **biblioteca** de hive-am: dos secciones del menú lateral que te ahorran repetir configuración. Los **tipos de agente** son plantillas para crear agentes con un par de clics. Las **skills** son bloques de instrucciones en Markdown que reutilizas en tantos agentes como quieras.
+Esta es la **biblioteca** de hive-am: dos secciones, en el grupo **Biblioteca e historial** de Inicio y en **Ctrl K**, que te ahorran repetir configuración. Los **tipos de agente** son plantillas para crear agentes con un par de clics. Las **skills** son bloques de instrucciones en Markdown que reutilizas en tantos agentes como quieras.
 
 ## Tipos de agente
 
-Un tipo es una plantilla con proveedor, modelo, prompt, permisos, rol y skills. Entra en **Tipos de agente** en el menú lateral.
+Un tipo es una plantilla con proveedor, modelo, prompt, permisos, rol y skills. Entra en **Tipos de agente** desde Inicio o con **Ctrl K** ("tipos" o "plantillas" también la encuentran).
 
 ![Pantalla Tipos de agente con tres tarjetas: Builder, Reviewer y Queen, cada una con Editar y Crear agente](img/tipos-lista.jpg)
 
@@ -50,7 +50,7 @@ Los valores se **copian**: desde ese momento el agente es independiente del tipo
 
 ## Skills
 
-Una skill es un bloque reutilizable de instrucciones: una lista de revisión, un estilo de commits, cómo correr tus pruebas. Se añade a las instrucciones del agente. Entra en **Skills** en el menú lateral.
+Una skill es un bloque reutilizable de instrucciones: una lista de revisión, un estilo de commits, cómo correr tus pruebas. Se añade a las instrucciones del agente. Entra en **Skills** desde Inicio o con **Ctrl K**.
 
 ### Las que vienen con hive-am
 

@@ -20,7 +20,7 @@ Una conexión vincula un agente de hive-am con un bot de Telegram o una app de S
 
 ## Crear la conexión
 
-1. Entra en **Conexiones** y pulsa **Nueva conexión**.
+1. Entra en **Conexiones** (su tarjeta en Inicio, o **Ctrl K** y "conexiones" o "telegram") y pulsa **Nueva conexión**.
 2. En **Plataforma**, deja **Telegram** (Slack aparece como "Slack · pronto" y no se puede elegir).
 3. Escribe un **Nombre**, una etiqueta para ti (por ejemplo "Bot de la tienda").
 4. En **Agente que responde**, elige el agente.
@@ -108,6 +108,8 @@ Cada tarjeta muestra un estado:
 | **Conectando...** | Está arrancando |
 | **Problema** | Algo falló (por ejemplo, token inválido); el motivo aparece en la conexión |
 | **Apagada** | La conexión está desactivada |
+
+Cuando una conexión tiene un **Problema**, Inicio también lo dice: una línea roja en la tarjeta de Conexiones y un "conexiones con error" en la fila de arriba, que abre esta pantalla.
 
 ## Enviar una prueba
 

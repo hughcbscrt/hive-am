@@ -1,6 +1,6 @@
 # La colonia
 
-La pantalla **Colonia** es el centro de hive-am. Muestra todos tus agentes y recursos como hexágonos en un mapa, agrupados en colonias y conectados a los orquestadores que los dirigen. Desde aquí ves quién está trabajando, creas agentes, colonias y recursos, y abres el chat de cualquier agente.
+La pantalla **Colonia** (`/colony`) es el centro de hive-am. Ábrela con **Colonia** en el menú o con su tarjeta en Inicio. Muestra todos tus agentes y recursos como hexágonos en un mapa, agrupados en colonias y conectados a los orquestadores que los dirigen. Desde aquí ves quién está trabajando, creas agentes, colonias y recursos, y abres el chat de cualquier agente.
 
 ![El mapa de la colonia con dos colonias, Infraestructura y Tienda online](img/colonia-mapa.jpg)
 
@@ -153,6 +153,6 @@ Cada vez que creas o guardas una colonia aparece **¿Qué deben heredar sus agen
 
 ## Delegaciones recientes
 
-Debajo del mapa, **Delegaciones recientes** lista las últimas 6 tareas que un orquestador pasó a un worker, con enlaces al agente y a la sesión. Si aún no hay ninguna, verás el mensaje: "Cuando un orquestador le pasa una tarea a un worker, aparece aquí". La tarjeta **tareas en curso** de las estadísticas lleva a esta sección. Más sobre delegar en el [capítulo 5](05-orquestacion-y-relaciones.md).
+Debajo del mapa, **Delegaciones recientes** lista las últimas 6 tareas que un orquestador pasó a un worker, con enlaces al agente y a la sesión. Si aún no hay ninguna, verás el mensaje: "Cuando un orquestador le pasa una tarea a un worker, aparece aquí". La tarjeta **tareas en curso** de las estadísticas lleva a esta sección. Inicio muestra la misma lista. Más sobre delegar en el [capítulo 5](05-orquestacion-y-relaciones.md).
 
 Siguiente: [Agentes](03-agentes.md)

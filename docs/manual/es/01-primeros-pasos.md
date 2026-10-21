@@ -58,26 +58,41 @@ Todo se guarda en `~/.hive-am` (la base de datos es `~/.hive-am/hive-am.db`). Pa
 
 ## Recorrido por la interfaz
 
-![La pantalla Colonia con el menú lateral a la izquierda](img/colonia-mapa.jpg)
+![El mapa de la colonia](img/colonia-mapa.jpg)
 
-*La pantalla Colonia. A la izquierda, el menú lateral con todas las secciones; abajo a la izquierda, el botón **Terminal**, el indicador de conexión y **Cambiar tema**.*
+*El mapa de la colonia, con el menú a la izquierda.*
 
-El menú lateral tiene estas secciones:
+El menú lateral tiene seis entradas:
 
-- **Principal**
-  - **Colonia**: el mapa con tus agentes y recursos ([capítulo 2](02-la-colonia.md)).
-  - **Recursos**: servidores, contenedores, peticiones HTTP y clústeres ([capítulo 10](10-recursos.md)).
-  - **Agentes**: la lista de todos tus agentes y su espacio de trabajo ([capítulo 3](03-agentes.md)).
-  - **Relaciones**: el lienzo donde conectas orquestadores con workers ([capítulo 5](05-orquestacion-y-relaciones.md)).
-  - **Conexiones**: enlaces con Telegram ([capítulo 9](09-conexiones-telegram.md)).
-  - **Programados**: mensajes que se envían a una hora definida ([capítulo 8](08-programados.md)).
-- **Biblioteca**
-  - **Tipos de agente**: plantillas de agente.
-  - **Skills**: conocimientos reutilizables ([capítulo 6](06-tipos-y-skills.md)).
-- **Historial**
-  - **Sesiones**: las conversaciones de todos los agentes ([capítulo 7](07-sesiones.md)).
+- **Inicio**: todas las secciones de hive-am como tarjetas, lo que pasa ahora y las últimas delegaciones (ver más abajo). El logo de hive-am también lleva ahí.
+- **Chat**: tu última conversación ([capítulo 4](04-chat.md)).
+- **Colonia**: el mapa con tus agentes y recursos ([capítulo 2](02-la-colonia.md)).
+- **Recursos**: servidores, contenedores, peticiones HTTP y clústeres ([capítulo 10](10-recursos.md)).
+- **Agentes**: la lista de todos tus agentes y su espacio de trabajo ([capítulo 3](03-agentes.md)).
+- **Programados**: mensajes que se envían a una hora definida ([capítulo 8](08-programados.md)).
 
-Al final del menú están el botón **Actividad** (avisos de agentes que terminaron, ver más abajo), el botón **Terminal** (abre el panel de terminales, [capítulo 12](12-terminales.md)), el indicador de estado del servidor y **Cambiar tema**, con la versión de hive-am instalada (por ejemplo `v1.7.0`) debajo. En pantallas estrechas no se muestra.
+Cinco secciones no están en el menú. Ábrelas desde **Inicio** o con **Ctrl K** (**⌘ K** en Mac); una línea bajo las entradas lo recuerda:
+
+- **Relaciones**: el lienzo donde conectas orquestadores con workers ([capítulo 5](05-orquestacion-y-relaciones.md)).
+- **Conexiones**: enlaces con Telegram y Slack ([capítulo 9](09-conexiones-telegram.md)).
+- **Tipos de agente**: plantillas de agente, y **Skills**: conocimientos reutilizables ([capítulo 6](06-tipos-y-skills.md)).
+- **Sesiones**: las conversaciones de todos los agentes ([capítulo 7](07-sesiones.md)).
+
+Cada una muestra un enlace **‹ Inicio** encima de su título para volver.
+
+Al final del menú están el botón **Actividad** (avisos de agentes que terminaron, ver más abajo), el botón **Terminal** (abre el panel de terminales, [capítulo 12](12-terminales.md)), el estado del servidor con la versión de hive-am instalada (por ejemplo `v1.7.0`) en la misma fila, y **Cambiar tema**. El icono de teclado junto a **EN** / **ES**, arriba, abre la lista de atajos.
+
+### Inicio
+
+Inicio (`/`) es la primera pantalla. Arriba, **Buscar agentes, secciones y acciones** abre la paleta de comandos y **Atajos de teclado** abre la lista de atajos. Debajo, una fila dice lo que pasa ahora, y solo muestra lo que no es cero: los agentes que trabajan (abre **Agentes**), los avisos sin leer (abre **Actividad**), las delegaciones en curso (baja hasta ellas) y las conexiones con error (abre **Conexiones**). Si no hay nada, dice que todo está en calma.
+
+Después vienen las diez secciones como tarjetas, en tres grupos:
+
+- **Trabajo**: Chat (con el nombre de tu último chat), Agentes, Colonia (los agentes que trabajan, o cuántas colonias tienes) y Relaciones.
+- **Operación**: Recursos, Programados y Conexiones (en rojo, cuántas tienen un error).
+- **Biblioteca e historial**: Tipos de agente, Skills y Sesiones.
+
+Las tarjetas muestran los totales que hive-am ya tiene, y ninguno en Relaciones, Programados y Sesiones. Al final están las seis últimas delegaciones, como en la pantalla Colonia. Si aún no hay agentes, una tarjeta arriba ofrece **Crear un agente**. Si los datos no se pueden cargar, un mensaje ofrece **Reintentar** y las tarjetas siguen abriendo sus secciones.
 
 Para dar más espacio a la pantalla, el botón de panel junto al nombre hive-am (**Contraer el menú**) pliega el menú a una columna estrecha de iconos. Al pasar el mouse o llevar el foco a un icono se ve su nombre, los contadores quedan como pequeñas insignias y **EN** / **ES** quedan uno encima del otro. El mismo botón (**Expandir el menú**) lo vuelve a abrir. Tu elección se recuerda en el navegador. En una pantalla estrecha (menos de 760 px) el menú es una barra superior con sus etiquetas y no se pliega.
 
@@ -99,7 +114,7 @@ El panel se abre hacia arriba junto al menú y se cierra con **Esc**, con un cli
 
 ### Indicador de conexión
 
-Junto al pie del menú aparece **Conectado al servidor** con un punto verde cuando la interfaz habla con el servidor. Si el servidor se detiene, el texto cambia a **Servidor sin conexión. Reintentando…** y la interfaz reconecta sola. Si ves ese aviso, consulta el [capítulo 14](14-problemas-frecuentes.md).
+Junto al pie del menú aparece **Conectado** con un punto verde cuando la interfaz habla con el servidor (al pasar el mouse se lee **Conectado al servidor**). Si el servidor se detiene, el texto cambia a **Servidor sin conexión. Reintentando…** y la interfaz reconecta sola. Si ves ese aviso, consulta el [capítulo 14](14-problemas-frecuentes.md).
 
 ### Idioma
 
@@ -121,14 +136,17 @@ Pulsa **Cambiar tema** (abajo en el menú lateral) para alternar entre el tema c
 
 ### Paleta de comandos y atajos
 
-**Ir a…**, justo bajo **EN** / **ES** arriba del menú, abre la paleta de comandos; también **Ctrl K** (**⌘ K** en Mac) desde cualquier parte. Escribe para filtrar, muévete con **↑** / **↓** y abre con **Enter**; **Esc** (o **Ctrl K** otra vez) la cierra. Sin texto lista, por este orden:
+**Ir a…**, justo bajo **EN** / **ES** arriba del menú, abre la paleta de comandos; también **Ctrl K** (**⌘ K** en Mac) desde cualquier parte y el botón de búsqueda de Inicio. Escribe para filtrar, muévete con **↑** / **↓** y abre con **Enter**; **Esc** (o **Ctrl K** otra vez) la cierra. Sin texto lista, por este orden:
 
 - **Sin leer**: los agentes con aviso, el más reciente arriba.
-- **Agentes**: todos, primero los que trabajan, luego tu último chat y luego los de actividad más reciente (hasta 50: sigue escribiendo para acotar la lista).
+- **Más secciones**: Relaciones, Conexiones, Tipos de agente, Skills y Sesiones, las secciones que no están en el menú.
+- **Agentes**: los cinco primeros, primero los que trabajan, luego tu último chat y luego los de actividad más reciente (sigue escribiendo para encontrar el resto).
 - **Ir a**: las pantallas del menú.
 - **Acciones**: ver actividad, ir al último sin leer, marcar todo como leído, plegar o desplegar el menú, cambiar tema, cambiar de idioma, mostrar u ocultar el terminal y la lista de atajos.
 
-El filtro mira el nombre, la colonia, la descripción, el proveedor y el modelo, sin distinguir mayúsculas ni tildes ("agil" encuentra "Ágil").
+Al escribir, **Más secciones** desaparece, **Agentes** muestra hasta 50 e **Ir a** lista todas las secciones. El filtro mira el nombre, la colonia, la descripción, el proveedor y el modelo, sin distinguir mayúsculas ni tildes ("agil" encuentra "Ágil"). Las secciones también se encuentran por otras palabras, en español y en inglés: "telegram" o "slack" encuentran Conexiones, "historial" o "sessions" encuentran Sesiones, "plantillas" encuentra Tipos de agente. Cuando una sección se encontró por una de esas palabras, la palabra aparece junto a su nombre.
+
+La lista de atajos se abre con **?**, con el icono de teclado arriba del menú, con el botón **Atajos de teclado** de Inicio y con la acción de la paleta.
 
 | Teclas | Qué hace |
 |---|---|
@@ -146,7 +164,7 @@ En Mac solo funciona **⌘** (Ctrl queda para el terminal). Los tres primeros fu
 
 Vas a crear un agente, darle una carpeta de trabajo y enviarle un mensaje.
 
-1. Ve a **Colonia**, pulsa **Nuevo** (arriba a la derecha) y elige **Nuevo agente**. También puedes pulsar **Añadir agente** en el hexágono punteado de una colonia: así el agente nace dentro de esa colonia.
+1. Ve a **Colonia** en el menú, pulsa **Nuevo** (arriba a la derecha) y elige **Nuevo agente**. También puedes pulsar **Añadir agente** en el hexágono punteado de una colonia: así el agente nace dentro de esa colonia.
 2. Elige cómo empezar:
    - Un **tipo** de la lista: rellena proveedor, modelo, instrucciones y skills por ti.
    - **Agente en blanco** ("Configura todo tú mismo"): empiezas sin nada.

@@ -83,7 +83,8 @@ hive-am/
     │   ├── favicon.ico, icon.png, apple-icon.png   # favicon e iconos (Next los detecta por nombre)
     │   ├── layout.tsx        # raíz: fuentes, metadatos, <Shell>
     │   ├── globals.css       # TODOS los estilos (tokens, tema claro/oscuro, componentes)
-    │   ├── page.tsx          # Colony (panal)
+    │   ├── page.tsx          # Inicio (todas las pantallas como tarjetas)
+    │   ├── colony/page.tsx   # Colony (panal)
     │   ├── agents/page.tsx   # listado de agentes
     │   ├── agents/layout.tsx # selector de agentes junto a la página de un agente
     │   ├── agents/[id]/page.tsx   # espacio de trabajo del agente (chat, cambios, ajustes, cuaderno)
@@ -94,6 +95,9 @@ hive-am/
     │   └── sessions/page.tsx # sesiones de los agentes
     ├── components/
     │   ├── Shell.tsx         # barra lateral, tema, proveedores globales
+    │   ├── sectionIcons.tsx  # el icono de cada pantalla (menú, paleta, Inicio)
+    │   ├── RecentDelegations.tsx  # feed de delegaciones recientes (Inicio y Colony)
+    │   ├── HomeCrumb.tsx     # enlace «‹ Inicio» de las pantallas fuera del menú
     │   ├── ui.tsx            # primitivas: Drawer, Modal, Field, pickers (incluye SkillPicker), toasts, Hex…
     │   ├── Dialog.tsx        # Dialog / Modal / Drawer: portal, fondo inerte, pila global, foco atrapado
     │   ├── ConfirmDialog.tsx # confirmación con estado de ocupado y aviso de error
@@ -143,6 +147,9 @@ hive-am/
         ├── tokens.ts         # tamaño estimado de las skills en tokens
         ├── channel.ts        # lee la cabecera de origen de un mensaje de canal
         ├── activity.ts       # «qué está haciendo» un agente en una línea
+        ├── sections.ts       # las pantallas: rutas, menú o Inicio, palabras clave de la paleta
+        ├── homeModel.ts      # lo que muestra Inicio, a partir del store
+        ├── shellCommands.tsx # abrir la paleta o la hoja de atajos desde una página
         ├── useDismiss.ts     # cerrar al hacer clic fuera o con Escape
         ├── hooks/            # usePolling, usePersistentState, useUnsavedGuard, useResizableWidth, useQueryState
         ├── git/              # utilidades de la pestaña Cambios
@@ -200,7 +207,8 @@ No hay un framework de pruebas: `server/scripts/test-*.ts` son scripts independi
 | Archivo | Responsabilidad |
 |---|---|
 | `app/layout.tsx` | Carga las fuentes (Bricolage Grotesque, Hanken Grotesk, JetBrains Mono), envuelve todo en `<Shell>` e incluye un script en línea que aplica el tema y el idioma guardados antes del primer pintado (sin parpadeo). |
-| `app/page.tsx` | Pantalla **Colony**: panal con colonias, líneas de relación, panel del agente seleccionado y delegaciones recientes. |
+| `app/page.tsx` | **Inicio**: botones de búsqueda y de atajos, lo que pasa ahora, todas las pantallas como tarjetas en tres grupos y las delegaciones recientes. |
+| `app/colony/page.tsx` | Pantalla **Colony**: panal con colonias, líneas de relación, panel del agente seleccionado y delegaciones recientes. |
 | `app/agents/page.tsx` | Tabla filtrable de agentes. |
 | `app/agents/layout.tsx` | En la página de un agente, la rejilla con el selector de agentes, que sigue montada al cambiar de agente. |
 | `app/agents/[id]/page.tsx` | Chat + pestaña Cambios + panel de ajustes plegable (configuración, cuaderno y sesiones). |
@@ -215,6 +223,7 @@ No hay un framework de pruebas: `server/scripts/test-*.ts` son scripts independi
 | `components/agents/*` | Formularios y paneles de agentes y colonias (`AgentForm` es el formulario compartido de agentes y tipos de agente y maneja la herencia desde la colonia); `NotebookPanel` edita el cuaderno. |
 | `components/chat/*` | `Chat` (transcripción memoizada, turno en vivo, tarjeta de delegación), `ToolCall` (cada herramienta como fila legible), `UserBubble` y `StatsBar`. |
 | `components/git/*` | La pestaña **Cambios**: `GitExplorer` (árbol, visor de archivos y diferencias, historial, stashes), `GitActions` (Fetch/Pull/Push/Commit, ramas), `DiffView`, `ConflictResolver`, etc. |
+| `lib/sections.ts`, `lib/homeModel.ts`, `lib/shellCommands.tsx` | Las pantallas en un solo sitio (ruta, claves de nombre y descripción, palabras clave de la paleta, cuáles seis están en el menú, los grupos de Inicio); lo que muestra Inicio; el contexto que abre la paleta y la hoja de atajos desde una página. Los dos primeros son puros y los prueban `test-web-home.ts` y `test-web-palette.ts`. |
 | `lib/store.tsx` | Estado global, WebSocket y reductor de eventos, con hooks estrechos (`useHiveSelector`, `useLive`…), error de carga y reintento. |
 | `lib/hooks/*` | `usePolling`, `usePersistentState`, `useUnsavedGuard`, `useResizableWidth`, `useQueryState`; ver [11.3](11-frontend.md#113-estado-global-libstoretsx). |
 | `lib/git/*` | Utilidades de la pestaña Cambios: hook `useGit`, árbol, diff, conflictos, preferencias y resaltado de sintaxis (con su worker). |

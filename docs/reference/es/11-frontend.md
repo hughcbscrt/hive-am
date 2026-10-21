@@ -4,7 +4,17 @@ Next.js 15 (App Router) + React 19 + TypeScript. Casi todo es **componente de cl
 
 ## 11.1 Pantallas
 
-### Colony (`/`, `app/page.tsx`)
+### Inicio (`/`, `app/page.tsx`)
+
+Todas las pantallas en un solo sitio. Solo lee el store (`useHiveData()`, que no vuelve a renderizar con cada token), los avisos sin leer (`useAttention()`) y el último chat (`hive-am.lastChat`): ninguna petición propia. Lo que muestra sale de `lib/homeModel.ts` (puro, probado por `server/scripts/test-web-home.ts`).
+
+- **Cabecera:** un botón de búsqueda que abre la paleta de comandos (con `Ctrl K` / `⌘ K`) y un botón **Atajos de teclado** (con `?`) que abre `ShortcutsSheet`. Los dos llegan al Shell por el contexto `ShellCommands` (`lib/shellCommands.tsx`).
+- **Ahora:** solo lo que vale más de cero, en este orden: agentes trabajando (a `/agents`), avisos sin leer (abre el panel Actividad), delegaciones `queued` o `running` (a `#recent`) y conexiones cuyo `status.state` es `error` (a `/connections`). Con todo a cero, una línea de calma.
+- **Tarjetas:** tres grupos (`HOME_GROUPS` de `lib/sections.ts`): Trabajo (Chat, Agentes, Colonia, Relaciones), Operación (Recursos, Programados, Conexiones) y Biblioteca e historial (Tipos de agente, Skills, Sesiones). Cada tarjeta es un solo enlace con el icono de la pantalla (`components/sectionIcons.tsx`), el nombre, una descripción y un número cuando el cliente lo tiene: el nombre del último chat, totales, los agentes trabajando (o las colonias) en Colonia, y una línea roja con las conexiones en error. Relaciones, Programados y Sesiones no llevan número (el store no los tiene).
+- **Estados:** diez esqueletos con `role="status"` mientras carga; con error, un aviso con *Reintentar* y las tarjetas sin números (siguen navegando); sin agentes, una tarjeta de bienvenida que abre `NewAgentDrawer`.
+- **Delegaciones recientes:** el mismo feed que Colony (`components/RecentDelegations.tsx`).
+
+### Colony (`/colony`, `app/colony/page.tsx`)
 
 Mapa del enjambre y panel de detalle.
 
@@ -13,7 +23,7 @@ Mapa del enjambre y panel de detalle.
 - **Carga y errores:** un esqueleto mientras la API no ha respondido y, si falla, un aviso de error con botón *Reintentar* (nunca una colonia vacía).
 - **Panal:** una celda hexagonal por agente, agrupadas por colonia (ver 11.2). Además de arrastrar, las colonias (por su nombre) y los hexágonos libres se pueden **mover con las flechas del teclado** (Mayús para pasos mayores).
 - **Panel derecho:** al seleccionar una celda muestra descripción, proveedor, modelo, carpeta efectiva ("· from colony" si es heredada), sesión, equipo (orquestadores), un **selector de colonia** (mueve al agente), botón **Open chat** y, en la esquina superior derecha, el botón de **ajustes** que abre `AgentEditDrawer`.
-- **Recent delegations:** las últimas 6, tomadas del store (`dispatches`, que refresca el WebSocket, sin sondeo), con enlaces al agente y a la sesión.
+- **Recent delegations:** las últimas 6, tomadas del store (`dispatches`, que refresca el WebSocket, sin sondeo), con enlaces al agente y a la sesión (`components/RecentDelegations.tsx`, compartido con Inicio).
 
 ### Agents (`/agents`)
 
@@ -26,7 +36,7 @@ Selector de agentes + chat + ajustes plegables (ver [documento 10](10-chat-y-vis
 - **Configuration:** `AgentForm` completo con barra inferior *Save changes* / *Discard* y botón *Delete agent* (con confirmación).
 - **Sessions:** conversaciones y tareas delegadas.
 
-Cabecera: volver a Colony, avatar, nombre, rol, proveedor, modelo, estado, **New conversation** (con confirmación) y **Settings**.
+Cabecera: volver a Colony (`/colony`), avatar, nombre, rol, proveedor, modelo, estado, **New conversation** (con confirmación) y **Settings**.
 
 ### Connections (`/connections`)
 Tarjetas de las conexiones externas con su estado en vivo (se refresca cada 5 s) y un panel lateral para crearlas o editarlas (cerrarlo con cambios sin guardar pregunta antes). Detalle en el [documento 14](14-conexiones-externas.md).
@@ -47,9 +57,11 @@ Lienzo de React Flow; ver [documento 9](09-orquestacion-y-relaciones.md#lienzo-r
 
 Lista por día con búsqueda y filtro por proveedor, y panel de transcripción con enlace **Open agent**. La sesión elegida está en la URL (`?session=<id>`). La transcripción usa los bloques del propio chat (`History`), así que **se ven las llamadas a herramientas y el razonamiento** y los mensajes largos ya no se pliegan.
 
+Connections, Types, Skills, Relations y Sessions no están en el menú: se llega desde Inicio y la paleta, y cada una muestra un enlace `‹ Inicio` encima de su título (`components/HomeCrumb.tsx`, `.crumb`), también vacía o con error. En Relations la cabecera flota sobre el lienzo con `pointer-events: none`, así que el enlace pone `pointer-events: auto`.
+
 ## 11.2 El panal (mapa de Colony)
 
-Implementado en `app/page.tsx`, sin librerías de gráficos: celdas HTML posicionadas de forma absoluta y capas SVG.
+Implementado en `app/colony/page.tsx`, sin librerías de gráficos: celdas HTML posicionadas de forma absoluta y capas SVG.
 
 **Geometría.** Hexágonos de punta arriba con radio `S = 74`; ancho `W = √3·S`, alto `H = 2·S`. Las posiciones salen de **coordenadas axiales** recorridas en espiral (anillo 0, 1, 2…), con `x = W·(q + r/2)` e `y = 1.5·S·r`.
 
@@ -64,7 +76,7 @@ Implementado en `app/page.tsx`, sin librerías de gráficos: celdas HTML posicio
 
 **Celdas.** Botones con `clip-path` hexagonal. Borde del color del proveedor; las celdas de orquestador usan el color miel. Un punto pulsante indica trabajo; rojo si hay error. Etiqueta con nombre y proveedor, y una pastilla `↑ nombre` / `↓ N` que indica la relación.
 
-**Relaciones.** SVG por encima de las celdas (ver [documento 9](09-orquestacion-y-relaciones.md#pantalla-colony-apppagetsx)).
+**Relaciones.** SVG por encima de las celdas (ver [documento 9](09-orquestacion-y-relaciones.md#pantalla-colony-appcolonypagetsx)).
 
 **Ajuste a la pantalla.** Un `ResizeObserver` mide el panel y escala el mapa completo con `transform: scale(k)` (`k ≤ 1`, nunca amplía) para que quepa sin scroll horizontal.
 
@@ -148,8 +160,8 @@ Definidos en `:root` y redefinidos para el tema oscuro (un solo bloque oscuro, `
 ### Tema claro/oscuro
 
 - Atributo `data-theme` en `<html>`: `light` o `dark`. Un script en línea de `layout.tsx` lo fija (y `lang`) **antes del primer pintado** a partir de `localStorage` o, sin elección guardada, de `prefers-color-scheme` (que sigue observando), así una página oscura nunca parpadea en claro.
-- El botón **Switch theme** (barra lateral, con `aria-pressed`) alterna y guarda la elección en `localStorage` (`hive-theme`).
-- Debajo, el menú muestra la versión (`v1.7.0`, `.rail-ver`). `web/next.config.mjs` la lee de `web/package.json` (que `make release` sube junto con las demás) y la fija al compilar como `NEXT_PUBLIC_HIVE_AM_VERSION`; sin versión no muestra nada. Oculta por debajo de 760px.
+- El botón **Switch theme** (pie de la barra lateral, con `aria-pressed`) alterna y guarda la elección en `localStorage` (`hive-theme`).
+- Encima, el menú muestra la versión (`v1.7.0`) a la derecha del estado de conexión, en la misma fila (`.conn.ver`; el estado dice solo *Conectado*, la frase completa va en el tooltip y en el texto para lectores de pantalla). `web/next.config.mjs` la lee de `web/package.json` (que `make release` sube junto con las demás) y la fija al compilar como `NEXT_PUBLIC_HIVE_AM_VERSION`; sin versión no muestra nada. Oculta con el menú plegado y por debajo de 760px.
 - El contraste de `--muted` y `--ok` se subió para cumplir 4,5:1 en texto en el tema claro.
 - Las iniciales de los hexágonos son oscuras en tema oscuro para mantener el contraste.
 
@@ -160,10 +172,11 @@ Las fuentes se cargan con `next/font/google` en `layout.tsx`, por lo que **la pr
 ### Responsivo y accesibilidad
 
 - Puntos de corte: **1100 px** (las columnas se apilan) y **760 px** (la barra lateral pasa a barra superior).
-- La barra lateral (`Shell.tsx`, `.rail`) se pliega de 220 px a 64 px con el botón de su cabecera (`aria-expanded`, `aria-label` *Contraer el menú* / *Expandir el menú*). El ancho es `--rail-w` en `.shell`; plegada, cada entrada conserva su etiqueta como `aria-label` (con el contador) y `title` (lo muestra el tooltip global), los contadores pasan a insignias (`99+` por encima de 99) y EN/ES se apilan. El estado se guarda en `localStorage` (`hive-am.railCollapsed`) y el script en línea de `layout.tsx` lo aplica como `data-rail` en `<html>` antes del primer pintado, así que al recargar nunca parpadea la barra ancha; el ancho solo se anima tras un clic (`.rail-anim`). Por debajo de 760 px el plegado se ignora y el botón se oculta.
+- La barra lateral (`Shell.tsx`, `.rail`) tiene seis entradas: Inicio, Chat, Colonia, Recursos, Agentes y Programados. Las pantallas, sus rutas, las palabras clave de la paleta y cuáles están en el menú viven en `lib/sections.ts` (`MENU_IDS`, `MORE_IDS`), probado por `test-web-home.ts`. El logo enlaza a Inicio, una línea bajo las entradas (`.rail-hint`, solo desplegada) dice dónde quedaron las otras cinco, un icono de teclado junto al selector de idioma abre `ShortcutsSheet` y el lema se oculta en ventanas de 800 px de alto o menos.
+- La barra lateral se pliega de 220 px a 64 px con el botón de su cabecera (`aria-expanded`, `aria-label` *Contraer el menú* / *Expandir el menú*). El ancho es `--rail-w` en `.shell`; plegada, cada entrada conserva su etiqueta como `aria-label` (con el contador) y `title` (lo muestra el tooltip global), los contadores pasan a insignias (`99+` por encima de 99) y EN/ES se apilan. El estado se guarda en `localStorage` (`hive-am.railCollapsed`) y el script en línea de `layout.tsx` lo aplica como `data-rail` en `<html>` antes del primer pintado, así que al recargar nunca parpadea la barra ancha; el ancho solo se anima tras un clic (`.rail-anim`). Por debajo de 760 px el plegado se ignora y el botón se oculta.
 - Foco visible en todos los controles (`:focus-visible`), `aria-label` en botones de solo icono, `aria-pressed`/`aria-current`/`aria-selected` en controles de estado, `role="dialog"` en paneles y diálogos.
 - `prefers-reduced-motion` desactiva animaciones y transiciones.
-- Atajos globales (`lib/hotkeys.ts`, reglas en `lib/hotkeyRules.ts`, probadas por `server/scripts/test-web-hotkeys.ts`): un solo `keydown` en `window` en fase de burbuja (el Ctrl+` de `lib/dock.tsx` sigue en captura). `Mod` es Ctrl, o ⌘ en Mac (solo `metaKey`; se detecta tras montar). **Mod K** abre o cierra la paleta de comandos (`components/CommandPalette.tsx`, un `Dialog` con `useCombobox`; lo que lista es `lib/paletteRules.ts`, probado por `test-web-palette.ts`), **Mod B** pliega el rail, **Mod .** abre el aviso sin leer más reciente (sin avisos dice `attn.noUnread` en la región `aria-live`) y **?** abre `ShortcutsSheet`. Se ignoran siempre con `isComposing`, `repeat`, `altKey` o `defaultPrevented`; los Mod funcionan en campos de texto normales pero no dentro de `[data-hotkeys="own"]` (xterm, `MarkdownEditor`, `CodeEditor`, `SourceEditor`, `SqlEditor`, el panel de consultas de bases de datos), ni con una capa abierta (`dialogDepth() > 0`) salvo Mod K si la capa es la paleta; **?** se ignora en campos, comboboxes, zonas `own`, con una capa o un `[role="menu"]` abierto; `/` queda para el explorador git. Marca con `data-hotkeys="own"` cualquier editor nuevo que tenga teclas propias. `lib/theme.ts` (`flipTheme`) y `chatHref()` de `lib/lastChat.ts` los comparten el rail y la paleta.
+- Atajos globales (`lib/hotkeys.ts`, reglas en `lib/hotkeyRules.ts`, probadas por `server/scripts/test-web-hotkeys.ts`): un solo `keydown` en `window` en fase de burbuja (el Ctrl+` de `lib/dock.tsx` sigue en captura). `Mod` es Ctrl, o ⌘ en Mac (solo `metaKey`; se detecta tras montar). **Mod K** abre o cierra la paleta de comandos (`components/CommandPalette.tsx`, un `Dialog` con `useCombobox`; lo que lista es `lib/paletteRules.ts`, probado por `test-web-palette.ts`: con la consulta vacía, *Más secciones* con las cinco pantallas fuera del menú va antes de los 5 primeros agentes; con texto, hasta 50 agentes y todas las pantallas, por su etiqueta o por las palabras clave en inglés y español de `lib/sections.ts`, y la fila muestra la palabra que casó), **Mod B** pliega el rail, **Mod .** abre el aviso sin leer más reciente (sin avisos dice `attn.noUnread` en la región `aria-live`) y **?** abre `ShortcutsSheet` (también el icono de teclado del rail, el botón de Inicio y la acción de la paleta; el Shell guarda ese estado y lo comparte por `ShellCommands`). Se ignoran siempre con `isComposing`, `repeat`, `altKey` o `defaultPrevented`; los Mod funcionan en campos de texto normales pero no dentro de `[data-hotkeys="own"]` (xterm, `MarkdownEditor`, `CodeEditor`, `SourceEditor`, `SqlEditor`, el panel de consultas de bases de datos), ni con una capa abierta (`dialogDepth() > 0`) salvo Mod K si la capa es la paleta; **?** se ignora en campos, comboboxes, zonas `own`, con una capa o un `[role="menu"]` abierto; `/` queda para el explorador git. Marca con `data-hotkeys="own"` cualquier editor nuevo que tenga teclas propias. `lib/theme.ts` (`flipTheme`) y `chatHref()` de `lib/lastChat.ts` los comparten el rail y la paleta.
 - Los diálogos atrapan y devuelven el foco; las pestañas, el árbol de archivos y las listas se manejan con teclado; el chat es un `role="log"`; las filas de tabla que abren algo son enfocables.
 - Unas clases de utilidad sustituyen estilos en línea repetidos: `.cluster` (fila que se ajusta), `.stack-s`, `.stack-l`, `.gap-xs`, `.gap-m`, `.push-r`, `.ellipsis` y `.mt-*`, además de las anteriores `.row`, `.col`, `.grow`, `.gap-s`, `.gap-l`.
 
@@ -194,6 +207,7 @@ Resumen de lo que cada pantalla necesita del backend, para quien toque la API:
 | Pantalla | Endpoints |
 |---|---|
 | Todas | `GET /api/agents`, `/types`, `/skills`, `/colonies`, `/providers`, WebSocket |
+| Inicio | `GET /api/dispatches` (a través del store, nada propio) |
 | Colony | `GET /api/dispatches`; `PATCH /api/agents/:id` (mover de colonia); `POST/PATCH/DELETE /api/colonies` |
 | Agente | `GET …/history`, `…/stats`, `…/live`, `…/sessions`; `POST …/messages`, `…/stop`, `…/new-session`, `…/resume-session`; `PATCH/DELETE /api/agents/:id` |
 | Types | `POST/PATCH/DELETE /api/types` |
@@ -209,7 +223,7 @@ Toda la interfaz está disponible en **inglés** y **español**. El sistema es p
 
 ### Selector de idioma
 
-- Está **arriba de la barra lateral**, debajo del logo (`/icon.png`, el mismo del favicon; se oculta cuando la barra se colapsa): un control `EN | ES` (`LanguageSwitch` en `components/Shell.tsx`).
+- Está **arriba de la barra lateral**, debajo del logo (`/icon.png`, el mismo del favicon; se oculta cuando la barra se colapsa): un control `EN | ES` (`LanguageSwitch` en `components/Shell.tsx`), con el icono de atajos de teclado a su derecha.
 - El cambio es **inmediato** y no recarga la página.
 - **Nada del idioma aparece en la URL**: las rutas (`/agents`, `/relations`, …) son las mismas en ambos idiomas. La elección se guarda solo en `localStorage` (`hive-locale`).
 - Idioma inicial: el guardado en `localStorage`; si no hay, el del navegador (`es*` → español, cualquier otro → inglés). También se actualiza `<html lang>`.

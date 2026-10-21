@@ -238,7 +238,7 @@ All under `/api`, local origin only.
 
 ## 14.9 Interface
 
-- **Connections** (`/connections`, in the sidebar): cards with name, status (Connected / Connecting / Problem / Off, with the error reason), agent, bot, number of threads and last message. It updates every 5 s.
+- **Connections** (`/connections`, from Home or Ctrl K; no longer in the sidebar): cards with name, status (Connected / Connecting / Problem / Off, with the error reason), agent, bot, number of threads and last message. It updates every 5 s.
 - **Connection panel** (expandable): platform, name, answering agent (with a warning if it is read-only or full access), token (shown as `Leave empty to keep ••••1234`), group mode, authorized groups and aliases (14.6.1), allowed people (id, name, admin), receive files, image model, bot language, what to do if the agent does not reply, active/off, **Send test**, delete and the thread list.
 - **Agent chat:** channel messages are seen as a bubble with their origin; the `channel_reply` call appears as the **"Reply in the channel"** row with the text sent (also when OpenCode calls it inside a code block).
 

@@ -27,7 +27,7 @@ Delegations run in their own session so that the direct chat with a worker conta
 
 ## The Sessions screen
 
-Open **Sessions** in the menu (under **History**).
+Open **Sessions** from its card in Home (group **Library and history**) or with **Ctrl K** ("history" also finds it).
 
 ![Sessions screen with the list grouped by day and Queen's transcript on the right](img/sesiones-transcripcion.jpg)
 

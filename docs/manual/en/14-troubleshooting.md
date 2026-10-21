@@ -10,7 +10,7 @@ The server is not running or is on another port. The interface retries on its ow
 2. If you closed it, start it again (`npx hive-am` or `hive-am`). If you started it with `hive-am start --background`, `hive-am status` tells you whether it is running and `hive-am logs` shows its last output; `hive-am stop` before backing up or resetting the data folder.
 3. If you changed the API port with `HIVE_AM_PORT`, the interface has to point to the same port. With the npm package the API port is fixed (4400).
 
-When the server comes back, the indicator changes to **Connected to server**.
+When the server comes back, the indicator at the bottom of the menu changes to **Connected** (**Connected to server** when you hover it).
 
 ## Instead of the lists I see a notice that they could not load
 

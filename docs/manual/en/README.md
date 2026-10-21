@@ -6,7 +6,7 @@ It does not replace those programs: it runs the ones you have installed and neve
 
 ![The sample colony map with two colonies, agents and resources](img/colonia-mapa.jpg)
 
-*The main screen, Colony: each hexagon is an agent or a resource, and each outlined area is a colony.*
+*The colony map: each hexagon is an agent or a resource, and each outlined area is a colony.*
 
 ## Who it is for
 
@@ -14,7 +14,7 @@ For anyone who works with coding agents and wants more than a terminal: split ta
 
 ## Contents
 
-1. [Getting started](01-getting-started.md): requirements, how to start hive-am, a tour of the interface and your first agent.
+1. [Getting started](01-getting-started.md): requirements, how to start hive-am, a tour of the interface (Home and the menu) and your first agent.
 2. [The colony](02-the-colony.md): the hexagon map, the statistics, colonies and what they share with their agents.
 3. [Agents](03-agents.md): create, configure and manage agents.
 4. [Chat](04-chat.md): talk to an agent and understand what the conversation shows.

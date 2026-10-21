@@ -1,6 +1,6 @@
 # The colony
 
-The **Colony** screen is the center of hive-am. It shows all your agents and resources as hexagons on a map, grouped into colonies and connected to the orchestrators that direct them. From here you see who is working, create agents, colonies and resources, and open the chat of any agent.
+The **Colony** screen (`/colony`) is the center of hive-am. Open it with **Colony** in the menu or its card in Home. It shows all your agents and resources as hexagons on a map, grouped into colonies and connected to the orchestrators that direct them. From here you see who is working, create agents, colonies and resources, and open the chat of any agent.
 
 ![The colony map with two colonies, Infrastructure and Online store](img/colonia-mapa.jpg)
 
@@ -153,6 +153,6 @@ Every time you create or save a colony, **What should its agents inherit?** appe
 
 ## Recent delegations
 
-Below the map, **Recent delegations** lists the last 6 tasks that an orchestrator passed to a worker, with links to the agent and the session. If there are none yet, you will see the message: "When an orchestrator hands a task to a worker, it shows up here." The **tasks in flight** card in the statistics takes you to this section. More about delegating in [chapter 5](05-orchestration-and-relations.md).
+Below the map, **Recent delegations** lists the last 6 tasks that an orchestrator passed to a worker, with links to the agent and the session. If there are none yet, you will see the message: "When an orchestrator hands a task to a worker, it shows up here." The **tasks in flight** card in the statistics takes you to this section. Home shows the same list. More about delegating in [chapter 5](05-orchestration-and-relations.md).
 
 Next: [Agents](03-agents.md)
