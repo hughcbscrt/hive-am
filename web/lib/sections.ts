@@ -36,3 +36,11 @@ export const SECTIONS: Section[] = [
 export const MENU_IDS: SectionId[] = SECTIONS.filter((s) => !s.more).map((s) => s.id);
 export const MORE_IDS: SectionId[] = SECTIONS.filter((s) => s.more).map((s) => s.id);
 export const sectionById = (id: SectionId): Section => SECTIONS.find((s) => s.id === id)!;
+
+export type HomeGroup = 'work' | 'operate' | 'library';
+/** The cards of Home, by group and in reading order: every screen but Home itself. */
+export const HOME_GROUPS: { id: HomeGroup; ids: SectionId[] }[] = [
+  { id: 'work', ids: ['chat', 'agents', 'colony', 'relations'] },
+  { id: 'operate', ids: ['resources', 'schedules', 'connections'] },
+  { id: 'library', ids: ['types', 'skills', 'sessions'] },
+];

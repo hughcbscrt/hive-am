@@ -7,7 +7,7 @@ import { useAttention } from '@/lib/attention';
 import { dotState } from '@/lib/attentionRules';
 import { usePersistentState } from '@/lib/hooks/usePersistentState';
 import { api } from '@/lib/api';
-import { CLUSTER_COLOR, PROVIDERS, ago, shortPath } from '@/lib/meta';
+import { CLUSTER_COLOR, PROVIDERS, shortPath } from '@/lib/meta';
 import type { Agent, Colony, ObjectView } from '@/lib/types';
 import { Banner, EmptyState, Hex, useToast } from '@/components/ui';
 import { Menu, MenuItem } from '@/components/Menu';
@@ -22,6 +22,7 @@ import { useI18n } from '@/lib/i18n';
 import { ObjectPanel } from '@/components/objects/ObjectPanel';
 import { ObjectEditor } from '@/components/objects/ObjectEditor';
 import { KIND } from '@/components/objects/meta';
+import { RecentDelegations } from '@/components/RecentDelegations';
 
 const S = 74; // hex circumradius
 const W = Math.sqrt(3) * S, H = 2 * S;
@@ -377,20 +378,7 @@ export default function Colony() {
             </AnchoredCard>
           ) : null}
       </div>
-      <div className="card card-pad recent" id="recent">
-        <div className="eyebrow recent-head">{t('colony.recent')}</div>
-        {feed.length === 0 ? <p className="muted small m0">{t('colony.recentEmpty')}</p> :
-          <div className="recent-grid">{feed.slice(0, 6).map((d) => (
-            <div key={d.id} className="feed-item">
-              <i className={`dot ${d.status === 'running' ? 'run' : d.status === 'queued' ? 'wait' : d.status === 'done' ? 'ok' : 'err'}`} title={t(`colony.task.${d.status}`)} />
-              <div>
-                <div className="feed-line">{agents.some((x) => x.id === d.from_id) ? <Link href={`/agents/${d.from_id}`} aria-label={t('cx.openAgent', { name: name(d.from_id) })}>{name(d.from_id)}</Link> : <b>{name(d.from_id)}</b>} → {agents.some((x) => x.id === d.to_id) ? <Link href={`/agents/${d.to_id}`} aria-label={t('cx.openAgent', { name: name(d.to_id) })}>{name(d.to_id)}</Link> : <b>{name(d.to_id)}</b>}</div>
-                <div className="muted small ellipsis">{d.task}</div>
-                <div className="muted feed-when">{ago(d.created_at)}</div>
-              </div>
-            </div>
-          ))}</div>}
-      </div>
+      <RecentDelegations feed={feed} agents={agents} />
       {cloning && agents.find((a) => a.id === cloning) && <CloneAgentModal agent={agents.find((a) => a.id === cloning)!} onClose={() => setCloning(null)} onCloned={(c) => setSel(c.id)} />}
       {deleting && agents.find((a) => a.id === deleting) && <DeleteAgentModal agent={agents.find((a) => a.id === deleting)!} onClose={() => setDeleting(null)} onDeleted={() => setSel(null)} />}
       {creating && <NewAgentDrawer presetColonyId={creating.colonyId} presetObjectId={creating.objectId} manager={creating.manager} onClose={() => setCreating(null)} onCreated={(id) => setSel(id)} />}
