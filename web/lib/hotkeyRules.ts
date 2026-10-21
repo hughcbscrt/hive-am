@@ -33,8 +33,9 @@ export function matchHotkey(e: KeyInfo, env: KeyEnv): HotkeyId | null {
   }
   const mod = env.mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
   if (!mod || e.shiftKey) return null;
-  // The letter as typed, or its physical key on layouts where it types something else.
-  const id = MOD_KEYS[e.key.toLowerCase()] ?? (e.code ? MOD_CODES[e.code] : undefined);
+  // The letter as typed. The physical key counts only on layouts that type no ASCII there (Cyrillic, Greek):
+  // on Dvorak or Colemak, Ctrl+X sits on the B key and Ctrl+V on the period, and those are cut and paste.
+  const id = /^[\x20-\x7e]$/.test(e.key) ? MOD_KEYS[e.key.toLowerCase()] : e.code ? MOD_CODES[e.code] : undefined;
   if (!id || env.inOwn) return null;
   if (env.layers > 0) return id === 'palette' && env.paletteOpen ? 'palette' : null;
   return id;
