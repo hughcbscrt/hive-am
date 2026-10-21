@@ -47,7 +47,7 @@ export function QueryPane({ o, sql, setSql, area, run, format, ctx, busy, result
         <HelpPopover size="sm" align="end" label={t('common.help')} title={t('db.help.title')}><p>{t('db.help.1')}</p><p>{t('db.help.2')}</p><p>{t('db.help.3')}</p><p>{t('db.help.4')}</p></HelpPopover>
         <GitSettings compact />
       </div>
-      <div className="db-ed gx" data-gx-theme={prefs.theme} style={{ ['--g-tab' as never]: prefs.tabSize }}>
+      <div className="db-ed gx" data-hotkeys="own" data-gx-theme={prefs.theme} style={{ ['--g-tab' as never]: prefs.tabSize }}>
         <SqlEditor value={sql} onChange={setSql} areaRef={area} ctx={ctx} label={t('db.editor')}
           onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); } else if (e.altKey && e.shiftKey && e.key.toLowerCase() === 'f') { e.preventDefault(); format(); } }} />
       </div>

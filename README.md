@@ -39,6 +39,7 @@ have installed; it does not replace them and it never copies your conversations 
 - **Changes explorer.** A Git tab per agent: file tree with highlighting, diff viewer, history, commit, pull, push and branches.
 - **Resources.** Servers, Docker containers, HTTP requests (`.http` files) and clusters that group them live in a colony as hexagons: start, stop, read logs, run requests; agents can look after them, and an agent with the Database management skill can look inside a database and run SQL, within its permission.
 - **Terminals.** A bottom panel (Ctrl+`) with real shells and object logs, reachable only from this machine.
+- **Never miss a finished agent.** Unread notices on avatars, the tab title and an Activity panel, optional browser notifications, a command palette (Ctrl/⌘ K) and a few shortcuts to jump around.
 - **Local and private.** The server binds to `127.0.0.1`. Data lives in `~/.hive-am/`.
 
 ## Screenshots

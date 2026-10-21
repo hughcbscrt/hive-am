@@ -37,7 +37,7 @@ export function SqlEditor({ value, onChange, areaRef, ctx, label, onKeyDown }: {
   };
   const h = areaRef.current?.clientHeight ?? 400;
   return (
-    <div className="se">
+    <div className="se" data-hotkeys="own">
       <CodeEditor value={value} path="query.sql" areaRef={areaRef} label={label}
         onChange={(v) => { onChange(v); const el = areaRef.current; if (el) requestAnimationFrame(() => refresh(v, el.selectionStart)); }}
         onClick={() => setSug(null)} onBlur={() => setTimeout(() => setSug(null), 120)} onKeyDown={keys} />

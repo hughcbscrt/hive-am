@@ -119,6 +119,29 @@ Pulsa **Cambiar tema** (abajo en el menú lateral) para alternar entre el tema c
 
 *El tema oscuro. El botón **Cambiar tema** aparece abajo a la izquierda, con el puntero encima.*
 
+### Paleta de comandos y atajos
+
+**Ir a…**, justo bajo **EN** / **ES** arriba del menú, abre la paleta de comandos; también **Ctrl K** (**⌘ K** en Mac) desde cualquier parte. Escribe para filtrar, muévete con **↑** / **↓** y abre con **Enter**; **Esc** (o **Ctrl K** otra vez) la cierra. Sin texto lista, por este orden:
+
+- **Sin leer**: los agentes con aviso, el más reciente arriba.
+- **Agentes**: todos, primero los que trabajan, luego tu último chat y luego los de actividad más reciente (hasta 50: sigue escribiendo para acotar la lista).
+- **Ir a**: las pantallas del menú.
+- **Acciones**: ver actividad, ir al último sin leer, marcar todo como leído, plegar o desplegar el menú, cambiar tema, cambiar de idioma, mostrar u ocultar el terminal y la lista de atajos.
+
+El filtro mira el nombre, la colonia, la descripción, el proveedor y el modelo, sin distinguir mayúsculas ni tildes ("agil" encuentra "Ágil").
+
+| Teclas | Qué hace |
+|---|---|
+| **Ctrl K** (**⌘ K**) | Abrir o cerrar la paleta de comandos |
+| **Ctrl B** (**⌘ B**) | Plegar o desplegar el menú |
+| **Ctrl .** (**⌘ .**) | Abrir el agente con el aviso sin leer más reciente |
+| **?** | Mostrar la lista de atajos (fuera de los campos de texto) |
+| **Ctrl `** | Mostrar u ocultar el terminal |
+| **Esc** | Cerrar el panel abierto |
+| **Ctrl Enter** (**⌘ Enter**) | Enviar o ejecutar en los editores |
+
+En Mac solo funciona **⌘** (Ctrl queda para el terminal). Los tres primeros funcionan mientras escribes en el cuadro del chat o en un buscador, pero no dentro de un terminal, del editor Markdown ni de un editor de código o de consultas, donde esas teclas conservan su significado (ahí Ctrl+B es negrita); **Ctrl `** funciona en todas partes. Dentro de un campo de texto **?** se escribe como un carácter normal. Con un diálogo abierto los atajos esperan a que se cierre, salvo **Ctrl K**, que cierra la paleta.
+
 ## Tu primer agente
 
 Vas a crear un agente, darle una carpeta de trabajo y enviarle un mensaje.

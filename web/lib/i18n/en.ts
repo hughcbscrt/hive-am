@@ -2007,6 +2007,37 @@ export const en = {
   "attn.notify.denied": "Blocked by the browser. Allow notifications for this site in its settings.",
   "attn.notify.unsupported": "Not available here. The browser needs https or localhost.",
 
+  // ---- command palette and keyboard shortcuts ----
+  "cmd.nav": "Jump to…",
+  "cmd.navHint": "Jump to… ({keys})",
+  "cmd.title": "Command palette",
+  "cmd.placeholder": "Search agents, screens and actions",
+  "cmd.group.screens": "Go to",
+  "cmd.group.actions": "Actions",
+  "cmd.empty": "Nothing matches “{query}”.",
+  "cmd.more": "Keep typing to narrow the list",
+  "cmd.hint": "↑ ↓ to move · Enter to open · Esc to close",
+  "cmd.results_one": "{count} result",
+  "cmd.results_other": "{count} results",
+  "cmd.act.jumpUnread": "Jump to latest unread",
+  "cmd.act.activity": "Show activity",
+  "cmd.act.language": "Switch language",
+  "cmd.act.shortcuts": "Keyboard shortcuts",
+  "keys.title": "Keyboard shortcuts",
+  "keys.group.anywhere": "Anywhere",
+  "keys.group.outside": "Outside text fields",
+  "keys.group.existing": "Already in the app",
+  "keys.open": "Open the command palette",
+  "keys.help": "Show this list",
+  "keys.rail": "Collapse or expand the menu",
+  "keys.unread": "Jump to the latest unread",
+  "keys.terminal": "Show or hide the terminal",
+  "keys.close": "Close the open panel",
+  "keys.send": "Send or run in editors",
+  "keys.note": "Inside a terminal or a code editor these keys belong to it, except Ctrl+`.",
+  "keys.mod.ctrl": "Control",
+  "keys.mod.cmd": "Command",
+
 };
 
 export type DictKey = keyof typeof en;

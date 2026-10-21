@@ -119,6 +119,29 @@ Click **Switch theme** (at the bottom of the sidebar) to toggle between the ligh
 
 *The dark theme. The **Switch theme** button is at the bottom left, with the pointer over it.*
 
+### Command palette and shortcuts
+
+**Jump to…**, right under **EN** / **ES** at the top of the menu, opens the command palette; so does **Ctrl K** (**⌘ K** on a Mac) from anywhere. Type to filter, move with **↑** / **↓** and open with **Enter**; **Esc** (or **Ctrl K** again) closes it. With nothing typed it lists, in this order:
+
+- **Unread**: the agents with a notice, the most recent first.
+- **Agents**: all of them, the ones working first, then your last chat, then the most recently active (up to 50: keep typing to narrow the list).
+- **Go to**: the screens of the menu.
+- **Actions**: show activity, jump to the latest unread, mark all as read, collapse or expand the menu, switch theme, switch language, show or hide the terminal and the list of shortcuts.
+
+The filter looks at the name, colony, description, provider and model, without caring about capitals or accents ("agil" finds "Ágil").
+
+| Keys | What it does |
+|---|---|
+| **Ctrl K** (**⌘ K**) | Open or close the command palette |
+| **Ctrl B** (**⌘ B**) | Collapse or expand the menu |
+| **Ctrl .** (**⌘ .**) | Open the agent with the latest unread notice |
+| **?** | Show the list of shortcuts (outside text fields) |
+| **Ctrl `** | Show or hide the terminal |
+| **Esc** | Close the open panel |
+| **Ctrl Enter** (**⌘ Enter**) | Send or run in editors |
+
+On a Mac only **⌘** works (Ctrl stays for the terminal). The first three work while you type in the chat box or a search field, but not inside a terminal, the Markdown editor or a code or query editor, where those keys keep their own meaning (Ctrl+B is bold there); **Ctrl `** works everywhere. **?** is typed as a normal character inside a text field. With a dialog open the shortcuts wait until it closes, except **Ctrl K**, which closes the palette.
+
 ## Your first agent
 
 You are going to create an agent, give it a working folder and send it a message.

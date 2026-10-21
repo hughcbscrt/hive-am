@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - **What each agent is doing, in the chat's side list.** The line under an agent's name now says whom an orchestrator is waiting for ("Delegated to Reviewer: check the diff", "(queued)" while it has not started; "Delegated 3 tasks: Reviewer, Tester, Docs"), what it is doing live, "Finished: …" with the start of an unread reply, or "Needs attention". Colony headings show how many agents have something unread, folded or not, and the collapsed list carries the same dots, with the state in each avatar's accessible name.
 
+- **Command palette and keyboard shortcuts.** **Jump to…** at the top of the menu, or **Ctrl K** (**⌘ K** on a Mac) from anywhere, opens a palette that lists the unread agents, every agent (working first, then your last chat), the screens and actions (show activity, jump to the latest unread, mark all as read, fold the menu, theme, language, terminal, shortcuts). It filters by name, colony, description, provider and model, ignoring capitals and accents. New shortcuts: **Ctrl B** folds the menu, **Ctrl .** opens the latest unread agent and **?** lists every shortcut. On a Mac only **⌘** counts. They keep away from terminals and the Markdown, code and query editors, which keep their own keys, and from text fields for **?**.
+
 ### Changed
 
 - **Denser, steadier side list.** Every row of the chat's agent list has the same height (about 72 px instead of 94): the provider and model stay on one line and a long model name is cut before the time. The live line is drawn in the text color in bold (4.5:1 or more in both themes) instead of a honey tint that was too faint, and rows are never reordered by state.

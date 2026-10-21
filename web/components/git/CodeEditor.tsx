@@ -63,7 +63,7 @@ export function CodeEditor({ value, onChange, path, id, label, areaRef, onKeyDow
   };
 
   return (
-    <div className="ce" style={{ ['--g-tab' as never]: prefs.tabSize, ['--ce-gw' as never]: `${gutter}ch` }}>
+    <div className="ce" data-hotkeys="own" style={{ ['--g-tab' as never]: prefs.tabSize, ['--ce-gw' as never]: `${gutter}ch` }}>
       <div className="ce-layer" ref={layer} aria-hidden>
         <div className="ce-space" style={{ height: raws.length * ROW_H, minWidth: `calc(${gutter}ch + ${widest}ch + 40px)` }}>
           <div className="ce-win" style={{ top: start * ROW_H }}>{rows}</div>
