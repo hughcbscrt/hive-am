@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-21
+
 ### Added
 
 - **Version in the sidebar.** The installed hive-am version (`v1.7.0`) shows under **Switch theme** at the bottom of the main menu, also when it is folded to icons, with the full name as tooltip. It is hidden on narrow screens.
@@ -246,7 +248,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/hughcbscrt/hive-am/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/hughcbscrt/hive-am/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/hughcbscrt/hive-am/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/hughcbscrt/hive-am/compare/v1.4.0...v1.5.0
