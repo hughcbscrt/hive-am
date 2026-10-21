@@ -14,6 +14,7 @@ import type { Agent } from '@/lib/types';
 import { Banner, EmptyState, Hex, useToast } from '@/components/ui';
 import { CloneChip, ClonesChip } from '@/components/agents/CloneTag';
 import { useI18n } from '@/lib/i18n';
+import { HomeCrumb } from '@/components/HomeCrumb';
 
 /** One colour per orchestrator, so overlapping lines can still be told apart; lightened in the dark theme (--series-mix). */
 const lineColor = (i: number) => { const c = SERIES_COLORS[i % SERIES_COLORS.length]; return `color-mix(in srgb, ${c} calc(100% - var(--series-mix, 0%)), white)`; };
@@ -137,7 +138,7 @@ export default function Relations() {
 
   return (
     <div className="page full rel">
-      <div className="rel-hud"><h1>{t('nav.relations')}</h1><p>{t('rel.hud')}</p></div>
+      <div className="rel-hud"><HomeCrumb /><h1>{t('nav.relations')}</h1><p>{t('rel.hud')}</p></div>
       <div className="rel-tools"><button className="btn sm" onClick={arrange}><LayoutGrid size={14} />{t('rel.autoArrange')}</button></div>
 
       {!ready ? (

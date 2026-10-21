@@ -8,6 +8,7 @@ import { useUnsavedGuard } from '@/lib/hooks/useUnsavedGuard';
 import { useI18n } from '@/lib/i18n';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { estTokens, fmtTok } from '@/lib/tokens';
+import { HomeCrumb } from '@/components/HomeCrumb';
 
 export default function Skills() {
   const { t } = useI18n();
@@ -54,11 +55,12 @@ export default function Skills() {
   return (
     <div className="page full">
       {ready && !skills.length && sel !== 'new' ? (
-        <div className="m-xl"><EmptyState title={t('skills.empty.title')} body={t('skills.empty.body')} action={<button className="btn primary" onClick={() => setSel('new')}><Plus size={16} />{t('skills.empty.create')}</button>} /></div>
+        <div className="m-xl"><HomeCrumb /><EmptyState title={t('skills.empty.title')} body={t('skills.empty.body')} action={<button className="btn primary" onClick={() => setSel('new')}><Plus size={16} />{t('skills.empty.create')}</button>} /></div>
       ) : (
         <div className="sk-ws">
           <aside className="switcher" aria-label={t('nav.skills')}>
             <div className="switcher-head">
+              <HomeCrumb />
               <div className="row"><b className="fa-title grow">{t('nav.skills')}</b>
                 <button className="btn ghost icon sm" onClick={() => choose('new')} aria-label={t('skills.new')} title={t('skills.new')}><Plus size={16} /></button></div>
               <SearchInput value={q} onChange={setQ} placeholder={t('skills.search')} label={t('skills.search')} />
