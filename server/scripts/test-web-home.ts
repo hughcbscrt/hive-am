@@ -2,7 +2,7 @@
 // pills, the three groups of cards and their numbers, with 0, 1 and many agents. No model, no browser.
 // Usage: HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-web-home.ts
 import './_guard.js';
-import { homeModel, type HomeInput, type HomeView } from '../../web/lib/homeModel.ts';
+import { HOME_FEED, homeModel, type HomeInput, type HomeView } from '../../web/lib/homeModel.ts';
 import { HOME_GROUPS, MENU_IDS, MIGRATION, MORE_IDS, SECTIONS } from '../../web/lib/sections.ts';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `got ${JSON.stringify(got)} want ${JSON.stringify(want)}`); if (!ok) fail++; };
@@ -66,6 +66,8 @@ eq('pills: only a delegation in progress', homeModel(input({ agents: [ag('a')], 
 eq('pills: only a connection error, with no agents', homeModel(input({ connections: [conn('error')] })).pills.map((p) => p.id), ['errors']);
 eq('pills: stopped and connecting are not errors', homeModel(input({ connections: [conn('stopped'), conn('connecting')] })).pills, []);
 eq('Connections with no error carries none', card(homeModel(input({ connections: [conn('connected')] })), 'connections')?.errors, undefined);
+
+eq('Home feed: three delegations, one row of the grid', HOME_FEED, 3);
 
 // where every screen lives
 eq('menu: six entries, in order', MENU_IDS, ['home', 'chat', 'colony', 'resources', 'agents', 'schedules']);

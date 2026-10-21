@@ -9,7 +9,7 @@ import { usePersistentState } from '@/lib/hooks/usePersistentState';
 import { LAST_CHAT } from '@/lib/lastChat';
 import { useIsMac } from '@/lib/hotkeys';
 import { keysText } from '@/lib/hotkeyRules';
-import { homeModel, type HomeCard, type Pill } from '@/lib/homeModel';
+import { HOME_FEED, homeModel, type HomeCard, type Pill } from '@/lib/homeModel';
 import { sectionById } from '@/lib/sections';
 import { useShellCommands } from '@/lib/shellCommands';
 import { useI18n } from '@/lib/i18n';
@@ -87,7 +87,7 @@ export default function Home() {
             <ul className="hgrid">{g.cards.map(card)}</ul>
           </section>
         ))}
-      {known && <RecentDelegations feed={dispatches} agents={agents} />}
+      {known && <RecentDelegations feed={dispatches} agents={agents} limit={HOME_FEED} viewAll />}
       {creating && <NewAgentDrawer onClose={() => setCreating(false)} onCreated={(id) => router.push(`/agents/${id}`)} />}
     </div>
   );

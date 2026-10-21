@@ -57,6 +57,7 @@ export const en = {
   "home.first.title": "No agents yet",
   "home.first.body": "Create the first one to get started. Then every section shows up here with its numbers.",
   "home.err": "Could not load. The sections still work.",
+  "home.recentAll": "View all",
   "hc.chat": "Pick up your last conversation",
   "hc.colony": "The map of colonies and delegations",
   "hc.resources": "Servers, containers, databases and HTTP",

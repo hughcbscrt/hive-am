@@ -1489,7 +1489,9 @@ a.card.stat:focus-visible, .table tbody tr.row-link:focus-visible { outline: 2px
 @keyframes cx-skel { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
 .cx-unplaced { --c: var(--line-strong); box-shadow: none; background: transparent; }
-.recent-head { margin-bottom: 6px; }
+.recent-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.recent-all { border-radius: 6px; color: var(--ink-2); font-size: var(--fs-ui); font-weight: 600; letter-spacing: 0; text-transform: none; text-decoration: none; }
+.recent-all:hover { color: var(--ink); text-decoration: underline; }
 .feed-item .dot { margin-top: 7px; }
 .feed-item .feed-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feed-item .feed-when { font-size: var(--fs-small); }
@@ -1671,6 +1673,16 @@ kbd { display: inline-block; min-width: 20px; padding: 0 5px; border: 1px solid 
 .firstrun > div { flex: 1; min-width: 0; } .firstrun b { font-size: var(--fs-lead); } .firstrun p { margin: 2px 0 0; color: var(--muted); }
 .hgroup { margin: 0 0 22px; }
 .hgroup h2 { margin: 0 0 8px; font-family: var(--font-body); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+/* Home fits a 1366x768 window with data on the desktop (a connection error and the recent delegations included): tighter
+   spacing than other pages, and on short windows the subtitle goes (the h1 stays). Phones keep the base spacing. */
+@media (min-width: 761px) {
+  .page.home { padding: 20px 36px 20px; }
+  .home-head { margin-bottom: 12px; } .home-err { margin-bottom: 12px; }
+  .now, .quiet { margin-bottom: 12px; }
+  .hgroup { margin-bottom: 14px; } .hgroup h2 { margin-bottom: 6px; }
+  .home-recent { margin-top: 12px; }
+}
+@media (min-width: 761px) and (max-height: 760px) { .home-head p { display: none; } }
 /* No overflow: hidden on the grid or the cards: the focus ring of a card must not be cut. */
 .hgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 12px; list-style: none; margin: 0; padding: 0; }
 .hgrid li { display: flex; } .hgrid li > .hc { flex: 1; min-width: 0; }

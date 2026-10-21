@@ -55,6 +55,7 @@ export const es: Record<DictKey, string> = {
   "home.first.title": "Aún no hay agentes",
   "home.first.body": "Crea el primero para empezar. Después verás aquí todas las secciones con sus números.",
   "home.err": "No se pudo cargar. Las secciones siguen funcionando.",
+  "home.recentAll": "Ver todas",
   "hc.chat": "Retoma tu última conversación",
   "hc.colony": "El mapa de colonias y delegaciones",
   "hc.resources": "Servidores, contenedores, bases de datos y HTTP",

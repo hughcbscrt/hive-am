@@ -7,6 +7,9 @@ import type { Agent, Connection, Dispatch } from './types';
  * `server/scripts/test-web-home.ts` checks it. Ids and numbers only: the page puts the words.
  */
 
+/** Rows of the recent delegations feed on Home (the Colony screen keeps six): with the current columns three fill one row of the grid, so Home fits a 1366x768 window. */
+export const HOME_FEED = 3;
+
 export type HomeState = 'loading' | 'error' | 'empty' | 'ready';
 /** The "Now" strip: agents working, unread notices, delegations in progress, connections with an error. */
 export interface Pill { id: 'running' | 'unread' | 'tasks' | 'errors'; count: number; /** None for unread: it opens the Activity panel. */ href?: string }
