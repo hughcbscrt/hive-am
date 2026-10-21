@@ -99,7 +99,10 @@ eq('line: three, oldest first', line({ dispatches: [disp('d3', 'w3', 3), disp('d
 eq('line: names are not repeated', line({ dispatches: [disp('d1', 'w1', 1), disp('d2', 'w1', 2), disp('d3', 'w2', 3)] }).text, 'Delegated 3 tasks: Reviewer, Tester');
 eq('line: a task on several lines becomes one', line({ dispatches: [disp('d1', 'w1', 1, 'running', 'Review\n\n  the   diff\n')] }).text, 'Delegated to Reviewer: Review the diff');
 eq('line: a target that no longer exists is left out', line({ dispatches: [disp('d1', 'gone', 1), disp('d2', 'w2', 2)] }).text, 'Delegated to Tester: Check the diff');
-eq('line: finished and other agents\' delegations do not count', line({ dispatches: [disp('d1', 'w1', 1, 'done'), { ...disp('d2', 'w2', 2), from_id: 'x' }], activity: 'Running Read' }), { kind: 'live', text: 'Running Read' });
+eq('line: finished and other agents\' delegations do not count', line({ dispatches: [disp('d1', 'w1', 1, 'done'), { ...disp('d2', 'w2', 2), from_id: 'x' }], agent: { id: 'o', status: 'running', description: 'x' }, activity: 'Running Read' }), { kind: 'live', text: 'Running Read' });
+eq('line: an error with its live turn kept is the error, not Starting', line({ agent: { id: 'o', status: 'error', description: 'x' }, activity: 'Starting…' }), { kind: 'error', text: 'Needs attention' });
+eq('line: idle with its live turn kept shows the unread result', line({ activity: 'Starting…', notice: { kind: 'done', at: NOW, snippet: 'Merged.' } }), { kind: 'done', text: 'Finished: Merged.' });
+eq('line: idle with its live turn kept and nothing unread is the description', line({ activity: 'Running Read' }), { kind: 'desc', text: 'Plans the work' });
 eq('line: unread with an excerpt', line({ notice: { kind: 'done', at: NOW, snippet: 'Merged.' } }), { kind: 'done', text: 'Finished: Merged.' });
 eq('line: unread without an excerpt', line({ notice: { kind: 'done', at: NOW, snippet: '' } }).text, 'Finished');
 eq('line: error status', line({ agent: { id: 'o', status: 'error', description: 'x' } }), { kind: 'error', text: 'Needs attention' });

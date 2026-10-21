@@ -107,7 +107,7 @@ export interface StatusInput {
 }
 export type StatusKind = 'deleg' | 'live' | 'done' | 'error' | 'desc';
 
-/** The one line under an agent's name: its open delegations, else what it is doing, else its unread result, its error or its description. */
+/** The one line under an agent's name: its open delegations, else what it is doing (only while it runs: a live turn kept after an error is over), else its unread result, its error or its description. */
 export function statusLine({ agent, dispatches, nameOf, activity, notice }: StatusInput, t: Translate): { kind: StatusKind; text: string } {
   const open = openDelegations(dispatches, agent.id).filter((d) => nameOf(d.to_id) !== undefined);
   if (open.length === 1) {
@@ -119,7 +119,7 @@ export function statusLine({ agent, dispatches, nameOf, activity, notice }: Stat
     const names = [...new Set(open.map((d) => nameOf(d.to_id)!))].join(', ');
     return { kind: 'deleg', text: t('attn.delegated', { count: open.length, names }) };
   }
-  if (activity) return { kind: 'live', text: activity };
+  if (activity && agent.status === 'running') return { kind: 'live', text: activity };
   if (notice?.kind === 'done') return { kind: 'done', text: notice.snippet ? t('attn.line.done', { text: notice.snippet }) : t('attn.state.done') };
   if (agent.status === 'error') return { kind: 'error', text: t('status.error') };
   return { kind: 'desc', text: agent.description || t('switcher.noDescription') };
