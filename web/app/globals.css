@@ -272,7 +272,8 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .composer-box { flex-wrap: wrap; max-width: 820px; margin: 0 auto; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 14px; padding: 10px 10px 10px 14px; display: flex; gap: 10px; align-items: flex-end; box-shadow: var(--shadow); }
 .composer-box:focus-within { border-color: var(--honey); box-shadow: 0 0 0 3px color-mix(in srgb, var(--honey) 25%, transparent); }
 .composer-box textarea { flex: 1; border: 0; background: transparent; resize: none; font: inherit; color: inherit; outline: none; max-height: 200px; padding: 6px 0; }
-.composer-meta { max-width: 820px; margin: 6px auto 0; display: flex; gap: 12px; font-size: var(--fs-small); color: var(--muted); }
+.composer-meta { max-width: 820px; margin: 6px auto 0; display: flex; gap: 12px; font-size: var(--fs-small); color: var(--muted); flex-wrap: wrap; align-items: center; row-gap: 6px; }
+.composer-meta .seg { margin-left: auto; padding: 2px; } .composer-meta .seg button { padding: 2px 9px; font-size: var(--fs-small); } .composer-meta .seg + .linkbtn { margin-left: 0; }
 .banner { padding: 9px 14px; border-radius: 10px; font-size: var(--fs-ui-lg); display: flex; gap: 10px; align-items: center; }
 .banner.err { background: var(--err-soft); color: var(--err-ink); }
 .banner-action { flex: none; margin-left: auto; }
@@ -457,6 +458,29 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .copybtn { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 2px 8px; font-size: var(--fs-caption); font-weight: 600; color: var(--ink-2); }
 .copybtn:hover { background: var(--surface-2); }
 .linkbtn { margin-left: auto; border: 0; background: none; padding: 0; font-size: var(--fs-small); font-weight: 600; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- compact chat view: one pill per step (components/chat/Pills.tsx) ---------- */
+.msg.assistant .who.pills { flex-wrap: wrap; row-gap: 6px; }
+.pillrow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; max-width: min(100%, 240px); min-width: 0; padding: 3px 9px 3px 7px; border: 1px solid var(--line); border-radius: 99px; background: var(--surface-2); color: var(--ink-2); font: inherit; font-size: var(--fs-small); font-weight: 500; line-height: 1.35; cursor: pointer; }
+.pill:hover { border-color: var(--line-strong); background: var(--bg-deep); }
+.pill[aria-expanded='true'] { border-color: var(--line-strong); background: var(--surface); color: var(--ink); }
+.pill .pico { display: inline-grid; place-items: center; color: var(--muted); flex: none; } .pill .pico svg { width: 13px; height: 13px; }
+.pill .plabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pill .pmeta { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: var(--fs-caption); color: var(--muted); font-variant-numeric: tabular-nums; }
+.pill .pmeta .live { color: var(--honey); font-weight: 700; }
+.pill .cf-add { color: var(--ok); font-weight: 600; } .pill .cf-del { color: var(--err); font-weight: 600; }
+.pill.think .plabel { font-style: italic; }
+.pill.err { border-color: color-mix(in srgb, var(--err) 40%, var(--line)); }
+.pill.running { border-color: color-mix(in srgb, var(--honey) 55%, var(--line)); }
+.pill.sum { max-width: 100%; } .pill.sum .chev { transition: transform .15s; } .pill.sum[aria-expanded='true'] .chev { transform: rotate(90deg); }
+.pill.sum.err { background: color-mix(in srgb, var(--err) 8%, var(--surface-2)); }
+.pill-detail { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: var(--fs-ui); overflow: hidden; min-width: 0; }
+.pill-detail > .tbody { border-top: 0; }
+.pill-detail.think pre { margin: 0; padding: 10px 12px; white-space: pre-wrap; word-break: break-word; max-height: 280px; overflow: auto; font-size: var(--fs-small); font-style: italic; color: var(--ink-2); }
+.pill-detail.changed .cf-list { padding: 6px 8px 8px; display: grid; gap: 2px; }
+.pill-detail.changed .cf-meta { display: flex; gap: 8px; flex: none; font-variant-numeric: tabular-nums; font-size: var(--fs-caption); font-weight: 600; color: var(--muted); }
+.pill-detail.changed .cf-meta em { font-style: normal; } .pill-detail.changed .cf-add { color: var(--ok); } .pill-detail.changed .cf-del { color: var(--err); }
 
 /* ---------- colonies ---------- */
 .inherit-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); cursor: pointer; }

@@ -80,6 +80,20 @@ On the right of each row you see metadata: the number of output lines, the durat
 
 Each row opens or closes with a click. To do it for all of them at once, use the **Expand all tools** link (which becomes **Collapse all tools**) in the bottom right corner, under the text box.
 
+### Normal and compact view
+
+Under the text box, next to **Expand all tools**, a **Normal / Compact** switch changes how the agent's steps look. The choice is remembered in this browser and applies to the chat of every agent (and to the transcripts on the **Sessions** page). **Normal** is the default: one row per step, as described above.
+
+In **Compact** each step is a small pill with a grey icon, on the same row as the agent's name:
+
+- Reasoning, shell commands, files read, written or edited, searches, web, `hive` tools (reply, send file, skill, mute, delegate, roster), subagents, plan, browser and any other tool each get a pill with a short label (the command, the file name, the agent...). Hover or focus a pill to see the full command or path.
+- Click a pill to open its detail under the row (the same command, output, copy buttons and diff as in Normal); click it again to close it. Several can be open at once.
+- Earlier replies fold into one summary pill such as `3 steps · 1 tool · 4.9s`. Click it to show that reply's pills. The latest reply shows its pills; while the agent is working, every saved reply is folded and the reply being written shows its pills.
+- A failed step has a red border and says `exit N` or `failed`. A summary pill that hides a failed step is red too and says how many failed.
+- A tool in progress keeps the honey border, the timer and the pulsing dot.
+- **Files changed (N)** is a pill with the lines added and removed; it stays visible even when its reply is folded, and opens the same list of files and changes.
+- **Expand all tools** opens every pill and unfolds every summary; **Collapse all tools** closes and folds them.
+
 ### Thought process
 
 If the agent exposes its reasoning, a collapsible **Thought process** row appears before its actions. Open it to read it.

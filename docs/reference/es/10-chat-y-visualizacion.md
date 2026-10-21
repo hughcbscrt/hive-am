@@ -144,6 +144,18 @@ Al final de cada respuesta (también en vivo, mientras el agente trabaja) se mue
 
 Junto a la caja de texto, el enlace **Expand all tools / Collapse all tools** abre o cierra todas las filas a la vez (contexto `ToolsOpen`); cada fila puede abrirse o cerrarse por separado después.
 
+### Vista normal y compacta (`lib/chat/chatPrefs.ts`, `Pills.tsx`)
+
+El selector **Normal / Compacto** (`.seg` con `aria-pressed`, en `.composer-meta` antes del enlace de expandir) fija una vista para todos los chats del navegador. Se guarda en `localStorage` con la clave `hive-am.chatView` (`'normal' | 'compact'`); un valor ausente o desconocido es `'normal'`. `useChatView()` lo lee con un store externo (`useSyncExternalStore`, instantánea de servidor `'normal'`), el mismo patrón que `lib/git/gitPrefs.ts`, así que no hay desajuste de hidratación. Lo leen `History` (que usa también la página **Sesiones**) y el turno en vivo.
+
+- **Normal** pinta `Blocks` como antes.
+- **Compacto** pinta cada respuesta con `PillReply` (`Chat.tsx`). `splitRuns` (`lib/chat/pills.ts`) parte los bloques en textos y tramos de pasos: el primer tramo va en la fila `.who` tras el nombre y la hora, los siguientes (pasos después de un texto) en su propia `.pillrow`. Cada paso es un `button.pill` con `aria-expanded`, `aria-controls` (si está abierto) y un `title` con el comando o la ruta completos; su detalle es un `.pill-detail` de ancho completo (`role="region"`) tras la fila, con el mismo `ToolDetail` que la tarjeta. Las etiquetas y tooltips salen de `describe()` (campos `pill` y `tip`).
+- **Plegado**: toda respuesta del asistente salvo la última pinta primero una píldora resumen (`SummaryPill`, `summarize()`: pasos = razonamiento + herramientas, herramientas, la duración de la respuesta o, si falta, la suma de la de sus herramientas, sin las partes en cero) y esconde sus píldoras hasta que se pulsa. Mientras hay un turno en vivo (`History` recibe `live`), se pliegan todas las respuestas guardadas; el turno en vivo nunca se pliega. El estado de plegado y de apertura es local a cada respuesta.
+- **Estados**: `err` si `tool.error` o un código de salida de shell distinto de 0 (`toolFailed`), con `salida N` / `falló` en rojo; un resumen que esconde un fallo recibe `err` y `N con error`. `running` conserva el borde miel, el contador de 500 ms (`useTick`) y el punto de ejecución.
+- **Archivos modificados** es una píldora con los totales `+añadidas −quitadas` (`ChangedFiles compact`), cerrada por defecto y fuera del plegado.
+- **Expandir todo / Contraer todo** (`ToolsOpen`) abre o cierra todas las píldoras (también las que llegan después) y despliega o pliega todos los resúmenes.
+- Un clic en una píldora fuera del turno en vivo desancla la vista (ver 10.7), así que abrir un detalle más arriba no mueve lo que estás leyendo.
+
 ## 10.5 Barra y panel de estadísticas (`StatsBar.tsx`)
 
 Debajo de la cabecera, una franja con el resumen de la sesión mostrada (la actual, o la que estés leyendo). Se calcula en el servidor (`GET …/stats`, ver [documento 8](08-sesiones-e-historial.md#86-estadísticas-de-sesión-statsts)) y se vuelve a pedir al terminar cada turno. Mientras hay un turno en curso, se **suman** sus números en vivo.

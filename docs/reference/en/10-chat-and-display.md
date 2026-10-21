@@ -144,6 +144,18 @@ At the end of each answer (also live, while the agent is working) a collapsible 
 
 Next to the text box, the **Expand all tools / Collapse all tools** link opens or closes all rows at once (`ToolsOpen` context); each row can then be opened or closed individually.
 
+### Normal and compact view (`lib/chat/chatPrefs.ts`, `Pills.tsx`)
+
+The **Normal / Compact** switch (`.seg` with `aria-pressed`, in `.composer-meta` before the expand link) sets one view for every chat in the browser. It is stored in `localStorage` under `hive-am.chatView` (`'normal' | 'compact'`); a missing or unknown value is `'normal'`. `useChatView()` reads it through an external store (`useSyncExternalStore`, server snapshot `'normal'`), the same pattern as `lib/git/gitPrefs.ts`, so there is no hydration mismatch. `History` (also used by the **Sessions** page) and the live turn read it.
+
+- **Normal** renders `Blocks` as before.
+- **Compact** renders each reply with `PillReply` (`Chat.tsx`). `splitRuns` (`lib/chat/pills.ts`) cuts the blocks into text blocks and runs of steps: the first run goes into the `.who` row after the name and the time, later runs (steps after a text) into their own `.pillrow`. Each step is a `button.pill` with `aria-expanded`, `aria-controls` (when open) and a `title` with the full command or path; its detail is a full-width `.pill-detail` (`role="region"`) after the row, with the same `ToolDetail` as the card. Labels and tooltips come from `describe()` (`pill` and `tip` fields).
+- **Folding**: every assistant reply except the latest renders a summary pill first (`SummaryPill`, `summarize()`: steps = reasoning + tools, tools, the reply's duration or else the sum of its tools' durations, zero parts left out) and hides its pills until clicked. While a turn is live (`History` gets `live`), every saved reply folds; the live turn never folds. Fold and open state is local to the reply.
+- **States**: `err` when `tool.error` or a shell exit code other than 0 (`toolFailed`), with `exit N` / `failed` in red; a summary that hides a failure gets `err` and `N failed`. `running` keeps the honey border, the 500 ms timer (`useTick`) and the running dot.
+- **Files changed** is a pill with the `+added −removed` totals (`ChangedFiles compact`), closed by default and outside the fold.
+- **Expand all / Collapse all** (`ToolsOpen`) opens or closes every pill (including the ones that stream in later) and unfolds or folds every summary.
+- A click on a pill outside the live turn unanchors the view (see 10.7), so opening a detail higher up does not move what you are reading.
+
 ## 10.5 Statistics bar and panel (`StatsBar.tsx`)
 
 Below the header, a strip with the summary of the session shown (the current one, or the one you are reading). It is computed on the server (`GET …/stats`, see [document 8](08-sessions-and-history.md#86-session-statistics-statsts)) and requested again when each turn finishes. While a turn is in progress, its live numbers are **added**.

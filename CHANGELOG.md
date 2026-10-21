@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Compact chat view.** A **Normal / Compact** switch under the chat box, next to **Expand all tools**, is remembered in the browser for every agent's chat (Normal stays the default and unchanged). In Compact each reasoning block and tool call is a small pill with a grey icon on the agent's row, with a short label and the full command or path as tooltip; clicking it opens the usual detail (command and output with copy buttons, diffs) under the row, and several can be open at once. Earlier replies fold into one summary pill (`3 steps · 1 tool · 4.9s`) that shows their pills on click; failed steps and the summaries that hide them are tinted red with the failed count; a running tool keeps the honey border and live timer and is never folded; **Files changed** is a pill with the `+added −removed` totals that stays visible. **Expand all tools** also opens every pill and unfolds every summary. Opening a pill higher up no longer moves the view.
+
 ## [1.6.0] - 2026-10-20
 
 ### Added
