@@ -145,6 +145,7 @@ Defined in `:root` and redefined for the dark theme (a single dark block, `:root
 
 - `data-theme` attribute on `<html>`: `light` or `dark`. An inline script in `layout.tsx` sets it (and `lang`) **before the first paint** from `localStorage` or, without a saved choice, from `prefers-color-scheme` (which it keeps following), so a dark page never flashes light.
 - The **Switch theme** button (sidebar, with `aria-pressed`) toggles and saves the choice in `localStorage` (`hive-theme`).
+- Under it, the rail shows the version (`v1.7.0`, `.rail-ver`). `web/next.config.mjs` reads it from `web/package.json` (which `make release` bumps with the others) and bakes it in at build time as `NEXT_PUBLIC_HIVE_AM_VERSION`; with no version it shows nothing. Hidden under 760px.
 - The contrast of `--muted` and `--ok` was raised to meet 4.5:1 for text in the light theme.
 - The hexagons' initials are dark in the dark theme to keep contrast.
 

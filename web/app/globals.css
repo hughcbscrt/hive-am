@@ -70,6 +70,7 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 .nav .count { margin-left: auto; font-size: var(--fs-small); color: var(--muted); font-variant-numeric: tabular-nums; }
 .rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 2px; padding: 10px 0 0; font-size: var(--fs-small); color: var(--muted); } .rail-foot .nav { font-size: var(--fs-lead); } .rail-foot .conn { padding: 4px 10px; }
 .conn { display: flex; align-items: center; gap: 8px; }
+.rail-ver { padding: 2px 10px 0; font-size: var(--fs-micro); font-variant-numeric: tabular-nums; }
 .rail-fold { margin-left: auto; flex: none; color: var(--muted); }
 /* Folded rail (not under 760px, where the rail is the top bar): icons only, labels become names and tooltips, counts become badges. */
 @media (min-width: 761px) {
@@ -84,6 +85,7 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
   :root[data-rail='collapsed'] .nav .t { display: none; }
   :root[data-rail='collapsed'] .nav .count { position: absolute; top: 1px; right: 0; margin: 0; min-width: 17px; padding: 0 4px; border-radius: 99px; background: var(--honey-soft); color: var(--ink-2); font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
   :root[data-rail='collapsed'] .rail-foot .conn { justify-content: center; padding: 6px 0; }
+  :root[data-rail='collapsed'] .rail-ver { padding: 2px 0 0; text-align: center; font-size: 10px; }
   :root[data-rail='collapsed'] .conn .t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
@@ -378,7 +380,7 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
 @media (max-width: 760px) {
   .shell { grid-template-columns: 1fr; } .rail { flex-direction: row; overflow-x: auto; padding: 8px; border-right: 0; border-bottom: 1px solid var(--line); }
   /* the rail becomes a bar of icon + label buttons (labels stay visible: icons alone are not enough) */
-  .brand, .nav-label, .rail-foot .conn, .rail-fold { display: none; } .rail { gap: 2px; }
+  .brand, .nav-label, .rail-foot .conn, .rail-fold, .rail-ver { display: none; } .rail { gap: 2px; }
   .nav { flex: none; flex-direction: column; justify-content: center; gap: 2px; min-width: 64px; min-height: 48px; padding: 6px 8px; font-size: var(--fs-micro); text-align: center; }
   .nav span.t { max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .nav .count { margin-left: 0; font-size: var(--fs-micro); }
   .rail-foot { margin-top: 0; flex-direction: row; padding: 0; gap: 2px; border-left: 1px solid var(--line); margin-left: 4px; padding-left: 4px; } .rail-foot .nav { font-size: var(--fs-micro); } button.nav { width: auto; text-align: center; }

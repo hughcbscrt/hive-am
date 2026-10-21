@@ -13,6 +13,8 @@ import { Tooltips } from './Tooltips';
 import { DockProvider, useDock } from '@/lib/dock';
 import { TerminalDock } from './dock/TerminalDock';
 
+const VERSION = process.env.NEXT_PUBLIC_HIVE_AM_VERSION ?? '';
+
 function HiveMark() {
   return <img src="/icon.png" width={34} height={34} alt="" aria-hidden className="brand-mark" />;
 }
@@ -84,6 +86,7 @@ function Nav({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void
         <button type="button" className="nav" onClick={dock.toggle} aria-pressed={dock.open} {...named(t('dock.nav'), dock.tabs.length || undefined)} title={`${t('dock.nav')} (Ctrl+\`)`}><SquareTerminal size={18} /><span className="t">{t('dock.nav')}</span>{dock.tabs.length > 0 && badge(dock.tabs.length)}</button>
         <div className="conn" title={collapsed ? (connected ? t('nav.connected') : t('nav.offline')) : undefined}><i className={`dot ${connected ? 'ok' : 'err'}`} /><span className="t">{connected ? t('nav.connected') : t('nav.offline')}</span></div>
         <button type="button" className="nav" onClick={flip} aria-pressed={dark} {...named(t('nav.switchTheme'))}>{dark ? <Sun size={18} /> : <Moon size={18} />}<span className="t">{t('nav.switchTheme')}</span></button>
+        {VERSION && <div className="rail-ver" title={t('nav.version', { version: VERSION })}>v{VERSION}</div>}
       </div>
     </nav>
   );

@@ -77,7 +77,7 @@ El menú lateral tiene estas secciones:
 - **Historial**
   - **Sesiones**: las conversaciones de todos los agentes ([capítulo 7](07-sesiones.md)).
 
-Al final del menú están el botón **Terminal** (abre el panel de terminales, [capítulo 12](12-terminales.md)), el indicador de estado del servidor y **Cambiar tema**.
+Al final del menú están el botón **Terminal** (abre el panel de terminales, [capítulo 12](12-terminales.md)), el indicador de estado del servidor y **Cambiar tema**, con la versión de hive-am instalada (por ejemplo `v1.7.0`) debajo. En pantallas estrechas no se muestra.
 
 Para dar más espacio a la pantalla, el botón de panel junto al nombre hive-am (**Contraer el menú**) pliega el menú a una columna estrecha de iconos. Al pasar el mouse o llevar el foco a un icono se ve su nombre, los contadores quedan como pequeñas insignias y **EN** / **ES** quedan uno encima del otro. El mismo botón (**Expandir el menú**) lo vuelve a abrir. Tu elección se recuerda en el navegador. En una pantalla estrecha (menos de 760 px) el menú es una barra superior con sus etiquetas y no se pliega.
 
