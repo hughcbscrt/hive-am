@@ -350,6 +350,8 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
       <div className="thread" ref={threadRef} role="log" aria-label={t('fa.chat.log', { name: agent.name })} aria-live={turn ? 'off' : 'polite'} aria-relevant="additions" tabIndex={-1}
         onWheel={(e) => { if (e.deltaY < 0 && scrollable()) release(); }} onTouchStart={touched} onTouchMove={touched} onPointerDown={touched} onPointerMove={(e) => { if (e.buttons) touched(); }}
         onKeyDown={(e) => { if (['PageUp', 'ArrowUp', 'Home'].includes(e.key) && !(e.target instanceof HTMLTextAreaElement) && scrollable()) release(); }}
+        // Opening or folding a pill of an earlier reply changes the height under it: the view stays where the person is reading instead of following the bottom.
+        onClickCapture={(e) => { const pill = (e.target as Element).closest('.pill'); if (pill && !pill.closest('[data-live]')) release(); }}
         onScroll={(e) => { const el = e.currentTarget;
           // Anchored only at the very bottom; a person's move up (a recent gesture) releases at any size. The gesture window, not the distance, tells a layout clamp from a scroll.
           if (distance() <= ANCHOR_PX) stick.current = true;
@@ -372,7 +374,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
               ) : !msgs.some((m) => m.role === 'user' && m.blocks.some((b) => b.type === 'text' && b.text.trim() === turn.prompt.trim())) && (
                 <UserBubble text={turn.prompt} agentId={agent.id} />
               )}
-              <div className="msg assistant">
+              <div className="msg assistant" data-live="">
                 {compact ? <PillReply head={<><Hex agent={agent} size="sm" />{agent.name}</>} blocks={turn.blocks} streaming /> : (<>
                   <div className="who"><Hex agent={agent} size="sm" />{agent.name}</div>
                   <Blocks blocks={turn.blocks} streaming />
