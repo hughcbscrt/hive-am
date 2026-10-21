@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-10-21
+
 ### Changed
 
 - **Diff comments are drawn as a card in the chat.** The message sent from the Changes tab shows a heading with the count and, per comment, the `path:line` (with its marks), your text and the quoted code in a monospaced block with added and removed lines colored. What the agent receives is unchanged, and any other message stays plain text.
@@ -275,7 +277,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.9.1...HEAD
+[1.9.1]: https://github.com/hughcbscrt/hive-am/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/hughcbscrt/hive-am/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/hughcbscrt/hive-am/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/hughcbscrt/hive-am/compare/v1.6.0...v1.7.0
