@@ -1,15 +1,18 @@
 'use client';
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ArrowDown, ArrowUp, Brain, ChevronRight, Paperclip, Square, X, Waypoints, Coins, Layers, Timer, Hammer } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useFinished, useHiveActions, useHiveData, useLive, type LiveTurn } from '@/lib/store';
 import { usePersistentState } from '@/lib/hooks/usePersistentState';
+import { setChatView, useChatView } from '@/lib/chat/chatPrefs';
+import { splitRuns } from '@/lib/chat/pills';
 import { ago } from '@/lib/meta';
 import type { Agent, Block, ChatMessage } from '@/lib/types';
 import { Banner, EmptyState, Hex, useToast } from '@/components/ui';
 import { ChangedFiles, ToolCall, ToolsOpen } from './ToolCall';
+import { StepPanels, StepPills, SummaryPill, type PillState } from './Pills';
 import { UserBubble } from './UserBubble';
 import { fmtCost, fmtDur, fmtTokens, totalTokens } from '@/lib/format';
 import { translateServerError, useI18n } from '@/lib/i18n/index';
@@ -120,28 +123,66 @@ export const Blocks = memo(function Blocks({ blocks, streaming }: { blocks: Bloc
   );
 });
 
+/** The compact view of a reply: its steps as pills, the first run in the agent's row (`head`). A foldable reply shows one summary pill until it is unfolded. */
+function PillReply({ head, blocks, streaming, foldable = false, durationMs }: { head: ReactNode; blocks: Block[]; streaming?: boolean; foldable?: boolean; durationMs?: number }) {
+  const forced = useContext(ToolsOpen);
+  // Every pill is open or closed as `all` says, except the ones clicked since; new steps of a streaming reply follow `all` too.
+  const [all, setAll] = useState(forced ?? false);
+  const [flipped, setFlipped] = useState<ReadonlySet<number>>(() => new Set());
+  const [unfolded, setUnfolded] = useState(forced ?? false);
+  useEffect(() => { if (forced === null) return; setAll(forced); setFlipped(new Set()); setUnfolded(forced); }, [forced]);
+  const ids = useId();
+  const st: PillState = {
+    ids, isOpen: (i) => all !== flipped.has(i),
+    toggle: (i) => setFlipped((f) => { const n = new Set(f); if (!n.delete(i)) n.add(i); return n; }),
+  };
+  const runs = splitRuns(blocks);
+  const lead = runs[0] && 'steps' in runs[0] ? runs[0].steps : null;
+  const shown = !foldable || unfolded;
+  return (
+    <>
+      <div className="who pills">{head}{foldable && <SummaryPill blocks={blocks} durationMs={durationMs} open={unfolded} onToggle={() => setUnfolded((u) => !u)} />}{shown && lead && <StepPills blocks={blocks} idx={lead} streaming={streaming} st={st} />}</div>
+      {shown && lead && <StepPanels blocks={blocks} idx={lead} st={st} />}
+      {runs.map((r, k) => 'text' in r ? <Md key={r.text} text={(blocks[r.text] as { text: string }).text} />
+        : k === 0 || !shown ? null : (
+          <Fragment key={r.steps[0]}>
+            <div className="pillrow"><StepPills blocks={blocks} idx={r.steps} streaming={streaming} st={st} /></div>
+            <StepPanels blocks={blocks} idx={r.steps} st={st} />
+          </Fragment>
+        ))}
+      <ChangedFiles blocks={blocks} compact />
+    </>
+  );
+}
+
 type Reply = ChatMessage & { durationMs?: number };
 
 /** The saved transcript. Memoised so typing in the composer never re-renders it. */
-export const History = memo(function History({ msgs, agent }: { msgs: ChatMessage[]; agent: Pick<Agent, 'id' | 'name' | 'provider' | 'role'> }) {
+export const History = memo(function History({ msgs, agent, live = false }: { msgs: ChatMessage[]; agent: Pick<Agent, 'id' | 'name' | 'provider' | 'role'>; /** a turn is running: in the compact view it is the latest reply, so every saved one folds */ live?: boolean }) {
   const { t } = useI18n(); // also re-renders the relative times when the language changes
   const list = useMemo(() => coalesce(msgs), [msgs]);
+  const compact = useChatView() === 'compact';
+  const latest = live ? -1 : list.findLastIndex((m) => m.role === 'assistant' && !m.compact);
   return (
     <>
-      {list.map((m: Reply) => m.compact ? (
+      {list.map((m: Reply, i) => m.compact ? (
         <div key={m.id} className="compact-mark" role="separator"><span>{t('chat.compactMark', { pre: fmtTokens(m.compact.pre), post: fmtTokens(m.compact.post) })}</span></div>
       ) : m.role === 'user' ? (
         <UserBubble key={m.id} agentId={agent.id} text={m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join('')} />
       ) : (
         <div key={m.id} className="msg assistant">
-          <div className="who"><Hex agent={agent} size="sm" />{agent.name}<span className="stamp">{m.ts ? ago(m.ts) : ''}</span></div>
-          <Blocks blocks={m.blocks} />
+          {compact ? (
+            <PillReply head={<><Hex agent={agent} size="sm" />{agent.name}<span className="stamp">{m.ts ? ago(m.ts) : ''}</span></>} blocks={m.blocks} foldable={i !== latest} durationMs={m.durationMs} />
+          ) : (<>
+            <div className="who"><Hex agent={agent} size="sm" />{agent.name}<span className="stamp">{m.ts ? ago(m.ts) : ''}</span></div>
+            <Blocks blocks={m.blocks} />
+          </>)}
           <ReplyMeta m={m} />
         </div>
       ))}
     </>
   );
-}, (a, b) => a.msgs === b.msgs && a.agent.id === b.agent.id && a.agent.name === b.agent.name && a.agent.provider === b.agent.provider && a.agent.role === b.agent.role);
+}, (a, b) => a.msgs === b.msgs && a.live === b.live && a.agent.id === b.agent.id && a.agent.name === b.agent.name && a.agent.provider === b.agent.provider && a.agent.role === b.agent.role);
 
 const fileSize = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 interface Pic { id: string; name: string; data: string; type: string; size: number }
@@ -153,6 +194,7 @@ const Composer = memo(function Composer({ agentId, name, running, queued, readOn
   onSend: (prompt: string, files?: { name: string; data: string; type: string }[]) => Promise<boolean>; onStop: () => void; toolsOpen: boolean | null; onToggleTools: () => void;
 }) {
   const { t } = useI18n();
+  const view = useChatView();
   // The draft is kept per agent (in this browser), so leaving the page or reloading does not lose a half-written message.
   const [text, setText] = usePersistentState(`hive-am.draft.${agentId}`, '');
   const [images, setImages] = useState<Pic[]>([]);
@@ -202,7 +244,12 @@ const Composer = memo(function Composer({ agentId, name, running, queued, readOn
           <button className="btn primary icon" onClick={() => void send()} disabled={!text.trim() && !images.length} aria-label={t('chat.send')}><ArrowUp size={18} /></button>
         </div>
       )}
-      <div className="composer-meta"><span>{t('chat.keys')}</span><button type="button" className="linkbtn" onClick={onToggleTools}>{toolsOpen ? t('chat.collapseTools') : t('chat.expandTools')}</button>{queued > 0 && <span>{t('queue.count', { count: queued })}</span>}</div>
+      <div className="composer-meta"><span>{t('chat.keys')}</span>
+        <div className="seg sm" role="group" aria-label={t('chat.view')}>
+          <button type="button" aria-pressed={view === 'normal'} onClick={() => setChatView('normal')}>{t('chat.view.normal')}</button>
+          <button type="button" aria-pressed={view === 'compact'} onClick={() => setChatView('compact')}>{t('chat.view.compact')}</button>
+        </div>
+        <button type="button" className="linkbtn" onClick={onToggleTools}>{toolsOpen ? t('chat.collapseTools') : t('chat.expandTools')}</button>{queued > 0 && <span>{t('queue.count', { count: queued })}</span>}</div>
     </div>
   );
 });
@@ -239,6 +286,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
   const turn = useLive(agent.id);
   const running = agent.status === 'running' || (!!turn && !turn.error);
   const readOnly = sessionOverride !== undefined && sessionOverride !== agent.session_id;
+  const compact = useChatView() === 'compact';
 
   const load = useCallback(() => {
     const sid = readOnly ? sessionOverride : agent.session_id;
@@ -312,7 +360,7 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
             <div className="mt-l"><EmptyState icon={<Hex agent={agent} size="lg" />} title={t('chat.empty.title', { name: agent.name })} body={agent.role === 'orchestrator' ? t('chat.empty.orchestrator') : t('chat.empty.worker')} /></div>
           )}
           {total > msgs.length && <button type="button" className="btn sm chat-earlier" onClick={earlier}>{t('chat.earlier', { n: total - msgs.length })}</button>}
-          <History msgs={msgs} agent={agent} />
+          <History msgs={msgs} agent={agent} live={!!turn} />
           {turn && (
             <>
               {turn.source === 'dispatch' ? (
@@ -325,8 +373,10 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
                 <UserBubble text={turn.prompt} agentId={agent.id} />
               )}
               <div className="msg assistant">
-                <div className="who"><Hex agent={agent} size="sm" />{agent.name}</div>
-                <Blocks blocks={turn.blocks} streaming />
+                {compact ? <PillReply head={<><Hex agent={agent} size="sm" />{agent.name}</>} blocks={turn.blocks} streaming /> : (<>
+                  <div className="who"><Hex agent={agent} size="sm" />{agent.name}</div>
+                  <Blocks blocks={turn.blocks} streaming />
+                </>)}
                 {!turn.error && <span className="typing" aria-label={t('common.working')}><i /><i /><i /></span>}
                 <LiveMeta turn={turn} />
                 {turn.error && (
