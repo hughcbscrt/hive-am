@@ -76,6 +76,26 @@ Next to the tabs you have two ways to view diffs:
 
 The **settings** (the settings icon in the bar) let you change the color theme, show whitespace and choose the tab width. They are saved only in this browser and apply to the viewer, the diffs and the history.
 
+### Comment on lines and send them to the agent
+
+In the **Diff** tab of a changed file, in the **Unified** view, you can leave comments on lines and send them all to the agent at once, as a code review:
+
+1. Click a **line number** (or the `+` / `−` column). The editor opens under that line. To take several lines, drag from one number to another, or click one and **Shift+click** another (always inside one block of the diff). Clicking the code itself does nothing, so you can still select text to copy.
+2. Write the comment (up to 1000 characters) and click **Add comment**, or press **Ctrl+Enter** (**⌘ Enter** on a Mac). **Esc** closes it; if you already wrote something it asks **Discard this draft?** first. A draft you leave open is kept while you look at other files or at the chat.
+3. Go on with other lines and files. Commented lines get a honey bar in the margin and a speech bubble; click the bubble or the line number to edit or delete the comment. A line has one comment at most.
+4. A bar at the bottom of the Changes tab says how many comments you have in how many files. **Review** lists them by file (click one to go to it), with **Show message**, which shows the exact text that will be sent, and **Copy message**. **Discard all comments** asks before deleting them.
+5. **Send N comments to the agent** sends them as a single chat message; it appears in the chat as yours, queued if the agent was working. The comments are deleted only once the server accepted it; if it fails they stay and you can **Try again**.
+
+With the keyboard, Tab to the diff and move with **↑** / **↓** (**Shift** to extend), **Home**, **End** and **Page Up/Down**; **C** or **Enter** opens the editor. On a touch screen tap a line, tap another in the same block to take the range, then **Comment** in the bar under the diff.
+
+The message starts with "N comments on your changes:" and lists each comment as `path:line: comment` (or `path:88-91`), with up to three lines of the code it refers to. Line numbers are those of the file as it is now; a comment on lines that were only removed is marked **removed** and uses their old numbers. Comments are in the language of the interface when you send them, and the message has no instruction of its own: what you wrote is what the agent reads.
+
+If the agent changes the file, a comment follows its lines when they are still there (its line number is updated). When they are no longer there, or the file leaves the changes (reverted or committed), the comment is marked **Outdated**; it is not deleted, and it is sent with the code you saw.
+
+Limits: 25 comments per agent and 1000 characters each. Comments exist only on the current changes: not on commits, comparisons, stashes or the side-by-side view (which offers to switch to Unified), nor on binary files, pictures or the cut-off end of a very large diff.
+
+> **Note:** comments, and the lines of code they quote, are saved only in this browser (`localStorage`), per agent, until you send or delete them; after 30 days they are dropped, and so are those of a deleted agent.
+
 ### Blame and other versions
 
 In the **File** tab of a versioned file, the **Blame** button adds a column with the commit and author of each stretch. When you click one, that commit opens in the history. **File history** lists only the commits that touched the file, and **View at…** shows the file as it was on any branch, tag or commit.

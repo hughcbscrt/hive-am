@@ -1,5 +1,5 @@
 'use client';
-import { Fragment, memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ArrowDown, ArrowUp, Brain, ChevronRight, Paperclip, Square, X, Waypoints, Coins, Layers, Timer, Hammer } from 'lucide-react';
@@ -254,7 +254,11 @@ const Composer = memo(function Composer({ agentId, name, running, queued, readOn
   );
 });
 
-export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride?: string | null }) {
+export type SendResult = { ok: true } | { ok: false; error: string };
+/** What other parts of the agent page can do with its chat: send a message the same way the box does (bubble, queue, undo on failure). */
+export interface ChatApi { send: (prompt: string, opts?: { quiet?: boolean }) => Promise<SendResult> }
+
+export function Chat({ agent, sessionOverride, apiRef }: { agent: Agent; sessionOverride?: string | null; apiRef?: MutableRefObject<ChatApi | null> }) {
   const { t } = useI18n();
   const { agents } = useHiveData(); // not `live`: the stream must not re-render this through the app-wide context
   const { clearLive } = useHiveActions();
@@ -324,17 +328,29 @@ export function Chat({ agent, sessionOverride }: { agent: Agent; sessionOverride
     return () => ro.disconnect();
   }, [loaded, agent.id, sync]);
 
-  const send = useCallback(async (prompt: string, files: { name: string; data: string; type: string }[] = []) => {
-    if (readOnly) return false;
+  // `quiet`: the caller shows the failure itself (the diff comments bar), so no toast on top of it.
+  const submit = useCallback(async (prompt: string, files: { name: string; data: string; type: string }[] = [], quiet = false): Promise<SendResult> => {
+    if (readOnly) return { ok: false, error: t('chat.sendFailed') };
     setOutbox((o) => [...o, prompt]); toBottom();
     try {
       const r = await api.post<{ prompt?: string }>(`/agents/${agent.id}/messages`, { prompt, ...(files.length ? { files } : {}) });
       // With pictures the server adds a note with where it saved them: the waiting bubble shows the message as the agent got it.
       if (r.prompt && r.prompt !== prompt) setOutbox((o) => { const i = o.lastIndexOf(prompt); return i < 0 ? o : o.map((x, j) => (j === i ? r.prompt! : x)); });
-      return true;
+      return { ok: true };
     }
-    catch (e) { setOutbox((o) => { const i = o.lastIndexOf(prompt); return i < 0 ? o : o.filter((_, j) => j !== i); }); toast(e instanceof Error ? e.message : t('chat.sendFailed'), 'err'); return false; }
+    catch (e) {
+      setOutbox((o) => { const i = o.lastIndexOf(prompt); return i < 0 ? o : o.filter((_, j) => j !== i); });
+      const error = e instanceof Error ? e.message : t('chat.sendFailed');
+      if (!quiet) toast(error, 'err');
+      return { ok: false, error };
+    }
   }, [agent.id, readOnly, toast, t, toBottom]);
+  const send = useCallback(async (prompt: string, files?: { name: string; data: string; type: string }[]) => (await submit(prompt, files)).ok, [submit]);
+  useEffect(() => {
+    if (!apiRef) return;
+    apiRef.current = { send: (prompt, opts) => submit(prompt, [], !!opts?.quiet) };
+    return () => { apiRef.current = null; };
+  }, [apiRef, submit]);
   const stop = useCallback(() => { void api.post(`/agents/${agent.id}/stop`).catch(() => undefined); }, [agent.id]);
   const toggleTools = useCallback(() => setToolsOpen((o) => (o ? false : true)), []);
 
