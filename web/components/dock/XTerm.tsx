@@ -60,5 +60,5 @@ export function XTerm({ id, visible, onEnded }: { id: string; visible: boolean; 
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (visible) { const h = setTimeout(() => { api.current?.fit(); api.current?.focus(); }, 30); return () => clearTimeout(h); } }, [visible]);
-  return <div className="xterm-box" ref={box} />;
+  return <div className="xterm-box" ref={box} data-hotkeys="own" />;
 }

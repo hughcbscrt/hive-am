@@ -76,6 +76,26 @@ Junto a las pestañas tienes dos modos de ver las diferencias:
 
 Los **Ajustes** (icono de ajustes en la barra) permiten cambiar el tema de colores, mostrar los espacios en blanco y elegir el ancho del tabulador. Se guardan solo en este navegador y valen para el visor, los diffs y el historial.
 
+### Comentar líneas y enviarlas al agente
+
+En la pestaña **Diff** de un archivo con cambios, en la vista **Unificada**, puedes dejar comentarios en las líneas y enviarlos todos juntos al agente, como una revisión de código:
+
+1. Haz clic en un **número de línea** (o en la columna de `+` / `−`). El editor se abre debajo de esa línea. Para tomar varias líneas, arrastra de un número a otro, o haz clic en uno y **Mayús+clic** en otro (siempre dentro de un mismo bloque del diff). El clic en el código no hace nada, así que puedes seguir seleccionando texto para copiarlo.
+2. Escribe el comentario (hasta 1000 caracteres) y haz clic en **Añadir comentario**, o pulsa **Ctrl+Intro** (**⌘ Intro** en Mac). **Esc** lo cierra; si ya escribiste algo, primero pregunta **¿Descartar este borrador?**. Un borrador que dejas abierto se conserva mientras miras otros archivos o el chat.
+3. Sigue con otras líneas y archivos. Las líneas comentadas llevan una barra honey en el margen y una burbuja; haz clic en la burbuja o en el número de línea para editar o eliminar el comentario. Cada línea admite un comentario como máximo.
+4. Una barra al pie de la pestaña Cambios dice cuántos comentarios tienes y en cuántos archivos. **Revisar** los lista por archivo (un clic lleva a cada uno), con **Ver mensaje**, que muestra el texto exacto que se enviará, y **Copiar mensaje**. **Descartar todos los comentarios** pregunta antes de borrarlos.
+5. **Enviar N comentarios al agente** los manda en un solo mensaje del chat; aparece en el chat como tuyo, en cola si el agente estaba trabajando. Los comentarios se borran solo cuando el servidor lo aceptó; si falla, se quedan y puedes **Reintentar**.
+
+Con el teclado, llega al diff con Tab y muévete con **↑** / **↓** (**Mayús** para extender), **Inicio**, **Fin** y **RePág/AvPág**; **C** o **Intro** abren el editor. En una pantalla táctil toca una línea, toca otra del mismo bloque para tomar el rango y luego **Comentar** en la barra bajo el diff.
+
+El mensaje empieza con "N comentarios sobre tus cambios:" y lista cada comentario como `ruta:línea: comentario` (o `ruta:88-91`), con hasta tres líneas del código al que se refiere. Los números de línea son los del archivo tal como está ahora; un comentario sobre líneas que solo se borraron se marca **eliminada** y usa sus números anteriores. El mensaje sale en el idioma de la interfaz al enviarlo y no añade ninguna instrucción: lo que escribiste es lo que lee el agente.
+
+Si el agente cambia el archivo, un comentario sigue a sus líneas si siguen ahí (se actualiza su número de línea). Si ya no están, o el archivo deja de tener cambios (revertido o en un commit), el comentario se marca **Desactualizado**; no se borra y se envía con el código que viste.
+
+Límites: 25 comentarios por agente y 1000 caracteres cada uno. Solo hay comentarios en los cambios actuales: no en commits, comparaciones, stashes ni en la vista lado a lado (que ofrece cambiar a Unificada), ni en archivos binarios, imágenes o el final cortado de un diff muy grande.
+
+> **Nota:** los comentarios, y las líneas de código que citan, se guardan solo en este navegador (`localStorage`), por agente, hasta que los envías o los borras; a los 30 días se eliminan, y también los de un agente borrado.
+
 ### Blame y otras versiones
 
 En la pestaña **Archivo** de un archivo versionado, el botón **Blame** agrega una columna con el commit y el autor de cada tramo. Al hacer clic en uno se abre ese commit en el historial. **Historial del archivo** lista solo los commits que lo tocaron, y **Ver en…** muestra el archivo como estaba en cualquier rama, tag o commit.

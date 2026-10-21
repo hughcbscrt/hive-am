@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { api } from './api';
 import type { Agent, AgentType, Block, Colony, Connection, Dispatch, ObjectView, ProviderInfo, Skill, StreamEvent, Usage } from './types';
+import { turnEnd, type TurnEnd } from './attentionRules';
 
 export interface LiveTurn { turnId: string; prompt: string; source: 'user' | 'dispatch'; from?: string; blocks: Block[]; error?: string; startedAt: number; usage?: Partial<Usage>; cost?: number; model?: string }
 
@@ -22,7 +23,8 @@ type Action =
   | { k: 'conn'; v: boolean }
   | { k: 'turn_start'; agentId: string; turnId: string; prompt: string; source: 'user' | 'dispatch'; from?: string }
   | { k: 'event'; agentId: string; turnId: string; ev: StreamEvent }
-  | { k: 'status'; agentId: string; status: Agent['status']; queued: number };
+  /** `silent`: not the end of a turn (dismissing an error banner), so it creates no unread notice. */
+  | { k: 'status'; agentId: string; status: Agent['status']; queued: number; silent?: boolean };
 
 export function foldEvent(blocks: Block[], ev: StreamEvent): Block[] {
   const out = blocks.slice();
@@ -89,6 +91,8 @@ interface Actions {
   retry: () => Promise<void>;
   agent: (id: string) => Agent | undefined;
   clearLive: (id: string) => void;
+  /** Called outside React each time a streamed turn ends (not for `clearLive`). Returns the unsubscribe. */
+  onTurnEnd: (listener: (end: TurnEnd) => void) => () => void;
 }
 /** Same shape as before; `error`, `retry` and `dispatches` are additions. */
 type Ctx = State & Actions;
@@ -125,7 +129,7 @@ export const useLive = (agentId: string | undefined): LiveTurn | undefined => us
 export const useFinished = (agentId: string | undefined): number => useHiveSelector((s) => (agentId ? s.finished[agentId] ?? 0 : 0));
 /** One agent by id, re-rendering only when that agent object changes. */
 export const useAgent = (id: string | undefined): Agent | undefined => useHiveSelector((s) => (id ? s.agents.find((a) => a.id === id) : undefined));
-/** Stable actions (refresh, retry, agent, clearLive) without subscribing to any state. */
+/** Stable actions (refresh, retry, agent, clearLive, onTurnEnd) without subscribing to any state. */
 export const useHiveActions = (): Actions => useStore().actions;
 
 /** Compatible full context: re-renders on every change, `live` deltas included. Prefer the narrow hooks above in hot components. */
@@ -144,7 +148,13 @@ export function HiveProvider({ children }: { children: ReactNode }) {
   if (!ref.current) {
     let state = INITIAL; const ls = new Set<() => void>();
     const failures = new Map<What, string>();
-    const set = (a: Action) => { const n = reduce(state, a); if (n !== state) { state = n; ls.forEach((l) => l()); } };
+    const ends = new Set<(end: TurnEnd) => void>();
+    const set = (a: Action) => {
+      // The reducer drops a clean turn, so what the notice needs (origin, last text, error) is read before it runs.
+      const prev = a.k === 'status' ? state.live[a.agentId] : undefined;
+      const n = reduce(state, a); if (n !== state) { state = n; ls.forEach((l) => l()); }
+      if (a.k === 'status') { const end = turnEnd(a.agentId, prev, a.status, a.silent); if (end) ends.forEach((l) => l(end)); }
+    };
     const refresh: Actions['refresh'] = async (what = ALL) => {
       const got: Record<string, unknown> = {}; let answered = 0;
       await Promise.all(what.map(async (w) => {
@@ -162,7 +172,8 @@ export function HiveProvider({ children }: { children: ReactNode }) {
       refresh,
       retry: async () => { await Promise.all([refresh(), loadProviders()]); },
       agent: (id) => state.agents.find((a) => a.id === id),
-      clearLive: (id) => set({ k: 'status', agentId: id, status: 'idle', queued: 0 }),
+      clearLive: (id) => set({ k: 'status', agentId: id, status: 'idle', queued: 0, silent: true }),
+      onTurnEnd: (l) => { ends.add(l); return () => { ends.delete(l); }; },
     };
     ref.current = { get: () => state, set, sub: (l) => { ls.add(l); return () => { ls.delete(l); }; }, actions };
   }

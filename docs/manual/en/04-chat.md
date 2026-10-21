@@ -25,8 +25,10 @@ To the left of the conversation there is a list of all your agents, grouped by c
 
 - Each colony heading (and **No colony**) folds or unfolds its group with a click, or with Enter or Space. Orchestrators come first in each group. A folded group still shows the agent you are on, and a pulsing dot when one of its agents is working. Folded groups are remembered.
 - Use **Find an agent** to filter. While you search every group with a match is shown open; clearing the search brings back the groups you had folded.
-- Each agent shows its provider and how long ago it was active. While it works, the subtitle shows what it is doing live (for example "Thinking…" or a tool in progress).
-- The button in the list header collapses it to a narrow column with just the initials. It stays grouped by colony: each group starts with a short heading (the colony's initials, in its color, and how many agents it has; the full name on hover) that folds or unfolds it the same way, and what you fold there is folded in the full list too. Your choice is remembered.
+- Each agent shows its provider and how long ago it was active, always on one line (a long model name is cut), so every row has the same height and rows never move when an agent changes state.
+- The line under the name says what the agent is up to, in this order: the delegations it is waiting for ("Delegated to Reviewer: check the diff", with "(queued)" while the worker has not started; "Delegated 3 tasks: Reviewer, Tester, Docs" when there are several); what it is doing live (for example "Thinking…" or a tool in progress); "Finished: …" with the start of its reply when it finished while you were elsewhere; "Needs attention" after an error; otherwise its description.
+- The dot on the avatar is honey and pulsing while the agent works, red when it needs attention and green when it finished and you have not seen it yet (see **Activity** in [chapter 1](01-getting-started.md)). Screen readers hear the state too. A colony heading shows a small pill with a dot and the number of agents with something unread (red if one of them failed), folded or not.
+- The button in the list header collapses it to a narrow column with just the initials. It stays grouped by colony: each group starts with a short heading (the colony's initials, in its color, and how many agents it has; the full name on hover; a green or red dot when one of its agents has something unread) that folds or unfolds it the same way, and what you fold there is folded in the full list too. Your choice is remembered.
 
 ## Send messages
 

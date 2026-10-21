@@ -1,17 +1,19 @@
 'use client';
 import { TerminalButton } from '@/components/dock/TerminalButton';
 import { useAgentSettings } from '@/components/agents/useAgentSettings';
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { History, RotateCcw, SlidersHorizontal, Waypoints } from 'lucide-react';
+import { History, MessageSquare, RotateCcw, SlidersHorizontal, Waypoints } from 'lucide-react';
 import { useAgent, useHiveData } from '@/lib/store';
 import { api } from '@/lib/api';
 import { ago, shortPath, PROVIDERS, permissionLabel } from '@/lib/meta';
 import { LAST_CHAT } from '@/lib/lastChat';
 import { writeStored } from '@/lib/hooks/usePersistentState';
 import { useQueryState } from '@/lib/hooks/useQueryState';
-import { Chat } from '@/components/chat/Chat';
+import { Chat, type ChatApi } from '@/components/chat/Chat';
+import type { DiffCommentsCtl } from '@/components/git/DiffComments';
+import { useDiffComments } from '@/lib/git/useDiffComments';
 import { StatsBar } from '@/components/chat/StatsBar';
 import { ResourceStrip } from '@/components/chat/ResourceStrip';
 import { CopyBtn } from '@/components/chat/ToolCall';
@@ -53,6 +55,14 @@ function Workspace({ id }: { id: string }) {
   // Always loaded (cheap) so the tab can show how many files changed; the file tree loads when the tab opens.
   const git = useGit(agent, view === 'changes');
   const changedCount = git.status && git.status.isRepo ? git.status.changes.length : 0;
+  // Comments on the diff live here, not in the explorer (unmounted on the way back to the chat), and go out through the chat's own send.
+  const diffComments = useDiffComments(id);
+  const chatApi = useRef<ChatApi | null>(null);
+  const readOnly = viewing !== undefined && viewing !== agent?.session_id;
+  const commentsCtl = useMemo<DiffCommentsCtl>(() => ({
+    ...diffComments, readOnly, busy: agent?.status === 'running', agentName: agent?.name ?? '', onViewChat: () => setView('chat'),
+    send: (text) => (chatApi.current ? chatApi.current.send(text, { quiet: true }) : Promise.resolve({ ok: false, error: t('chat.sendFailed') })),
+  }), [diffComments, readOnly, agent?.status, agent?.name, t]);
 
   const setOpen = (v: boolean, tb?: CfgTab) => { const next = tb ?? tab; setLastTab(next); setQtab(v ? next : ''); };
   const settings = useAgentSettings(agent, { onDeleted: () => router.push('/agents'), onCloned: (c) => router.push(`/agents/${c.id}`) });
@@ -95,7 +105,8 @@ function Workspace({ id }: { id: string }) {
           primary={<>
             <div className="seg" role="group" aria-label={t('git.tab.label')}>
               <button type="button" aria-pressed={view === 'chat'} onClick={() => setView('chat')}>{t('git.tab.chat')}</button>
-              <button type="button" aria-pressed={view === 'changes'} onClick={() => setView('changes')}>{t('git.tab.changes')}{changedCount > 0 && <span className="tabcount">{changedCount}</span>}</button>
+              <button type="button" aria-pressed={view === 'changes'} onClick={() => setView('changes')}>{t('git.tab.changes')}{changedCount > 0 && <span className="tabcount">{changedCount}</span>}
+                {diffComments.items.length > 0 && <span className="tabcount dc-tabcount" role="img" aria-label={t('diffc.tab', { count: diffComments.items.length })} title={t('diffc.tab', { count: diffComments.items.length })}><MessageSquare size={10} aria-hidden />{diffComments.items.length}</span>}</button>
             </div>
             <TerminalButton spec={{ agentId: id }} title={t('dock.agent')} />
             <button type="button" className={`btn sm ${open ? 'primary' : ''}`} onClick={() => (open ? closeCfg() : setOpen(true))} aria-expanded={open} aria-label={t('colony.agentSettings')}><SlidersHorizontal size={14} />{t('agent.settings')}{dirty && <i className="dot run" title={t('agent.unsaved')} />}</button>
@@ -110,9 +121,9 @@ function Workspace({ id }: { id: string }) {
           )}
           <ResourceStrip agent={agent} />
           <StatsBar agent={agent} session={viewing} />
-          <Chat agent={agent} sessionOverride={viewing} />
+          <Chat agent={agent} sessionOverride={viewing} apiRef={chatApi} />
         </div>
-        {view === 'changes' && <GitExplorer agent={agent} git={git} />}
+        {view === 'changes' && <GitExplorer agent={agent} git={git} comments={commentsCtl} />}
       </section>
 
       {open && (

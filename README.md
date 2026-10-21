@@ -36,9 +36,10 @@ have installed; it does not replace them and it never copies your conversations 
 - **Slack.** The same over Socket Mode (no public URL): DMs and channels, the agent answers in a thread opened on the message, scheduled messages land in the channel, `/hive` slash commands.
 - **Files and images.** People send documents and photos to the agent; the agent sends files back. An optional image model can describe pictures for models that cannot see them.
 - **Permissions that hold.** *Read-only*, *Edit files* and *Full access* are enforced by the CLI itself in all three providers.
-- **Changes explorer.** A Git tab per agent: file tree with highlighting, diff viewer, history, commit, pull, push and branches.
+- **Changes explorer.** A Git tab per agent: file tree with highlighting, diff viewer, history, commit, pull, push and branches. Comment on lines of the diff and send them to the agent in one message.
 - **Resources.** Servers, Docker containers, HTTP requests (`.http` files) and clusters that group them live in a colony as hexagons: start, stop, read logs, run requests; agents can look after them, and an agent with the Database management skill can look inside a database and run SQL, within its permission.
 - **Terminals.** A bottom panel (Ctrl+`) with real shells and object logs, reachable only from this machine.
+- **Never miss a finished agent.** Unread notices on avatars, the tab title and an Activity panel, optional browser notifications, a command palette (Ctrl/⌘ K) and a few shortcuts to jump around.
 - **Local and private.** The server binds to `127.0.0.1`. Data lives in `~/.hive-am/`.
 
 ## Screenshots

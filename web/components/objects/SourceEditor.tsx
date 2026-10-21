@@ -72,7 +72,7 @@ export function SourceEditor({ value, onChange, onSave, vars, named }: { value: 
     requestAnimationFrame(() => { ta.current?.focus(); ta.current?.setSelectionRange(pos, pos); });
   };
   return (
-    <div className="se">
+    <div className="se" data-hotkeys="own">
       <CodeEditor value={value} path="requests.http" areaRef={ta} onChange={(v) => { onChange(v); const el = ta.current; if (el) requestAnimationFrame(() => refresh(v, el.selectionStart)); }}
         onClick={() => setSug(null)} onBlur={() => setTimeout(() => setSug(null), 120)}
         onKeyDown={(e) => {

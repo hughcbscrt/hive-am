@@ -26,6 +26,8 @@ import { CommitDialog } from './CommitDialog';
 import { HistoryList } from './HistoryList';
 import { DiscardConfirm, type DiscardFile, type DiscardSummary } from './DiscardConfirm';
 import { FilePreview } from './FilePreview';
+import { DiffCommentsBar, type DiffCommentsCtl } from './DiffComments';
+import type { DiffComment } from '@/lib/git/diffComments';
 import { FileTree } from './FileTree';
 import { GitTabs, GIT_MODES, GIT_PANEL_ID, gitTabId, type GitMode } from './GitTabs';
 
@@ -36,7 +38,7 @@ const TREE_MAX_ROWS = 2000;   // the file tree is a list of buttons, not windowe
 
 /* ------------------------------------------------------------------ explorer */
 
-export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<typeof useGit> }) {
+export function GitExplorer({ agent, git, comments }: { agent: Agent; git: ReturnType<typeof useGit>; /** Comments on the current diff, kept by the agent page. */ comments?: DiffCommentsCtl }) {
   const { t } = useI18n();
   const { status, tree, loading, error, refresh } = git;
   const [sel, setSel] = useState<string | null>(null);
@@ -154,6 +156,12 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
     }
   }, [agent.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const pickFile = useCallback((p: string) => { setFocusLine(undefined); setSel(p); }, []);
+  // Diff comments: sending them locks the editors; "go to" opens the file's Unified diff at the comment.
+  const [sending, setSending] = useState(false);
+  const [commentFocus, setCommentFocus] = useState<{ id: string; key: number; edit: boolean } | undefined>();
+  const goToComment = useCallback((c: DiffComment, edit: boolean) => { setMode('files'); pickFile(c.path); setCommentFocus({ id: c.id, key: Date.now(), edit }); }, [pickFile]);
+  // A file that left the changes (reverted, committed) makes its comments outdated; a truncated list says nothing about the rest.
+  useEffect(() => { if (comments && repo) comments.syncChanges(new Set(repo.changes.map((c) => c.path)), repo.truncated); }, [repo?.generatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---- states without a tree ---- */
   if (error && !status) return <div className="gx"><div className="gx-empty"><h3>{t('git.error.title')}</h3><p>{error}</p><button className="btn" onClick={() => void refresh()}>{t('git.refresh')}</button></div></div>;
@@ -298,8 +306,9 @@ export function GitExplorer({ agent, git }: { agent: Agent; git: ReturnType<type
           : mode === 'tags' ? (tagSel ? <TagView key={tagSel.name} agent={agent} tag={tagSel} onChanged={() => void refresh()} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.tags.select')}</p></div></div>)
           : mode === 'history' ? (commitSel ? <CommitPreview key={`${commitSel}|${histPath ?? ''}`} agent={agent} sha={commitSel} focus={histPath ?? undefined} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.hist.select')}</p></div></div>)
           : sel && selChange?.status === 'conflict' ? <ConflictResolver key={sel} agent={agent} path={sel} state={status.state} a={actions} onResolved={() => { void refresh(); }} />
-          : sel ? <FilePreview key={sel} agent={agent} path={sel} ignored={isIgnored(sel)} change={selChange} stamp={status.generatedAt} refs={refs} focusLine={focusLine} onHistory={(p) => { setHistPath(p); setCommitSel(null); setMode('history'); }} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} onDiscard={discardFile} onDiscardHunk={discardHunk} onDiscardLines={discardLines} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
+          : sel ? <FilePreview key={sel} agent={agent} path={sel} ignored={isIgnored(sel)} change={selChange} stamp={status.generatedAt} refs={refs} focusLine={focusLine} onHistory={(p) => { setHistPath(p); setCommitSel(null); setMode('history'); }} onOpenCommit={(sha) => { setCommitSel(sha); setMode('history'); }} onDiscard={discardFile} onDiscardHunk={discardHunk} onDiscardLines={discardLines} comments={comments} commentsLocked={sending} commentFocus={commentFocus} /> : <div className="gx-preview"><div className="gx-empty"><p>{t('git.select')}</p></div></div>}
       </div>
+      {comments && <DiffCommentsBar ctl={comments} sending={sending} setSending={setSending} onGoTo={goToComment} />}
       {switchPlan && <SwitchDialog agent={agent} plan={switchPlan} a={actions} onClose={() => setSwitchPlan(null)} onGo={() => { const p = switchPlan; setSwitchPlan(null); void doSwitch(p); }} />}
       {saveStash && <SaveStashDialog a={actions} onClose={() => setSaveStash(false)} />}
       {cancelSmart && status.stash && (

@@ -14,10 +14,13 @@ import { CopyBtn } from '@/components/chat/ToolCall';
 import { RefPicker } from './RefPicker';
 import { RefFile } from './RefFile';
 import { DiffView } from './DiffView';
+import { hasCommentable } from '@/lib/git/diffComments';
+import type { DiffCommentsCtl } from './DiffComments';
 import { FileView } from './FileView';
 
 /** One file open in the explorer: its diff, its content (highlighted, blamed, rendered Markdown or the picture) and the toolbar. */
-export function FilePreview({ agent, path, ignored = false, change, stamp, refs, focusLine, onHistory, onOpenCommit, onDiscard, onDiscardHunk, onDiscardLines }: { agent: Agent; path: string; ignored?: boolean; change?: GitChange; stamp: number; refs: GitRefs | null; focusLine?: { line: number; key: number }; onHistory: (path: string) => void; onOpenCommit: (sha: string) => void; onDiscard: (c: GitChange) => void; onDiscardHunk: (path: string, index: number, header: string) => void; onDiscardLines: (path: string, index: number, header: string, lines: number[]) => void }) {
+export function FilePreview({ agent, path, ignored = false, change, stamp, refs, focusLine, onHistory, onOpenCommit, onDiscard, onDiscardHunk, onDiscardLines, comments, commentsLocked = false, commentFocus }: { agent: Agent; path: string; ignored?: boolean; change?: GitChange; stamp: number; refs: GitRefs | null; focusLine?: { line: number; key: number }; onHistory: (path: string) => void; onOpenCommit: (sha: string) => void; onDiscard: (c: GitChange) => void; onDiscardHunk: (path: string, index: number, header: string) => void; onDiscardLines: (path: string, index: number, header: string, lines: number[]) => void;
+  /** Comments on the current changes (only this view has them: not commits, comparisons, stashes or the file's peek). */ comments?: DiffCommentsCtl; commentsLocked?: boolean; commentFocus?: { id: string; key: number; edit: boolean } }) {
   const { t } = useI18n();
   const [blameOn, setBlameOn] = useState(false);
   // Text changes open on their diff; images (and unchanged files) open on the file itself.
@@ -53,6 +56,14 @@ export function FilePreview({ agent, path, ignored = false, change, stamp, refs,
   }, [agent.id, path, view, change?.status, change?.oldPath, stamp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const parsed = useMemo(() => (diff && diff.path === path ? parseDiff(diff.diff) : null), [diff, path]);
+  // Each new diff of this file: its comments follow their lines or become outdated (not on a cut diff, whose end is missing).
+  useEffect(() => { if (comments && parsed && !parsed.binary && !diff?.truncated) comments.relocate(path, parsed); }, [parsed]); // eslint-disable-line react-hooks/exhaustive-deps
+  // "Go to the comment" from the Review list: the Unified diff, where comments are drawn.
+  useEffect(() => { if (commentFocus && change) { setAtRef(null); setView('diff'); setLayout('unified'); } }, [commentFocus?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const commentable = !!comments && view === 'diff' && !!change && !!parsed && !parsed.binary && parsed.hunks.length > 0;
+  // The hints only where a line takes a comment (a cut-off diff of one hunk has none).
+  const hinted = commentable && !!parsed && !atRef && hasCommentable(parsed, !!diff?.truncated);
+  const fileComments = useMemo(() => (comments ? comments.items.filter((c) => c.path === path) : []), [comments?.items, path]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The File view marks what changed since the last commit. New files are all added; for the rest, read the diff.
   const [markDiff, setMarkDiff] = useState<GitDiffResult | null>(null);
@@ -95,17 +106,20 @@ export function FilePreview({ agent, path, ignored = false, change, stamp, refs,
           <div className="gx-ptl">
             {(change || isMd) && <Segmented value={view} onChange={setView} options={[...(change ? [{ id: 'diff' as const, label: t('git.view.diff') }] : []), ...(isMd ? [{ id: 'preview' as const, label: t('git.view.preview') }] : []), { id: 'file' as const, label: t(isMd ? 'git.view.source' : 'git.view.file') }]} />}
             {view === 'diff' && change && <Segmented value={layout} onChange={setLayout} options={[{ id: 'unified', label: t('git.layout.unified') }, { id: 'split', label: t('git.layout.split') }]} />}
+            {hinted && layout === 'unified' && <span className="dc-hint"><span className="fine">{t('diffc.hint')}</span><span className="coarse">{t('diffc.hint.touch')}</span></span>}
           </div>
         </div>
       </header>
       {change?.oldPath && <div className="gx-banner">{t('git.renamedFrom', { path: change.oldPath })}</div>}
+      {hinted && layout === 'split' && <div className="gx-banner row gap-s"><span className="grow">{t('diffc.splitHint')}</span><button type="button" className="btn sm" onClick={() => setLayout('unified')}>{t('diffc.splitHint.go')}</button></div>}
       {atRef && <div className="gx-banner row gap-s"><span className="grow">{t('git.file.atRef', { ref: atRef })}</span><button className="btn sm" onClick={() => setAtRef(null)}>{t('git.file.backToCurrent')}</button></div>}
       {atRef ? <RefFile agent={agent} gitRef={atRef} path={change?.oldPath && atRef ? change.oldPath : path} toolbar={false} /> : <div className="gx-body">
         {err ? <p className="gx-note err">{err}</p> : busy && !parsed && !file ? <p className="gx-note">{t('git.loading')}</p> : view === 'diff' && change ? (
           parsed ? (
             parsed.binary ? <p className="gx-note">{t('git.diff.binary')}</p>
               : parsed.hunks.length === 0 ? <p className="gx-note">{t('git.diff.empty')}</p>
-              : (<>{diff?.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<DiffView parsed={parsed} layout={layout} path={path} cutOff={!!diff?.truncated} onDiscardHunk={change?.status === 'modified' ? (i, h) => onDiscardHunk(path, i, h) : undefined} onDiscardLines={change?.status === 'modified' ? (i, h, lines) => onDiscardLines(path, i, h, lines) : undefined} /></>)
+              : (<>{diff?.truncated && <div className="gx-banner">{t('git.diff.truncated')}</div>}<DiffView parsed={parsed} layout={layout} path={path} cutOff={!!diff?.truncated} onDiscardHunk={change?.status === 'modified' ? (i, h) => onDiscardHunk(path, i, h) : undefined} onDiscardLines={change?.status === 'modified' ? (i, h, lines) => onDiscardLines(path, i, h, lines) : undefined}
+                comments={commentable && comments && layout === 'unified' ? { items: fileComments, store: comments, total: comments.items.length, focus: commentFocus && fileComments.some((c) => c.id === commentFocus.id) ? commentFocus : undefined, locked: commentsLocked } : undefined} /></>)
           ) : null
         ) : isImage && !imgFailed && change?.status !== 'deleted' ? (
           <div className="gx-image"><img src={`/api/agents/${agent.id}/git/raw?path=${encodeURIComponent(path)}&v=${stamp}`} alt={name} onError={() => setImgFailed(true)} /></div>
