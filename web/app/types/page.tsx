@@ -10,6 +10,7 @@ import { AgentForm, draftFromTypeRecord, typePayload, type AgentDraft } from '@/
 import { NewAgentDrawer } from '@/components/agents/NewAgentDrawer';
 import { useI18n } from '@/lib/i18n';
 import { useUnsavedGuard } from '@/lib/hooks/useUnsavedGuard';
+import { HomeCrumb } from '@/components/HomeCrumb';
 
 export default function Types() {
   const { t } = useI18n();
@@ -40,7 +41,7 @@ export default function Types() {
   return (
     <div className="page">
       <div className="page-head">
-        <div><h1>{t('nav.types')}</h1><p>{t('types.subtitle')}</p></div>
+        <div><HomeCrumb /><h1>{t('nav.types')}</h1><p>{t('types.subtitle')}</p></div>
         <button className="btn primary" onClick={() => openDraft(draftFromTypeRecord())}><Plus size={16} />{t('types.new')}</button>
       </div>
       {ready && !types.length ? (

@@ -4,7 +4,18 @@ Next.js 15 (App Router) + React 19 + TypeScript. Almost everything is a **client
 
 ## 11.1 Screens
 
-### Colony (`/`, `app/page.tsx`)
+### Home (`/`, `app/page.tsx`)
+
+Every screen in one place. It reads only the store (`useHiveData()`, which does not re-render on every token), the unread notices (`useAttention()`) and the last chat (`hive-am.lastChat`): no request of its own. What it shows comes from `lib/homeModel.ts` (pure, tested by `server/scripts/test-web-home.ts`).
+
+- **Header:** a search button that opens the command palette (with `Ctrl K` / `⌘ K`) and a **Keyboard shortcuts** button (with `?`) that opens `ShortcutsSheet`. Both reach the Shell through the `ShellCommands` context (`lib/shellCommands.tsx`).
+- **Now:** only what is above zero, in this order: agents working (to `/agents`), unread notices (opens the Activity panel), delegations `queued` or `running` (to `#recent`) and connections whose `status.state` is `error` (to `/connections`). With everything at zero, one quiet line.
+- **Cards:** three groups (`HOME_GROUPS` of `lib/sections.ts`): Work (Chat, Agents, Colony, Relations), Operate (Resources, Schedules, Connections) and Library and history (Agent types, Skills, Sessions). Each card is one link with the screen's icon (`components/sectionIcons.tsx`), name, a description and a number when the client has one: the last chat's name, totals, the agents working (or the colonies) for Colony, and a red line with the connections in error. Relations, Schedules and Sessions have none (the store does not hold them).
+- **States:** ten skeletons with `role="status"` while loading; with an error, a banner with *Retry* and the cards without numbers (they still navigate); with no agents, a welcome card that opens `NewAgentDrawer`.
+- **Recent delegations:** the same feed as Colony (`components/RecentDelegations.tsx`), cut to `HOME_FEED` (3, one row of its grid) instead of six, with a **View all** link to `/colony#recent`.
+- **Height:** on the desktop (over 760 px wide) Home has tighter spacing than other pages (`.page.home`, 20 px at the bottom instead of 60) and hides its subtitle on windows up to 760 px tall, so it fits 1366x768 with data and a connection error.
+
+### Colony (`/colony`, `app/colony/page.tsx`)
 
 Swarm map and detail panel.
 
@@ -13,7 +24,7 @@ Swarm map and detail panel.
 - **Loading and errors:** a skeleton while the API has not answered and, if it fails, an error banner with a *Retry* button (never an empty colony).
 - **Honeycomb:** one hexagonal cell per agent, grouped by colony (see 11.2). Besides dragging, colonies (by their name) and free hexagons can be **moved with the arrow keys** (Shift for bigger steps).
 - **Right panel:** when a cell is selected it shows description, provider, model, effective folder ("· from colony" if inherited), session, team (orchestrators), a **colony selector** (moves the agent), an **Open chat** button and, in the top right corner, the **settings** button that opens `AgentEditDrawer`.
-- **Recent delegations:** the last 6, taken from the store (`dispatches`, refreshed by the WebSocket, no polling), with links to the agent and the session.
+- **Recent delegations:** the last 6, taken from the store (`dispatches`, refreshed by the WebSocket, no polling), with links to the agent and the session (`components/RecentDelegations.tsx`, shared with Home).
 
 ### Agents (`/agents`)
 
@@ -26,7 +37,7 @@ Agent switcher + chat + collapsible settings (see [document 10](10-chat-and-disp
 - **Configuration:** the full `AgentForm` with a bottom bar *Save changes* / *Discard* and a *Delete agent* button (with confirmation).
 - **Sessions:** conversations and delegated tasks.
 
-Header: back to Colony, avatar, name, role, provider, model, status, **New conversation** (with confirmation) and **Settings**.
+Header: back to Colony (`/colony`), avatar, name, role, provider, model, status, **New conversation** (with confirmation) and **Settings**.
 
 ### Connections (`/connections`)
 Cards of the external connections with their live status (refreshed every 5 s) and a side panel to create or edit them (closing it with unsaved changes asks first). Details in [document 14](14-external-connections.md).
@@ -47,9 +58,11 @@ React Flow canvas; see [document 9](09-orchestration-and-relations.md#relations-
 
 List by day with search and a provider filter, and a transcript panel with an **Open agent** link. The chosen session is in the URL (`?session=<id>`). The transcript uses the chat's own blocks (`History`), so **tool calls and thinking are shown** and long messages are no longer folded.
 
+Connections, Types, Skills, Relations and Sessions are not in the menu: they are reached from Home and the palette, and each shows a `‹ Home` link above its title (`components/HomeCrumb.tsx`, `.crumb`), also when empty or failed. In Relations the heading floats over the canvas with `pointer-events: none`, so the link sets `pointer-events: auto`.
+
 ## 11.2 The honeycomb (Colony map)
 
-Implemented in `app/page.tsx`, with no charting libraries: absolutely positioned HTML cells and SVG layers.
+Implemented in `app/colony/page.tsx`, with no charting libraries: absolutely positioned HTML cells and SVG layers.
 
 **Geometry.** Pointy-top hexagons with radius `S = 74`; width `W = √3·S`, height `H = 2·S`. Positions come from **axial coordinates** walked in a spiral (ring 0, 1, 2…), with `x = W·(q + r/2)` and `y = 1.5·S·r`.
 
@@ -64,7 +77,7 @@ Implemented in `app/page.tsx`, with no charting libraries: absolutely positioned
 
 **Cells.** Buttons with a hexagonal `clip-path`. Border in the provider's color; orchestrator cells use the honey color. A pulsing dot indicates work; red if there is an error. A label with name and provider, and a `↑ name` / `↓ N` pill that indicates the relation.
 
-**Relations.** SVG above the cells (see [document 9](09-orchestration-and-relations.md#colony-screen-apppagetsx)).
+**Relations.** SVG above the cells (see [document 9](09-orchestration-and-relations.md#colony-screen-appcolonypagetsx)).
 
 **Fit to screen.** A `ResizeObserver` measures the panel and scales the whole map with `transform: scale(k)` (`k ≤ 1`, never enlarges) so that it fits without horizontal scroll.
 
@@ -148,8 +161,8 @@ Defined in `:root` and redefined for the dark theme (a single dark block, `:root
 ### Light/dark theme
 
 - `data-theme` attribute on `<html>`: `light` or `dark`. An inline script in `layout.tsx` sets it (and `lang`) **before the first paint** from `localStorage` or, without a saved choice, from `prefers-color-scheme` (which it keeps following), so a dark page never flashes light.
-- The **Switch theme** button (sidebar, with `aria-pressed`) toggles and saves the choice in `localStorage` (`hive-theme`).
-- Under it, the rail shows the version (`v1.7.0`, `.rail-ver`). `web/next.config.mjs` reads it from `web/package.json` (which `make release` bumps with the others) and bakes it in at build time as `NEXT_PUBLIC_HIVE_AM_VERSION`; with no version it shows nothing. Hidden under 760px.
+- The **Switch theme** button (rail foot, with `aria-pressed`) toggles and saves the choice in `localStorage` (`hive-theme`).
+- Above it, the rail shows the version (`v1.7.0`) at the right of the connection status, in the same row (`.conn.ver`; the status says only *Connected*, the whole sentence is the tooltip and the screen reader text). `web/next.config.mjs` reads it from `web/package.json` (which `make release` bumps with the others) and bakes it in at build time as `NEXT_PUBLIC_HIVE_AM_VERSION`; with no version it shows nothing. Hidden with the rail folded and under 760px.
 - The contrast of `--muted` and `--ok` was raised to meet 4.5:1 for text in the light theme.
 - The hexagons' initials are dark in the dark theme to keep contrast.
 
@@ -160,10 +173,11 @@ Fonts are loaded with `next/font/google` in `layout.tsx`, so **the first build n
 ### Responsive and accessibility
 
 - Breakpoints: **1100 px** (columns stack) and **760 px** (the sidebar becomes a top bar).
-- The sidebar (`Shell.tsx`, `.rail`) folds from 220 px to 64 px with its header button (`aria-expanded`, `aria-label` *Collapse the menu* / *Expand the menu*). The width is `--rail-w` on `.shell`; folded, each entry keeps its label as `aria-label` (with the count) and `title` (shown by the global tooltip), counts become badges (`99+` above 99) and EN/ES stack. The state is saved in `localStorage` (`hive-am.railCollapsed`) and the inline script of `layout.tsx` applies it as `data-rail` on `<html>` before the first paint, so a reload never flashes the wide sidebar; the width only animates after a click (`.rail-anim`). Under 760 px the folding is ignored and the button hidden.
+- The sidebar (`Shell.tsx`, `.rail`) has six entries: Home, Chat, Colony, Resources, Agents and Schedules. The screens, their routes, the palette keywords and which ones are in the menu live in `lib/sections.ts` (`MENU_IDS`, `MORE_IDS`), tested by `test-web-home.ts`. The logo links to Home, a line under the entries (`.rail-hint`, unfolded only) says where the other five went, a keyboard icon next to the language switch opens `ShortcutsSheet`, and the tagline hides on windows up to 800 px tall.
+- The sidebar folds from 220 px to 64 px with its header button (`aria-expanded`, `aria-label` *Collapse the menu* / *Expand the menu*). The width is `--rail-w` on `.shell`; folded, each entry keeps its label as `aria-label` (with the count) and `title` (shown by the global tooltip), counts become badges (`99+` above 99) and EN/ES stack. The state is saved in `localStorage` (`hive-am.railCollapsed`) and the inline script of `layout.tsx` applies it as `data-rail` on `<html>` before the first paint, so a reload never flashes the wide sidebar; the width only animates after a click (`.rail-anim`). Under 760 px the folding is ignored and the button hidden.
 - Visible focus on all controls (`:focus-visible`), `aria-label` on icon-only buttons, `aria-pressed`/`aria-current`/`aria-selected` on state controls, `role="dialog"` on panels and dialogs.
 - `prefers-reduced-motion` disables animations and transitions.
-- Global shortcuts (`lib/hotkeys.ts`, rules in `lib/hotkeyRules.ts`, tested by `server/scripts/test-web-hotkeys.ts`): one `keydown` on `window` in the bubbling phase (Ctrl+` of `lib/dock.tsx` stays in the capture phase). `Mod` is Ctrl, or ⌘ on a Mac (`metaKey` only; detected after mounting). **Mod K** opens or closes the command palette (`components/CommandPalette.tsx`, a `Dialog` with `useCombobox`; what it lists is `lib/paletteRules.ts`, tested by `test-web-palette.ts`), **Mod B** folds the rail, **Mod .** opens the latest unread notice (with none it says `attn.noUnread` in the live region) and **?** opens `ShortcutsSheet`. Ignored always with `isComposing`, `repeat`, `altKey` or `defaultPrevented`; Mod keys work in plain text fields but not inside `[data-hotkeys="own"]` (xterm, `MarkdownEditor`, `CodeEditor`, `SourceEditor`, `SqlEditor`, the database query pane), nor with a layer open (`dialogDepth() > 0`) except Mod K while the palette is the layer; **?** is ignored in fields, comboboxes, `own` areas, with a layer or a `[role="menu"]` open; `/` is left to the git explorer. Mark any new editor that has its own keys with `data-hotkeys="own"`. `lib/theme.ts` (`flipTheme`) and `chatHref()` of `lib/lastChat.ts` are shared by the rail and the palette.
+- Global shortcuts (`lib/hotkeys.ts`, rules in `lib/hotkeyRules.ts`, tested by `server/scripts/test-web-hotkeys.ts`): one `keydown` on `window` in the bubbling phase (Ctrl+` of `lib/dock.tsx` stays in the capture phase). `Mod` is Ctrl, or ⌘ on a Mac (`metaKey` only; detected after mounting). **Mod K** opens or closes the command palette (`components/CommandPalette.tsx`, a `Dialog` with `useCombobox`; what it lists is `lib/paletteRules.ts`, tested by `test-web-palette.ts`: with an empty query, *More sections* with the five screens out of the menu goes before the first 5 agents; with text, up to 50 agents and every screen, matched by its label or by the English and Spanish keywords of `lib/sections.ts`, the matching keyword shown in the row), **Mod B** folds the rail, **Mod .** opens the latest unread notice (with none it says `attn.noUnread` in the live region) and **?** opens `ShortcutsSheet` (so do the keyboard icon of the rail, the button of Home and the palette action; the Shell holds that state and shares it through `ShellCommands`). Ignored always with `isComposing`, `repeat`, `altKey` or `defaultPrevented`; Mod keys work in plain text fields but not inside `[data-hotkeys="own"]` (xterm, `MarkdownEditor`, `CodeEditor`, `SourceEditor`, `SqlEditor`, the database query pane), nor with a layer open (`dialogDepth() > 0`) except Mod K while the palette is the layer; **?** is ignored in fields, comboboxes, `own` areas, with a layer or a `[role="menu"]` open; `/` is left to the git explorer. Mark any new editor that has its own keys with `data-hotkeys="own"`. `lib/theme.ts` (`flipTheme`) and `chatHref()` of `lib/lastChat.ts` are shared by the rail and the palette.
 - Dialogs trap and return focus; tabs, the file tree and the lists are used with the keyboard; the chat is a `role="log"`; table rows that open something are focusable.
 - Utility classes replace repeated inline styles: `.cluster` (a wrapping row), `.stack-s`, `.stack-l`, `.gap-xs`, `.gap-m`, `.push-r`, `.ellipsis` and `.mt-*`, besides the older `.row`, `.col`, `.grow`, `.gap-s`, `.gap-l`.
 
@@ -194,6 +208,7 @@ A summary of what each screen needs from the backend, for whoever touches the AP
 | Screen | Endpoints |
 |---|---|
 | All | `GET /api/agents`, `/types`, `/skills`, `/colonies`, `/providers`, WebSocket |
+| Home | `GET /api/dispatches` (through the store, nothing of its own) |
 | Colony | `GET /api/dispatches`; `PATCH /api/agents/:id` (move colony); `POST/PATCH/DELETE /api/colonies` |
 | Agent | `GET …/history`, `…/stats`, `…/live`, `…/sessions`; `POST …/messages`, `…/stop`, `…/new-session`, `…/resume-session`; `PATCH/DELETE /api/agents/:id` |
 | Types | `POST/PATCH/DELETE /api/types` |
@@ -209,7 +224,7 @@ The whole interface is available in **English** and **Spanish**. The system is i
 
 ### Language switch
 
-- It is **at the top of the sidebar**, below the logo (`/icon.png`, the same as the favicon; hidden when the bar collapses): an `EN | ES` control (`LanguageSwitch` in `components/Shell.tsx`).
+- It is **at the top of the sidebar**, below the logo (`/icon.png`, the same as the favicon; hidden when the bar collapses): an `EN | ES` control (`LanguageSwitch` in `components/Shell.tsx`), with the keyboard shortcuts icon at its right.
 - The change is **immediate** and does not reload the page.
 - **Nothing about the language appears in the URL**: the routes (`/agents`, `/relations`, …) are the same in both languages. The choice is stored only in `localStorage` (`hive-locale`).
 - Initial language: the one saved in `localStorage`; if none, the browser's (`es*` → Spanish, anything else → English). `<html lang>` is also updated.

@@ -215,8 +215,8 @@ Solo preferencias de vista; si se borran, la interfaz funciona igual.
 | `hive-cfg-width` | número (px) | `agents/[id]/page.tsx`: ancho del panel de ajustes del agente (se arrastra, con `useResizableWidth`) |
 | `hive-am.drawerWidth` | número (px) | `Dialog.tsx` (`Drawer`): ancho de los paneles laterales (se arrastra, con `useResizableWidth`) |
 | `hive-obj-switcher-collapsed` | `1` \| `0` | `ObjectWorkspace.tsx`: si la lista de recursos está contraída |
-| `hive-colony-layout` | JSON `{ id: {x, y} }` | `app/page.tsx`: dónde colocaste colonias, agentes libres y recursos en el mapa |
-| `hive-colony-zoom` | número | `app/page.tsx`: zoom del mapa de la colonia |
+| `hive-colony-layout` | JSON `{ id: {x, y} }` | `app/colony/page.tsx`: dónde colocaste colonias, agentes libres y recursos en el mapa |
+| `hive-colony-zoom` | número | `app/colony/page.tsx`: zoom del mapa de la colonia |
 | `hive-am.agents.q` | texto | `agents/page.tsx`: búsqueda de la lista de agentes |
 | `hive-am.agents.role` | `all` \| rol | `agents/page.tsx`: filtro por rol de la lista de agentes |
 | `hive-am.agents.provider` | `all` \| proveedor | `agents/page.tsx`: filtro por proveedor de la lista de agentes |

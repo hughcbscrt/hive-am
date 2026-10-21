@@ -134,7 +134,7 @@ checked on the server. Tokens are stored in `~/.hive-am/hive-am.db` and never re
   - `src/connections/`: external connections. One agent session shared by every chat, group or topic.
   - `src/skills/`: the skills that ship with hive-am and the agent notebook.
   - `mcp/dispatch.mjs`: the `hive` MCP server: `list_agents` and `dispatch` for orchestrators, `channel_*` for connections, `notebook_*` and `skill_read`.
-- `web/`: Next.js 15 UI. Colony (honeycomb), Agents, the agent workspace (chat, changes, settings, notebook, sessions), Relations canvas, Types, Skills, Connections and Sessions.
+- `web/`: Next.js 15 UI. Home (every screen at a glance), Colony (honeycomb), Agents, the agent workspace (chat, changes, settings, notebook, sessions), Relations canvas, Types, Skills, Connections and Sessions.
 
 ## User manual
 

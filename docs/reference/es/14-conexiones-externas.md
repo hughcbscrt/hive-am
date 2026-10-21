@@ -238,7 +238,7 @@ Todas bajo `/api`, solo origen local.
 
 ## 14.9 Interfaz
 
-- **Conexiones** (`/connections`, en la barra lateral): tarjetas con nombre, estado (Conectada / Conectando / Problema / Apagada, con el motivo del error), agente, bot, nº de hilos y último mensaje. Se actualiza cada 5 s.
+- **Conexiones** (`/connections`, desde Inicio o Ctrl K; ya no está en la barra lateral): tarjetas con nombre, estado (Conectada / Conectando / Problema / Apagada, con el motivo del error), agente, bot, nº de hilos y último mensaje. Se actualiza cada 5 s.
 - **Panel de la conexión** (ampliable): plataforma, nombre, agente que responde (con aviso si está en solo lectura o en acceso total), token (se muestra `Déjalo vacío para conservar ••••1234`), modo de grupos, grupos autorizados y alias (14.6.1), personas permitidas (id, nombre, admin), recibir archivos, modelo para ver imágenes, idioma del bot, qué hacer si el agente no responde, activa/apagada, **Enviar prueba**, eliminar y la lista de hilos.
 - **Chat del agente:** los mensajes de un canal se ven como burbuja con su origen; la llamada a `channel_reply` aparece como la fila **«Responder en el canal»** con el texto enviado (también cuando OpenCode la llama dentro de un bloque de código).
 

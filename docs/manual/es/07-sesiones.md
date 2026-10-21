@@ -27,7 +27,7 @@ Las delegaciones corren en una sesión propia para que el chat directo con un wo
 
 ## La pantalla Sesiones
 
-Abre **Sesiones** en el menú (bajo **Historial**).
+Abre **Sesiones** desde su tarjeta en Inicio (grupo **Biblioteca e historial**) o con **Ctrl K** ("historial" también la encuentra).
 
 ![Pantalla Sesiones con la lista agrupada por día y la transcripción de Reina a la derecha](img/sesiones-transcripcion.jpg)
 

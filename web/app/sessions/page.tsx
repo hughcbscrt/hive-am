@@ -12,6 +12,7 @@ import { fmtCost, fmtTokens, totalTokens } from '@/lib/format';
 import type { ChatMessage, Provider, SessionRow } from '@/lib/types';
 import { Banner, EmptyState, ProviderBadge, SearchInput, Segmented } from '@/components/ui';
 import { dateLocale, useI18n } from '@/lib/i18n';
+import { HomeCrumb } from '@/components/HomeCrumb';
 
 const FIRST = 100, MORE = 200; // messages first loaded / added per click
 
@@ -58,13 +59,14 @@ export default function Sessions() {
   return (
     <div className="page full">
       {loadErr && !rows?.length ? (
-        <div className="m-xl"><Banner kind="err">{t('fa.sessions.loadFailed')}</Banner></div>
+        <div className="m-xl"><HomeCrumb /><Banner kind="err">{t('fa.sessions.loadFailed')}</Banner></div>
       ) : rows && !rows.length ? (
-        <div className="m-xl"><EmptyState title={t('sessions.empty.title')} body={t('sessions.empty.body')} action={<Link className="btn primary" href="/agents">{t('sessions.empty.go')}</Link>} /></div>
+        <div className="m-xl"><HomeCrumb /><EmptyState title={t('sessions.empty.title')} body={t('sessions.empty.body')} action={<Link className="btn primary" href="/agents">{t('sessions.empty.go')}</Link>} /></div>
       ) : (
         <div className="sk-ws sx-ws">
           <aside className="switcher" aria-label={t('nav.sessions')}>
             <div className="switcher-head">
+              <HomeCrumb />
               <b className="fa-title">{t('nav.sessions')}</b>
               <SearchInput value={q} onChange={setQ} placeholder={t('sessions.searchPlaceholder')} label={t('sessions.searchLabel')} />
               <Segmented value={prov} onChange={setProv} options={[{ id: 'all', label: t('common.all') }, ...(Object.keys(PROVIDERS) as Provider[]).map((p) => ({ id: p, label: PROVIDERS[p].short }))]} />

@@ -97,7 +97,7 @@ function Workspace({ id }: { id: string }) {
     <>
       <section className="ws-chat">
         <WorkspaceHeader
-          back={{ href: '/', label: t('agent.backToColony') }}
+          back={{ href: '/colony', label: t('agent.backToColony') }}
           avatar={<Hex agent={agent} />}
           title={agent.name}
           meta={<><RoleChip role={agent.role} /><ProviderBadge provider={agent.provider} /><span className="small">{agent.model || t('model.cliDefault')}</span><StatusChip status={agent.status} /><CloneChip agent={agent} link /><ClonesChip agent={agent} /></>}

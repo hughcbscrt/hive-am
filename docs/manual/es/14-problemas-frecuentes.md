@@ -10,7 +10,7 @@ El servidor no está corriendo o está en otro puerto. La interfaz reintenta sol
 2. Si la cerraste, arráncalo de nuevo (`npx hive-am` o `hive-am`). Si lo arrancaste con `hive-am start --background`, `hive-am status` te dice si está corriendo y `hive-am logs` muestra su última salida; usa `hive-am stop` antes de respaldar o reiniciar la carpeta de datos.
 3. Si cambiaste el puerto de la API con `HIVE_AM_PORT`, la interfaz tiene que apuntar al mismo puerto. Con el paquete de npm el puerto de la API es fijo (4400).
 
-Cuando el servidor vuelve, el indicador pasa a **Conectado al servidor**.
+Cuando el servidor vuelve, el indicador del pie del menú pasa a **Conectado** (**Conectado al servidor** al pasar el mouse).
 
 ## En lugar de las listas veo un aviso de que no pudo cargar
 

@@ -8,6 +8,7 @@ import { useI18n } from '@/lib/i18n';
 import type { Connection } from '@/lib/types';
 import { Banner, EmptyState, Hex } from '@/components/ui';
 import { ConnectionDrawer } from '@/components/ConnectionDrawer';
+import { HomeCrumb } from '@/components/HomeCrumb';
 
 const DOT: Record<Connection['status']['state'], string> = { connected: 'ok', connecting: 'run', error: 'err', stopped: '' };
 
@@ -22,7 +23,7 @@ export default function Connections() {
   return (
     <div className="page">
       <div className="page-head">
-        <div><h1>{t('nav.connections')}</h1><p>{t('conn.subtitle')}</p></div>
+        <div><HomeCrumb /><h1>{t('nav.connections')}</h1><p>{t('conn.subtitle')}</p></div>
         <button className="btn primary" onClick={() => setEditing('new')}><Plus size={16} />{t('conn.new')}</button>
       </div>
 

@@ -39,7 +39,7 @@ Lo que debes saber:
 
 ## Conectar y desconectar workers
 
-Entra en **Relaciones** en el menú lateral. Verás un hexágono por agente. Los orquestadores tienen un punto en la parte inferior y los workers uno en la parte superior.
+Entra en **Relaciones** desde su tarjeta en Inicio (grupo **Trabajo**) o con **Ctrl K** (escribe "relaciones" o "grafo"). Verás un hexágono por agente. Los orquestadores tienen un punto en la parte inferior y los workers uno en la parte superior.
 
 ![Lienzo Relaciones con Reina arriba conectada con líneas verdes a Backend, Frontend y QA; Guardián queda a la derecha sin conectar](img/relaciones.jpg)
 

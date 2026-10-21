@@ -160,7 +160,7 @@ Built with React Flow (`@xyflow/react`).
 - **Adding a connection:** drag between handles, or the *Connect a worker…* / *Connect to an orchestrator…* selector in the panel.
 - The selected agent's panel shows, for an orchestrator, "Delegates to · N"; for a worker, "Directed by".
 
-### Colony screen (`app/page.tsx`)
+### Colony screen (`app/colony/page.tsx`)
 
 Relations are drawn **on top of** the honeycomb cells:
 

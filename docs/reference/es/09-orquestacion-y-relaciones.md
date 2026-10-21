@@ -160,7 +160,7 @@ Construido con React Flow (`@xyflow/react`).
 - **Añadir una conexión:** arrastrar entre handles, o el selector *Connect a worker…* / *Connect to an orchestrator…* del panel.
 - El panel del agente seleccionado muestra, para un orquestador, "Delegates to · N"; para un worker, "Directed by".
 
-### Pantalla Colony (`app/page.tsx`)
+### Pantalla Colony (`app/colony/page.tsx`)
 
 Las relaciones se dibujan **encima** de las celdas del panal:
 

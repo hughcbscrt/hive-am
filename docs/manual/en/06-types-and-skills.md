@@ -1,10 +1,10 @@
 # Agent types and skills
 
-This is hive-am's **library**: two sections of the side menu that save you from repeating configuration. **Agent types** are templates for creating agents in a couple of clicks. **Skills** are blocks of Markdown instructions that you reuse in as many agents as you like.
+This is hive-am's **library**: two sections, in the **Library and history** group of Home and in **Ctrl K**, that save you from repeating configuration. **Agent types** are templates for creating agents in a couple of clicks. **Skills** are blocks of Markdown instructions that you reuse in as many agents as you like.
 
 ## Agent types
 
-A type is a template with provider, model, prompt, permissions, role and skills. Open **Agent types** in the side menu.
+A type is a template with provider, model, prompt, permissions, role and skills. Open **Agent types** from Home or with **Ctrl K** ("types" or "templates" also find it).
 
 ![Agent types screen with three cards: Builder, Reviewer and Queen, each with Edit and Create agent](img/tipos-lista.jpg)
 
@@ -50,7 +50,7 @@ The values are **copied**: from then on the agent is independent of the type. If
 
 ## Skills
 
-A skill is a reusable block of instructions: a review checklist, a commit style, how to run your tests. It is added to the agent's instructions. Open **Skills** in the side menu.
+A skill is a reusable block of instructions: a review checklist, a commit style, how to run your tests. It is added to the agent's instructions. Open **Skills** from Home or with **Ctrl K**.
 
 ### The ones that come with hive-am
 

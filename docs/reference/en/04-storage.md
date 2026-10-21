@@ -215,8 +215,8 @@ View preferences only; if they are deleted, the UI works the same.
 | `hive-cfg-width` | number (px) | `agents/[id]/page.tsx`: width of the agent's settings panel (dragged, via `useResizableWidth`) |
 | `hive-am.drawerWidth` | number (px) | `Dialog.tsx` (`Drawer`): width of the side drawers (dragged, via `useResizableWidth`) |
 | `hive-obj-switcher-collapsed` | `1` \| `0` | `ObjectWorkspace.tsx`: whether the resources list is collapsed |
-| `hive-colony-layout` | JSON `{ id: {x, y} }` | `app/page.tsx`: where you placed colonies, free agents and resources on the map |
-| `hive-colony-zoom` | number | `app/page.tsx`: zoom of the colony map |
+| `hive-colony-layout` | JSON `{ id: {x, y} }` | `app/colony/page.tsx`: where you placed colonies, free agents and resources on the map |
+| `hive-colony-zoom` | number | `app/colony/page.tsx`: zoom of the colony map |
 | `hive-am.agents.q` | text | `agents/page.tsx`: search of the agent list |
 | `hive-am.agents.role` | `all` \| role | `agents/page.tsx`: role filter of the agent list |
 | `hive-am.agents.provider` | `all` \| provider | `agents/page.tsx`: provider filter of the agent list |

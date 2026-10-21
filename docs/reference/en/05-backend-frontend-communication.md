@@ -221,7 +221,7 @@ finished: { [agentId]: number }      // counter of finished turns
 | `turn_start` of a delegation, `status` `idle` / `error` | Debounced reload of `dispatches`, so the *Recent* feed stays current without polling. |
 | Socket close | `connected = false`; retries with exponential backoff: `min(8000, 800 · 2^n)` ms. |
 
-A malformed frame is ignored (it does not break the socket handler). The connection status is shown at the bottom of the sidebar ("Connected to server" / "Server offline. Retrying…").
+A malformed frame is ignored (it does not break the socket handler). The connection status is shown at the bottom of the sidebar, next to the version ("Connected", with "Connected to server" as tooltip / "Server offline. Retrying…").
 
 `useHive()` keeps its usual shape, but components that run hot read narrower slices so that every streamed token does not re-render them: `useHiveSelector(select)`, `useHiveData()` (everything except `live` and `finished`), `useLive(agentId)`, `useFinished(agentId)`, `useAgent(id)` and `useHiveActions()`. The client `api.ts` throws `ApiError` (with `status`), and each method accepts a last `{ signal, timeoutMs }` argument; `isAbort(e)` recognises a cancelled call.
 

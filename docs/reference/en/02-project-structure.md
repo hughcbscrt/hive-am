@@ -83,7 +83,8 @@ hive-am/
     │   ├── favicon.ico, icon.png, apple-icon.png   # favicon and icons (Next detects them by name)
     │   ├── layout.tsx        # root: fonts, metadata, <Shell>
     │   ├── globals.css       # ALL the styles (tokens, light/dark theme, components)
-    │   ├── page.tsx          # Colony (honeycomb)
+    │   ├── page.tsx          # Home (every screen as a card)
+    │   ├── colony/page.tsx   # Colony (honeycomb)
     │   ├── agents/page.tsx   # agent list
     │   ├── agents/layout.tsx # agent switcher next to an agent's page
     │   ├── agents/[id]/page.tsx   # agent workspace (chat, changes, settings, notebook)
@@ -94,6 +95,9 @@ hive-am/
     │   └── sessions/page.tsx # agent sessions
     ├── components/
     │   ├── Shell.tsx         # sidebar, theme, global providers
+    │   ├── sectionIcons.tsx  # the icon of each screen (menu, palette, Home)
+    │   ├── RecentDelegations.tsx  # recent delegations feed (Home and Colony)
+    │   ├── HomeCrumb.tsx     # "‹ Home" link of the screens out of the menu
     │   ├── ui.tsx            # primitives: Drawer, Modal, Field, pickers (including SkillPicker), toasts, Hex…
     │   ├── Dialog.tsx        # Dialog / Modal / Drawer: portal, inert background, global stack, focus trap
     │   ├── ConfirmDialog.tsx # confirmation with busy state and error toast
@@ -143,6 +147,9 @@ hive-am/
         ├── tokens.ts         # estimated size of skills in tokens
         ├── channel.ts        # reads the origin header of a channel message
         ├── activity.ts       # "what is it doing" for an agent in one line
+        ├── sections.ts       # the screens: routes, menu or Home, palette keywords
+        ├── homeModel.ts      # what Home shows, from the store
+        ├── shellCommands.tsx # open the palette or the shortcuts sheet from a page
         ├── useDismiss.ts     # close on outside click or Escape
         ├── hooks/            # usePolling, usePersistentState, useUnsavedGuard, useResizableWidth, useQueryState
         ├── git/              # Changes tab utilities
@@ -200,7 +207,8 @@ There is no test framework: `server/scripts/test-*.ts` are standalone scripts (2
 | File | Responsibility |
 |---|---|
 | `app/layout.tsx` | Loads the fonts (Bricolage Grotesque, Hanken Grotesk, JetBrains Mono), wraps everything in `<Shell>` and includes an inline script that applies the saved theme and language before the first paint (no flash). |
-| `app/page.tsx` | **Colony** screen: honeycomb with colonies, relation lines, the selected agent's panel and recent delegations. |
+| `app/page.tsx` | **Home**: search and shortcuts buttons, what is happening now, every screen as a card in three groups and the recent delegations. |
+| `app/colony/page.tsx` | **Colony** screen: honeycomb with colonies, relation lines, the selected agent's panel and recent delegations. |
 | `app/agents/page.tsx` | Filterable table of agents. |
 | `app/agents/layout.tsx` | On an agent's page, the grid with the agent switcher, kept mounted while switching agents. |
 | `app/agents/[id]/page.tsx` | Chat + Changes tab + collapsible settings panel (configuration, notebook and sessions). |
@@ -215,6 +223,7 @@ There is no test framework: `server/scripts/test-*.ts` are standalone scripts (2
 | `components/agents/*` | Forms and panels of agents and colonies (`AgentForm` is the shared form of agents and agent types and handles inheritance from the colony); `NotebookPanel` edits the notebook. |
 | `components/chat/*` | `Chat` (memoized transcript, live turn, delegation card), `ToolCall` (each tool as a readable row), `UserBubble` and `StatsBar`. |
 | `components/git/*` | The **Changes** tab: `GitExplorer` (tree, file and diff viewer, history, stashes), `GitActions` (Fetch/Pull/Push/Commit, branches), `DiffView`, `ConflictResolver`, etc. |
+| `lib/sections.ts`, `lib/homeModel.ts`, `lib/shellCommands.tsx` | The screens in one place (route, name and description keys, palette keywords, which six are in the menu, the Home groups); what Home shows; the context that opens the palette and the shortcuts sheet from a page. The first two are pure and tested by `test-web-home.ts` and `test-web-palette.ts`. |
 | `lib/store.tsx` | Global state, WebSocket and event reducer, with narrow hooks (`useHiveSelector`, `useLive`…), load error and retry. |
 | `lib/hooks/*` | `usePolling`, `usePersistentState`, `useUnsavedGuard`, `useResizableWidth`, `useQueryState`; see [11.3](11-frontend.md#113-global-state-libstoretsx). |
 | `lib/git/*` | Changes tab utilities: `useGit` hook, tree, diff, conflicts, preferences and syntax highlighting (with its worker). |

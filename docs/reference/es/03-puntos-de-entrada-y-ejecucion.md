@@ -76,13 +76,14 @@ Detalle en el [documento 9](09-orquestacion-y-relaciones.md).
 
 - `HiveProvider` (`lib/store.tsx`): carga agentes, tipos, skills, colonias y proveedores, y abre el WebSocket.
 - `Toaster` (notificaciones).
-- La barra lateral de navegación.
+- La barra lateral de navegación (seis entradas; la paleta y la hoja de atajos se comparten con las páginas por `ShellCommands`, `lib/shellCommands.tsx`).
 
 Cada pantalla es una ruta de `web/app/`:
 
 | Ruta | Archivo |
 |---|---|
-| `/` | `app/page.tsx` (Colony) |
+| `/` | `app/page.tsx` (Inicio) |
+| `/colony` | `app/colony/page.tsx` (Colony) |
 | `/agents` | `app/agents/page.tsx` |
 | `/agents/<id>` | `app/agents/[id]/page.tsx` |
 | `/types` | `app/types/page.tsx` |
