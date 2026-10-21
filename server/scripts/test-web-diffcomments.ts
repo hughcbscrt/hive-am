@@ -2,7 +2,7 @@
 // and the exact message the agent gets, in English and Spanish. No model, no browser. Usage: HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-web-diffcomments.ts
 import './_guard.js';
 import { parseDiff, type DiffLine } from '../../web/lib/git/diff.ts';
-import { MAX_CHARS, MAX_COMMENTS, buildMessage, canAdd, cite, hasCommentable, clampText, makeComment, markGone, pruneComments, reanchor, sortForMessage, type DiffComment } from '../../web/lib/git/diffComments.ts';
+import { MAX_CHARS, MAX_COMMENTS, buildMessage, parseMessage, canAdd, cite, hasCommentable, clampText, makeComment, markGone, pruneComments, reanchor, sortForMessage, type DiffComment } from '../../web/lib/git/diffComments.ts';
 import { setCurrentLocale, translate } from '../../web/lib/i18n/core.ts';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `\n  got  ${JSON.stringify(got)}\n  want ${JSON.stringify(want)}`); if (!ok) fail++; };
@@ -150,6 +150,15 @@ eq('message es: one comment', buildMessage([m1], translate).split('\n')[0], '1 c
 eq('message es: two more lines', buildMessage([makeComment('n.ts', five.hunks[0].lines, 'x', NOW, 'n')], translate).split('\n').pop(), '   > … 2 líneas más');
 eq('message es: both marks', buildMessage([both], translate).split('\n')[4], '1. web/lib/old.ts:30-31 (eliminada, desactualizado): Do not delete this guard.');
 setCurrentLocale('en');
+
+// parseMessage: the chat draws the message as a card; anything that is not exactly that message stays plain text.
+const pm = parseMessage(buildMessage([blank, both, makeComment('n.ts', five.hunks[0].lines, 'x', NOW, 'n')], translate));
+eq('parse: three comments, in order', pm?.comments.map((c) => [c.path, c.range, c.marks]), [['a.ts', '5', ''], ['n.ts', '1-5', ''], ['web/lib/old.ts', '30-31', 'removed, outdated']]);
+eq('parse: head, text with its blank lines, quote and the "more" line', [pm?.head, pm?.comments[0].text, pm?.comments[0].quote, pm?.comments[1].more], ['3 comments on your changes', 'First line\n\n\nAfter a blank line', ['  same();'], '… 2 more lines']);
+setCurrentLocale('es');
+eq('parse es: marks and head', [parseMessage(buildMessage([both], translate))?.head, parseMessage(buildMessage([both], translate))?.comments[0].marks], ['1 comentario sobre tus cambios', 'eliminada, desactualizado']);
+setCurrentLocale('en');
+eq('parse: ordinary text is not a message', [parseMessage('hola'), parseMessage('1 comment on your changes:\nnothing else'), parseMessage('1 comment on your changes:\n\n2. a:1: x\n   Code:\n   > + y')], [null, null, null]);
 
 const keep: DiffComment[] = [];
 eq('empty list helpers', [canAdd(keep), pruneComments(keep, NOW) === keep], [true, true]);

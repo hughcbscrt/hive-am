@@ -89,6 +89,7 @@ En la pestaña **Diff** de un archivo con cambios, en la vista **Unificada**, pu
 Con el teclado, llega al diff con Tab y muévete con **↑** / **↓** (**Mayús** para extender), **Inicio**, **Fin** y **RePág/AvPág**; **C** o **Intro** abren el editor. En una pantalla táctil toca una línea, toca otra del mismo bloque para tomar el rango y luego **Comentar** en la barra bajo el diff.
 
 El mensaje empieza con "N comentarios sobre tus cambios:" y lista cada comentario como `ruta:línea: comentario` (o `ruta:88-91`), con hasta tres líneas del código al que se refiere. Los números de línea son los del archivo tal como está ahora; un comentario sobre líneas que solo se borraron se marca **eliminada** y usa sus números anteriores. El mensaje sale en el idioma de la interfaz al enviarlo y no añade ninguna instrucción: lo que escribiste es lo que lee el agente.
+En el chat el mensaje aparece como una tarjeta: el número arriba y, por cada comentario, el archivo y la línea, lo que escribiste y el código citado en un bloque.
 
 Si el agente cambia el archivo, un comentario sigue a sus líneas si siguen ahí (se actualiza su número de línea). Si ya no están, o el archivo deja de tener cambios (revertido o en un commit), el comentario se marca **Desactualizado**; no se borra y se envía con el código que viste.
 

@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Changed
+
+- **Diff comments are drawn as a card in the chat.** The message sent from the Changes tab shows a heading with the count and, per comment, the `path:line` (with its marks), your text and the quoted code in a monospaced block with added and removed lines colored. What the agent receives is unchanged, and any other message stays plain text.
+
+### Fixed
+
+- **OpenCode received every message twice.** The `--` added before the prompt in 1.9.0 made OpenCode 2.x pass it on twice, so the model saw each message duplicated (the instructions too on the first turn) and the chat showed both copies. The prompt now goes last with no `--`, and a message that begins with a dash gets a space in front. Conversations already stored with a duplicate are shown once.
+
 ## [1.9.0] - 2026-10-21
 
 ### Added
