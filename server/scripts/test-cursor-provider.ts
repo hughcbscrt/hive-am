@@ -145,6 +145,11 @@ check(readFileSync(join(sub, '.cursor', 'mcp.json'), 'utf8') === before && readF
 writeFileSync(join(sub, '.cursor', 'mcp.json'), '{ "mcpServers": { "mine": ');
 writeCursorMcp(sub);
 check(readFileSync(join(sub, '.cursor', 'mcp.json'), 'utf8') === '{ "mcpServers": { "mine": ', 'a file that is not valid JSON is left alone');
+for (const text of ['null', '[1, 2]', '7', '"x"', '{ "mcpServers": null }', '{ "mcpServers": [] }']) {
+  writeFileSync(join(sub, '.cursor', 'mcp.json'), text);
+  let threw = false; try { writeCursorMcp(sub); } catch { threw = true; }
+  check(!threw && readFileSync(join(sub, '.cursor', 'mcp.json'), 'utf8') === text, `valid JSON that is not a config (${text}) is left alone and the turn goes on`);
+}
 const plain = join(dir, 'plain'); mkdirSync(plain);
 await collect(agent({ cwd: plain }));
 check(!existsSync(join(plain, '.cursor')) && envOf().HIVE_CAPS === '', 'an agent without hive tools writes no file and gets no tools from a shared one');

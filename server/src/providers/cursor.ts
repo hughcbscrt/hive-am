@@ -62,6 +62,8 @@ export function writeCursorMcp(cwd: string): void {
   let cfg: { mcpServers?: Record<string, unknown> } = {};
   const before = existsSync(file) ? readFileSync(file, 'utf8') : '';
   if (before) { try { cfg = JSON.parse(before); } catch { return; } }   // a file the person is editing is not overwritten
+  const isObject = (v: unknown) => !!v && typeof v === 'object' && !Array.isArray(v);
+  if (!isObject(cfg) || (cfg.mcpServers !== undefined && !isObject(cfg.mcpServers))) return;   // nor one that is not a config (`null`, a list, a number)
   const next = JSON.stringify({ ...cfg, mcpServers: { ...(cfg.mcpServers ?? {}), hive: cursorMcpServer() } }, null, 2);
   if (next !== before) { mkdirSync(dir, { recursive: true }); writeFileSync(file, next); }
   excludeFromGit(cwd);
