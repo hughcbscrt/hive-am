@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-22
+
 ### Added
 
 - **Cursor as a fourth provider.** Pick **Cursor** (`cursor-agent`) for an agent, chat with it and see its text, thinking and tool calls live; the conversation continues between messages (`--resume`) and after a restart, and is read back from Cursor's own transcripts (text and tool calls; Cursor does not store tool output, thinking or usage, which are only shown live). Models come from `cursor-agent --list-models`, and a new Cursor agent starts on `auto`, the only model a free plan runs; Cursor has no effort selector because the level is part of the model id. Agents with hive tools get them over MCP under every permission: hive-am adds a `hive` entry to the folder's `.cursor/mcp.json`, keeps your other servers there and hides the file from `git status`. Permissions are Cursor's own rules in a config folder per agent: **Read-only** writes nothing and runs no shell, **Edit files** edits the project but never `.git` or keys and runs no shell, **Full access** runs everything. With Cursor, **Edit files** cannot stop the file tool from writing outside the agent's folder. It needs `cursor-agent` installed and signed in (`cursor-agent login`).
@@ -281,7 +283,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.9.1...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/hughcbscrt/hive-am/compare/v1.9.1...v1.10.0
 [1.9.1]: https://github.com/hughcbscrt/hive-am/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/hughcbscrt/hive-am/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/hughcbscrt/hive-am/compare/v1.7.0...v1.8.0
