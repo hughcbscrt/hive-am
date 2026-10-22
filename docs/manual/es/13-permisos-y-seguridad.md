@@ -20,26 +20,26 @@ Un agente no es interactivo: si una acción necesita aprobación, no puede pedí
 
 ## Qué significa cada nivel en cada proveedor
 
-Los tres niveles se aplican en los tres proveedores, pero cada CLI lo implementa a su manera.
+Los tres niveles se aplican en los cuatro proveedores, pero cada CLI lo implementa a su manera.
 
-| Nivel | Claude Code | OpenCode | Kiro |
-|---|---|---|---|
-| **Solo lectura** | Modo de planificación de Claude | Se deniegan editar, comandos y tareas | Ninguna herramienta de confianza |
-| **Editar archivos** | Edita archivos, sin tocar `.git` ni claves. Deja pasar los comandos de archivos (`touch`, `mv`...). Otros comandos de shell no se aprueban y fallan | Edita (incluido `.env`), sin comandos, sin `.git` ni claves, solo dentro de su carpeta | Igual que OpenCode |
-| **Acceso total** | Sin restricciones | Sin restricciones | Todas las herramientas de confianza |
+| Nivel | Claude Code | OpenCode | Kiro | Cursor |
+|---|---|---|---|---|
+| **Solo lectura** | Modo de planificación de Claude | Se deniegan editar, comandos y tareas | Ninguna herramienta de confianza | Modo plan; se deniegan escribir y los comandos |
+| **Editar archivos** | Edita archivos, sin tocar `.git` ni claves. Deja pasar los comandos de archivos (`touch`, `mv`...). Otros comandos de shell no se aprueban y fallan | Edita (incluido `.env`), sin comandos, sin `.git` ni claves, solo dentro de su carpeta | Igual que OpenCode | Edita (incluido `.env`), sin comandos, sin `.git` ni claves, pero **puede escribir fuera de su carpeta** |
+| **Acceso total** | Sin restricciones | Sin restricciones | Todas las herramientas de confianza | Sin restricciones |
 
 > **Nota:** en **Solo lectura**, Claude Code bloquea también las herramientas de hive (delegar, cuaderno, skills a demanda). Las skills a demanda se incluyen completas en las instrucciones en ese caso.
 
 ## Qué protege el nivel Editar archivos
 
-Con **Editar archivos**, los tres proveedores:
+Con **Editar archivos**, los cuatro proveedores:
 
 - No pueden editar `.git`.
 - No pueden editar claves privadas (archivos `*.pem` y `*.key`).
-- No pueden salir de la carpeta del agente.
+- No pueden salir de la carpeta del agente, **salvo Cursor**: Cursor no tiene una regla que mantenga su herramienta de archivos dentro de una carpeta, así que un agente de Cursor puede crear o cambiar archivos en otras partes de tu máquina. Dale **Editar archivos** a un agente de Cursor solo donde también le darías eso, o usa **Solo lectura**.
 - Sí pueden editar `.env`.
 
-OpenCode y Kiro bloquean todos los comandos de shell en este nivel. Claude solo permite los de archivos.
+OpenCode, Kiro y Cursor bloquean todos los comandos de shell en este nivel. Claude solo permite los de archivos.
 
 > **Consejo:** si quieres que un agente corra pruebas o instale dependencias, necesita **Acceso total** (en Claude, algunos comandos pasan en **Editar archivos**, pero no cuentes con ello). Dale ese nivel solo en un proyecto que puedas recuperar con git.
 
@@ -99,7 +99,7 @@ Lo que hive-am guarda de su propio registro no crece para siempre. Cada seis hor
 
 ## Dónde van los secretos
 
-- **Los CLI usan su propia sesión.** hive-am no guarda tus inicios de sesión de Claude, OpenCode ni Kiro.
+- **Los CLI usan su propia sesión.** hive-am no guarda tus inicios de sesión de Claude, OpenCode, Kiro ni Cursor.
 - **Token del bot:** la única credencial que guarda hive-am es el token del bot de cada conexión externa, en `hive-am.db`. La API nunca lo devuelve: la interfaz solo muestra una pista (como `••••1234`). Al editar la conexión, si dejas el campo vacío se conserva el guardado.
 - **Contraseñas de bases de datos:** las de los recursos de tipo base de datos se guardan localmente y no se devuelven por la API. Solo las usan las acciones locales descritas arriba.
 - **Los tokens no llegan al agente:** cuando un agente responde por un canal, es el servidor quien envía el mensaje.

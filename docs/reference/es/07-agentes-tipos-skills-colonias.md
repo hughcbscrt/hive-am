@@ -10,7 +10,7 @@ Un agente es **configuración + puntero a sesión**. Campos (`server/src/types.t
 | `role` | `orchestrator` o `worker`. |
 | `type_id` | Tipo del que se creó (informativo; ver 7.2). |
 | `provider`, `model` | Proveedor y modelo. **Siempre propios del agente**, nunca heredados. |
-| `effort` | Esfuerzo de razonamiento de cada turno (`''` es el predeterminado del CLI). También propio del agente, nunca heredado, y lo copian los tipos y los clones. Ver [6.7](06-proveedores.md#67-deteccion-de-instalacion-y-modelos). |
+| `effort` | Esfuerzo de razonamiento de cada turno (`''` es el predeterminado del CLI). También propio del agente, nunca heredado, y lo copian los tipos y los clones. Ver [6.8](06-proveedores.md#68-deteccion-de-instalacion-y-modelos). |
 | `permission` | `plan` (solo lectura), `acceptEdits` (edita archivos), `bypassPermissions` (acceso total). |
 | `system_prompt` | Prompt propio. |
 | `skill_ids` | Skills propias. |
@@ -23,13 +23,13 @@ Un agente es **configuración + puntero a sesión**. Campos (`server/src/types.t
 
 ### Permisos y lo que significan por proveedor
 
-| Permiso | Claude | OpenCode | Kiro |
-|---|---|---|---|
-| `plan` (Read-only) | `--permission-mode plan` | Deniega `edit`, `bash` y `task` | Ninguna herramienta de confianza |
-| `acceptEdits` (Edit files) | `--permission-mode acceptEdits`, sin `.git` ni llaves | Edita (incluido `.env`), sin comandos, sin `.git` ni llaves, solo en su carpeta | Edita (incluido `.env`), sin comandos, sin `.git` ni llaves, solo en su carpeta |
-| `bypassPermissions` (Full access) | `--permission-mode bypassPermissions` | Sin restricciones (`--auto`) | `--trust-all-tools` |
+| Permiso | Claude | OpenCode | Kiro | Cursor |
+|---|---|---|---|---|
+| `plan` (Read-only) | `--permission-mode plan` | Deniega `edit`, `bash` y `task` | Ninguna herramienta de confianza | `--mode plan`, deniega `Write(**)` y `Shell(*)` |
+| `acceptEdits` (Edit files) | `--permission-mode acceptEdits`, sin `.git` ni llaves | Edita (incluido `.env`), sin comandos, sin `.git` ni llaves, solo en su carpeta | Edita (incluido `.env`), sin comandos, sin `.git` ni llaves, solo en su carpeta | Edita (incluido `.env`), sin comandos, sin `.git` ni llaves, **puede escribir fuera de su carpeta** |
+| `bypassPermissions` (Full access) | `--permission-mode bypassPermissions` | Sin restricciones (`--auto`) | `--trust-all-tools` | `--force` sin reglas |
 
-Claude es el único que en «Edit files» deja pasar los comandos de archivos (`touch`, `mv`…); los otros dos bloquean todos. Los tres niveles se comprueban con `server/scripts/sim-readonly.ts`.
+Claude es el único que en «Edit files» deja pasar los comandos de archivos (`touch`, `mv`…); los otros tres bloquean todos. Los tres niveles se comprueban con `server/scripts/sim-readonly.ts`.
 
 Detalle y límites en el [documento 6](06-proveedores.md) y el [12](12-operacion-y-problemas.md).
 
@@ -195,6 +195,6 @@ Si la carpeta efectiva queda vacía al empezar un turno, el turno falla con: *"T
 | Código: `server/src/connections/prompt.ts` | Cabecera de cada mensaje de un canal (`[hive:channel]`, `[hive:files]`, `[hive:context]`) | Solo código |
 | Código: `server/src/providers/opencode.ts` | Configuración que prohíbe la herramienta `question` | Solo código |
 
-Las instrucciones **orientan al modelo, no lo obligan**. Lo que el servidor sí hace cumplir: a quién responde cada conexión (personas y grupos autorizados), el permiso del agente (lo aplica el CLI en los tres proveedores; probado con `sim-readonly.ts`) y qué archivos pueden salir (`connections/outbound.ts`). Por ejemplo, la regla «no busques el token del bot» es una instrucción; el token sigue en la base de datos local ([14.6.3](14-conexiones-externas.md)).
+Las instrucciones **orientan al modelo, no lo obligan**. Lo que el servidor sí hace cumplir: a quién responde cada conexión (personas y grupos autorizados), el permiso del agente (lo aplica el CLI en los cuatro proveedores; probado con `sim-readonly.ts`) y qué archivos pueden salir (`connections/outbound.ts`). Por ejemplo, la regla «no busques el token del bot» es una instrucción; el token sigue en la base de datos local ([14.6.3](14-conexiones-externas.md)).
 
-Cómo llegan al CLI: por `--append-system-prompt` en Claude (al crear la sesión; si cambian después, como bloque de actualización en el mensaje) y como preámbulo en el mensaje en OpenCode y Kiro ([documento 6](06-proveedores.md#66-preámbulo-de-instrucciones-providerspreamblets)).
+Cómo llegan al CLI: por `--append-system-prompt` en Claude (al crear la sesión; si cambian después, como bloque de actualización en el mensaje) y como preámbulo en el mensaje en OpenCode y Kiro ([documento 6](06-proveedores.md#67-preámbulo-de-instrucciones-providerspreamblets)).

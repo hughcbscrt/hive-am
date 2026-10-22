@@ -6,6 +6,7 @@ hive-am guarda datos en **cinco** lugares. Entender cuál guarda qué es clave:
 |---|---|---|
 | `~/.hive-am/hive-am.db` | hive-am | Configuración: agentes, tipos, skills, colonias, relaciones, punteros a sesiones, registro de delegaciones |
 | `~/.hive-am/mcp/<agentId>.json` | hive-am | Configuración MCP temporal por agente (solo Claude) |
+| `~/.hive-am/cursor/<agentId>/cli-config.json` | hive-am | Configuración de Cursor de un agente de Cursor limitado: tus ajustes más sus reglas de permisos, reescrita en cada turno ([6.6](06-proveedores.md#66-cursor-providerscursorts)) |
 | `~/.hive-am/inbox/<agentId>/<fecha>/` | hive-am | Archivos que las personas enviaron a un agente por una conexión; se borran a los 14 días ([14.6.2](14-conexiones-externas.md#1462-archivos-recibidos)) |
 | Almacenes nativos de cada CLI | **cada CLI** | Las **conversaciones** (mensajes, herramientas, uso de tokens) |
 | `localStorage` del navegador | la interfaz | Preferencias de vista (tema, panel, posiciones del lienzo) |
@@ -195,6 +196,7 @@ hive-am **lee** estos archivos para mostrar el historial; nunca los modifica.
 | Claude Code | `~/.claude/projects/<carpeta-codificada>/<sessionId>.jsonl` | JSONL, una línea por bloque de contenido. La carpeta codificada reemplaza `/` y `.` por `-`. Si no se encuentra en la carpeta esperada, se busca en todas las carpetas de proyecto. |
 | OpenCode | `~/.local/share/opencode/opencode.db` | SQLite, tablas `session_v2` (metadatos, `directory`) y `session_message` (mensajes). Se abre en modo `readonly`. |
 | Kiro | `~/.kiro/sessions/cli/<sessionId>.jsonl` y `<sessionId>.json` | `.jsonl`: mensajes (`Prompt`, `AssistantMessage`, …). `.json`: metadatos de sesión, incluido el medidor por turno (créditos, duración, % de contexto). |
+| Cursor | `~/.cursor/projects/<carpeta>/agent-transcripts/<sessionId>/<sessionId>.jsonl` | JSONL, una línea por mensaje del usuario o por paso de una respuesta (texto y llamadas a herramientas, sin resultados ni uso). La carpeta es la del agente con cada tramo de caracteres que no son letras ni dígitos convertido en `-`. Si no está ahí, se busca en todas las carpetas de proyecto. |
 
 Detalle de cada lector en el [documento 8](08-sesiones-e-historial.md).
 

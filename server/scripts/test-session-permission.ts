@@ -7,7 +7,7 @@ const { updateColony } = await import('../src/services/colonies.js');
 
 let fail = 0;
 const check = (ok: boolean, what: string) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); if (!ok) fail++; };
-const mk = (name: string, provider: 'opencode' | 'claude' | 'kiro', extra: Record<string, unknown> = {}) =>
+const mk = (name: string, provider: 'opencode' | 'claude' | 'kiro' | 'cursor', extra: Record<string, unknown> = {}) =>
   agents.create({ name, role: 'worker', provider, model: '', cwd: '/tmp', permission: 'acceptEdits', ...extra } as any);
 const cur = (id: string) => agents.get(id)!;
 
@@ -33,6 +33,10 @@ const k = mk('ki', 'kiro');
 agents.setSession(cur(k.id), 'ki_1');
 updateAgent(k.id, { permission: 'bypassPermissions' } as any);
 check(!permissionStale(cur(k.id)), 'a Kiro agent is never flagged');
+const cu = mk('cu', 'cursor');
+agents.setSession(cur(cu.id), '72f3bd62-e98f-42be-b8bb-3bce6449bb3e');
+updateAgent(cu.id, { permission: 'plan' } as any);
+check(!permissionStale(cur(cu.id)), 'a Cursor agent is never flagged (its rules are rewritten every turn)');
 
 const legacy = mk('old', 'opencode');
 agents.setSession(cur(legacy.id), 'old_1');

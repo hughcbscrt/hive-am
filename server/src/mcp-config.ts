@@ -28,3 +28,14 @@ export const kiroProfile = (agentId: string, name: string, caps: string[], acces
   tools: ['*'], allowedTools: [...access.trusted, ...(caps.length ? ['@hive'] : [])], includeMcpJson: false,
   ...(access.toolsSettings ? { toolsSettings: access.toolsSettings } : {}),
 });
+
+/**
+ * The `hive` server in a Cursor `mcp.json` (Cursor reads it from the project folder). Every agent in the folder shares the same entry: the values
+ * come from the process env (`${env:...}`), which each turn sets for its own agent.
+ */
+export const cursorMcpServer = () => ({
+  command: process.execPath, args: [script],
+  env: { HIVE_AGENT_ID: '${env:HIVE_AGENT_ID}', HIVE_AM_API: '${env:HIVE_AM_API}', HIVE_CAPS: '${env:HIVE_CAPS}' },
+});
+/** The env a Cursor turn passes so the shared `hive` entry starts as this agent (no caps: the server offers no tools). */
+export const cursorMcpEnv = (agentId: string, caps: string[]) => env(agentId, caps);

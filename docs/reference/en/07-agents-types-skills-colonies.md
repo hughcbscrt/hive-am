@@ -10,7 +10,7 @@ An agent is **configuration + session pointer**. Fields (`server/src/types.ts`, 
 | `role` | `orchestrator` or `worker`. |
 | `type_id` | Type it was created from (informational; see 7.2). |
 | `provider`, `model` | Provider and model. **Always the agent's own**, never inherited. |
-| `effort` | Reasoning effort of every turn (`''` is the CLI's default). Also the agent's own, never inherited, and copied by types and clones. See [6.7](06-providers.md#67-install-detection-and-models). |
+| `effort` | Reasoning effort of every turn (`''` is the CLI's default). Also the agent's own, never inherited, and copied by types and clones. See [6.8](06-providers.md#68-install-detection-and-models). |
 | `permission` | `plan` (read-only), `acceptEdits` (edits files), `bypassPermissions` (full access). |
 | `system_prompt` | Own prompt. |
 | `skill_ids` | Own skills. |
@@ -23,13 +23,13 @@ An agent is **configuration + session pointer**. Fields (`server/src/types.ts`, 
 
 ### Permissions and what they mean per provider
 
-| Permission | Claude | OpenCode | Kiro |
-|---|---|---|---|
-| `plan` (Read-only) | `--permission-mode plan` | Denies `edit`, `bash` and `task` | No tool trusted |
-| `acceptEdits` (Edit files) | `--permission-mode acceptEdits`, without `.git` or keys | Edits (`.env` included), no commands, no `.git` or keys, only inside its folder | Edits (`.env` included), no commands, no `.git` or keys, only inside its folder |
-| `bypassPermissions` (Full access) | `--permission-mode bypassPermissions` | No restrictions (`--auto`) | `--trust-all-tools` |
+| Permission | Claude | OpenCode | Kiro | Cursor |
+|---|---|---|---|---|
+| `plan` (Read-only) | `--permission-mode plan` | Denies `edit`, `bash` and `task` | No tool trusted | `--mode plan`, denies `Write(**)` and `Shell(*)` |
+| `acceptEdits` (Edit files) | `--permission-mode acceptEdits`, without `.git` or keys | Edits (`.env` included), no commands, no `.git` or keys, only inside its folder | Edits (`.env` included), no commands, no `.git` or keys, only inside its folder | Edits (`.env` included), no commands, no `.git` or keys, **can write outside its folder** |
+| `bypassPermissions` (Full access) | `--permission-mode bypassPermissions` | No restrictions (`--auto`) | `--trust-all-tools` | `--force` with no rules |
 
-Claude is the only one that, in "Edit files", lets file commands through (`touch`, `mv`…); the other two block all of them. The three levels are checked with `server/scripts/sim-readonly.ts`.
+Claude is the only one that, in "Edit files", lets file commands through (`touch`, `mv`…); the other three block all of them. The three levels are checked with `server/scripts/sim-readonly.ts`.
 
 Details and limits in [document 6](06-providers.md) and [12](12-operations-and-troubleshooting.md).
 
@@ -195,6 +195,6 @@ If the effective folder is empty when a turn starts, the turn fails with: *"This
 | Code: `server/src/connections/prompt.ts` | Header of each channel message (`[hive:channel]`, `[hive:files]`, `[hive:context]`) | Code only |
 | Code: `server/src/providers/opencode.ts` | Configuration that forbids the `question` tool | Code only |
 
-The instructions **guide the model, they do not force it**. What the server does enforce: whom each connection answers (authorized people and groups), the agent's permission (enforced by the CLI in all three providers; tested with `sim-readonly.ts`) and which files may leave (`connections/outbound.ts`). For example, the rule "do not look for the bot token" is an instruction; the token is still in the local database ([14.6.3](14-external-connections.md)).
+The instructions **guide the model, they do not force it**. What the server does enforce: whom each connection answers (authorized people and groups), the agent's permission (enforced by the CLI in all four providers; tested with `sim-readonly.ts`) and which files may leave (`connections/outbound.ts`). For example, the rule "do not look for the bot token" is an instruction; the token is still in the local database ([14.6.3](14-external-connections.md)).
 
-How they reach the CLI: through `--append-system-prompt` in Claude (when the session is created; if they change later, as an update block in the message) and as a preamble in the message in OpenCode and Kiro ([document 6](06-providers.md#66-instructions-preamble-providerspreamblets)).
+How they reach the CLI: through `--append-system-prompt` in Claude (when the session is created; if they change later, as an update block in the message) and as a preamble in the message in OpenCode and Kiro ([document 6](06-providers.md#67-instructions-preamble-providerspreamblets)).

@@ -125,6 +125,16 @@ Usage   = { input, output, cacheRead, cacheWrite, reasoning, credits?, contextPc
 
 > **Nota:** en las sesiones de Kiro probadas no había llamadas a herramientas guardadas, así que el mapeo de `toolUse`/`ToolResults` es de mejor esfuerzo.
 
+### Cursor (`history/cursor.ts`)
+
+**Ubicación:** `~/.cursor/projects/<carpeta>/agent-transcripts/<sessionId>/<sessionId>.jsonl` (`CURSOR_DATA_DIR` reemplaza a `~/.cursor`), donde `<carpeta>` es la carpeta del agente con cada tramo de caracteres que no son letras ni dígitos convertido en un solo `-` (`cursorSlug`). Si el archivo no está ahí, se buscan todas las carpetas de proyecto. El id debe ser un UUID.
+
+- `role: user` → mensaje de usuario. Cursor envuelve lo enviado en `<timestamp>…</timestamp>` + `<user_query>…</user_query>`; solo se queda la consulta, y se limpia el bloque `<instructions …>`.
+- `role: assistant` → bloques `text` y `tool_use`. Cursor escribe una línea por cada paso de una respuesta; las líneas seguidas se unen en un solo mensaje, como en el chat en vivo. `CallDynamicTool` (una llamada MCP) pasa a `mcp__<namespace>__<toolName>` con sus `arguments`; `SendToCall`, que repite el texto de la respuesta, se omite.
+- Las líneas `turn_ended` se ignoran.
+
+> **Nota:** la transcripción no guarda razonamiento, resultados de herramientas, ids de herramientas, uso ni horas. Una conversación de Cursor releída muestra el texto y las llamadas a herramientas sin su salida, y sus estadísticas no tienen tokens; todo eso se ve en vivo mientras corre el turno.
+
 ## 8.6 Estadísticas de sesión (`stats.ts`)
 
 `sessionStats(mensajes)` produce un `SessionStats` que alimenta la barra de estadísticas del chat y la lista de sesiones:

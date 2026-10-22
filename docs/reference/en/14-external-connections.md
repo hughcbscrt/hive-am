@@ -53,7 +53,7 @@ The `hive` MCP server (`server/mcp/dispatch.mjs`) announces tools according to t
 | `memory` | `notebook_read`, `notebook_add`, `notebook_rewrite` | Agents with the Notebook skill ([7.3.2](07-agents-types-skills-colonies.md#732-the-agents-notebook)) |
 | `skills` | `skill_read` | Agents with some *on-demand* skill ([7.3.3](07-agents-types-skills-colonies.md#733-on-demand-loading)) |
 
-`mcpCaps(agent)` in `instructions.ts` computes the set on every turn and the three providers receive it (`TurnOptions.mcpCaps`). `channel_reply({ text })` answers **the thread of the message being attended**; the agent does not copy ids. If the turn does not come from a channel it returns an explanatory error. The agent's instructions (`composeInstructions`) add a section that explains it, with the tool's name according to the provider.
+`mcpCaps(agent)` in `instructions.ts` computes the set on every turn and the four providers receive it (`TurnOptions.mcpCaps`). `channel_reply({ text })` answers **the thread of the message being attended**; the agent does not copy ids. If the turn does not come from a channel it returns an explanatory error. The agent's instructions (`composeInstructions`) add a section that explains it, with the tool's name according to the provider.
 
 Tokens never reach the agent: the MCP calls `POST /api/channel/reply` on the local server and it is the adapter that sends.
 
@@ -61,7 +61,7 @@ Tokens never reach the agent: the MCP calls `POST /api/channel/reply` on the loc
 
 - **Minimum "Edit files".** Claude blocks all MCP tools in `plan` ("Read-only") mode, including `channel_reply`, so an agent with an active connection cannot be in `plan`. The server requires it when creating or editing the connection and also when changing the permission of the agent or its colony: the update is **reverted** (transaction) if it would leave a linked agent in `plan`.
 - **"Full access"** is allowed; the interface shows a warning: anyone on the list will be able to make the agent run commands on the machine.
-- The three permission levels are applied in the three providers ([document 12](12-operations-and-troubleshooting.md)), OpenCode and Kiro included.
+- The three permission levels are applied in the four providers ([document 12](12-operations-and-troubleshooting.md)), OpenCode, Kiro and Cursor included (in Cursor, "Edit files" can write outside the agent's folder).
 - The agent's form disables "Read-only" while it has active connections, and the connection's panel offers an **Allow file editing** button.
 - **Chat commands:**
 
@@ -157,7 +157,7 @@ The net does not recognise every possible secret (a password with no recognisabl
 
 - **Time in the header:** every message carries `Now: Fri 2026-10-09 10:58 CST` (server time), so the agent answers "what time/day is it" without running `date`.
 - **No text after replying:** the channel instructions ask the agent to end the turn right after `channel_reply` (any later text is never delivered).
-- **Reasoning effort** (connection setting `effort`: empty, `low`, `medium`, `high`, `xhigh`, `max`): an **override** of the agent's own effort (set in its settings, see [6.7](06-providers.md#67-install-detection-and-models)) for the turns of this connection only; empty uses the agent's. It is passed as `--effort` to Claude and Kiro and, for OpenCode, as the variant the agent's model has for that level (if it has none, the agent's own is used). Measured with `bench-latency.ts`, `low` saves roughly 0.5–1 s per reply.
+- **Reasoning effort** (connection setting `effort`: empty, `low`, `medium`, `high`, `xhigh`, `max`): an **override** of the agent's own effort (set in its settings, see [6.8](06-providers.md#68-install-detection-and-models)) for the turns of this connection only; empty uses the agent's. It is passed as `--effort` to Claude and Kiro and, for OpenCode, as the variant the agent's model has for that level (if it has none, the agent's own is used). Cursor takes none: its model id names the level. Measured with `bench-latency.ts`, `low` saves roughly 0.5–1 s per reply.
 
 ### 14.6.6 The "Chat channels" skill
 

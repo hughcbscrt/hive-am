@@ -2,7 +2,7 @@
 
 Un **proveedor** es un CLI de agente de código instalado en tu máquina. hive-am no usa SDKs ni ACP: ejecuta el CLI como proceso hijo, **un proceso por turno**, y lee su salida en formato JSON por líneas.
 
-Hay exactamente tres proveedores (`Provider = 'claude' | 'opencode' | 'kiro'`), registrados en dos sitios:
+Hay exactamente cuatro proveedores (`Provider = 'claude' | 'opencode' | 'kiro' | 'cursor'`), registrados en dos sitios:
 
 - `server/src/providers/index.ts`: el registro `providers` (proveedor → `ProviderAdapter`, con un `id` y un generador `run(o)`), más `runners`, los mismos adaptadores como funciones sueltas.
 - `server/src/services/providers.ts`: tabla `PROVIDERS` (proveedor → binario y nombre para detección de instalación).
@@ -29,14 +29,14 @@ Un runner debe: construir los argumentos, lanzar el CLI con `spawnLines`, y **tr
 `spawnLines({ cmd, args, cwd, env?, stdin?, signal })`:
 
 - Lanza el proceso con `stdio: ['pipe','pipe','pipe']`, `cwd` = carpeta efectiva del agente y **`PWD` = esa misma carpeta**.
-  > **Por qué `PWD`:** Node hereda `PWD` del servidor de hive-am; OpenCode confía en `PWD` por encima del `cwd` real y registraba las sesiones en la carpeta del servidor. Fijarlo explícitamente lo corrige para los tres proveedores.
+  > **Por qué `PWD`:** Node hereda `PWD` del servidor de hive-am; OpenCode confía en `PWD` por encima del `cwd` real y registraba las sesiones en la carpeta del servidor. Fijarlo explícitamente lo corrige para todos los proveedores.
 - Entrega **stdout línea a línea** (`readline`), ignorando líneas vacías.
 - `stdin`: si se da texto, lo escribe y cierra; si no, cierra el stdin de inmediato.
 - Silencio: el temporizador se reinicia con cada línea de stdout; tras 10 minutos sin ninguna (`HIVE_AM_TURN_STALL_MS`, para pruebas) el CLI se detiene como en una cancelación y la llamada lanza `<cmd> stopped answering`. Un turno largo no se corta mientras el CLI siga emitiendo.
 - Cancelación: al abortarse la señal envía `SIGTERM` al proceso, y si sigue vivo tras un periodo de gracia (5 s, `HIVE_AM_KILL_GRACE_MS`) envía `SIGKILL`.
 - Termina con `exit` y no con `close`: algunos CLIs (OpenCode) lanzan un servicio en segundo plano que hereda el pipe de stdout y haría que `close` no ocurriera nunca. Tras `exit` espera 250 ms para vaciar el pipe y luego lo destruye.
-- Si el proceso sale con código ≠ 0 y no fue cancelado, lanza un `Error` con el código y los últimos 600 caracteres de stderr. El runtime lo convierte en un evento `error`.
-- `safeJson(línea)` parsea sin lanzar excepciones. `spawnJson` es `spawnLines` más `safeJson` (las líneas que no son JSON se saltan) y `flattenText` convierte el resultado de una herramienta (texto, lista de bloques u otro JSON) en texto; los tres runners los comparten.
+- Si el proceso sale con código ≠ 0 y no fue cancelado, lanza un `Error` con el código y los últimos 600 caracteres de stderr (los primeros 600 con `stderrHead`, que usa Cursor: escribe primero el motivo y después la lista entera de modelos). El runtime lo convierte en un evento `error`.
+- `safeJson(línea)` parsea sin lanzar excepciones. `spawnJson` es `spawnLines` más `safeJson` (las líneas que no son JSON se saltan) y `flattenText` convierte el resultado de una herramienta (texto, lista de bloques u otro JSON) en texto; los runners los comparten.
 
 ## 6.3 Claude Code (`providers/claude.ts`)
 
@@ -86,7 +86,7 @@ opencode run --standalone --format json --thinking --auto \
 | Permisos | Siempre `--auto` (aprueba lo que no esté denegado; un `deny` se respeta igual). Los tres niveles se escriben como reglas de OpenCode en `opencodePermissions()` (`providers/opencode.ts`): **solo leer** deniega `edit`, `bash` y `task`; **editar archivos** permite leer y editar (incluido `.env`) salvo `.git/**`, `*.pem` y `*.key`, deniega `bash` y `task`, y deniega `external_directory` (todo lo que quede fuera de la carpeta efectiva del agente, que es donde arranca el proceso) salvo `~/.hive-am/inbox/**`; **acceso total** no añade reglas. `doom_loop` queda por defecto. OpenCode conserva las herramientas con las que empezó una conversación, así que un permiso cambiado después no le llega: hive-am guarda el permiso con el que empezó cada conversación (`agent_sessions.permission`), la API del agente informa `permission_stale` y el chat avisa y ofrece **Aplicar ahora**, que empieza una conversación nueva (la anterior queda en Sesiones). Las conversaciones registradas antes de esta columna no se detectan. Ver [documento 12](12-operacion-y-problemas.md). |
 | Modelo | `-m` con formato `proveedor/modelo`, p. ej. `opencode/…`. |
 | Reanudación | `-s <id>` **solo si** la carpeta registrada por OpenCode para esa sesión (`session_v2.directory`) coincide con la carpeta del agente (o si no se puede saber). Si no coincide (sesiones creadas con versiones anteriores de hive-am que se registraron en la carpeta equivocada), se **inicia una sesión nueva**. |
-| Instrucciones | Sin flag de system prompt: se envían como preámbulo en el mensaje (ver 6.6). |
+| Instrucciones | Sin flag de system prompt: se envían como preámbulo en el mensaje (ver 6.7). |
 | Configuración por turno | Siempre `--standalone` (servidor privado que sí lee la configuración del entorno) y la variable `OPENCODE_CONFIG_CONTENT` con `permission.question = "deny"` (y `edit`, `bash` y `task` si el agente es de solo lectura). Los turnos no son interactivos: la herramienta `question` de OpenCode se descartaba y el proceso terminaba con código 1 ("The user dismissed this question"). Denegada, el agente hace la pregunta como texto normal del chat. |
 | Delegación | La misma variable `OPENCODE_CONFIG_CONTENT` añade el servidor MCP `hive` (solo orquestadores con subagentes). |
 | Id de sesión | Campo `sessionID` de cualquier evento. |
@@ -118,7 +118,7 @@ kiro-cli chat --no-interactive --output-format stream-json \
 |---|---|
 | Permisos | Una herramienta sin confianza no puede pedir aprobación (el turno no es interactivo) y falla. **Solo leer:** ninguna de confianza. **Editar archivos:** perfil generado (`~/.kiro/agents/hive-<id>.json`) con `allowedTools` = `fs_read`, `grep`, `glob`, `web_fetch`, `web_search` (`KIRO_EDIT_TOOLS`; el shell no) y `toolsSettings.fs_write`: `allowedPaths` = la carpeta efectiva del agente (con sus archivos que empiezan con punto, como `.env`) y `deniedPaths` = `.git`, `*.pem`, `*.key`. `fs_write` no se confía entero, así que una ruta fuera de la carpeta no se puede aprobar. **Acceso total:** `--trust-all-tools`. Dos cosas que aprendimos con Kiro 2.27: con un perfil (`--agent`) el flag `--trust-tools` deja de aplicarse, y las reglas `permissions.rules` de la documentación son de Kiro 3.x y aquí se ignoran; por eso se usa `toolsSettings`. |
 | Reanudación | `--resume-id <id>`. Las sesiones de Kiro son por carpeta, de ahí la importancia del `cwd`. |
-| Instrucciones | Preámbulo en el mensaje (ver 6.6). |
+| Instrucciones | Preámbulo en el mensaje (ver 6.7). |
 | Perfil | Kiro solo carga servidores MCP y rutas permitidas desde un perfil `~/.kiro/agents/hive-<agentId>.json`, que hive-am regenera en cada turno cuando el agente tiene herramientas de hive (`mcpServers.hive`, `tools: ["*"]`, `allowedTools: ["@hive"]`: delegación, canales, cuaderno, skills a demanda) o permiso «Editar archivos»; en ese caso se ejecuta con `--agent hive-<agentId>`. |
 | Id de sesión | `data.sessionId` de cualquier evento. |
 
@@ -134,9 +134,52 @@ kiro-cli chat --no-interactive --output-format stream-json \
 | `runFinished` con `status: success` | `done` (con `finalText`) |
 | `runFinished` con otro estado | `error` |
 
-## 6.6 Preámbulo de instrucciones (`providers/preamble.ts`)
+## 6.6 Cursor (`providers/cursor.ts`)
 
-OpenCode y Kiro no tienen un flag para añadir un system prompt, así que las instrucciones viajan **dentro del mensaje**:
+**Comando** (prompt como último argumento, con la misma regla del espacio inicial que OpenCode):
+
+```bash
+cursor-agent -p --output-format stream-json --stream-partial-output --trust --workspace <cwd> --force \
+  [--mode plan] [--approve-mcps] [--resume <session_id>] [--model <modelo>] "<prompt>"
+```
+
+| Aspecto | Comportamiento |
+|---|---|
+| Permisos | Siempre `--force`: un turno con `-p` no puede preguntar y, sin él, Cursor rechaza **todas** las llamadas MCP (aun con `--approve-mcps`). Los límites son reglas de la propia configuración de Cursor, que `--force` no se salta: cada agente limitado se ejecuta con `CURSOR_CONFIG_DIR=~/.hive-am/cursor/<agentId>`, una copia del `cli-config.json` de la persona (de `CURSOR_CONFIG_DIR`, `$XDG_CONFIG_HOME/cursor` o `~/.cursor`) cuyos `permissions` se reemplazan en cada turno (`cursorPermissions()`). **Solo leer:** `--mode plan` y `deny: Write(**), Shell(*)`. **Editar archivos:** `deny: Shell(*), Write(**/.git/**), Write(**/*.pem), Write(**/*.key)`; `.env` sigue editable. **Acceso total:** sin reglas y con la configuración propia de la persona. La sesión iniciada (`~/.config/cursor/auth.json`) y las conversaciones (`~/.cursor/projects`) no están en esa carpeta, así que no se ven afectadas. Ver «Qué garantizan los límites» más abajo. |
+| Reanudación | `--resume <id>`. El id es el `session_id` del evento `system/init`; sobrevive a un reinicio de hive-am. |
+| Instrucciones | Preámbulo en el mensaje (ver 6.7). |
+| Modelo y esfuerzo | `--model` solo cuando el agente tiene uno. Cursor no tiene esfuerzo: el nivel va en el id del modelo (`gpt-5.3-codex-high`), así que nunca se pasa `--effort` y el formulario no muestra el campo. Un plan gratuito de Cursor solo acepta `auto`: cualquier otro modelo, y el predeterminado de Cursor cuando no se pasa ninguno, hace fallar el turno con el motivo de Cursor. Por eso un agente, tipo o modelo de imágenes nuevo en Cursor empieza con `auto` (`defaultModel()` en `services/providers.ts` y `lib/meta.ts`); los agentes existentes no cambian. |
+| Delegación (MCP) | Cursor lee servidores MCP solo de `<carpeta>/.cursor/mcp.json` o del `~/.cursor/mcp.json` de la persona (`--workspace` cambia la carpeta real del agente, así que no sirve para esconder el archivo en otro sitio). Un agente con herramientas de hive fusiona una entrada `hive` en el archivo de la carpeta (los otros servidores de la persona se quedan; un archivo que no es JSON válido, o no es un objeto JSON, no se toca) y añade `--approve-mcps`. La entrada lee `HIVE_AGENT_ID`, `HIVE_CAPS` y `HIVE_AM_API` con `${env:...}`, así que un mismo archivo sirve a todos los agentes de la carpeta; cada turno pasa sus propios valores en el entorno del proceso (un agente sin herramientas de hive pasa `HIVE_CAPS` vacío y no recibe ninguna). El archivo se añade una vez al `.git/info/exclude` del repositorio (`/<prefijo>.cursor/mcp.json`), así que no aparece en `git status`. Cursor llama a las herramientas `hive-<herramienta>`. |
+| Id de sesión | `session_id` del primer evento que lo trae (`system/init`). |
+| Errores | Sin sesión iniciada, un modelo que el plan no permite o un modelo desconocido: Cursor escribe el motivo en stderr y sale con 1; se convierte en el error del turno (con `stderrHead`). Un `result` con `is_error: true` es un `error` con su texto. |
+
+**Traducción de eventos** (stream-json, un objeto por línea):
+
+| Línea de Cursor | `StreamEvent` |
+|---|---|
+| `system` / `init` | `session` (y el nombre del modelo, `Auto` para `auto`, para `usage`) |
+| `thinking` / `delta` | `thinking` (`completed` se ignora) |
+| `assistant` con `timestamp_ms` y sin `model_call_id` | `text` (un trozo, con `--stream-partial-output`) |
+| `assistant` con `model_call_id` (antes de una herramienta) o sin `timestamp_ms` (al final) | Cursor repite entero el tramo de texto: se salta si antes llegaron trozos y es `text` si no (sin salida parcial) |
+| `tool_call` / `started` | `tool`. La herramienta es la clave dentro de `tool_call`, con el nombre que usa la transcripción de Cursor: `shellToolCall` → `Shell` (`command`), `editToolCall` con `streamContent` → `Write` (`path`, `contents`), `mcpToolCall` → `mcp__<servidor>__<herramienta>` con sus argumentos, las demás con mayúscula inicial (`readToolCall` → `Read`) |
+| `tool_call` / `completed` | `tool_result`. Solo `result.success` es un éxito; `rejected`, `permissionDenied`, `writePermissionDenied`, `error` son `error: true` con el motivo de Cursor. Un comando de shell que sale con un código distinto de 0 añade `Exit code: <n>`; un resultado MCP lleva su texto y su `isError` |
+| `result` | `usage` (`inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `duration_ms`) y después `done` (con `result` como `summary`) o `error` |
+
+**Qué garantizan los límites** (comprobado con `cursor-agent` 2026.10.22 en carpetas desechables):
+
+| Nivel | Escribir en la carpeta | `.git/**`, `*.pem`, `*.key` | Shell | Escribir fuera de la carpeta |
+|---|---|---|---|---|
+| Solo leer | rechazado | rechazado | rechazado | rechazado |
+| Editar archivos | sí (`.env` también) | rechazado | rechazado | **posible con la herramienta de archivos** |
+| Acceso total | sí | sí | sí | sí |
+
+- El sandbox de Cursor (`--sandbox enabled`) no limita nada de lo que importa aquí: con él, tanto la herramienta de archivos como el shell escribieron en `.git/x`, `a.pem`, `a.key` y en una carpeta de `$HOME` fuera del proyecto. Por eso «Editar archivos» rechaza el shell en vez de confiar en el sandbox.
+- `--mode plan` por sí solo no deja a un agente en solo lectura con `--force`: el shell siguió escribiendo archivos, y el modelo puede llamar a `SwitchMode` para salir del modo plan y luego escribir. Las reglas `deny` se cumplen en cualquier modo.
+- Cursor no tiene una regla que permita una carpeta y rechace el resto (un `deny: Write(/**)` gana a un `allow` de la carpeta, y `Write(../**)` no coincide con nada), así que con «Editar archivos» la herramienta de archivos **puede escribir fuera de la carpeta del agente**. Usa «Solo leer» u otro proveedor cuando eso importe.
+
+## 6.7 Preámbulo de instrucciones (`providers/preamble.ts`)
+
+OpenCode, Kiro y Cursor no tienen un flag para añadir un system prompt, así que las instrucciones viajan **dentro del mensaje**:
 
 | Situación | Qué se envía |
 |---|---|
@@ -148,9 +191,9 @@ OpenCode y Kiro no tienen un flag para añadir un system prompt, así que las in
 
 Los lectores de historial **ocultan** estos bloques al mostrar el chat (ver [documento 8](08-sesiones-e-historial.md)). Los modelos sí los reciben.
 
-## 6.7 Detección de instalación y modelos
+## 6.8 Detección de instalación y modelos
 
-**Instalación** (`GET /api/providers`): ejecuta `claude --version`, `opencode --version`, `kiro-cli --version` (máx. 8 s cada uno). Si fallan → `installed: false`. Resultado cacheado 60 s. La interfaz muestra "● installed" / "● not found" en el selector de proveedor.
+**Instalación** (`GET /api/providers`): ejecuta `claude --version`, `opencode --version`, `kiro-cli --version`, `cursor-agent --version` (máx. 8 s cada uno). Si fallan → `installed: false`. Resultado cacheado 60 s. La interfaz muestra "● installed" / "● not found" en el selector de proveedor.
 
 **Modelos** (`server/src/models.ts`, caché 10 min, solo se cachean resultados no vacíos):
 
@@ -159,6 +202,7 @@ Los lectores de historial **ocultan** estos bloques al mostrar el chat (ver [doc
 | Claude | Lista fija: `opus`, `sonnet`, `haiku`, `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-4-5-20251001` |
 | OpenCode | Salida de `opencode models` (se aceptan líneas con formato `proveedor/modelo`) |
 | Kiro | `kiro-cli chat --list-models --format json` |
+| Cursor | `cursor-agent --list-models` (líneas `<id> - <nombre>`; se quita la nota `(current, default)`) |
 
 El campo de modelo de la interfaz es texto libre con sugerencias (`<datalist>`): si el CLI no lista modelos, puedes escribir cualquier id; vacío = modelo por defecto del CLI. Cambiar el proveedor de un agente limpia el modelo en el formulario.
 
@@ -168,15 +212,17 @@ El campo de modelo de la interfaz es texto libre con sugerencias (`<datalist>`):
 |---|---|---|
 | Claude Code | `claude … --effort <nivel>` | `low`, `medium`, `high`, `xhigh`, `max` |
 | Kiro | `kiro-cli chat … --effort <nivel>` | los mismos cinco; cuando el turno de un modelo informa `reasoning.effortLevels` solo se ofrecen esos para él |
+| Cursor | nunca: el nivel va en el id del modelo (`gpt-5.3-codex-high`, `claude-opus-5-5-max`) | ninguno; cualquier esfuerzo se rechaza al guardarlo, y el esfuerzo de una conexión hace correr a Cursor con el suyo por defecto |
 | OpenCode | la variante del modelo: `-m proveedor/modelo#<id>` | las variantes **que tiene el modelo elegido** (`0`…`5`, o `none`, `low`, `medium`, `high`, `xhigh`, `max`, según el modelo), leídas de su catálogo (`GET /api/model` → `variants[].id`, con la etiqueta de `settings.reasoningEffort`) |
 
 Lo aprendido (`reasoning-efforts.json`, junto a `context-windows.json`) se refresca como las ventanas de contexto: el catálogo se lee como mucho una vez por hora, y otra vez diez minutos después si la lectura falló. `GET /api/providers/:p/efforts?model=` le da al formulario los niveles (y si se conocen); lee primero el catálogo de OpenCode cuando todavía no se conocen los del modelo. Un esfuerzo se comprueba al guardarlo: un nivel que el proveedor no admite, o una variante que el modelo de OpenCode no tiene, es un 400; cambiar el proveedor o el modelo borra el que ya no aplica. Al correr el turno, un esfuerzo que no aplica (el modelo cambió) corre con el predeterminado del CLI, con una línea en el log del servidor, en vez de hacer fallar el turno, y el nombre de nivel de una conexión se convierte en la variante que el modelo tiene para él.
 
-## 6.8 Costos y precios
+## 6.9 Costos y precios
 
 - Claude: `result.total_cost_usd` se emite como `usage.cost` en vivo; en el historial no hay costo, así que se **estima** con `pricing.ts`.
 - OpenCode: usa el costo que reporta el CLI; si es 0, intenta estimar.
 - Kiro: factura en **créditos**, no en tokens; se muestran créditos.
+- Cursor: informa tokens en vivo pero no costo, y su transcripción no guarda uso; el costo solo se estima cuando el id del modelo nombra una de las familias de abajo.
 
 Tabla de estimación (USD por millón de tokens, por familia detectada en el nombre del modelo):
 
@@ -188,7 +234,7 @@ Tabla de estimación (USD por millón de tokens, por familia detectada en el nom
 
 Modelos fuera de esas familias no tienen costo estimado. Las estimaciones se marcan con "≈" en la interfaz.
 
-## 6.9 Cómo añadir un proveedor nuevo
+## 6.10 Cómo añadir un proveedor nuevo
 
 1. **Tipos:** añade el valor a `Provider` en `server/src/types.ts` y `web/lib/types.ts`.
 2. **Runner:** crea `server/src/providers/<nombre>.ts` con un generador `(o: TurnOptions) => AsyncGenerator<StreamEvent>` usando `spawnLines`. Fija `cwd` y recuerda emitir `session` en cuanto conozcas el id.

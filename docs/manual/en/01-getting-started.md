@@ -6,7 +6,7 @@ This chapter takes you from zero to your first agent in a conversation: what you
 
 - **Node.js 20 or later.**
 - **macOS or Linux.**
-- At least one of these tools installed **and signed in**: `claude` (Claude Code), `opencode` or `kiro-cli`. You do not need all three.
+- At least one of these tools installed **and signed in**: `claude` (Claude Code), `opencode`, `kiro-cli` or `cursor-agent` (Cursor). You do not need all of them.
 
 > **Note:** hive-am runs those tools exactly as they are on your machine. If one does not work on its own in your terminal, it will not work from hive-am either.
 
@@ -178,7 +178,7 @@ You are going to create an agent, give it a working folder and send it a message
    - **What is it for?**: one line. Orchestrators read it to decide who gets each task.
    - **Role**: **Worker** (does the work it receives) or **Orchestrator** (plans and delegates).
    - **Colony**: optional. A colony can lend it a folder, permissions, skills and context.
-   - **Provider**: **Claude Code**, **OpenCode** or **Kiro**. Each card shows whether it is installed (**installed**) or not (**not found**).
+   - **Provider**: **Claude Code**, **OpenCode**, **Kiro** or **Cursor**. Each card shows whether it is installed (**installed**) or not (**not found**).
    - **Model**: the one you want to use. Left at the default, it uses the tool's own default.
    - **Working folder**: type it or click **Browse**. It is required, unless the agent follows its colony's folder.
    - **What can it do?** (permissions): **Read-only**, **Edit files** or **Full access**.

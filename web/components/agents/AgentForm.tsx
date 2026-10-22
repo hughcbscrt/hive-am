@@ -7,7 +7,7 @@ import { EffortField, Field, FolderPicker, ModelField, PermissionField, Provider
 import { useHiveData } from '@/lib/store';
 import { MemberPick } from './MemberPick';
 import type { Agent, AgentType, Colony, InheritField, Permission, Provider, Role, SkillLoad } from '@/lib/types';
-import { permissionLabel, shortPath } from '@/lib/meta';
+import { defaultModel, permissionLabel, shortPath } from '@/lib/meta';
 import { PickSearch } from '@/components/PickSearch';
 import { CheckRow } from '@/components/Primitives';
 import { MANAGEABLE } from '@/components/objects/ManagerField';
@@ -23,7 +23,7 @@ export interface AgentDraft {
 }
 
 export const draftFromType = (t?: AgentType): AgentDraft => ({
-  name: '', description: t?.description ?? '', role: t?.role ?? 'worker', provider: t?.provider ?? 'claude', model: t?.model ?? '', effort: t?.effort ?? '',
+  name: '', description: t?.description ?? '', role: t?.role ?? 'worker', provider: t?.provider ?? 'claude', model: t ? t.model || defaultModel(t.provider) : '', effort: t?.effort ?? '',
   system_prompt: t?.system_prompt ?? '', permission: t?.permission ?? 'acceptEdits', cwd: '', skill_ids: t?.skill_ids ?? [], skill_loads: t?.skill_loads ?? {}, worker_ids: [], type_id: t?.id ?? null, colony_id: null, overrides: [], browser: false, object_ids: [],
 });
 /** Editing a type: its stored values with its name. The type's id stays with the caller, not in the draft. */
@@ -107,7 +107,7 @@ export function AgentForm({ draft, onChange, errors, selfId, showType = true, fo
           </select>
         </Field>
       )}
-      <Field label={t('form.provider')}><ProviderPicker value={draft.provider} onChange={(p) => onChange({ ...draft, provider: p, model: '', effort: '', browser: p === 'claude' && draft.browser })} providers={providers} /></Field>
+      <Field label={t('form.provider')}><ProviderPicker value={draft.provider} onChange={(p) => onChange({ ...draft, provider: p, model: defaultModel(p), effort: '', browser: p === 'claude' && draft.browser })} providers={providers} /></Field>
       <ModelField provider={draft.provider} value={draft.model} onChange={(v) => set('model', v)} />
       <EffortField provider={draft.provider} model={draft.model} value={draft.effort} onChange={(v) => set('effort', v)} />
       {!isType && draft.provider === 'claude' && <CheckRow checked={draft.browser} onChange={(v) => set('browser', v)} label={t('form.browser')} hint={t('form.browser.hint')} />}

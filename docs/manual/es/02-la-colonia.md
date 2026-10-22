@@ -30,7 +30,7 @@ El icono **?** junto al título abre una ayuda breve, "Cómo leer esto". Se cier
 Estos son los elementos del mapa:
 
 - **Colonias:** cada área con contorno es una colonia. Arriba lleva una etiqueta con su color, su nombre y cuántos agentes tiene. El icono de ajustes de la etiqueta abre su editor.
-- **Agentes:** un hexágono por agente. El borde indica el proveedor (la leyenda del pie lo explica: Claude, OpenCode, Kiro) y los orquestadores van en color miel. Debajo del nombre se lee el proveedor.
+- **Agentes:** un hexágono por agente. El borde indica el proveedor (la leyenda del pie lo explica: Claude, OpenCode, Kiro, Cursor) y los orquestadores van en color miel. Debajo del nombre se lee el proveedor.
 - **Recursos:** también son hexágonos, con un icono propio (servidor, base de datos, peticiones HTTP, clúster) y su estado debajo del nombre, como **Corriendo** o **Listo**.
 - **Orquestadores:** llevan una etiqueta **↓ N** con el número de workers a los que pueden delegar. Cada worker lleva **↑ Nombre** con el orquestador que lo dirige. Solo se muestran los conectados directamente.
 - **Líneas de relación:** unen a un orquestador con sus workers. Una línea en movimiento indica que hay una tarea en curso. Las líneas punteadas de color unen a un agente administrador con los recursos que cuida.

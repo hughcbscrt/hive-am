@@ -30,7 +30,7 @@ The **?** icon next to the title opens a short help, "How to read this". It clos
 These are the elements of the map:
 
 - **Colonies:** each outlined area is a colony. At the top it has a tag with its color, its name and how many agents it has. The settings icon on the tag opens its editor.
-- **Agents:** one hexagon per agent. The border shows the provider (the legend at the bottom explains it: Claude, OpenCode, Kiro) and orchestrators are honey-colored. The provider is shown under the name.
+- **Agents:** one hexagon per agent. The border shows the provider (the legend at the bottom explains it: Claude, OpenCode, Kiro, Cursor) and orchestrators are honey-colored. The provider is shown under the name.
 - **Resources:** also hexagons, with their own icon (server, database, HTTP requests, cluster) and their status under the name, such as **Running** or **Ready**.
 - **Orchestrators:** carry a **↓ N** tag with the number of workers they can delegate to. Each worker carries **↑ Name** with the orchestrator that directs it. Only directly connected ones are shown.
 - **Relation lines:** join an orchestrator to its workers. A moving line means a task is in progress. Dotted colored lines join a managing agent to the resources it looks after.

@@ -16,6 +16,8 @@ export interface SpawnOpts {
   env?: Record<string, string>;
   stdin?: string;
   signal: AbortSignal;
+  /** The error quotes the start of stderr instead of its end (a CLI that prints the reason and then a long list). */
+  stderrHead?: boolean;
 }
 
 /** Spawns a CLI and yields its stdout lines. Throws with stderr tail if it exits non-zero and nothing aborted it. */
@@ -46,8 +48,8 @@ export async function* spawnLines(o: SpawnOpts): AsyncGenerator<string> {
   };
   armStall();
 
-  let stderr = '';
-  child.stderr.on('data', (d) => { stderr = (stderr + d).slice(-4000); });
+  let stderr = ''; let head = '';
+  child.stderr.on('data', (d) => { stderr = (stderr + d).slice(-4000); if (head.length < 600) head = (head + d).slice(0, 600); });
   const exit = new Promise<number | null>((res) => {
     child.on('error', (e) => { stderr += String(e); res(-1); });
     // 'exit' (not 'close'): a daemon the CLI forks (e.g. opencode's background service) can keep
@@ -70,7 +72,8 @@ export async function* spawnLines(o: SpawnOpts): AsyncGenerator<string> {
   }
   const code = await exit;
   if (stalled && !o.signal.aborted) throw new StalledError(`${o.cmd} stopped answering (nothing on stdout for ${quietFor(STALL_MS())})`);
-  if (code !== 0 && !o.signal.aborted) throw new Error(`${o.cmd} exited with code ${code}${stderr ? `: ${stderr.trim().slice(-600)}` : ''}`);
+  const said = o.stderrHead ? head.trim() : stderr.trim().slice(-600);
+  if (code !== 0 && !o.signal.aborted) throw new Error(`${o.cmd} exited with code ${code}${said ? `: ${said}` : ''}`);
 }
 
 export function safeJson(line: string): any | null {

@@ -15,7 +15,7 @@ Un tipo es una plantilla con proveedor, modelo, prompt, permisos, rol y skills. 
 1. Entra en **Tipos de agente** y pulsa **Nuevo tipo**.
 2. Escribe el **Nombre** y una **Descripción** (se muestra al elegir un tipo).
 3. Elige el **Rol**: Worker u Orquestador.
-4. Elige el **Proveedor** (Claude Code, OpenCode o Kiro) y el **Modelo**.
+4. Elige el **Proveedor** (Claude Code, OpenCode, Kiro o Cursor) y el **Modelo**.
 5. En **¿Qué puede hacer?** elige **Solo lectura**, **Editar archivos** o **Acceso total**.
 6. Escribe el system prompt y añade las skills que quieras.
 7. Pulsa **Crear tipo**.

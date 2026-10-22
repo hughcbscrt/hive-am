@@ -1,5 +1,6 @@
 import type { Agent, Provider } from '../types.js';
 import { runners } from '../providers/index.js';
+import { isProvider } from '../services/providers.js';
 import { inboxDir } from './files.js';
 import type { SavedFile } from './types.js';
 
@@ -14,7 +15,7 @@ const MAX_IMAGE_BYTES = 8_000_000;
 const TIMEOUT_MS = 120_000;
 
 export const validVision = (v: unknown): v is VisionConfig =>
-  !!v && typeof v === 'object' && ['claude', 'opencode', 'kiro'].includes((v as any).provider) && typeof (v as any).model === 'string';
+  !!v && typeof v === 'object' && isProvider((v as any).provider) && typeof (v as any).model === 'string';
 
 async function describe(agent: Agent, cfg: VisionConfig, path: string): Promise<string> {
   // A throwaway agent in the agent's own id (so its inbox is readable) and read-only: it can only look at the file.

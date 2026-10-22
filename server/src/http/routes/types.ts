@@ -3,7 +3,7 @@ import { spawnFromType } from '../../services/agents.js';
 import { body } from '../body.js';
 import { bad, notFound } from '../errors.js';
 import { route } from '../router.js';
-import { isProvider } from '../../services/providers.js';
+import { defaultModel, isProvider } from '../../services/providers.js';
 import { checkEffort } from '../../efforts.js';
 import { requireName, text, validateAgentInput } from '../validate.js';
 
@@ -12,6 +12,7 @@ route('POST', '/api/types', async ({ req }) => {
   const p = await body(req);
   const name = requireName(p.name);
   if (!isProvider(p.provider)) throw bad('Pick a provider');
+  if (p.model === undefined) p.model = defaultModel(p.provider);
   const why = checkEffort(p.provider, text(p.model), p.effort); if (why) throw bad(why);
   try { return types.create({ ...p, name } as Parameters<typeof types.create>[0]); } catch { throw bad(`A type named "${text(p.name)}" already exists`); }
 });

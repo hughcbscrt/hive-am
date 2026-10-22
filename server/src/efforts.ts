@@ -4,7 +4,7 @@ import { DATA_DIR } from './db.js';
 import type { Provider } from './types.js';
 
 /**
- * Reasoning effort: how hard the model thinks in a turn. Claude Code and Kiro take `--effort <level>`; OpenCode takes it as a variant of the
+ * Reasoning effort: how hard the model thinks in a turn. Claude Code and Kiro take `--effort <level>`; Cursor takes none (the level is part of its model id); OpenCode takes it as a variant of the
  * model (`provider/model#variant`) and the variants are whatever the chosen model has, so what OpenCode and Kiro report is learned and stored
  * on disk (`reasoning-efforts.json`), next to what is learned about context windows. An empty effort means the CLI's own default: no flag and no `#variant`.
  */
@@ -49,6 +49,7 @@ export interface EffortOptions {
 /** The levels the form offers for a provider and (for OpenCode and Kiro) a model. */
 export function effortOptions(provider: Provider, model: string): EffortOptions {
   const shared: Variant[] = EFFORTS.map((id) => ({ id, level: id }));
+  if (provider === 'cursor') return { options: [], known: true };          // the level is part of Cursor's model id
   if (provider === 'claude') return { options: shared, known: true };
   if (provider === 'kiro') {
     const learned = model ? learnedEfforts('kiro', model) : null;
@@ -63,6 +64,7 @@ export function effortOptions(provider: Provider, model: string): EffortOptions 
 export function checkEffort(provider: Provider, model: string, effort: unknown): string | null {
   if (effort === undefined || effort === null || effort === '') return null;
   if (typeof effort !== 'string') return 'effort must be text';
+  if (provider === 'cursor') return 'Cursor takes no effort: pick a model whose id names the level (gpt-5.3-codex-high).';
   if (provider === 'opencode') {
     if (model.includes('#')) return 'This model id already names its variant: leave the effort empty.';
     const learned = model ? learnedEfforts('opencode', model) : null;

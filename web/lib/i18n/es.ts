@@ -86,6 +86,7 @@ export const es: Record<DictKey, string> = {
   "provider.claude.blurb": "El agente de código de Anthropic. Transmite tokens y se reanuda por id de sesión.",
   "provider.opencode.blurb": "Agente de código abierto sobre cualquier proveedor de modelos que tengas configurado.",
   "provider.kiro.blurb": "El CLI agéntico de AWS con flujos guiados por especificaciones.",
+  "provider.cursor.blurb": "El agente de Cursor en la terminal. El nivel de razonamiento va en el modelo que elijas.",
   "provider.installed": "● instalado",
   "provider.notFound": "● no encontrado",
 
@@ -909,7 +910,7 @@ export const es: Record<DictKey, string> = {
   "skills.delete": "Eliminar skill",
 
   // ---- sessions ----
-  "sessions.subtitle": "Todas las conversaciones que han tenido tus agentes, leídas directamente de Claude Code, OpenCode y Kiro. No se muestran otras sesiones de esta máquina.",
+  "sessions.subtitle": "Todas las conversaciones que han tenido tus agentes, leídas directamente de Claude Code, OpenCode, Kiro y Cursor. No se muestran otras sesiones de esta máquina.",
   "sessions.searchPlaceholder": "Busca por agente, carpeta o primer mensaje",
   "sessions.searchLabel": "Buscar sesiones",
   "sessions.empty.title": "Aún no hay sesiones",

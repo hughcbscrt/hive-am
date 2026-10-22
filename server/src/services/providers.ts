@@ -7,7 +7,10 @@ export const PROVIDERS: Record<Provider, { bin: string; label: string }> = {
   claude: { bin: 'claude', label: 'Claude Code' },
   opencode: { bin: 'opencode', label: 'OpenCode' },
   kiro: { bin: 'kiro-cli', label: 'Kiro' },
+  cursor: { bin: 'cursor-agent', label: 'Cursor' },
 };
+/** The model a new agent, type or image model starts with: Cursor's own default (Composer) is refused on a free plan, `auto` runs on every plan. */
+export const defaultModel = (p: Provider | undefined): string => (p === 'cursor' ? 'auto' : '');
 /** Own keys only: `"constructor" in PROVIDERS` is true. */
 export const isProvider = (v: unknown): v is Provider => typeof v === 'string' && Object.hasOwn(PROVIDERS, v);
 

@@ -3,7 +3,7 @@
 ## Requisitos
 
 - Node.js 20 o superior (probado con 20.19).
-- Los CLIs que quieras usar, instalados y con sesión iniciada: `claude`, `opencode`, `kiro-cli`. No hace falta tener los tres.
+- Los CLIs que quieras usar, instalados y con sesión iniciada: `claude`, `opencode`, `kiro-cli`, `cursor-agent`. No hace falta tenerlos todos.
 - Desarrollado y probado en Linux. Se usa `better-sqlite3` (módulo nativo con binarios precompilados); en otros sistemas puede requerir herramientas de compilación.
 
 ## Cómo arrancar

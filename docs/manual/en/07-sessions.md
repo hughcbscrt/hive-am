@@ -4,7 +4,7 @@ A session is one conversation of an agent. The **Sessions** section gathers the 
 
 ## What a native session is
 
-hive-am does not store your conversations. It stores only a pointer: which native session each agent uses. The real conversation lives in the store of the CLI itself (Claude Code, OpenCode or Kiro), and hive-am reads it from there when it needs it.
+hive-am does not store your conversations. It stores only a pointer: which native session each agent uses. The real conversation lives in the store of the CLI itself (Claude Code, OpenCode, Kiro or Cursor), and hive-am reads it from there when it needs it.
 
 That is why:
 
@@ -42,7 +42,7 @@ Open **Sessions** from its card in Home (group **Library and history**) or with 
 ### Search and filter
 
 - **Search:** type in "Search by agent, folder or first message".
-- **Provider filter:** **All**, **Claude**, **OpenCode** or **Kiro**.
+- **Provider filter:** **All**, **Claude**, **OpenCode**, **Kiro** or **Cursor**.
 
 If nothing matches you see "No sessions match." If there are no sessions yet, send a message to any agent and it will appear here.
 

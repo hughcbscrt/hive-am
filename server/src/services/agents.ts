@@ -1,6 +1,7 @@
 import { agents, colonies, db, resolved } from '../db.js';
 import { notebooks } from '../skills/notebook.js';
 import { checkEffort } from '../efforts.js';
+import { defaultModel } from './providers.js';
 import { channelPermissionError } from '../connections/rules.js';
 import { liveTurn, notifyAgentsChanged, stopAgent } from '../runtime.js';
 import { findRepo } from '../git/repo.js';
@@ -30,15 +31,16 @@ const checkAgentEffort = (provider: Agent['provider'], model: string, effort: un
 export function createAgent(p: AgentInput): Agent {
   const name = trimmed(p.name);
   uniqueName(name);
-  if (p.effort !== undefined && p.provider) checkAgentEffort(p.provider, p.model ?? '', p.effort);
-  return create({ ...p, name, cwd: p.cwd ?? '' } as NewAgent);
+  const model = p.model ?? defaultModel(p.provider);
+  if (p.effort !== undefined && p.provider) checkAgentEffort(p.provider, model, p.effort);
+  return create({ ...p, name, model, cwd: p.cwd ?? '' } as NewAgent);
 }
 /** A new agent that starts from a type: the type lends everything but name, description, folder and colony. */
 export function spawnFromType(t: AgentType, p: AgentInput & { description?: string }): Agent {
   const name = trimmed(p.name);
   uniqueName(name);
   return create({
-    name, description: p.description ?? t.description, role: t.role, type_id: t.id, provider: t.provider, model: t.model,
+    name, description: p.description ?? t.description, role: t.role, type_id: t.id, provider: t.provider, model: t.model || defaultModel(t.provider),
     effort: checkEffort(t.provider, t.model, t.effort) === null ? t.effort : '',     // a type whose level the model no longer takes starts at the default
     system_prompt: t.system_prompt, permission: t.permission, cwd: p.cwd ?? '', skill_ids: t.skill_ids, skill_loads: t.skill_loads, colony_id: p.colony_id ?? null,
   });

@@ -1,6 +1,6 @@
 # Agentes
 
-Un agente es un asistente de código con nombre propio: tiene un proveedor (Claude Code, OpenCode o Kiro), una carpeta donde trabaja, unas instrucciones y unos permisos. La sección **Agentes** es donde los ves todos en una tabla, los creas y entras a cada uno. Los ajustes de un agente se editan en un panel lateral que se abre desde su pantalla.
+Un agente es un asistente de código con nombre propio: tiene un proveedor (Claude Code, OpenCode, Kiro o Cursor), una carpeta donde trabaja, unas instrucciones y unos permisos. La sección **Agentes** es donde los ves todos en una tabla, los creas y entras a cada uno. Los ajustes de un agente se editan en un panel lateral que se abre desde su pantalla.
 
 ## La lista de agentes
 
@@ -25,7 +25,7 @@ Las columnas son:
 
 - **Búsqueda:** escribe en el campo "Busca por nombre, descripción o carpeta".
 - **Filtro por rol:** **Todos**, **Orquestadores** o **Workers**.
-- **Filtro por proveedor:** **Cualquier proveedor**, **Claude**, **OpenCode** o **Kiro**.
+- **Filtro por proveedor:** **Cualquier proveedor**, **Claude**, **OpenCode**, **Kiro** o **Cursor**.
 
 Si nada coincide, aparece "Nada coincide" y un botón para limpiar los filtros.
 
@@ -77,13 +77,13 @@ Si eliges una colonia que comparte algo, aparece una fila por cada valor heredab
 
 ### Proveedor y modelo
 
-Elige uno de los tres: **Claude Code**, **OpenCode** o **Kiro**. Cada tarjeta indica si el CLI está instalado en tu máquina.
+Elige uno de los cuatro: **Claude Code**, **OpenCode**, **Kiro** o **Cursor**. Cada tarjeta indica si el CLI está instalado en tu máquina. Cursor necesita `cursor-agent` instalado y con la sesión iniciada (`cursor-agent login`); un plan gratuito de Cursor solo ejecuta el modelo `auto`, que es con el que empieza un agente nuevo de Cursor.
 
 El campo **Modelo** es un selector con búsqueda: "Predeterminado del CLI" (lo elige el CLI), los modelos que lista el CLI, o cualquier id que escribas a mano ("Usar «id»").
 
 ### Esfuerzo de razonamiento
 
-Debajo del modelo, **Esfuerzo de razonamiento** fija cuánto piensa el modelo en **cada** turno de este agente: el chat web, Telegram y Slack, las programaciones, los avisos y las tareas delegadas. **Predeterminado** deja el del propio CLI, que es con lo que empieza cualquier agente. El campo solo ofrece lo que admiten el proveedor y el modelo elegidos: Claude Code y Kiro admiten **Bajo, Medio, Alto, Muy alto** y **Máximo**; en OpenCode son las variantes que tiene el modelo seleccionado (se leen de la propia lista de OpenCode: un modelo puede ofrecer Bajo, Alto y Máximo, otro de 0 a 5, otro ninguna, y entonces el campo lo dice). Cambiar el proveedor o el modelo lo devuelve a **Predeterminado** si el nivel ya no aplica. Un **tipo** también lo lleva, y una conexión puede reemplazarlo para su propio chat (ver [Conexiones](09-conexiones-telegram.md)). Un nivel más bajo responde más rápido y piensa menos.
+Debajo del modelo, **Esfuerzo de razonamiento** fija cuánto piensa el modelo en **cada** turno de este agente: el chat web, Telegram y Slack, las programaciones, los avisos y las tareas delegadas. **Predeterminado** deja el del propio CLI, que es con lo que empieza cualquier agente. El campo solo ofrece lo que admiten el proveedor y el modelo elegidos: Claude Code y Kiro admiten **Bajo, Medio, Alto, Muy alto** y **Máximo**; en OpenCode son las variantes que tiene el modelo seleccionado (se leen de la propia lista de OpenCode: un modelo puede ofrecer Bajo, Alto y Máximo, otro de 0 a 5, otro ninguna, y entonces el campo lo dice). Cursor no tiene este campo: el nivel va en el modelo que elijas (`gpt-5.3-codex-high`, `claude-opus-5-5-max`). Cambiar el proveedor o el modelo lo devuelve a **Predeterminado** si el nivel ya no aplica. Un **tipo** también lo lleva, y una conexión puede reemplazarlo para su propio chat (ver [Conexiones](09-conexiones-telegram.md)). Un nivel más bajo responde más rápido y piensa menos.
 
 > **Nota:** si cambias el proveedor de un agente que ya tiene conversación, esta se descarta: el id de sesión de un CLI no sirve en otro. Las conversaciones anteriores se conservan en la pestaña **Sesiones**.
 

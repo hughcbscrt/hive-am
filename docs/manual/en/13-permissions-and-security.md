@@ -20,26 +20,26 @@ An agent is not interactive: if an action needs approval, it cannot ask you for 
 
 ## What each level means for each provider
 
-The three levels apply to all three providers, but each CLI implements them in its own way.
+The three levels apply to all four providers, but each CLI implements them in its own way.
 
-| Level | Claude Code | OpenCode | Kiro |
-|---|---|---|---|
-| **Read-only** | Claude's planning mode | Editing, commands and tasks are denied | No trusted tools |
-| **Edit files** | Edits files, without touching `.git` or keys. File commands (`touch`, `mv`...) are let through. Other shell commands are not approved and fail | Edits (including `.env`), no commands, no `.git` or keys, only inside its folder | Same as OpenCode |
-| **Full access** | No restrictions | No restrictions | All tools trusted |
+| Level | Claude Code | OpenCode | Kiro | Cursor |
+|---|---|---|---|---|
+| **Read-only** | Claude's planning mode | Editing, commands and tasks are denied | No trusted tools | Plan mode; writing and commands are denied |
+| **Edit files** | Edits files, without touching `.git` or keys. File commands (`touch`, `mv`...) are let through. Other shell commands are not approved and fail | Edits (including `.env`), no commands, no `.git` or keys, only inside its folder | Same as OpenCode | Edits (including `.env`), no commands, no `.git` or keys, but **it can write outside its folder** |
+| **Full access** | No restrictions | No restrictions | All tools trusted | No restrictions |
 
 > **Note:** in **Read-only**, Claude Code also blocks hive's tools (delegate, notebook, on-demand skills). In that case on-demand skills are included in full in the instructions.
 
 ## What the Edit files level protects
 
-With **Edit files**, all three providers:
+With **Edit files**, all four providers:
 
 - Cannot edit `.git`.
 - Cannot edit private keys (`*.pem` and `*.key` files).
-- Cannot leave the agent's folder.
+- Cannot leave the agent's folder, **except Cursor**: Cursor has no rule that keeps its file tool inside a folder, so a Cursor agent can create or change files elsewhere on your machine. Give a Cursor agent **Edit files** only where you would also give it that, or use **Read-only**.
 - Can edit `.env`.
 
-OpenCode and Kiro block all shell commands at this level. Claude allows only file commands.
+OpenCode, Kiro and Cursor block all shell commands at this level. Claude allows only file commands.
 
 > **Tip:** if you want an agent to run tests or install dependencies, it needs **Full access** (in Claude, some commands get through at **Edit files**, but do not count on it). Give that level only in a project you can recover with git.
 
@@ -99,7 +99,7 @@ What hive-am keeps of its own record does not grow for ever. Every six hours it 
 
 ## Where secrets go
 
-- **The CLIs use their own session.** hive-am does not store your Claude, OpenCode or Kiro logins.
+- **The CLIs use their own session.** hive-am does not store your Claude, OpenCode, Kiro or Cursor logins.
 - **Bot token:** the only credential hive-am stores is the bot token of each external connection, in `hive-am.db`. The API never returns it: the interface shows only a hint (like `••••1234`). When you edit the connection, if you leave the field empty the stored one is kept.
 - **Database passwords:** those of database-type resources are stored locally and are not returned by the API. Only the local actions described above use them.
 - **Tokens never reach the agent:** when an agent replies through a channel, it is the server that sends the message.

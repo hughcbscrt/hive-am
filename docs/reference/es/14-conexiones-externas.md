@@ -53,7 +53,7 @@ El servidor MCP `hive` (`server/mcp/dispatch.mjs`) anuncia herramientas según l
 | `memory` | `notebook_read`, `notebook_add`, `notebook_rewrite` | Agentes con la skill Notebook ([7.3.2](07-agentes-tipos-skills-colonias.md#732-el-cuaderno-del-agente)) |
 | `skills` | `skill_read` | Agentes con alguna skill *a demanda* ([7.3.3](07-agentes-tipos-skills-colonias.md#733-carga-bajo-demanda)) |
 
-`mcpCaps(agent)` en `instructions.ts` calcula el conjunto en cada turno y los tres proveedores lo reciben (`TurnOptions.mcpCaps`). `channel_reply({ text })` responde **al hilo del mensaje que se está atendiendo**; el agente no copia ids. Si el turno no viene de un canal devuelve un error explicativo. Las instrucciones del agente (`composeInstructions`) añaden una sección que lo explica, con el nombre de la herramienta según el proveedor.
+`mcpCaps(agent)` en `instructions.ts` calcula el conjunto en cada turno y los cuatro proveedores lo reciben (`TurnOptions.mcpCaps`). `channel_reply({ text })` responde **al hilo del mensaje que se está atendiendo**; el agente no copia ids. Si el turno no viene de un canal devuelve un error explicativo. Las instrucciones del agente (`composeInstructions`) añaden una sección que lo explica, con el nombre de la herramienta según el proveedor.
 
 Los tokens nunca llegan al agente: el MCP llama a `POST /api/channel/reply` en el servidor local y es el adaptador quien envía.
 
@@ -61,7 +61,7 @@ Los tokens nunca llegan al agente: el MCP llama a `POST /api/channel/reply` en e
 
 - **Mínimo «Editar archivos».** Claude bloquea todas las herramientas MCP en modo `plan` («Solo lectura»), incluida `channel_reply`, así que un agente con una conexión activa no puede estar en `plan`. El servidor lo exige al crear o editar la conexión y también al cambiar el permiso del agente o de su colonia: la actualización se **revierte** (transacción) si dejaría a un agente vinculado en `plan`.
 - **«Acceso total»** está permitido; la interfaz muestra una advertencia: cualquiera de la lista podrá hacer que el agente ejecute comandos en la máquina.
-- Los tres niveles de permiso se aplican en los tres proveedores ([documento 12](12-operacion-y-problemas.md)), también OpenCode y Kiro.
+- Los tres niveles de permiso se aplican en los cuatro proveedores ([documento 12](12-operacion-y-problemas.md)), también OpenCode, Kiro y Cursor (en Cursor, «Editar archivos» puede escribir fuera de la carpeta del agente).
 - El formulario del agente deshabilita «Solo lectura» mientras tenga conexiones activas, y el panel de la conexión ofrece un botón **Permitir editar archivos**.
 - **Comandos del chat:**
 
@@ -157,7 +157,7 @@ La red no reconoce todos los secretos posibles (una contraseña sin nombre ni fo
 
 - **Hora en el encabezado:** cada mensaje trae `Now: Fri 2026-10-09 10:58 CST` (hora del servidor), así el agente responde «qué hora/día es» sin ejecutar `date`.
 - **Sin texto tras responder:** las instrucciones de canal piden terminar el turno justo después de `channel_reply` (el texto posterior nunca se entrega).
-- **Esfuerzo de razonamiento** (ajuste de la conexión `effort`: vacío, `low`, `medium`, `high`, `xhigh`, `max`): un **reemplazo** del esfuerzo propio del agente (se fija en sus ajustes, ver [6.7](06-proveedores.md#67-deteccion-de-instalacion-y-modelos)) solo para los turnos de esta conexión; vacío usa el del agente. Se pasa como `--effort` a Claude y Kiro y, en OpenCode, como la variante que el modelo del agente tiene para ese nivel (si no tiene, se usa el del propio agente). Medido con `bench-latency.ts`, `low` ahorra más o menos 0.5–1 s por respuesta.
+- **Esfuerzo de razonamiento** (ajuste de la conexión `effort`: vacío, `low`, `medium`, `high`, `xhigh`, `max`): un **reemplazo** del esfuerzo propio del agente (se fija en sus ajustes, ver [6.8](06-proveedores.md#68-deteccion-de-instalacion-y-modelos)) solo para los turnos de esta conexión; vacío usa el del agente. Se pasa como `--effort` a Claude y Kiro y, en OpenCode, como la variante que el modelo del agente tiene para ese nivel (si no tiene, se usa el del propio agente). Cursor no lleva ninguno: el id de su modelo nombra el nivel. Medido con `bench-latency.ts`, `low` ahorra más o menos 0.5–1 s por respuesta.
 
 ### 14.6.6 La skill «Chat channels»
 

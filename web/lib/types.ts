@@ -1,4 +1,4 @@
-export type Provider = 'claude' | 'opencode' | 'kiro';
+export type Provider = 'claude' | 'opencode' | 'kiro' | 'cursor';
 export type Role = 'orchestrator' | 'worker';
 export type Permission = 'plan' | 'acceptEdits' | 'bypassPermissions';
 
@@ -15,7 +15,7 @@ export interface Agent {
   effective: { cwd: string; permission: Permission; system_prompt: string; skill_ids: string[]; skill_loads: Record<string, SkillLoad>; inherited: InheritField[] };
   session_id: string | null; status: 'idle' | 'running' | 'error';
   skill_ids: string[]; skill_loads: Record<string, SkillLoad>; worker_ids: string[]; created_at: number; updated_at: number;
-  /** Reasoning effort of every turn ('' is the CLI's own default). Claude and Kiro take a level, OpenCode a variant of the model. */
+  /** Reasoning effort of every turn ('' is the CLI's own default). Claude and Kiro take a level, OpenCode a variant of the model, Cursor none. */
   effort: string;
   /** The agent this one was cloned from (null for any other agent, and when that agent was deleted). */
   cloned_from: string | null;

@@ -4,7 +4,7 @@ Una sesión es una conversación de un agente. La sección **Sesiones** reúne e
 
 ## Qué es una sesión nativa
 
-hive-am no guarda tus conversaciones. Guarda solo un puntero: qué sesión nativa usa cada agente. La conversación real vive en el almacén del propio CLI (Claude Code, OpenCode o Kiro), y hive-am la lee de ahí cuando la necesita.
+hive-am no guarda tus conversaciones. Guarda solo un puntero: qué sesión nativa usa cada agente. La conversación real vive en el almacén del propio CLI (Claude Code, OpenCode, Kiro o Cursor), y hive-am la lee de ahí cuando la necesita.
 
 Por eso:
 
@@ -42,7 +42,7 @@ Abre **Sesiones** desde su tarjeta en Inicio (grupo **Biblioteca e historial**) 
 ### Buscar y filtrar
 
 - **Búsqueda:** escribe en "Busca por agente, carpeta o primer mensaje".
-- **Filtro por proveedor:** **Todos**, **Claude**, **OpenCode** o **Kiro**.
+- **Filtro por proveedor:** **Todos**, **Claude**, **OpenCode**, **Kiro** o **Cursor**.
 
 Si nada coincide verás "Ninguna sesión coincide". Si aún no hay sesiones, envía un mensaje a cualquier agente y aparecerá aquí.
 

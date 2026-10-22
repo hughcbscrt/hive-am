@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import { historySig } from './history/index.js';
 import { RETENTION_DAYS } from './connections/files.js';
+import type { Provider } from './types.js';
 
 /**
  * What hive-am keeps of its own record, and for how long. Three tables only ever grew: the messages of channel conversations, the log of
@@ -23,7 +24,7 @@ export function retentionPass({ now = Date.now() }: { now?: number } = {}): Rete
   // A direct conversation goes only when it is old AND its transcript is gone. `historySig` is null for a failed read too: the age is what makes that harmless.
   const gone: { agent_id: string; session_id: string }[] = [];
   const old = db.prepare("SELECT s.agent_id, s.session_id, s.provider, s.cwd FROM agent_sessions s WHERE s.kind='direct' AND s.last_seen < ? AND s.session_id IS NOT (SELECT session_id FROM agents WHERE id=s.agent_id)")
-    .all(forgetBefore) as { agent_id: string; session_id: string; provider: 'claude' | 'opencode' | 'kiro'; cwd: string }[];
+    .all(forgetBefore) as { agent_id: string; session_id: string; provider: Provider; cwd: string }[];
   for (const s of old) if (historySig({ provider: s.provider, cwd: s.cwd }, s.session_id) === null) gone.push(s);
 
   return db.transaction((): RetentionResult => {
