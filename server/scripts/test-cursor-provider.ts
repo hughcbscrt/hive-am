@@ -152,6 +152,8 @@ check(!existsSync(join(plain, '.cursor')) && envOf().HIVE_CAPS === '', 'an agent
 // ---- models and effort ----
 eq('models come from --list-models', parseCursorModels('Available models\n\nauto - Auto (current, default)\ngpt-5.3-codex-high - Codex 5.3 High\ngrok-4.7-low-fast - Grok 4.7  Low Fast​​\n\nTip: use --model'), [
   { id: 'auto', label: 'Auto' }, { id: 'gpt-5.3-codex-high', label: 'Codex 5.3 High' }, { id: 'grok-4.7-low-fast', label: 'Grok 4.7  Low Fast' }]);
+eq('models parse through ANSI colors', parseCursorModels('\x1b[2mAvailable models\x1b[22m\n\n\x1b[32mauto\x1b[39m \x1b[2m- Auto\x1b[22m\x1b[2m (current, default)\x1b[22m\n\x1b[36mgpt-5.3-codex\x1b[39m \x1b[2m- Codex 5.3\x1b[22m\n'), [
+  { id: 'auto', label: 'Auto' }, { id: 'gpt-5.3-codex', label: 'Codex 5.3' }]);
 check(['low', 'high', 'max', 'xhigh'].every((e) => checkEffort('cursor', 'gpt-5.3-codex', e) !== null) && checkEffort('cursor', 'auto', '') === null, 'Cursor refuses any effort, and the default is fine');
 eq('and offers none', effortOptions('cursor', 'auto'), { options: [], known: true });
 check(resolveEffort('cursor', 'auto', 'max') === '', 'a connection\'s effort runs Cursor at its default');

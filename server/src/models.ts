@@ -18,7 +18,7 @@ const CLAUDE: ModelInfo[] = [
 
 /** The models `cursor-agent --list-models` prints. */
 export function parseCursorModels(stdout: string): ModelInfo[] {
-  return stdout.split('\n').map((l) => /^([\w.\-\[\]=,]+) - (.+)$/.exec(l.trim())).filter((m): m is RegExpExecArray => !!m)
+  return stdout.replace(/\x1b\[[0-9;]*m/g, '').split('\n').map((l) => /^([\w.\-\[\]=,]+) - (.+)$/.exec(l.trim())).filter((m): m is RegExpExecArray => !!m)
     .map((m) => ({ id: m[1], label: m[2].replace(/\s*\((?:current|default)[^)]*\)\s*$/, '').replace(/[\u200b\u200c\u200d\ufeff]/g, '').trim() }));
 }
 
