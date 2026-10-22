@@ -77,7 +77,7 @@ If you choose a colony that shares something, a row appears for each inheritable
 
 ### Provider and model
 
-Choose one of the four: **Claude Code**, **OpenCode**, **Kiro** or **Cursor**. Each card shows whether the CLI is installed on your machine. Cursor needs `cursor-agent` installed and signed in (`cursor-agent login`); a free Cursor plan only runs the `auto` model.
+Choose one of the four: **Claude Code**, **OpenCode**, **Kiro** or **Cursor**. Each card shows whether the CLI is installed on your machine. Cursor needs `cursor-agent` installed and signed in (`cursor-agent login`); a free Cursor plan only runs the `auto` model, which is what a new Cursor agent starts with.
 
 The **Model** field is a searchable selector: "CLI default" (the CLI picks), the models the CLI lists, or any id you type by hand ("Use “id”").
 

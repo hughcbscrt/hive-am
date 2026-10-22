@@ -105,7 +105,7 @@ Each tool call is a collapsible `<details>` row:
 [icon] Label  summary (mono)            [exit 1] [N lines] [duration] [●] ›
 ```
 
-- **Label and summary** come from `describe(tool)`, which recognizes the names from the three providers.
+- **Label and summary** come from `describe(tool)`, which recognizes the names from the four providers.
 - **Metadata on the right:** exit code (Shell only, if the result contains `Exit code N`; red if ≠ 0), "failed" if there is an error without a code, number of output lines, duration and, if in progress, a pulsing dot.
 - **In progress:** honey-colored border and a live timer.
 - **Error:** red border.

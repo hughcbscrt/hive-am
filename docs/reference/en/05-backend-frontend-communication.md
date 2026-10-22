@@ -147,7 +147,7 @@ Each message is a JSON object with a `kind` field. They are produced by the runt
 
 ### Turn events (`StreamEvent`)
 
-They are common to the three providers (each runner translates its own format):
+They are common to the four providers (each runner translates its own format):
 
 | `t` | Fields | Meaning |
 |---|---|---|

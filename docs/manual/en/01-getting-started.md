@@ -6,7 +6,7 @@ This chapter takes you from zero to your first agent in a conversation: what you
 
 - **Node.js 20 or later.**
 - **macOS or Linux.**
-- At least one of these tools installed **and signed in**: `claude` (Claude Code), `opencode` or `kiro-cli`. You do not need all three.
+- At least one of these tools installed **and signed in**: `claude` (Claude Code), `opencode`, `kiro-cli` or `cursor-agent` (Cursor). You do not need all of them.
 
 > **Note:** hive-am runs those tools exactly as they are on your machine. If one does not work on its own in your terminal, it will not work from hive-am either.
 

@@ -77,7 +77,7 @@ Si eliges una colonia que comparte algo, aparece una fila por cada valor heredab
 
 ### Proveedor y modelo
 
-Elige uno de los cuatro: **Claude Code**, **OpenCode**, **Kiro** o **Cursor**. Cada tarjeta indica si el CLI está instalado en tu máquina. Cursor necesita `cursor-agent` instalado y con la sesión iniciada (`cursor-agent login`); un plan gratuito de Cursor solo ejecuta el modelo `auto`.
+Elige uno de los cuatro: **Claude Code**, **OpenCode**, **Kiro** o **Cursor**. Cada tarjeta indica si el CLI está instalado en tu máquina. Cursor necesita `cursor-agent` instalado y con la sesión iniciada (`cursor-agent login`); un plan gratuito de Cursor solo ejecuta el modelo `auto`, que es con el que empieza un agente nuevo de Cursor.
 
 El campo **Modelo** es un selector con búsqueda: "Predeterminado del CLI" (lo elige el CLI), los modelos que lista el CLI, o cualquier id que escribas a mano ("Usar «id»").
 

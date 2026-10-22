@@ -147,7 +147,7 @@ Cada mensaje es un objeto JSON con un campo `kind`. Los genera el `bus` del runt
 
 ### Eventos de un turno (`StreamEvent`)
 
-Son comunes a los tres proveedores (cada runner traduce su formato propio):
+Son comunes a los cuatro proveedores (cada runner traduce su formato propio):
 
 | `t` | Campos | Significado |
 |---|---|---|

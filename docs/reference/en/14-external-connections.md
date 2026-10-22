@@ -53,7 +53,7 @@ The `hive` MCP server (`server/mcp/dispatch.mjs`) announces tools according to t
 | `memory` | `notebook_read`, `notebook_add`, `notebook_rewrite` | Agents with the Notebook skill ([7.3.2](07-agents-types-skills-colonies.md#732-the-agents-notebook)) |
 | `skills` | `skill_read` | Agents with some *on-demand* skill ([7.3.3](07-agents-types-skills-colonies.md#733-on-demand-loading)) |
 
-`mcpCaps(agent)` in `instructions.ts` computes the set on every turn and the three providers receive it (`TurnOptions.mcpCaps`). `channel_reply({ text })` answers **the thread of the message being attended**; the agent does not copy ids. If the turn does not come from a channel it returns an explanatory error. The agent's instructions (`composeInstructions`) add a section that explains it, with the tool's name according to the provider.
+`mcpCaps(agent)` in `instructions.ts` computes the set on every turn and the four providers receive it (`TurnOptions.mcpCaps`). `channel_reply({ text })` answers **the thread of the message being attended**; the agent does not copy ids. If the turn does not come from a channel it returns an explanatory error. The agent's instructions (`composeInstructions`) add a section that explains it, with the tool's name according to the provider.
 
 Tokens never reach the agent: the MCP calls `POST /api/channel/reply` on the local server and it is the adapter that sends.
 
@@ -61,7 +61,7 @@ Tokens never reach the agent: the MCP calls `POST /api/channel/reply` on the loc
 
 - **Minimum "Edit files".** Claude blocks all MCP tools in `plan` ("Read-only") mode, including `channel_reply`, so an agent with an active connection cannot be in `plan`. The server requires it when creating or editing the connection and also when changing the permission of the agent or its colony: the update is **reverted** (transaction) if it would leave a linked agent in `plan`.
 - **"Full access"** is allowed; the interface shows a warning: anyone on the list will be able to make the agent run commands on the machine.
-- The three permission levels are applied in the three providers ([document 12](12-operations-and-troubleshooting.md)), OpenCode and Kiro included.
+- The three permission levels are applied in the four providers ([document 12](12-operations-and-troubleshooting.md)), OpenCode, Kiro and Cursor included (in Cursor, "Edit files" can write outside the agent's folder).
 - The agent's form disables "Read-only" while it has active connections, and the connection's panel offers an **Allow file editing** button.
 - **Chat commands:**
 

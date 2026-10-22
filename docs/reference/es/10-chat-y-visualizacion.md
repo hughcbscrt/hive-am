@@ -105,7 +105,7 @@ Cada llamada a herramienta es una fila plegable `<details>`:
 [icono] Etiqueta  resumen (mono)            [exit 1] [N líneas] [duración] [●] ›
 ```
 
-- **Etiqueta y resumen** vienen de `describe(tool)`, que reconoce los nombres de los tres proveedores.
+- **Etiqueta y resumen** vienen de `describe(tool)`, que reconoce los nombres de los cuatro proveedores.
 - **Metadatos a la derecha:** código de salida (solo Shell, si el resultado contiene `Exit code N`; rojo si ≠ 0), "failed" si hay error sin código, número de líneas de salida, duración y, si está en curso, un punto pulsante.
 - **En curso:** borde miel y cronómetro vivo.
 - **Error:** borde rojo.
