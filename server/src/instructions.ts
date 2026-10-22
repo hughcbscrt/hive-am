@@ -32,8 +32,8 @@ export function mcpCaps(a: Agent): string[] {
   return caps;
 }
 
-/** How each CLI names the tools of the `hive` MCP server. OpenCode exposes them as `tools.<server>.<tool>`, Kiro as `@<server>/<tool>`. */
-const toolName = (provider: Agent['provider'], tool: string) => (provider === 'opencode' ? `tools.hive.${tool}` : provider === 'kiro' ? `@hive/${tool}` : `mcp__hive__${tool}`);
+/** How each CLI names the tools of the `hive` MCP server. OpenCode exposes them as `tools.<server>.<tool>`, Kiro as `@<server>/<tool>`, Cursor as `<server>-<tool>`. */
+const toolName = (provider: Agent['provider'], tool: string) => (provider === 'opencode' ? `tools.hive.${tool}` : provider === 'kiro' ? `@hive/${tool}` : provider === 'cursor' ? `hive-${tool}` : `mcp__hive__${tool}`);
 
 export function composeInstructions(a: Agent, delegated = false): string {
   const parts: string[] = [];

@@ -62,8 +62,10 @@ check(stripInstructions('plain') === 'plain', 'a message without the block is un
 const f = join(dir, 't.jsonl');
 writeFileSync(f, '{"a":1}\n\n{"b":\n{"c":3}\n{"d"');
 check(JSON.stringify([...jsonLines(f)]) === '[{"a":1},{"c":3}]', 'jsonLines skips damaged and partial lines');
-check(Object.keys(historyReaders).sort().join() === 'claude,kiro,opencode', 'there is a reader for every provider');
-check(readHistory({ provider: 'kiro', cwd: dir, session_id: null }).length === 0 && readHistory({ provider: 'kiro', cwd: dir, session_id: 'not-a-uuid' }).length === 0, 'an unknown session reads as empty');
+check(Object.keys(historyReaders).sort().join() === 'claude,cursor,kiro,opencode', 'there is a reader for every provider');
+for (const provider of ['kiro', 'cursor'] as const) {
+  check(readHistory({ provider, cwd: dir, session_id: null }).length === 0 && readHistory({ provider, cwd: dir, session_id: 'not-a-uuid' }).length === 0 && readHistory({ provider, cwd: dir, session_id: '00000000-0000-0000-0000-000000000000' }).length === 0, `${provider}: an unknown or malformed session reads as empty`);
+}
 
 // OpenCode: its failure comes as an `error` event with exit code 1, and the reason (not "exited with code 1") is what the turn reports; flags the CLI lacks are not passed
 const fakeBin = join(dir, 'bin'); mkdirSync(fakeBin);

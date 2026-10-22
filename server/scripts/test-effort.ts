@@ -15,6 +15,7 @@ import { runners } from '../src/providers/index.js';
 import { runClaude } from '../src/providers/claude.js';
 import { runOpencode } from '../src/providers/opencode.js';
 import { runKiro } from '../src/providers/kiro.js';
+import { runCursor } from '../src/providers/cursor.js';
 import { migrate, MIGRATIONS } from '../src/db/migrations.js';
 
 let fail = 0;
@@ -33,6 +34,7 @@ check(!validEffort('') && !validEffort('ultra') && !validEffort(3), 'nothing els
 // ---- what each provider accepts ----
 check(checkEffort('claude', 'sonnet', '') === null && checkEffort('claude', '', 'xhigh') === null && checkEffort('claude', '', 'max') === null, 'Claude takes empty, xhigh and max');
 check(/effort must be/.test(checkEffort('claude', '', 'ultra') ?? '') && /effort must be/.test(checkEffort('kiro', '', 'extreme') ?? ''), 'and not a level that does not exist');
+check(EFFORTS.every((e) => /Cursor takes no effort/.test(checkEffort('cursor', 'gpt-5.3-codex', e) ?? '')) && checkEffort('cursor', 'auto', '') === null, 'Cursor takes no level at all (its model id names it), only the default');
 learnEfforts('kiro', { 'kiro-model-a': [{ id: 'low' }, { id: 'high' }] });
 check(checkEffort('kiro', 'kiro-model-a', 'high') === null && /takes low, high/.test(checkEffort('kiro', 'kiro-model-a', 'max') ?? ''), 'Kiro narrows to what a model reports once it is known');
 check(checkEffort('kiro', 'never-seen', 'max') === null, 'and offers the documented levels until it is');
@@ -48,9 +50,11 @@ check(effortOptions('claude', '').known && effortOptions('claude', '').options.l
 check(effortOptions('kiro', 'kiro-model-a').options.map((o) => o.id).join() === 'low,high' && effortOptions('kiro', 'never-seen').options.length === 5, 'Kiro offers what its model reports, else the five');
 check(effortOptions('opencode', 'p/with').options.map((o) => o.id).join() === 'low,high,max' && effortOptions('opencode', 'p/none').options.length === 0 && effortOptions('opencode', 'p/none').known, 'OpenCode offers the variants of the model, or says it has none');
 check(!effortOptions('opencode', 'q/unseen').known && !effortOptions('opencode', '').known, 'and says it does not know when the catalog has not been read');
+check(effortOptions('cursor', 'auto').known && effortOptions('cursor', 'auto').options.length === 0, 'Cursor offers none');
 
 // ---- what is passed to the CLI ----
 check(resolveEffort('claude', 'x', 'max') === 'max' && resolveEffort('claude', 'x', 'bogus') === '' && resolveEffort('claude', 'x', undefined) === '', 'Claude gets a level or nothing');
+check(resolveEffort('cursor', 'auto', 'max') === '', 'Cursor always gets nothing');
 check(resolveEffort('opencode', 'p/numbered', 'high') === '3' && resolveEffort('opencode', 'p/numbered', '0') === '0' && resolveEffort('opencode', 'p/numbered', 'max') === '', 'a level name becomes the variant the model has for it, and one it lacks becomes nothing');
 check(resolveEffort('opencode', 'q/unseen', 'high') === 'high' && resolveEffort('opencode', 'p/with#low', 'high') === '', 'for an unread model the value goes as it is (as before)');
 
@@ -60,6 +64,7 @@ const a = mk('thinker', { effort: 'xhigh' });
 check(a.effort === 'xhigh' && agents.get(a.id)!.effort === 'xhigh', 'an effort is stored');
 check(throws(() => mk('bad-claude', { effort: 'ultra' }), /effort must be/) && !agents.byName('bad-claude'), 'a level the provider does not take is refused, and nothing is created');
 check(throws(() => mk('bad-oc', { provider: 'opencode', model: 'p/with', effort: 'xhigh' }), /no "xhigh" variant/), 'so is a variant the OpenCode model does not have');
+check(throws(() => mk('bad-cursor', { provider: 'cursor', model: 'auto', effort: 'high' }), /Cursor takes no effort/) && mk('cursor-agent', { provider: 'cursor', model: 'auto' }).effort === '', 'and any effort for Cursor');
 const oc = mk('oc-agent', { provider: 'opencode', model: 'p/with', effort: 'high' });
 check(oc.effort === 'high', 'and a variant it has is accepted');
 check(throws(() => updateAgent(oc.id, { effort: 'max2' } as any), /has no "max2"/) && agents.get(oc.id)!.effort === 'high', 'an update with a variant it does not have is refused and keeps the saved one');
@@ -111,7 +116,7 @@ check(seen.at(-1) === undefined, 'a saved effort that no longer applies runs at 
 const bin = join(dir, 'bin'); mkdirSync(bin);
 const log = join(dir, 'args.log');
 const stub = (name: string, extra = '') => { const f = join(bin, name); writeFileSync(f, `#!/bin/sh\n${extra}{ echo "<<<"; for a in "$@"; do printf '%s\\n' "$a"; done; echo ">>>"; } >> "${log}"\ncat > /dev/null 2>&1 || true\necho '{"session_id":"s","type":"result","result":"ok"}'\n`); chmodSync(f, 0o755); };
-stub('claude'); stub('kiro-cli'); stub('opencode', `if [ "$2" = "--help" ]; then echo '--format --thinking --auto'; exit 0; fi\n`);
+stub('claude'); stub('kiro-cli'); stub('cursor-agent'); stub('opencode', `if [ "$2" = "--help" ]; then echo '--format --thinking --auto'; exit 0; fi\n`);
 process.env.PATH = `${bin}:${process.env.PATH}`;
 const last = () => { const t = readFileSync(log, 'utf8'); return t.slice(t.lastIndexOf('<<<\n') + 4, t.lastIndexOf('>>>')).trim().split('\n'); };
 const run = async (fn: any, agent: any, effort: string | undefined) => { try { for await (const _ of fn({ agent, prompt: 'hi', signal: new AbortController().signal, instructions: '', mcpCaps: [], refreshInstructions: false, effort })) void _; } catch { /* the stub is not a real CLI: only its arguments matter */ } return last(); };
@@ -122,6 +127,8 @@ args = await run(runClaude, { ...base, provider: 'claude' }, undefined);
 check(!args.includes('--effort'), 'and with no flag when there is none');
 args = await run(runKiro, { ...base, provider: 'kiro' }, 'max');
 check(args.join(' ').includes('--effort max'), 'Kiro is run with --effort max');
+args = await run(runCursor, { ...base, provider: 'cursor', model: 'gpt-5.3-codex-high' }, 'max');
+check(!args.includes('--effort') && !args.includes('max') && args[args.indexOf('--model') + 1] === 'gpt-5.3-codex-high', 'Cursor is run with its model and never --effort');
 args = await run(runOpencode, { ...base, provider: 'opencode', model: 'p/numbered' }, '3');
 check(args.includes('-m') && args[args.indexOf('-m') + 1] === 'p/numbered#3', 'OpenCode is run with the variant after the model');
 args = await run(runOpencode, { ...base, provider: 'opencode', model: 'p/numbered' }, undefined);
@@ -135,6 +142,8 @@ check(ro.status === 200 && ro.json.known && ro.json.options.map((o: any) => o.id
 const rn = await get('/api/providers/opencode/efforts?model=p%2Fnone');
 check(rn.json.known && rn.json.options.length === 0, 'a model with no variants says so');
 check((await get('/api/providers/nope/efforts')).status === 404, 'an unknown provider is a 404');
+const rcu = await get('/api/providers/cursor/efforts?model=auto');
+check(rcu.status === 200 && rcu.json.known && rcu.json.options.length === 0, 'Cursor\'s offer nothing');
 const cr = await send('POST', '/api/agents', { name: 'http-agent', role: 'worker', provider: 'claude', model: '', cwd: dir, effort: 'max' });
 check(cr.status === 200 && cr.json.effort === 'max', 'the agent API stores it');
 check((await send('POST', '/api/agents', { name: 'http-bad', role: 'worker', provider: 'claude', model: '', cwd: dir, effort: 'ultra' })).status === 400, 'and refuses one that does not apply');

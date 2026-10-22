@@ -16,12 +16,23 @@ const CLAUDE: ModelInfo[] = [
   { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
 ];
 
+/** The models `cursor-agent --list-models` prints. */
+export function parseCursorModels(stdout: string): ModelInfo[] {
+  return stdout.split('\n').map((l) => /^([\w.\-\[\]=,]+) - (.+)$/.exec(l.trim())).filter((m): m is RegExpExecArray => !!m)
+    .map((m) => ({ id: m[1], label: m[2].replace(/\s*\((?:current|default)[^)]*\)\s*$/, '').replace(/[\u200b\u200c\u200d\ufeff]/g, '').trim() }));
+}
+
 async function discover(p: Provider): Promise<ModelInfo[]> {
   try {
     if (p === 'claude') return CLAUDE;
     if (p === 'opencode') {
       const { stdout } = await run('opencode', ['models'], { timeout: 20000, maxBuffer: 4e6 });
       return stdout.split('\n').map((s) => s.trim()).filter((s) => /^[\w.-]+\/\S+/.test(s)).map((id) => ({ id, label: id }));
+    }
+    if (p === 'cursor') {
+      // `id - Label`, one per line, with a "(current, default)" note on the one in use.
+      const { stdout } = await run('cursor-agent', ['--list-models'], { timeout: 20000, maxBuffer: 4e6 });
+      return parseCursorModels(stdout);
     }
     const { stdout } = await run('kiro-cli', ['chat', '--list-models', '--format', 'json'], { timeout: 20000, maxBuffer: 4e6 });
     const j = JSON.parse(stdout);

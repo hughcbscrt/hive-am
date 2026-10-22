@@ -1,4 +1,4 @@
-export type Provider = 'claude' | 'opencode' | 'kiro';
+export type Provider = 'claude' | 'opencode' | 'kiro' | 'cursor';
 export type Role = 'orchestrator' | 'worker';
 export type Permission = 'plan' | 'acceptEdits' | 'bypassPermissions';
 export type AgentStatus = 'idle' | 'running' | 'error';
@@ -70,7 +70,7 @@ export interface Agent {
   skill_loads: Record<string, SkillLoad>;
   /** Workers this orchestrator may dispatch to (only meaningful for orchestrators). */
   worker_ids: string[];
-  /** Reasoning effort every turn of this agent asks for; '' keeps the CLI's own default. Claude and Kiro take a level, OpenCode a variant of the model. */
+  /** Reasoning effort every turn of this agent asks for; '' keeps the CLI's own default. Claude and Kiro take a level, OpenCode a variant of the model, Cursor none (the level is part of its model id). */
   effort: string;
   /** The agent this one was cloned from (null for any other agent, and when that agent was deleted). */
   cloned_from: string | null;

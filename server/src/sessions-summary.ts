@@ -1,7 +1,7 @@
 import { historySig, readHistory } from './history/index.js';
 import { emptyUsage } from './pricing.js';
 import { sessionStats } from './stats.js';
-import type { Usage } from './types.js';
+import type { Provider, Usage } from './types.js';
 
 /**
  * What the Sessions list shows about each conversation (size, cost, first words). Computing it means reading the whole conversation, which
@@ -9,7 +9,7 @@ import type { Usage } from './types.js';
  * background, newest first, one conversation at a time. A cached entry is reused until the conversation changes.
  */
 export interface SessionSummary { message_count: number; preview: string; usage: Usage; cost: number | null; tool_calls: number; model: string | null }
-interface Target { provider: 'claude' | 'opencode' | 'kiro'; cwd: string; session_id: string }
+interface Target { provider: Provider; cwd: string; session_id: string }
 
 const cache = new Map<string, { sig: string; summary: SessionSummary }>();
 const queued = new Set<string>();

@@ -2,6 +2,7 @@ import type { Agent, ChatMessage, Provider } from '../types.js';
 import { claudeSig, readClaude } from './claude.js';
 import { opencodeSig, readOpencode } from './opencode.js';
 import { kiroSig, readKiro } from './kiro.js';
+import { cursorSig, readCursor } from './cursor.js';
 
 /** How a CLI's own transcript store is read. The conversation lives there; hive-am only keeps the pointer. */
 export interface HistoryReader {
@@ -14,6 +15,7 @@ export const historyReaders: Record<Provider, HistoryReader> = {
   claude: { read: readClaude, sig: claudeSig },
   opencode: { read: (_cwd, id) => readOpencode(id), sig: (_cwd, id) => opencodeSig(id) },
   kiro: { read: (_cwd, id) => readKiro(id), sig: (_cwd, id) => kiroSig(id) },
+  cursor: { read: readCursor, sig: cursorSig },
 };
 
 export function readHistory(a: Pick<Agent, 'provider' | 'cwd' | 'session_id'>, sessionId = a.session_id): ChatMessage[] {
