@@ -1,6 +1,6 @@
 // The Cursor adapter without a model: recorded `cursor-agent` output (stream-json with partial text) goes through a stub CLI, and what comes out is checked:
 // the session, thinking, text once (not again when Cursor repeats it whole), tools and their results (a refused one is an error), usage and the end of the turn.
-// Also the permission rules each level writes, the shared `.cursor/mcp.json`, the model list and the effort Cursor does not take.
+// Also the permission rules each level writes, the shared `.cursor/mcp.json`, the model list, the effort Cursor does not take and the model a new Cursor agent starts with.
 //   HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-cursor-provider.ts
 import './_guard.js';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -162,6 +162,17 @@ eq('models parse through ANSI colors', parseCursorModels('\x1b[2mAvailable model
 check(['low', 'high', 'max', 'xhigh'].every((e) => checkEffort('cursor', 'gpt-5.3-codex', e) !== null) && checkEffort('cursor', 'auto', '') === null, 'Cursor refuses any effort, and the default is fine');
 eq('and offers none', effortOptions('cursor', 'auto'), { options: [], known: true });
 check(resolveEffort('cursor', 'auto', 'max') === '', 'a connection\'s effort runs Cursor at its default');
+
+// A new agent or type on Cursor starts on `auto` (Cursor's own default is refused on a free plan); one that names a model, and other providers, keep theirs.
+const { createAgent, spawnFromType } = await import('../src/services/agents.js');
+const { defaultModel } = await import('../src/services/providers.js');
+const { types } = await import('../src/db.js');
+eq('the default model is auto only on Cursor', (['claude', 'opencode', 'kiro', 'cursor'] as const).map(defaultModel), ['', '', '', 'auto']);
+eq('a new Cursor agent without a model gets auto', createAgent({ name: 'cur-new', role: 'worker', provider: 'cursor', cwd: plain } as any).model, 'auto');
+eq('one that names a model keeps it', createAgent({ name: 'cur-named', role: 'worker', provider: 'cursor', model: 'gpt-5.3-codex', cwd: plain } as any).model, 'gpt-5.3-codex');
+eq('a new Claude agent without a model stays at the CLI default', createAgent({ name: 'claude-new', role: 'worker', provider: 'claude', cwd: plain } as any).model, '');
+const ty = types.create({ name: 'cur-type', role: 'worker', provider: 'cursor', model: '', permission: 'plan', system_prompt: '', skill_ids: [] } as any);
+eq('an agent spawned from a Cursor type without a model gets auto', spawnFromType(ty, { name: 'cur-spawned', cwd: plain } as any).model, 'auto');
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

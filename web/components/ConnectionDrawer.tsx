@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, Volume2, VolumeX, X } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
-import { ago, PROVIDERS } from '@/lib/meta';
+import { ago, defaultModel, PROVIDERS } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n';
 import type { AllowedChat, AllowedUser, ChatMember, Connection, ConnectionThread, Provider } from '@/lib/types';
 import { PasswordInput } from './PasswordInput';
@@ -235,7 +235,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
               <Segmented value={vision ? 'other' : 'agent'} onChange={(v) => setVision(v === 'other' ? { provider: 'claude', model: 'haiku' } : null)} options={[{ id: 'agent', label: t('conn.vision.agent') }, { id: 'other', label: t('conn.vision.other') }]} />
               {vision && (
                 <div className="stack-s">
-                  <select className="input" value={vision.provider} onChange={(e) => setVision({ provider: e.target.value as Provider, model: '' })} aria-label={t('form.provider')}>
+                  <select className="input" value={vision.provider} onChange={(e) => setVision({ provider: e.target.value as Provider, model: defaultModel(e.target.value as Provider) })} aria-label={t('form.provider')}>
                     {(Object.keys(PROVIDERS) as Provider[]).map((p) => <option key={p} value={p}>{PROVIDERS[p].label}</option>)}
                   </select>
                   <ModelField provider={vision.provider} value={vision.model} onChange={(m) => setVision({ ...vision, model: m })} />

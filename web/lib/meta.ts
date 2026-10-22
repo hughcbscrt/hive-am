@@ -2,6 +2,9 @@ import type { Permission, Provider } from './types';
 import { translate as t } from './i18n/core';
 import { fmtDate } from './format';
 
+/** The model a new agent, type or image model starts with: Cursor's own default (Composer) is refused on a free plan, `auto` runs on every plan. */
+export const defaultModel = (p: Provider): string => (p === 'cursor' ? 'auto' : '');
+
 /** Names and colours are brand identifiers and are not translated; descriptions come from the message catalogue. */
 export const PROVIDERS: Record<Provider, { label: string; short: string; color: string }> = {
   claude: { label: 'Claude Code', short: 'Claude', color: 'var(--p-claude)' },
