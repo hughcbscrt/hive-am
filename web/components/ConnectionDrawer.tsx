@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, Volume2, VolumeX, X } from 'lucide-react';
 import { useHive } from '@/lib/store';
 import { api } from '@/lib/api';
-import { ago } from '@/lib/meta';
+import { ago, PROVIDERS } from '@/lib/meta';
 import { useI18n } from '@/lib/i18n';
 import type { AllowedChat, AllowedUser, ChatMember, Connection, ConnectionThread, Provider } from '@/lib/types';
 import { PasswordInput } from './PasswordInput';
@@ -236,7 +236,7 @@ export function ConnectionDrawer({ connection, onClose }: { connection?: Connect
               {vision && (
                 <div className="stack-s">
                   <select className="input" value={vision.provider} onChange={(e) => setVision({ provider: e.target.value as Provider, model: '' })} aria-label={t('form.provider')}>
-                    {(['claude', 'opencode', 'kiro'] as Provider[]).map((p) => <option key={p} value={p}>{p === 'claude' ? 'Claude Code' : p === 'opencode' ? 'OpenCode' : 'Kiro'}</option>)}
+                    {(Object.keys(PROVIDERS) as Provider[]).map((p) => <option key={p} value={p}>{PROVIDERS[p].label}</option>)}
                   </select>
                   <ModelField provider={vision.provider} value={vision.model} onChange={(m) => setVision({ ...vision, model: m })} />
                 </div>

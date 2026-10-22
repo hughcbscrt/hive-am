@@ -9,7 +9,7 @@ const display = Bricolage_Grotesque({ subsets: ['latin'], variable: '--f-display
 const body = Hanken_Grotesk({ subsets: ['latin'], variable: '--f-body' });
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--f-mono' });
 
-export const metadata: Metadata = { title: 'hive-am', description: 'Run a colony of coding agents across Claude Code, OpenCode and Kiro.' };
+export const metadata: Metadata = { title: 'hive-am', description: 'Run a colony of coding agents across Claude Code, OpenCode, Kiro and Cursor.' };
 
 /**
  * Runs before the first paint: applies the saved (or the system's) theme and language so a dark page never flashes light and `lang` is right from the start,

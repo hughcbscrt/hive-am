@@ -49,7 +49,7 @@ function Kv({ rows }: { rows: [string, ReactNode][] }) {
 const base = (p: string) => p.replace(/[\\/]+$/, '').replace(/^.*[\\/]/, '');
 const join = (a: string, b: string) => (b ? `${a}: ${b}` : a);
 
-/** Turn a provider-specific tool call (Claude / OpenCode / Kiro naming) into something readable. */
+/** Turn a provider-specific tool call (Claude / OpenCode / Kiro / Cursor naming) into something readable. */
 export function describe(tool: Tool): Described {
   const d = kind(tool);
   return { ...d, pill: d.pill || d.label, tip: d.tip || join(d.label, d.summary) };
@@ -106,7 +106,7 @@ function kind(tool: Tool): Kind {
     return { icon: <FileText size={14} />, label: tr('tool.read'), summary: tilde(p) || str(input.operations ? JSON.stringify(input.operations).slice(0, 80) : ''), pill: base(p), tip: p, body: <Kv rows={[[tr('tool.k.path'), <code key="p">{p}</code>], [tr('tool.k.offset'), str(input.offset ?? '')], [tr('tool.k.limit'), str(input.limit ?? '')]]} /> };
   }
   if (['write', 'fswrite', 'create', 'writefile'].includes(n)) {
-    const p = str(pick(input, 'file_path', 'filePath', 'path')); const c = str(pick(input, 'content', 'file_text', 'text'));
+    const p = str(pick(input, 'file_path', 'filePath', 'path')); const c = str(pick(input, 'content', 'contents', 'file_text', 'text'));
     return { icon: <FilePlus size={14} />, label: tr('tool.write'), summary: tr('tool.writeSummary', { path: tilde(p), count: c.split('\n').length }), pill: base(p), tip: p, body: (<><Kv rows={[[tr('tool.k.path'), <code key="p">{p}</code>]]} /><pre className="codebox">{c.slice(0, 4000)}{c.length > 4000 ? '\n…' : ''}</pre></>) };
   }
   if (['edit', 'strreplace', 'strreplaceeditor', 'patch', 'replace'].includes(n)) {

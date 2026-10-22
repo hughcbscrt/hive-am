@@ -158,7 +158,7 @@ export function ModelField({ provider, value, onChange }: { provider: Provider; 
   );
 }
 
-/** The reasoning levels a provider (and, for OpenCode and Kiro, a model) takes, as the server knows them. */
+/** The reasoning levels a provider (and, for OpenCode and Kiro, a model) takes, as the server knows them. Cursor takes none: its model id names the level. */
 interface EffortInfo { options: { id: string; level?: string }[]; known: boolean }
 /**
  * The agent's reasoning effort: the CLI's default, or one of the levels the chosen provider and model take (never one that would fail the turn).
@@ -178,6 +178,8 @@ export function EffortField({ provider, model, value, onChange }: { provider: Pr
     const named = (x: string) => ((['low', 'medium', 'high', 'xhigh', 'max'] as const).includes(x as 'low') ? t(`effort.${x as 'low'}`) : x);
     return o.level && o.level !== o.id ? `${o.id} · ${named(o.level)}` : named(o.id);
   };
+  // Nothing to choose for Cursor, so no field (the effect above still clears an effort left from another provider).
+  if (provider === 'cursor') return null;
   const hint = info === null ? t('form.effort.loading') : !info.known ? t('form.effort.unknown') : info.options.length === 0 ? t('form.effort.none') : t('form.effort.hint');
   return (
     <Field label={t('form.effort')} hint={hint}>

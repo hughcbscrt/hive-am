@@ -88,6 +88,7 @@ export const en = {
   "provider.claude.blurb": "Anthropic’s coding agent. Streams tokens, resumes by session id.",
   "provider.opencode.blurb": "Open-source agent over any model provider you have configured.",
   "provider.kiro.blurb": "AWS’s agentic CLI with spec-driven workflows.",
+  "provider.cursor.blurb": "Cursor’s agent in the terminal. The reasoning level is part of the model you pick.",
   "provider.installed": "● installed",
   "provider.notFound": "● not found",
 
@@ -911,7 +912,7 @@ export const en = {
   "skills.delete": "Delete skill",
 
   // ---- sessions ----
-  "sessions.subtitle": "Every conversation your agents have had, read straight from Claude Code, OpenCode and Kiro. Other sessions on this machine are not shown.",
+  "sessions.subtitle": "Every conversation your agents have had, read straight from Claude Code, OpenCode, Kiro and Cursor. Other sessions on this machine are not shown.",
   "sessions.searchPlaceholder": "Search by agent, folder or first message",
   "sessions.searchLabel": "Search sessions",
   "sessions.empty.title": "No sessions yet",

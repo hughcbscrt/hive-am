@@ -7,6 +7,7 @@ export const PROVIDERS: Record<Provider, { label: string; short: string; color: 
   claude: { label: 'Claude Code', short: 'Claude', color: 'var(--p-claude)' },
   opencode: { label: 'OpenCode', short: 'OpenCode', color: 'var(--p-opencode)' },
   kiro: { label: 'Kiro', short: 'Kiro', color: 'var(--p-kiro)' },
+  cursor: { label: 'Cursor', short: 'Cursor', color: 'var(--p-cursor)' },
 };
 
 export const providerBlurb = (p: Provider) => t(`provider.${p}.blurb`);
