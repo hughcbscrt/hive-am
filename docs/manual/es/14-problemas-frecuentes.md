@@ -61,7 +61,7 @@ La ruta que escribiste no existe en el disco. hive-am no expande `~`, así que e
 Casi siempre es el nivel de permisos del agente (o el de su colonia, si lo sigue).
 
 - **Solo lectura:** planifica y lee; nunca edita ni ejecuta comandos.
-- **Editar archivos:** edita dentro de su carpeta, sin tocar `.git` ni llaves privadas. En OpenCode y Kiro bloquea todos los comandos; en Claude solo deja pasar comandos de archivos.
+- **Editar archivos:** edita dentro de su carpeta, sin tocar `.git` ni llaves privadas. En OpenCode, Kiro y Cursor bloquea todos los comandos (y Cursor aún puede escribir fuera de su carpeta); en Claude solo deja pasar comandos de archivos.
 - **Acceso total:** sin restricciones.
 
 Cambia el nivel en los ajustes del agente (o en la colonia, si lo hereda). Un agente con una conexión externa necesita al menos **Editar archivos**. Más en el [capítulo 13](13-permisos-y-seguridad.md).

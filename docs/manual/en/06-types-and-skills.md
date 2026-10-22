@@ -15,7 +15,7 @@ A type is a template with provider, model, prompt, permissions, role and skills.
 1. Open **Agent types** and click **New type**.
 2. Enter the **Name** and a **Description** (shown when you pick a type).
 3. Choose the **Role**: Worker or Orchestrator.
-4. Choose the **Provider** (Claude Code, OpenCode or Kiro) and the **Model**.
+4. Choose the **Provider** (Claude Code, OpenCode, Kiro or Cursor) and the **Model**.
 5. Under **What can it do?** choose **Read-only**, **Edit files** or **Full access**.
 6. Write the system prompt and add the skills you want.
 7. Click **Create type**.

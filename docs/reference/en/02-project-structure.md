@@ -64,16 +64,18 @@ hive-am/
 │       ├── providers/
 │       │   ├── index.ts      # ProviderAdapter and provider → adapter registry
 │       │   ├── spawn.ts      # process launcher (spawnLines)
-│       │   ├── preamble.ts   # instructions preamble (OpenCode, Kiro and Claude on resume)
+│       │   ├── preamble.ts   # instructions preamble (OpenCode, Kiro, Cursor and Claude on resume)
 │       │   ├── claude.ts     # Claude Code runner
 │       │   ├── opencode.ts   # OpenCode runner
-│       │   └── kiro.ts       # Kiro runner
+│       │   ├── kiro.ts       # Kiro runner
+│       │   └── cursor.ts     # Cursor runner
 │       └── history/
 │           ├── index.ts      # readHistory(): dispatches to the right reader
 │           ├── lines.ts      # jsonLines(): JSONL reading shared by the readers
 │           ├── claude.ts     # reads ~/.claude/projects/**/<id>.jsonl
 │           ├── opencode.ts   # reads opencode.db (SQLite, read-only)
-│           └── kiro.ts       # reads ~/.kiro/sessions/cli/<id>.jsonl and .json
+│           ├── kiro.ts       # reads ~/.kiro/sessions/cli/<id>.jsonl and .json
+│           └── cursor.ts     # reads ~/.cursor/projects/<folder>/agent-transcripts/<id>/<id>.jsonl
 └── web/                      # @hive-am/web — Next.js 15 frontend (App Router)
     ├── package.json
     ├── tsconfig.json
@@ -196,8 +198,8 @@ There is no test framework: `server/scripts/test-*.ts` are standalone scripts (2
 | `git/switch.ts` | Smart branch switch: carries local changes over, or stashes them and reapplies; leaves conflicts to the resolver. |
 | `mcp-config.ts` | `API_PORT` (`HIVE_AM_PORT` variable, 4400 by default) and the MCP configuration objects handed to each provider. |
 | `providers/spawn.ts` | `spawnLines`: launches the CLI, delivers stdout line by line, handles cancellation (SIGTERM, then SIGKILL after a grace period), errors and `PWD`; `spawnJson`, `safeJson` and `flattenText` are shared by the runners. |
-| `providers/claude.ts`, `opencode.ts`, `kiro.ts` | One async generator per provider that produces `StreamEvent`. |
-| `providers/preamble.ts` | `withInstructions`: prepends the instructions to the message (always for OpenCode and Kiro; for Claude only when resuming a session whose instructions changed). |
+| `providers/claude.ts`, `opencode.ts`, `kiro.ts`, `cursor.ts` | One async generator per provider that produces `StreamEvent`. |
+| `providers/preamble.ts` | `withInstructions`: prepends the instructions to the message (always for OpenCode, Kiro and Cursor; for Claude only when resuming a session whose instructions changed). |
 | `history/*.ts` | Reading of native transcripts and normalization to `ChatMessage[]`; `history/index.ts` has the `HistoryReader` registry and `lines.ts` the shared JSONL reading. |
 | `objects/exec.ts` | `execCapture`: runs a program and returns its output, code, and whether it is missing or timed out; a death by signal or by `maxBuffer` counts as a failure (used by the Docker resources). |
 | `mcp/dispatch.mjs` | Minimal stdio MCP server; it only talks to hive-am's HTTP API. It announces the tools according to `HIVE_CAPS`: `dispatch`, `channel` (includes sending files), `memory` and `skills`. |

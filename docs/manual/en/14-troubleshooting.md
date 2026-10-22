@@ -61,7 +61,7 @@ The path you typed does not exist on disk. hive-am does not expand `~`, so type 
 It is almost always the agent's permission level (or its colony's, if it follows it).
 
 - **Read-only:** plans and reads; never edits or runs commands.
-- **Edit files:** edits inside its folder, without touching `.git` or private keys. In OpenCode and Kiro it blocks all commands. In Claude it only lets file commands through.
+- **Edit files:** edits inside its folder, without touching `.git` or private keys. In OpenCode, Kiro and Cursor it blocks all commands (and Cursor can still write outside its folder). In Claude it only lets file commands through.
 - **Full access:** no restrictions.
 
 Change the level in the agent's settings (or in the colony, if it inherits it). An agent with an external connection needs at least **Edit files**. More in [chapter 13](13-permissions-and-security.md).

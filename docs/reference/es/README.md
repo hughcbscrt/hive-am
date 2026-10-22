@@ -2,7 +2,7 @@
 
 > 🇬🇧 [Read in English](../en/README.md)
 
-hive-am es un administrador de agentes de programación. Permite crear **orquestadores** y **subagentes** sobre tres CLIs ya instalados en tu máquina (**Claude Code**, **OpenCode** y **Kiro**), agruparlos en **colonias**, darles **skills**, conversar con ellos desde el navegador y ver todo su historial, aun después de un apagón.
+hive-am es un administrador de agentes de programación. Permite crear **orquestadores** y **subagentes** sobre cuatro CLIs ya instalados en tu máquina (**Claude Code**, **OpenCode**, **Kiro** y **Cursor**), agruparlos en **colonias**, darles **skills**, conversar con ellos desde el navegador y ver todo su historial, aun después de un apagón.
 
 Esta carpeta describe el proyecto completo: cómo está organizado, cómo se ejecuta, dónde se guarda cada dato y cómo se comunican las piezas.
 
@@ -15,7 +15,7 @@ Esta carpeta describe el proyecto completo: cómo está organizado, cómo se eje
 | 3 | [Puntos de entrada y ejecución](03-puntos-de-entrada-y-ejecucion.md) | Cómo arranca todo, puertos, variables de entorno, scripts |
 | 4 | [Almacenamiento](04-almacenamiento.md) | Base SQLite, tablas, migraciones, archivos de los CLIs, `localStorage` |
 | 5 | [Comunicación back ↔ front](05-comunicacion-back-front.md) | API REST, WebSocket, flujo de un mensaje, reconexión |
-| 6 | [Proveedores](06-proveedores.md) | Cómo se maneja Claude Code, OpenCode y Kiro; cómo añadir otro |
+| 6 | [Proveedores](06-proveedores.md) | Cómo se maneja Claude Code, OpenCode, Kiro y Cursor; cómo añadir otro |
 | 7 | [Agentes, tipos, skills y colonias](07-agentes-tipos-skills-colonias.md) | Modelo de datos, herencia, instrucciones compuestas |
 | 8 | [Sesiones e historial](08-sesiones-e-historial.md) | Sesiones nativas, lectores de historial, reanudación |
 | 9 | [Orquestación y relaciones](09-orquestacion-y-relaciones.md) | Delegación, MCP, reglas, cola por agente |

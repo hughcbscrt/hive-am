@@ -157,7 +157,7 @@ La red no reconoce todos los secretos posibles (una contraseña sin nombre ni fo
 
 - **Hora en el encabezado:** cada mensaje trae `Now: Fri 2026-10-09 10:58 CST` (hora del servidor), así el agente responde «qué hora/día es» sin ejecutar `date`.
 - **Sin texto tras responder:** las instrucciones de canal piden terminar el turno justo después de `channel_reply` (el texto posterior nunca se entrega).
-- **Esfuerzo de razonamiento** (ajuste de la conexión `effort`: vacío, `low`, `medium`, `high`, `xhigh`, `max`): un **reemplazo** del esfuerzo propio del agente (se fija en sus ajustes, ver [6.7](06-proveedores.md#67-deteccion-de-instalacion-y-modelos)) solo para los turnos de esta conexión; vacío usa el del agente. Se pasa como `--effort` a Claude y Kiro y, en OpenCode, como la variante que el modelo del agente tiene para ese nivel (si no tiene, se usa el del propio agente). Medido con `bench-latency.ts`, `low` ahorra más o menos 0.5–1 s por respuesta.
+- **Esfuerzo de razonamiento** (ajuste de la conexión `effort`: vacío, `low`, `medium`, `high`, `xhigh`, `max`): un **reemplazo** del esfuerzo propio del agente (se fija en sus ajustes, ver [6.8](06-proveedores.md#68-deteccion-de-instalacion-y-modelos)) solo para los turnos de esta conexión; vacío usa el del agente. Se pasa como `--effort` a Claude y Kiro y, en OpenCode, como la variante que el modelo del agente tiene para ese nivel (si no tiene, se usa el del propio agente). Cursor no lleva ninguno: el id de su modelo nombra el nivel. Medido con `bench-latency.ts`, `low` ahorra más o menos 0.5–1 s por respuesta.
 
 ### 14.6.6 La skill «Chat channels»
 

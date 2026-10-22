@@ -2,7 +2,7 @@
 
 > 🇪🇸 [Leer en español](../es/README.md)
 
-hive-am is a coding-agent manager. It lets you create **orchestrators** and **subagents** on top of three CLIs already installed on your machine (**Claude Code**, **OpenCode** and **Kiro**), group them into **colonies**, give them **skills**, talk to them from the browser or from Telegram, and see their whole history, even after a blackout.
+hive-am is a coding-agent manager. It lets you create **orchestrators** and **subagents** on top of four CLIs already installed on your machine (**Claude Code**, **OpenCode**, **Kiro** and **Cursor**), group them into **colonies**, give them **skills**, talk to them from the browser or from Telegram, and see their whole history, even after a blackout.
 
 This folder describes the whole project: how it is organized, how it runs, where each piece of data is stored and how the pieces communicate.
 
@@ -15,7 +15,7 @@ This folder describes the whole project: how it is organized, how it runs, where
 | 3 | [Entry points and execution](03-entry-points-and-execution.md) | How everything starts, ports, environment variables, scripts |
 | 4 | [Storage](04-storage.md) | SQLite database, tables, migrations, the CLIs' files, `localStorage` |
 | 5 | [Backend ↔ frontend communication](05-backend-frontend-communication.md) | REST API, WebSocket, flow of a message, reconnection |
-| 6 | [Providers](06-providers.md) | How Claude Code, OpenCode and Kiro are handled; how to add another |
+| 6 | [Providers](06-providers.md) | How Claude Code, OpenCode, Kiro and Cursor are handled; how to add another |
 | 7 | [Agents, types, skills and colonies](07-agents-types-skills-colonies.md) | Data model, inheritance, composed instructions |
 | 8 | [Sessions and history](08-sessions-and-history.md) | Native sessions, history readers, resuming |
 | 9 | [Orchestration and relations](09-orchestration-and-relations.md) | Delegation, MCP, rules, per-agent queue |

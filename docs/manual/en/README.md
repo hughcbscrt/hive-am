@@ -1,6 +1,6 @@
 # hive-am manual
 
-hive-am is a manager for colonies of coding agents. It lets you create **orchestrators** and **workers** on top of the tools you already use (Claude Code, OpenCode and Kiro), group them into **colonies**, talk to them from the browser or from Telegram, and see everything they did, even after you restart your machine.
+hive-am is a manager for colonies of coding agents. It lets you create **orchestrators** and **workers** on top of the tools you already use (Claude Code, OpenCode, Kiro and Cursor), group them into **colonies**, talk to them from the browser or from Telegram, and see everything they did, even after you restart your machine.
 
 It does not replace those programs: it runs the ones you have installed and never copies your conversations into its own database. Everything runs on your computer, and your data lives in `~/.hive-am`.
 

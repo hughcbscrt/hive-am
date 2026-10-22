@@ -178,7 +178,7 @@ Vas a crear un agente, darle una carpeta de trabajo y enviarle un mensaje.
    - **¿Para qué sirve?**: una línea. Los orquestadores la leen para decidir quién recibe cada tarea.
    - **Rol**: **Worker** (hace el trabajo que recibe) u **Orquestador** (planifica y delega).
    - **Colonia**: opcional. Una colonia puede prestarle carpeta, permisos, skills y contexto.
-   - **Proveedor**: **Claude Code**, **OpenCode** o **Kiro**. Cada tarjeta indica si está instalado (**instalado**) o no (**no encontrado**).
+   - **Proveedor**: **Claude Code**, **OpenCode**, **Kiro** o **Cursor**. Cada tarjeta indica si está instalado (**instalado**) o no (**no encontrado**).
    - **Modelo**: el que quieras usar; si lo dejas por defecto, usa el predeterminado de la herramienta.
    - **Carpeta de trabajo**: escríbela o pulsa **Explorar**. Es obligatoria, salvo que el agente siga la carpeta de su colonia.
    - **¿Qué puede hacer?** (permisos): **Solo lectura**, **Editar archivos** o **Acceso total**.

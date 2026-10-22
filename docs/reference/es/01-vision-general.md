@@ -7,6 +7,7 @@ hive-am es una aplicación local (servidor Node + interfaz web en Next.js) que *
 - **Claude Code** (`claude`)
 - **OpenCode** (`opencode`)
 - **Kiro** (`kiro-cli`)
+- **Cursor** (`cursor-agent`)
 
 Un agente es una configuración (proveedor, modelo, prompt, permisos, carpeta, skills) más un **puntero** a una sesión nativa del CLI. La conversación en sí **nunca se copia ni se resume** en la base de datos de hive-am: vive en el almacén propio de cada CLI y se vuelve a leer desde allí.
 

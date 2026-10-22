@@ -178,7 +178,7 @@ You are going to create an agent, give it a working folder and send it a message
    - **What is it for?**: one line. Orchestrators read it to decide who gets each task.
    - **Role**: **Worker** (does the work it receives) or **Orchestrator** (plans and delegates).
    - **Colony**: optional. A colony can lend it a folder, permissions, skills and context.
-   - **Provider**: **Claude Code**, **OpenCode** or **Kiro**. Each card shows whether it is installed (**installed**) or not (**not found**).
+   - **Provider**: **Claude Code**, **OpenCode**, **Kiro** or **Cursor**. Each card shows whether it is installed (**installed**) or not (**not found**).
    - **Model**: the one you want to use. Left at the default, it uses the tool's own default.
    - **Working folder**: type it or click **Browse**. It is required, unless the agent follows its colony's folder.
    - **What can it do?** (permissions): **Read-only**, **Edit files** or **Full access**.

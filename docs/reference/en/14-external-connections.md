@@ -157,7 +157,7 @@ The net does not recognise every possible secret (a password with no recognisabl
 
 - **Time in the header:** every message carries `Now: Fri 2026-10-09 10:58 CST` (server time), so the agent answers "what time/day is it" without running `date`.
 - **No text after replying:** the channel instructions ask the agent to end the turn right after `channel_reply` (any later text is never delivered).
-- **Reasoning effort** (connection setting `effort`: empty, `low`, `medium`, `high`, `xhigh`, `max`): an **override** of the agent's own effort (set in its settings, see [6.7](06-providers.md#67-install-detection-and-models)) for the turns of this connection only; empty uses the agent's. It is passed as `--effort` to Claude and Kiro and, for OpenCode, as the variant the agent's model has for that level (if it has none, the agent's own is used). Measured with `bench-latency.ts`, `low` saves roughly 0.5–1 s per reply.
+- **Reasoning effort** (connection setting `effort`: empty, `low`, `medium`, `high`, `xhigh`, `max`): an **override** of the agent's own effort (set in its settings, see [6.8](06-providers.md#68-install-detection-and-models)) for the turns of this connection only; empty uses the agent's. It is passed as `--effort` to Claude and Kiro and, for OpenCode, as the variant the agent's model has for that level (if it has none, the agent's own is used). Cursor takes none: its model id names the level. Measured with `bench-latency.ts`, `low` saves roughly 0.5–1 s per reply.
 
 ### 14.6.6 The "Chat channels" skill
 

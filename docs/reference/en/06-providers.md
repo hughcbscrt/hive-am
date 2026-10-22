@@ -2,7 +2,7 @@
 
 A **provider** is a coding-agent CLI installed on your machine. hive-am uses no SDKs or ACP: it runs the CLI as a child process, **one process per turn**, and reads its line-delimited JSON output.
 
-There are exactly three providers (`Provider = 'claude' | 'opencode' | 'kiro'`), registered in two places:
+There are exactly four providers (`Provider = 'claude' | 'opencode' | 'kiro' | 'cursor'`), registered in two places:
 
 - `server/src/providers/index.ts`: the `providers` registry (provider → `ProviderAdapter`, an `id` and a `run(o)` generator), plus `runners`, the same adapters as plain functions.
 - `server/src/services/providers.ts`: the `PROVIDERS` table (provider → binary and name for install detection).
@@ -29,14 +29,14 @@ A runner must: build the arguments, launch the CLI with `spawnLines`, and **tran
 `spawnLines({ cmd, args, cwd, env?, stdin?, signal })`:
 
 - Launches the process with `stdio: ['pipe','pipe','pipe']`, `cwd` = the agent's effective folder and **`PWD` = that same folder**.
-  > **Why `PWD`:** Node inherits `PWD` from the hive-am server; OpenCode trusts `PWD` over the real `cwd` and was recording sessions in the server's folder. Setting it explicitly fixes this for all three providers.
+  > **Why `PWD`:** Node inherits `PWD` from the hive-am server; OpenCode trusts `PWD` over the real `cwd` and was recording sessions in the server's folder. Setting it explicitly fixes this for every provider.
 - Delivers **stdout line by line** (`readline`), ignoring empty lines.
 - `stdin`: if text is given, it writes it and closes; otherwise it closes stdin immediately.
 - Silence: the stall timer restarts on every stdout line; after 10 minutes without any (`HIVE_AM_TURN_STALL_MS`, for tests) the CLI is stopped as in a cancellation and the call throws `<cmd> stopped answering`. A long turn is fine as long as the CLI keeps emitting.
 - Cancellation: when the signal aborts it sends `SIGTERM` to the process, and if it is still alive after a grace period (5 s, `HIVE_AM_KILL_GRACE_MS`) it sends `SIGKILL`.
 - It ends on `exit`, not on `close`: some CLIs (OpenCode) launch a background service that inherits the stdout pipe and would make `close` never happen. After `exit` it waits 250 ms to drain the pipe and then destroys it.
-- If the process exits with a code ≠ 0 and was not cancelled, it throws an `Error` with the code and the last 600 characters of stderr. The runtime turns it into an `error` event.
-- `safeJson(line)` parses without throwing exceptions. `spawnJson` is `spawnLines` plus `safeJson` (lines that are not JSON are skipped) and `flattenText` turns a tool result (string, list of blocks or other JSON) into text; the three runners share them.
+- If the process exits with a code ≠ 0 and was not cancelled, it throws an `Error` with the code and the last 600 characters of stderr (the first 600 with `stderrHead`, which Cursor uses: it prints the reason first and then the whole list of models). The runtime turns it into an `error` event.
+- `safeJson(line)` parses without throwing exceptions. `spawnJson` is `spawnLines` plus `safeJson` (lines that are not JSON are skipped) and `flattenText` turns a tool result (string, list of blocks or other JSON) into text; the runners share them.
 
 ## 6.3 Claude Code (`providers/claude.ts`)
 
@@ -86,7 +86,7 @@ opencode run --standalone --format json --thinking --auto \
 | Permissions | Always `--auto` (approves whatever is not denied; a `deny` is still respected). The three levels are written as OpenCode rules in `opencodePermissions()` (`providers/opencode.ts`): **read-only** denies `edit`, `bash` and `task`; **edit files** allows reading and editing (`.env` included) except `.git/**`, `*.pem` and `*.key`, denies `bash` and `task`, and denies `external_directory` (everything outside the agent's effective folder, which is where the process starts) except `~/.hive-am/inbox/**`; **full access** adds no rules. `doom_loop` stays at its default. OpenCode keeps the tools a conversation started with, so a permission changed later does not reach it: hive-am stores the permission each conversation started with (`agent_sessions.permission`), the agent API reports `permission_stale`, and the chat warns and offers **Apply now**, which starts a new conversation (the old one stays in Sessions). Conversations recorded before this column existed are not detected. See [document 12](12-operations-and-troubleshooting.md). |
 | Model | `-m` in `provider/model` format, e.g. `opencode/…`. |
 | Resume | `-s <id>` **only if** the folder OpenCode recorded for that session (`session_v2.directory`) matches the agent's folder (or it cannot be known). If it does not match (sessions created with earlier hive-am versions that were recorded in the wrong folder), a **new session is started**. |
-| Instructions | No system-prompt flag: they are sent as a preamble in the message (see 6.6). |
+| Instructions | No system-prompt flag: they are sent as a preamble in the message (see 6.7). |
 | Per-turn configuration | Always `--standalone` (a private server that does read the environment configuration) and the `OPENCODE_CONFIG_CONTENT` variable with `permission.question = "deny"` (and `edit`, `bash` and `task` if the agent is read-only). Turns are not interactive: OpenCode's `question` tool was dismissed and the process ended with exit code 1 ("The user dismissed this question"). Denied, the agent asks the question as normal chat text. |
 | Delegation | The same `OPENCODE_CONFIG_CONTENT` variable adds the `hive` MCP server (only orchestrators with subagents). |
 | Session id | `sessionID` field of any event. |
@@ -118,7 +118,7 @@ kiro-cli chat --no-interactive --output-format stream-json \
 |---|---|
 | Permissions | A tool that is not trusted cannot ask for approval (the turn is not interactive) and fails. **Read-only:** none trusted. **Edit files:** a generated profile (`~/.kiro/agents/hive-<id>.json`) with `allowedTools` = `fs_read`, `grep`, `glob`, `web_fetch`, `web_search` (`KIRO_EDIT_TOOLS`; not the shell) and `toolsSettings.fs_write`: `allowedPaths` = the agent's effective folder (including its dot files, such as `.env`) and `deniedPaths` = `.git`, `*.pem`, `*.key`. `fs_write` is not trusted as a whole, so a path outside the folder cannot be approved. **Full access:** `--trust-all-tools`. Two things we learned with Kiro 2.27: with a profile (`--agent`) the `--trust-tools` flag no longer applies, and the `permissions.rules` of the documentation are Kiro 3.x and are ignored here; that is why `toolsSettings` is used. |
 | Resume | `--resume-id <id>`. Kiro sessions are per folder, hence the importance of `cwd`. |
-| Instructions | Preamble in the message (see 6.6). |
+| Instructions | Preamble in the message (see 6.7). |
 | Profile | Kiro only loads MCP servers and allowed paths from a `~/.kiro/agents/hive-<agentId>.json` profile, which hive-am regenerates on every turn when the agent has hive tools (`mcpServers.hive`, `tools: ["*"]`, `allowedTools: ["@hive"]`: delegation, channels, notebook, on-demand skills) or the "Edit files" permission; in that case it runs with `--agent hive-<agentId>`. |
 | Session id | `data.sessionId` of any event. |
 
@@ -134,9 +134,52 @@ kiro-cli chat --no-interactive --output-format stream-json \
 | `runFinished` with `status: success` | `done` (with `finalText`) |
 | `runFinished` with another status | `error` |
 
-## 6.6 Instructions preamble (`providers/preamble.ts`)
+## 6.6 Cursor (`providers/cursor.ts`)
 
-OpenCode and Kiro have no flag to add a system prompt, so the instructions travel **inside the message**:
+**Command** (prompt as the last argument, with the same leading-space rule as OpenCode):
+
+```bash
+cursor-agent -p --output-format stream-json --stream-partial-output --trust --workspace <cwd> --force \
+  [--mode plan] [--approve-mcps] [--resume <session_id>] [--model <model>] "<prompt>"
+```
+
+| Aspect | Behavior |
+|---|---|
+| Permissions | Always `--force`: a turn under `-p` cannot ask, and without it Cursor refuses **every** MCP call (even with `--approve-mcps`). The limits are rules of Cursor's own config, which `--force` does not override: each limited agent runs with `CURSOR_CONFIG_DIR=~/.hive-am/cursor/<agentId>`, a copy of the person's `cli-config.json` (from `CURSOR_CONFIG_DIR`, `$XDG_CONFIG_HOME/cursor` or `~/.cursor`) whose `permissions` are replaced on every turn (`cursorPermissions()`). **Read-only:** `--mode plan` and `deny: Write(**), Shell(*)`. **Edit files:** `deny: Shell(*), Write(**/.git/**), Write(**/*.pem), Write(**/*.key)`; `.env` stays editable. **Full access:** no rules and the person's own config. Sign-in (`~/.config/cursor/auth.json`) and conversations (`~/.cursor/projects`) are not under that folder, so they are not affected. See "What the limits guarantee" below. |
+| Resume | `--resume <id>`. The id is the `session_id` of the `system/init` event; it survives a hive-am restart. |
+| Instructions | Preamble in the message (see 6.7). |
+| Model and effort | `--model` only when the agent has one. Cursor has no effort: the level is part of the model id (`gpt-5.3-codex-high`), so `--effort` is never passed and the form shows no effort field. A free Cursor plan only takes `auto`: any other model fails the turn with Cursor's reason. |
+| Delegation (MCP) | Cursor reads MCP servers only from `<folder>/.cursor/mcp.json` or the person's `~/.cursor/mcp.json` (`--workspace` moves the agent's real folder, so it cannot hide the file elsewhere). An agent with hive tools merges a `hive` entry into the folder's file (the person's other servers stay; a file that is not valid JSON is left alone) and adds `--approve-mcps`. The entry reads `HIVE_AGENT_ID`, `HIVE_CAPS` and `HIVE_AM_API` with `${env:...}`, so one identical file serves every agent in the folder; each turn passes its own values in the process env (an agent without hive tools passes an empty `HIVE_CAPS` and gets no tools). The file is added once to the repository's `.git/info/exclude` (`/<prefix>.cursor/mcp.json`), so it does not show in `git status`. Cursor names the tools `hive-<tool>`. |
+| Session id | `session_id` of the first event that carries it (`system/init`). |
+| Errors | Not signed in, a model the plan does not allow or an unknown model: Cursor writes the reason to stderr and exits with 1; it becomes the turn's error (with `stderrHead`). A `result` with `is_error: true` is an `error` with its text. |
+
+**Event translation** (stream-json, one object per line):
+
+| Cursor line | `StreamEvent` |
+|---|---|
+| `system` / `init` | `session` (and the model name, `Auto` for `auto`, for `usage`) |
+| `thinking` / `delta` | `thinking` (`completed` is ignored) |
+| `assistant` with `timestamp_ms` and no `model_call_id` | `text` (a piece, with `--stream-partial-output`) |
+| `assistant` with `model_call_id` (before a tool call) or without `timestamp_ms` (at the end) | Cursor repeats the stretch of text whole: skipped when pieces came before it, `text` otherwise (no partial output) |
+| `tool_call` / `started` | `tool`. The tool is the key inside `tool_call`, named as Cursor's transcript names it: `shellToolCall` → `Shell` (`command`), `editToolCall` with `streamContent` → `Write` (`path`, `contents`), `mcpToolCall` → `mcp__<server>__<tool>` with its arguments, others capitalized (`readToolCall` → `Read`) |
+| `tool_call` / `completed` | `tool_result`. Only `result.success` is a success; `rejected`, `permissionDenied`, `writePermissionDenied`, `error` are `error: true` with Cursor's reason. A shell command that exits with a code other than 0 adds `Exit code: <n>`; an MCP result carries its text and its `isError` |
+| `result` | `usage` (`inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `duration_ms`) and then `done` (with `result` as `summary`) or `error` |
+
+**What the limits guarantee** (checked with `cursor-agent` 2026.10.22 in throwaway folders):
+
+| Level | Writes in the folder | `.git/**`, `*.pem`, `*.key` | Shell | Writes outside the folder |
+|---|---|---|---|---|
+| Read-only | refused | refused | refused | refused |
+| Edit files | yes (`.env` too) | refused | refused | **possible with the file tool** |
+| Full access | yes | yes | yes | yes |
+
+- Cursor's sandbox (`--sandbox enabled`) does not confine anything that matters here: with it, both the file tool and the shell wrote to `.git/x`, `a.pem`, `a.key` and to a folder under `$HOME` outside the project. That is why "Edit files" refuses the shell instead of relying on the sandbox.
+- `--mode plan` alone does not make an agent read-only under `--force`: the shell still wrote files, and the model can call `SwitchMode` to leave plan mode and then write. The `deny` rules hold in every mode.
+- Cursor has no rule that allows a folder and refuses the rest (a `deny: Write(/**)` wins over an `allow` of the folder, and `Write(../**)` matches nothing), so under "Edit files" the file tool **can write outside the agent's folder**. Use "Read-only" or another provider when that matters.
+
+## 6.7 Instructions preamble (`providers/preamble.ts`)
+
+OpenCode, Kiro and Cursor have no flag to add a system prompt, so the instructions travel **inside the message**:
 
 | Situation | What is sent |
 |---|---|
@@ -148,9 +191,9 @@ How does the runtime know they changed? It computes a SHA‑1 of the composed in
 
 The history readers **hide** these blocks when showing the chat (see [document 8](08-sessions-and-history.md)). The models do receive them.
 
-## 6.7 Install detection and models
+## 6.8 Install detection and models
 
-**Installation** (`GET /api/providers`): runs `claude --version`, `opencode --version`, `kiro-cli --version` (max. 8 s each). If they fail → `installed: false`. Result cached for 60 s. The UI shows "● installed" / "● not found" in the provider selector.
+**Installation** (`GET /api/providers`): runs `claude --version`, `opencode --version`, `kiro-cli --version`, `cursor-agent --version` (max. 8 s each). If they fail → `installed: false`. Result cached for 60 s. The UI shows "● installed" / "● not found" in the provider selector.
 
 **Models** (`server/src/models.ts`, 10-minute cache, only non-empty results are cached):
 
@@ -159,6 +202,7 @@ The history readers **hide** these blocks when showing the chat (see [document 8
 | Claude | Fixed list: `opus`, `sonnet`, `haiku`, `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-4-5-20251001` |
 | OpenCode | Output of `opencode models` (lines in `provider/model` format are accepted) |
 | Kiro | `kiro-cli chat --list-models --format json` |
+| Cursor | `cursor-agent --list-models` (`<id> - <name>` lines; the `(current, default)` note is dropped) |
 
 The UI's model field is free text with suggestions (`<datalist>`): if the CLI does not list models, you can type any id; empty = the CLI's default model. Changing an agent's provider clears the model in the form.
 
@@ -168,15 +212,17 @@ The UI's model field is free text with suggestions (`<datalist>`): if the CLI do
 |---|---|---|
 | Claude Code | `claude … --effort <level>` | `low`, `medium`, `high`, `xhigh`, `max` |
 | Kiro | `kiro-cli chat … --effort <level>` | the same five; once a model's turn reports `reasoning.effortLevels` only those are offered for it |
+| Cursor | never: the level is part of the model id (`gpt-5.3-codex-high`, `claude-opus-5-5-max`) | none; any effort is refused when stored, and a connection's effort runs Cursor at its default |
 | OpenCode | the model's variant: `-m provider/model#<id>` | the variants **the chosen model has** (`0`…`5`, or `none`, `low`, `medium`, `high`, `xhigh`, `max`, depending on the model), read from its catalog (`GET /api/model` → `variants[].id`, labelled by `settings.reasoningEffort`) |
 
 What was learned (`reasoning-efforts.json`, next to `context-windows.json`) is refreshed the way context windows are: the catalog is read at most once an hour, and again ten minutes later if the read failed. `GET /api/providers/:p/efforts?model=` gives the form the levels (and whether they are known); it reads OpenCode's catalog first when the model's are not known yet. An effort is checked when it is stored: a level the provider does not take, or a variant the OpenCode model does not have, is a 400; changing the provider or the model clears one that no longer applies. At turn time an effort that does not apply (the model changed under it) runs at the CLI's default, with a line in the server log, instead of failing the turn, and a connection's level name is turned into the variant the model has for it.
 
-## 6.8 Costs and prices
+## 6.9 Costs and prices
 
 - Claude: `result.total_cost_usd` is emitted as `usage.cost` live; the history has no cost, so it is **estimated** with `pricing.ts`.
 - OpenCode: uses the cost the CLI reports; if it is 0, it tries to estimate.
 - Kiro: bills in **credits**, not tokens; credits are shown.
+- Cursor: reports tokens live but no cost, and its transcript keeps no usage; a cost is estimated only when the model id names one of the families below.
 
 Estimation table (USD per million tokens, by family detected in the model name):
 
@@ -188,7 +234,7 @@ Estimation table (USD per million tokens, by family detected in the model name):
 
 Models outside those families have no estimated cost. Estimates are marked with "≈" in the UI.
 
-## 6.9 How to add a new provider
+## 6.10 How to add a new provider
 
 1. **Types:** add the value to `Provider` in `server/src/types.ts` and `web/lib/types.ts`.
 2. **Runner:** create `server/src/providers/<name>.ts` with a generator `(o: TurnOptions) => AsyncGenerator<StreamEvent>` using `spawnLines`. Set `cwd` and remember to emit `session` as soon as you know the id.

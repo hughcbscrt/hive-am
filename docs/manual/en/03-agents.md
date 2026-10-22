@@ -1,6 +1,6 @@
 # Agents
 
-An agent is a coding assistant with a name of its own. It has a provider (Claude Code, OpenCode or Kiro), a folder where it works, some instructions and some permissions. The **Agents** section is where you see them all in a table, create new ones and open each one. You edit an agent's settings in a side panel that opens from its screen.
+An agent is a coding assistant with a name of its own. It has a provider (Claude Code, OpenCode, Kiro or Cursor), a folder where it works, some instructions and some permissions. The **Agents** section is where you see them all in a table, create new ones and open each one. You edit an agent's settings in a side panel that opens from its screen.
 
 ## The agent list
 
@@ -25,7 +25,7 @@ The columns are:
 
 - **Search:** type in the "Search by name, description or folder" field.
 - **Role filter:** **All**, **Orchestrators** or **Workers**.
-- **Provider filter:** **Any provider**, **Claude**, **OpenCode** or **Kiro**.
+- **Provider filter:** **Any provider**, **Claude**, **OpenCode**, **Kiro** or **Cursor**.
 
 If nothing matches, you see "Nothing matches" and a button to clear the filters.
 
@@ -77,13 +77,13 @@ If you choose a colony that shares something, a row appears for each inheritable
 
 ### Provider and model
 
-Choose one of the three: **Claude Code**, **OpenCode** or **Kiro**. Each card shows whether the CLI is installed on your machine.
+Choose one of the four: **Claude Code**, **OpenCode**, **Kiro** or **Cursor**. Each card shows whether the CLI is installed on your machine. Cursor needs `cursor-agent` installed and signed in (`cursor-agent login`); a free Cursor plan only runs the `auto` model.
 
 The **Model** field is a searchable selector: "CLI default" (the CLI picks), the models the CLI lists, or any id you type by hand ("Use “id”").
 
 ### Reasoning effort
 
-Under the model, **Reasoning effort** sets how hard the model thinks in **every** turn of this agent: the web chat, Telegram and Slack, schedules, wake-ups and delegated tasks. **Default** leaves the CLI's own, which is what every agent starts with. The field only offers what the chosen provider and model take: Claude Code and Kiro take **Low, Medium, High, Extra high** and **Max**; for OpenCode they are the variants the selected model has (read from OpenCode's own list: one model may offer Low, High and Max, another 0 to 5, another none, and then the field says so). Changing the provider or the model sends it back to **Default** if the level no longer applies. A **type** carries it too, and a connection can override it for its own chat (see [Connections](09-telegram-connections.md)). A lower level answers faster and thinks less.
+Under the model, **Reasoning effort** sets how hard the model thinks in **every** turn of this agent: the web chat, Telegram and Slack, schedules, wake-ups and delegated tasks. **Default** leaves the CLI's own, which is what every agent starts with. The field only offers what the chosen provider and model take: Claude Code and Kiro take **Low, Medium, High, Extra high** and **Max**; for OpenCode they are the variants the selected model has (read from OpenCode's own list: one model may offer Low, High and Max, another 0 to 5, another none, and then the field says so). Cursor has no such field: the level is part of the model you pick (`gpt-5.3-codex-high`, `claude-opus-5-5-max`). Changing the provider or the model sends it back to **Default** if the level no longer applies. A **type** carries it too, and a connection can override it for its own chat (see [Connections](09-telegram-connections.md)). A lower level answers faster and thinks less.
 
 > **Note:** if you change the provider of an agent that already has a conversation, that conversation is discarded: a CLI's session id is of no use in another CLI. Earlier conversations are kept in the **Sessions** tab.
 

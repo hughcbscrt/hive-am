@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>A colony of coding agents on your machine.</strong><br />
-  Orchestrators and subagents over <b>Claude Code</b>, <b>OpenCode</b> and <b>Kiro</b>, with the real sessions of each CLI, a browser UI and Telegram.
+  Orchestrators and subagents over <b>Claude Code</b>, <b>OpenCode</b>, <b>Kiro</b> and <b>Cursor</b>, with the real sessions of each CLI, a browser UI and Telegram.
 </p>
 
 <p align="center">
@@ -26,7 +26,7 @@ have installed; it does not replace them and it never copies your conversations 
 
 ## Highlights
 
-- **Three providers, one place.** Claude Code, OpenCode and Kiro agents side by side, each with its own model.
+- **Four providers, one place.** Claude Code, OpenCode, Kiro and Cursor agents side by side, each with its own model.
 - **Real sessions.** An agent stores only a pointer (`provider`, `session_id`, `cwd`). The transcript lives in the CLI's own store and is read back from there. After a restart every agent resumes its real session.
 - **Orchestration.** An orchestrator delegates to the workers connected to it on the Relations canvas. Every delegation runs in a fresh native session of the worker, and the rule is enforced on the server, not just requested.
 - **Colonies.** Group agents on a honeycomb map and lend them defaults: working folder, permissions, skills and a shared prompt. Each agent can opt out per field.
@@ -68,12 +68,13 @@ More in the [user manual](docs/manual/en/README.md).
 | Claude Code | `claude -p --output-format stream-json --resume <id>` | `~/.claude/projects/*/<id>.jsonl` |
 | OpenCode | `opencode run --format json -s <id>` | `~/.local/share/opencode/opencode.db` (`session_message`) |
 | Kiro | `kiro-cli chat --no-interactive --output-format stream-json --resume-id <id>` | `~/.kiro/sessions/cli/<id>.jsonl` |
+| Cursor | `cursor-agent -p --output-format stream-json --resume <id>` | `~/.cursor/projects/<folder>/agent-transcripts/<id>/<id>.jsonl` |
 
 Plain CLI processes, one per turn, not ACP. Turns are serialized per agent.
 
 ## Quick start
 
-You need **Node 20+** (macOS or Linux) and at least one of the three CLIs installed and logged in (`claude`, `opencode` or `kiro-cli`).
+You need **Node 20+** (macOS or Linux) and at least one of the four CLIs installed and logged in (`claude`, `opencode`, `kiro-cli` or `cursor-agent`).
 
 ### From npm
 
@@ -108,13 +109,14 @@ Data lives in `~/.hive-am/hive-am.db` (override with `HIVE_AM_HOME`). The server
 
 ## Permission levels
 
-| Level | Claude Code | OpenCode | Kiro |
-|---|---|---|---|
-| **Read-only** | `--permission-mode plan` | edit, shell and subagents denied | no tool trusted |
-| **Edit files** | `acceptEdits`, `.git` and keys protected | edits (`.env` included), no shell, only inside the agent's folder | same |
-| **Full access** | `bypassPermissions` | no restrictions | `--trust-all-tools` |
+| Level | Claude Code | OpenCode | Kiro | Cursor |
+|---|---|---|---|---|
+| **Read-only** | `--permission-mode plan` | edit, shell and subagents denied | no tool trusted | `--mode plan`, writes and shell denied |
+| **Edit files** | `acceptEdits`, `.git` and keys protected | edits (`.env` included), no shell, only inside the agent's folder | same | edits (`.env` included), no shell, `.git` and keys denied |
+| **Full access** | `bypassPermissions` | no restrictions | `--trust-all-tools` | `--force` |
 
-In *Edit files* the agent cannot touch `.git` or private keys (`*.pem`, `*.key`) and cannot write outside its folder. Details and the
+In *Edit files* the agent cannot touch `.git` or private keys (`*.pem`, `*.key`) and cannot write outside its folder, except with
+Cursor: its file tool can still write outside the folder, because Cursor has no rule for that. Details and the
 few differences between providers are in [docs/06](docs/reference/en/06-providers.md) and [docs/12](docs/reference/en/12-operations-and-troubleshooting.md).
 
 ## Connections (Telegram and Slack)

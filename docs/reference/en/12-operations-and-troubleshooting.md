@@ -16,7 +16,7 @@ hive-am is meant as a **local, single-user tool**. It is worth knowing its reach
 | Files sent | The agent only sends through the `channel_send_file` tool, which rejects paths outside its working folder, credentials, keys, databases and hive-am data ([14.6.3](14-external-connections.md#1463-files-sent-by-the-agent)). The bot token is still readable by an agent with file access (it is in the database): it does not need it, but it is not prevented from reading it. |
 | Files received | They are saved in `~/.hive-am/inbox/` (14 days, 20 MB each, never executed) only if they come from authorized people. If the connection uses an image model, each image is sent to that provider. Their content may try to give instructions to the agent: the instructions tell it to treat it as data, but it is wise to give matching permissions. |
 | External connections | They only answer the people list (by DM and in groups with no rule of their own) or whoever an authorized group admits; an agent with a connection needs at least "Edit files" and authorizing a group gives that access to all its members, unless the group is limited to "Only these people", which admits only its own members, not even the people list ([document 14](14-external-connections.md#145-permissions)). |
-| History readers | They validate session ids (Claude: `^[\w-]+$`; Kiro: UUID) and open OpenCode's database read-only. |
+| History readers | They validate session ids (Claude: `^[\w-]+$`; Kiro and Cursor: UUID) and open OpenCode's database read-only. |
 
 ### Recommended security improvements (not implemented)
 
@@ -44,6 +44,8 @@ hive-am is meant as a **local, single-user tool**. It is worth knowing its reach
 | 14 | **OpenCode model list** | It depends on `opencode models`; if it does not return `provider/model` lines, the list stays empty (you can type the id by hand). |
 | 15 | **No automated tests** | There is no test suite; new features are verified with simulations with real agents (`server/scripts/sim-*.ts`, see 12.4). |
 | 16 | **Duplicated types** | `server/src/types.ts` and `web/lib/types.ts` are maintained by hand. |
+| 17 | **Cursor writes into the agent's folder** | An agent with hive tools merges a `hive` entry into `<folder>/.cursor/mcp.json` and adds that file to the repository's `.git/info/exclude`. Each limited Cursor agent also has `~/.hive-am/cursor/<agentId>/cli-config.json` (a copy of your Cursor settings with its permission rules), rewritten on every turn. Both stay when the agent is deleted. |
+| 18 | **Cursor's "Edit files" can write outside the folder** | Cursor has no rule that keeps its file tool inside a folder: `.git`, keys and the shell are refused, writing elsewhere is not (see 6.6). Cursor's transcript also keeps no thinking, tool output or usage, so a re-read Cursor conversation shows less than it did live. |
 | 17 | **Moving agents between colonies** | It is done with selectors and lists; there is no drag and drop on the honeycomb. |
 | 18 | **`type_id` is informational** | Editing a type does not update agents already created. |
 | 19 | **Language flicker** | On the first load the base English is briefly visible before the saved language is applied. |

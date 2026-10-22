@@ -6,6 +6,7 @@ hive-am keeps data in **five** places. Understanding which one holds what is key
 |---|---|---|
 | `~/.hive-am/hive-am.db` | hive-am | Configuration: agents, types, skills, colonies, relations, session pointers, delegation log |
 | `~/.hive-am/mcp/<agentId>.json` | hive-am | Temporary MCP configuration per agent (Claude only) |
+| `~/.hive-am/cursor/<agentId>/cli-config.json` | hive-am | Cursor config of a limited Cursor agent: your settings plus its permission rules, rewritten every turn ([6.6](06-providers.md#66-cursor-providerscursorts)) |
 | `~/.hive-am/inbox/<agentId>/<date>/` | hive-am | Files people sent to an agent through a connection; deleted after 14 days ([14.6.2](14-external-connections.md#1462-received-files)) |
 | Each CLI's native stores | **each CLI** | The **conversations** (messages, tools, token usage) |
 | Browser `localStorage` | the UI | View preferences (theme, panel, canvas positions) |
@@ -195,6 +196,7 @@ hive-am **reads** these files to show the history; it never modifies them.
 | Claude Code | `~/.claude/projects/<encoded-folder>/<sessionId>.jsonl` | JSONL, one line per content block. The encoded folder replaces `/` and `.` with `-`. If it is not found in the expected folder, all project folders are searched. |
 | OpenCode | `~/.local/share/opencode/opencode.db` | SQLite, tables `session_v2` (metadata, `directory`) and `session_message` (messages). Opened in `readonly` mode. |
 | Kiro | `~/.kiro/sessions/cli/<sessionId>.jsonl` and `<sessionId>.json` | `.jsonl`: messages (`Prompt`, `AssistantMessage`, …). `.json`: session metadata, including the per-turn meter (credits, duration, % of context). |
+| Cursor | `~/.cursor/projects/<folder>/agent-transcripts/<sessionId>/<sessionId>.jsonl` | JSONL, one line per user message or step of a reply (text and tool calls, no results or usage). The folder is the agent's with every run of characters other than letters and digits turned into `-`. If it is not found there, all project folders are searched. |
 
 Details of each reader in [document 8](08-sessions-and-history.md).
 
