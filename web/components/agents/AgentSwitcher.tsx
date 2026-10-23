@@ -22,6 +22,8 @@ export function AgentSwitcher({ activeId, collapsed = false, onToggle }: { activ
   const { unread } = useAttention();
   const card = useAgentCard();
   const [q, setQ] = useState('');
+  // The collapsed list has no search box, so a search typed before collapsing would filter it unseen.
+  useEffect(() => { if (collapsed) setQ(''); }, [collapsed]);
   const [creating, setCreating] = useState(false);
   // Folded groups (colony ids and 'free'), remembered; ids of colonies that no longer exist are dropped on the next change.
   const [foldedRaw, setFolded] = usePersistentState<string[]>('hive-am.switcher.folded', []);

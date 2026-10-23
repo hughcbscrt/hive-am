@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Fixed
 
 - **Lists follow the language at once.** Changing the language with the app open left some names in the old language until a reload: the **No colony** group in the chat's agent list and in **Resources**, and the colony hints in the agent form and the resource manager field. They now change right away.
+- **Collapsing the agent list clears its search.** A search typed in the chat's agent list kept filtering the collapsed list, which has no search box, so agents and groups seemed to vanish and the group headings stayed disabled. Collapsing now clears the search, and expanding shows the full list with an empty box.
 
 ## [1.10.1] - 2026-10-23
 
