@@ -583,7 +583,10 @@ else {
     copyOf = createObject({ name: 'test-managed-copy', kind: 'docker', config: { ...cc, ports: [] } });
     check((objectsStore.get(copyOf.id)!.config as any).image === image, 'the copy is saved as a container hive-am creates');
   } finally {
+    // The image declares a volume, so the container hive-am created last has an anonymous one: removing the resource leaves it (rm -f without -v).
+    const leftover = mc ? spawnSync('docker', ['inspect', '-f', '{{range .Mounts}}{{if eq .Type "volume"}}{{.Name}} {{end}}{{end}}', `hive-am-${mc.id.slice(0, 8)}`], { encoding: 'utf8' }).stdout.split(' ').filter((x) => /^[0-9a-f]{64}$/.test(x.trim())) : [];
     for (const o of [mc, ex2, copyOf]) if (o) await removeObject(o.id).catch(() => undefined);
+    for (const v of leftover) try { execFileSync('docker', ['volume', 'rm', v.trim()], { stdio: 'ignore', timeout: 30000 }); } catch { /* cleanup */ }
     try { execFileSync('docker', ['network', 'disconnect', n2, cname], { stdio: 'ignore', timeout: 30000 }); } catch { /* cleanup */ }
     for (const args of [['volume', 'rm', kvol], ['network', 'rm', n1], ['network', 'rm', n2], ['rmi', vimg]]) try { execFileSync('docker', args, { stdio: 'ignore', timeout: 30000 }); } catch { /* cleanup */ }
   }
