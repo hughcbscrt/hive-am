@@ -24,3 +24,15 @@ export function copyNameFor(kind: SourceKind, path: string): string {
 }
 /** The folder of a path, where the copy goes. */
 export const folderOf = (path: string) => path.slice(0, path.lastIndexOf('/')) || '/';
+
+/**
+ * Line endings. The editor (a textarea) only knows `\n`, so a file with Windows line endings (`\r\n`) is shown with `\n` and written back
+ * with `\r\n`. The first line break of the file decides for the whole file (a file that mixes both is saved with that one on every line).
+ * Nothing edited means nothing changed: the text is sent exactly as it was read.
+ */
+export type Eol = '\r\n' | '\n';
+export const eolOf = (text: string): Eol => { const i = text.indexOf('\n'); return i > 0 && text[i - 1] === '\r' ? '\r\n' : '\n'; };
+export const forEditor = (text: string) => text.replace(/\r\n/g, '\n');
+export const forDisk = (draft: string, eol: Eol) => (eol === '\n' ? draft : draft.replace(/\r?\n/g, '\r\n'));
+/** What is sent for the text in the editor of a file read as `original`. */
+export const toSave = (original: string, draft: string) => (draft === forEditor(original) ? original : forDisk(draft, eolOf(original)));

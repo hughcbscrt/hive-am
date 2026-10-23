@@ -1260,7 +1260,7 @@ export const es: Record<DictKey, string> = {
   "dk.build.title": "Construir desde un Dockerfile",
   "dk.build.hint": "Construye una imagen en esta máquina y la elige. Los pasos del Dockerfile corren aquí y pueden descargarse imágenes base, así que puede tardar minutos.",
   "dk.build.file": "Dockerfile",
-  "dk.build.file.hint": "Explorar lista los archivos llamados Dockerfile, Containerfile o nombre.Dockerfile; cualquier otro nombre se puede escribir.",
+  "dk.build.file.hint": "Explorar lista los archivos llamados Dockerfile, Containerfile o nombre.Dockerfile. También puedes escribir la ruta, pero solo se construye un archivo con uno de esos nombres (o Dockerfile.nombre).",
   "dk.build.context": "Carpeta de construcción (opcional)",
   "dk.build.context.hint": "De dónde puede copiar el Dockerfile. Por defecto, la carpeta del propio Dockerfile.",
   "dk.build.tag": "Nombre de la imagen",

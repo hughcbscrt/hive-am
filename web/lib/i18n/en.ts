@@ -1262,7 +1262,7 @@ export const en = {
   "dk.build.title": "Build from a Dockerfile",
   "dk.build.hint": "Builds an image on this machine and picks it. The Dockerfile's steps run here and base images may be downloaded, so it can take minutes.",
   "dk.build.file": "Dockerfile",
-  "dk.build.file.hint": "Browse lists files named Dockerfile, Containerfile or name.Dockerfile; any other name can be typed.",
+  "dk.build.file.hint": "Browse lists files named Dockerfile, Containerfile or name.Dockerfile. A path can also be typed, but only a file named like that (or Dockerfile.name) is built.",
   "dk.build.context": "Build folder (optional)",
   "dk.build.context.hint": "What the Dockerfile can copy from. By default, the Dockerfile's own folder.",
   "dk.build.tag": "Image name",

@@ -291,7 +291,7 @@ check(await routeStatus('POST', '/api/docker/networks', 'https://evil.example') 
   let exists: unknown = null; try { await composeFileCopy(comp.id, { name: 'docker-compose.copy.yml', content: 'x: 1\n' }); } catch (e) { exists = e; }
   check(exists instanceof ObjectError && exists.kind === 'conflict' && readFileSync(cp.path, 'utf8').includes('nginx:3'), 'a copy with the name of a file that exists is a conflict (409) and does not replace it');
   const cp2 = await composeFileCopy(comp.id, { name: 'docker-compose.copy.yml', content: 'services:\n  web:\n    image: nginx:4\n', overwrite: true, repoint: true });
-  check(readFileSync(cp.path, 'utf8').includes('nginx:4') && (objectsStore.get(comp.id)!.config as any).file === cp.path && cp2.object?.id === comp.id, 'with overwrite it is replaced; with repoint the resource points to the copy');
+  check(readFileSync(cp.path, 'utf8').includes('nginx:4') && (objectsStore.get(comp.id)!.config as any).file === cp.path && cp2.object?.id === comp.id && cp2.running === false, 'with overwrite it is replaced; with repoint the resource points to the copy (and, with nothing created, no running warning)');
   check(composeFileRead(comp.id).path === cp.path, 'and its file is read from the copy from then on');
   const cpNew = await composeFileCopy(comp.id, { name: 'other.yaml' });
   check(readFileSync(cpNew.path, 'utf8') === readFileSync(cp.path, 'utf8'), 'a copy without content takes the text of the file');
@@ -299,6 +299,15 @@ check(await routeStatus('POST', '/api/docker/networks', 'https://evil.example') 
   const refused = await Promise.all(names.map((n) => rejects(() => composeFileCopy(comp.id, { name: n, overwrite: true }), /.+/)));
   check(refused.every(Boolean), 'a copy name with / or .., starting with - or ., of another kind, equal to the original, empty or too long is refused');
   check(assertCopyName('dockerfile', '/a/Dockerfile', 'Dockerfile.copy') === 'Dockerfile.copy' && await rejects(() => assertCopyName('dockerfile', '/a/Dockerfile', 'copy.txt'), /not a Dockerfile/) && await rejects(() => assertCopyName('compose', '/a/c.yml', 'c.yml'), /different from the original/), 'a Dockerfile copy keeps a Dockerfile name; the original name is refused');
+  // What is sent is what is written, byte for byte (Windows line endings included), and the file keeps its mode (an umask of 022 would turn 664 into 644).
+  const cur = (objectsStore.get(comp.id)!.config as any).file as string;
+  chmodSync(cur, 0o664);
+  const crlf = 'services:\r\n  web:\r\n    image: nginx:5\r\n';
+  const wc = await composeFileWrite(comp.id, crlf, composeFileRead(comp.id).etag);
+  check(readFileSync(cur).equals(Buffer.from(crlf)) && wc.etag === etagOf(Buffer.from(crlf)) && composeFileRead(comp.id).content === crlf, 'a text with \\r\\n is saved byte for byte and read back the same');
+  check((statSync(cur).mode & 0o777) === 0o664, 'saving keeps the mode of the file (664 stays 664 despite the umask)');
+  const cm = copySource('compose', cur, 'mode.copy.yml', undefined, false);
+  check((statSync(cm.path).mode & 0o777) === 0o664 && readFileSync(cm.path).equals(Buffer.from(crlf)), 'and a copy gets the same mode and the same bytes');
   // Dockerfiles: the path comes from the page, so only a regular file named like a Dockerfile (its real name too), up to 512 KB.
   const d1 = readSource('dockerfile', dfile);
   const dw = writeSource('dockerfile', dfile, 'FROM scratch\nLABEL x=1\n', d1.etag);
@@ -407,6 +416,10 @@ else {
     const was = ids(), f = await composeFileRead(comp.id);
     const sv = await composeFileWrite(comp.id, `${f.content}# edited from hive-am\n`, f.etag);
     check(sv.running === true && sv.check?.ok === true && !!was && ids() === was, 'saving the file of a running compose project warns that it is running and does not recreate anything (same container)');
+    const file0 = (objectsStore.get(comp.id)!.config as any).file;
+    const cr = await composeFileCopy(comp.id, { name: 'docker-compose.running.yml', repoint: true });
+    check(cr.running === true && !!cr.object && ids() === was, 'a copy the resource now uses, made while it runs, warns that the services run the old definition (and recreates nothing)');
+    updateObject(comp.id, { config: { ...(objectsStore.get(comp.id)!.config as any), file: file0 } });
   }
   check((await fetch(`http://127.0.0.1:${cport}/`).then((r) => r.status).catch(() => 0)) === 200, 'and serves');
   check((await objectLogs(comp.id, { tail: 20 })).text.length >= 0, 'its logs can be read');

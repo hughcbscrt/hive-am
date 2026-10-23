@@ -170,12 +170,16 @@ export async function composeFileWrite(id: string, content: unknown, etag: unkno
   const [check, running] = await Promise.all([composeCheck(c), composeRunning(id, c)]);
   return { ...r, check, running };
 }
-/** A copy next to the compose file; with `repoint`, the resource uses it from then on (saved like any change of settings: Docker is not touched). */
+/**
+ * A copy next to the compose file; with `repoint`, the resource uses it from then on (saved like any change of settings: Docker is not
+ * touched), and `running` says whether services still run the definition they were created with.
+ */
 export async function composeFileCopy(id: string, p: { name?: unknown; content?: unknown; overwrite?: unknown; repoint?: unknown }) {
   const c = composeOf(id);
   const r = copySource('compose', c.file, p.name, p.content, p.overwrite === true);
   const object = p.repoint === true ? updateObject(id, { config: { ...c, file: r.path } }) : undefined;
-  return { ...r, check: await composeCheck({ ...c, file: r.path }), object };
+  const [check, running] = await Promise.all([composeCheck({ ...c, file: r.path }), object ? composeRunning(id, { ...c, file: r.path }) : false]);
+  return { ...r, check, running, object };
 }
 
 export { listTemplates };

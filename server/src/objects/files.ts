@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { closeSync, existsSync, fsyncSync, linkSync, lstatSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeSync } from 'node:fs';
+import { closeSync, existsSync, fchmodSync, fsyncSync, linkSync, lstatSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join } from 'node:path';
 import { DOCKERFILE_NAME } from './docker.js';
 import { ObjectError } from './model.js';
@@ -57,7 +57,7 @@ export function readSource(kind: SourceKind, path: unknown): SourceFile {
 }
 
 /**
- * Writes `content` into a temporary file next to `target` (with `mode`), flushes it and then either renames it over `target` or, with
+ * Writes `content` (as given: its line endings are not touched) into a temporary file next to `target` (with exactly `mode`), flushes it and then either renames it over `target` or, with
  * `noClobber`, links it there (which fails if `target` exists, so nothing is overwritten). On any failure the temporary file is removed and
  * `target` is as it was. Temporary files left by a hive-am that died while saving the same file are removed first (only that exact prefix).
  */
@@ -68,6 +68,7 @@ function atomicWrite(target: string, content: string, mode: number, noClobber = 
   let fd: number | null = null;
   try {
     fd = openSync(tmp, 'w', mode);
+    fchmodSync(fd, mode);                                                     // `open` applies the umask: 664 would become 644
     writeSync(fd, content);
     fsyncSync(fd);
     closeSync(fd); fd = null;

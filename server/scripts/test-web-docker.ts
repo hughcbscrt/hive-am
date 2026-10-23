@@ -4,7 +4,7 @@
 import './_guard.js';
 import { emptyRow, isFolder, isIncomplete, isNewVolume, isReadOnly, parseVolumeLine, parseVolumes, volumesText, withReadOnly } from '../../web/lib/dockerVolumes.ts';
 import { canCreate, canRemove, imageNameFor, validName, whenAvailable } from '../../web/lib/dockerLists.ts';
-import { copyNameFor, folderOf } from '../../web/lib/dockerFiles.ts';
+import { copyNameFor, eolOf, folderOf, forEditor, toSave } from '../../web/lib/dockerFiles.ts';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `got ${JSON.stringify(got)} want ${JSON.stringify(want)}`); if (!ok) fail++; };
 
@@ -51,6 +51,15 @@ eq('an image name is suggested from the Dockerfile\'s folder', [imageNameFor('/h
 eq('the name offered for a copy keeps the kind of the file (the server refuses anything else)', ['/a/docker-compose.yml', '/a/compose.YAML', '/a/Dockerfile', '/a/web.Dockerfile', '/a/Dockerfile.prod', '/a/Containerfile'].map((p) => copyNameFor(p.endsWith('ml') || p.endsWith('ML') ? 'compose' : 'dockerfile', p)),
   ['docker-compose.copy.yml', 'compose.copy.YAML', 'Dockerfile.copy', 'web.copy.Dockerfile', 'Dockerfile.prod.copy', 'Containerfile.copy']);
 eq('a copy goes in the folder of the original', [folderOf('/srv/app/docker-compose.yml'), folderOf('/Dockerfile')], ['/srv/app', '/']);
+
+// Line endings: the editor only has \n, the file keeps its own.
+const crlf = 'services:\r\n  web:\r\n    image: nginx\r\n';
+eq('a file with Windows line endings shows with \\n in the editor', forEditor(crlf), 'services:\n  web:\n    image: nginx\n');
+eq('and an edit is saved with \\r\\n on every line', toSave(crlf, 'services:\n  web:\n    image: nginx:2\n'), 'services:\r\n  web:\r\n    image: nginx:2\r\n');
+eq('a line added at the end gets \\r\\n too', toSave(crlf, `${forEditor(crlf)}  db:\n`), `${crlf}  db:\r\n`);
+eq('a file with \\n is saved as typed', toSave('a\nb\n', 'a\nc\n'), 'a\nc\n');
+eq('nothing edited sends the bytes as read, even when the file mixes line endings', [toSave(crlf, forEditor(crlf)), toSave('a\r\nb\nc\r\n', 'a\nb\nc\n')], [crlf, 'a\r\nb\nc\r\n']);
+eq('a file that mixes them takes the first line break for every line once edited', [eolOf('a\r\nb\n'), eolOf('a\nb\r\n'), eolOf(''), eolOf('one line'), toSave('a\nb\r\n', 'a\nb\nx\n')], ['\r\n', '\n', '\n', '\n', 'a\nb\nx\n']);
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

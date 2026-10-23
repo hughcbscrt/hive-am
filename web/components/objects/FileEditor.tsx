@@ -1,8 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Copy, Loader2, RefreshCcw, RotateCcw, Save } from 'lucide-react';
 import { ApiError } from '@/lib/api';
-import { copyNameFor, folderOf, type SavedFile, type SourceFile, type SourceKind } from '@/lib/dockerFiles';
+import { copyNameFor, folderOf, forEditor, toSave, type SavedFile, type SourceFile, type SourceKind } from '@/lib/dockerFiles';
 import { fmtBytes } from '@/lib/format';
 import { useGitPrefs } from '@/lib/git/gitPrefs';
 import { useI18n } from '@/lib/i18n/index';
@@ -18,8 +18,9 @@ const noAsk = new Set<string>();
  * A compose file or a Dockerfile in the code editor: **Save** writes over it (after a confirmation that names the file), **Save as copy**
  * writes next to it, **Discard** goes back to what was read. The server refuses a save if the file changed on disk since it was read (409):
  * then reload it, or overwrite it after another confirmation. `onRecreate` (compose) is offered when services still run the old definition.
+ * Windows line endings are kept (see `toSave`).
  */
-export function FileEditor({ kind, load, save, copy, repointOption = false, startWithCopy = false, onCopied, onRecreate, onDirty }: {
+export function FileEditor({ kind, load, save, copy, repointOption = false, startWithCopy = false, startRunning = false, onCopied, onRecreate, onDirty }: {
   kind: SourceKind;
   load: () => Promise<SourceFile>;
   save: (content: string, etag: string) => Promise<SavedFile>;
@@ -28,6 +29,8 @@ export function FileEditor({ kind, load, save, copy, repointOption = false, star
   repointOption?: boolean;
   /** Opens "Save as copy" as soon as the file is read. */
   startWithCopy?: boolean;
+  /** Opens with the notice that services still run the old definition (a copy the resource now uses, made while they ran). */
+  startRunning?: boolean;
   onCopied?: (r: SavedFile, repointed: boolean) => void;
   onRecreate?: () => void;
   onDirty?: (dirty: boolean) => void;
@@ -43,14 +46,17 @@ export function FileEditor({ kind, load, save, copy, repointOption = false, star
   const [skip, setSkip] = useState(false);
   const [stale, setStale] = useState(false);
   const [after, setAfter] = useState<SavedFile | null>(null);
+  const [running, setRunning] = useState(startRunning);
   const [copying, setCopying] = useState(startWithCopy);
-  const dirty = !!file && draft !== file.content;
+  // What the editor shows of the file as read (only `\n` line endings): the draft is compared with this.
+  const base = useMemo(() => (file ? forEditor(file.content) : ''), [file]);
+  const dirty = !!file && draft !== base;
   useUnsavedGuard(dirty);
   useEffect(() => { onDirty?.(dirty); }, [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reload = async () => {
     setErr(''); setStale(false);
-    try { const f = await load(); setFile(f); setDraft(f.content); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    try { const f = await load(); setFile(f); setDraft(forEditor(f.content)); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   };
   useEffect(() => { void reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -58,8 +64,9 @@ export function FileEditor({ kind, load, save, copy, repointOption = false, star
     if (!file) return;
     setBusy(true); setErr('');
     try {
-      const r = await save(draft, etag);
-      setFile({ ...file, content: draft, etag: r.etag, bytes: r.bytes }); setStale(false); setAfter(r);
+      const content = toSave(file.content, draft);
+      const r = await save(content, etag);
+      setFile({ ...file, content, etag: r.etag, bytes: r.bytes }); setStale(false); setAfter(r); setRunning(!!r.running);
       toast(t('fe.saved', { name: file.path }));
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) setStale(true); else setErr(e instanceof Error ? e.message : String(e));
@@ -78,13 +85,13 @@ export function FileEditor({ kind, load, save, copy, repointOption = false, star
         <span className="muted small fe-size">{fmtBytes(file.bytes)}{dirty ? ` · ${t('fe.dirty')}` : ''}</span>
         <div className="fe-acts">
           <GitSettings compact />
-          <button type="button" className="btn ghost sm" disabled={!dirty || busy} onClick={() => setDraft(file.content)}><RotateCcw size={14} />{t('common.discard')}</button>
+          <button type="button" className="btn ghost sm" disabled={!dirty || busy} onClick={() => setDraft(base)}><RotateCcw size={14} />{t('common.discard')}</button>
           <button type="button" className="btn sm" disabled={busy} onClick={() => setCopying(true)}><Copy size={14} />{t('fe.copy')}</button>
           <button type="button" className="btn primary sm" disabled={!dirty || busy} aria-busy={busy} onClick={askSave}>{busy ? <Loader2 size={14} className="spin" aria-hidden /> : <Save size={14} />}{t('fe.save')}</button>
         </div>
       </div>
       <p className="fe-note muted small">{t(`fe.note.${kind}`)}</p>
-      {(stale || err || after) && (
+      {(stale || err || after || running) && (
         <div className="fe-msgs">
           {stale && (
             <Banner kind="warn" action={<div className="row gap-s wrap">
@@ -94,8 +101,8 @@ export function FileEditor({ kind, load, save, copy, repointOption = false, star
           )}
           {err && <Banner kind="err" onDismiss={() => setErr('')}>{err}</Banner>}
           {after?.check && !after.check.ok && <Banner kind="err" onDismiss={() => setAfter({ ...after, check: undefined })}>{t('fe.invalid')}{after.check.error && <pre className="fe-out">{after.check.error}</pre>}</Banner>}
-          {after?.running && onRecreate && (
-            <Banner kind="warn" onDismiss={() => setAfter({ ...after, running: false })} action={<button type="button" className="btn sm" onClick={onRecreate}><RefreshCcw size={14} />{t('obj.act.recreate')}</button>}>{t('fe.running')}</Banner>
+          {running && onRecreate && (
+            <Banner kind="warn" onDismiss={() => setRunning(false)} action={<button type="button" className="btn sm" onClick={onRecreate}><RefreshCcw size={14} />{t('obj.act.recreate')}</button>}>{t('fe.running')}</Banner>
           )}
         </div>
       )}
@@ -113,7 +120,7 @@ export function FileEditor({ kind, load, save, copy, repointOption = false, star
         <ConfirmDialog title={t('fe.confirm.title')} body={t('fe.stale.confirm', { path: file.path })} confirmLabel={t('fe.stale.overwrite')} danger
           onConfirm={overwrite} onClose={() => setAsking(null)} />
       )}
-      {copying && <CopyDialog kind={kind} path={file.path} content={draft} repointOption={repointOption} copy={copy} onClose={() => setCopying(false)}
+      {copying && <CopyDialog kind={kind} path={file.path} content={toSave(file.content, draft)} repointOption={repointOption} copy={copy} onClose={() => setCopying(false)}
         onDone={(r, repointed) => { setCopying(false); toast(t('fe.copied', { name: r.path })); onCopied?.(r, repointed); }} />}
     </div>
   );

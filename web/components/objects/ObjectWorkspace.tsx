@@ -67,7 +67,9 @@ function Screen({ object: o }: { object: ObjectView }) {
   // Unsaved edits of the File tab: leaving it for another tab asks first.
   const [fileDirty, setFileDirty] = useState(false);
   const [leaving, setLeaving] = useState<Tab | null>(null);
-  const go = (x: Tab) => { if (x === 'logs') setLogFilter(''); setTab(x); };
+  // A copy the resource now uses, made while services ran: the editor of the copy opens with the notice that they run the old definition.
+  const [copyRunning, setCopyRunning] = useState(false);
+  const go = (x: Tab) => { if (x === 'logs') setLogFilter(''); setCopyRunning(false); setTab(x); };
   const [busy, setBusy] = useState<string | null>(null);
   const { icon: Icon, color } = KIND[o.kind];
   const st = o.state.status, live = st === 'running' || st === 'starting';
@@ -128,7 +130,7 @@ function Screen({ object: o }: { object: ObjectView }) {
           {tab === 'logs' && <LogPane key={logFilter} id={o.id} members={cluster ? memberNames : undefined} initialFilter={logFilter || undefined} />}
           {tab === 'file' && docker?.mode === 'compose' && (
             <FileEditor key={docker.file} kind="compose" load={() => readCompose(o.id)} save={(content, etag) => saveCompose(o.id, content, etag)} copy={(p) => copyCompose(o.id, p)}
-              repointOption onRecreate={() => setRecreating(true)} onDirty={setFileDirty} />
+              repointOption startRunning={copyRunning} onCopied={(r, repointed) => setCopyRunning(repointed && !!r.running)} onRecreate={() => setRecreating(true)} onDirty={setFileDirty} />
           )}
           {tab === 'config' && <ObjectConfig object={o} />}
           {o.kind === 'database' && (tab === 'query' || tab === 'schema' || tab === 'history') && <DbWorkspace object={o} pane={tab} onPane={setTab} />}
