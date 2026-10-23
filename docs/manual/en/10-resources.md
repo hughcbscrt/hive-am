@@ -116,23 +116,45 @@ A Docker resource manages containers. It needs the `docker` command on your mach
 
 | Mode | What hive-am does | When you delete the resource |
 |---|---|---|
-| **Create a container** | Creates the container from an **Image**, with **Ports** (`8080:80`), **Volumes** (`/host/path:/in/container`), environment variables, **Restart policy** and **Command (optional)**. | The container is removed. |
+| **Create a container** | Creates the container from an **Image**, with **Ports** (`8080:80`), **Volumes** (one row each: a volume or a folder, and where it goes), environment variables, **Restart policy** and **Command (optional)**. | The container is removed. |
 | **Compose project** | Manages a **Compose file**, with **Project name (optional)** and **Services (optional)** (empty means all). | The project is stopped, not removed. |
 | **Existing container** | Only starts, stops and restarts it, and reads its logs. | It is left as it is. It is never removed. |
 
-The forms ask Docker to suggest what already exists: local images, existing containers (the ones hive-am created are marked) and, when you pick a compose file, its services. If Docker is not available, the lists are empty and you can always type the value by hand.
+The forms ask Docker to suggest what already exists: local images, networks and volumes (each says how many containers use it), existing containers (the ones hive-am created are marked) and, when you pick a compose file, its services. If Docker is not available, the lists are empty and you can always type the value by hand.
 
-In **Create a container** mode you can set limits and network (memory, CPUs, network, log size, time to stop). If you change one, the container is created again the next time it starts or restarts, and what was inside it is lost.
+In **Volumes**, press **Add a volume** and, in the row, pick a volume of this machine, type a new name (Docker creates it the first time the container starts, and the row tells you) or press **Folder** to choose a folder; then write the path inside the container (a row needs both sides to be saved, and says so) and tick **Read only** if the container should not write there. A resource you saved before shows its volumes in these rows.
+
+Under the image, **Build from a Dockerfile** builds an image for you: choose the Dockerfile (a file named `Dockerfile`, `Containerfile`, `Dockerfile.something` or `something.Dockerfile`), optionally the folder it builds from (by default its own folder), and the image name (suggested from the folder), then press **Build**. When it ends, the new image is picked. The Dockerfile's steps run on your machine and may download base images, so it can take a few minutes; if it fails you see the last lines of the output. Building does not create the container: that happens on **Start**, as always. Next to the Dockerfile, **Edit** opens it in the code editor and **Save as copy** writes a copy next to it (`Dockerfile.copy` by default) that becomes the file to build. Saving asks first and builds nothing: the next **Build** uses it.
+
+If the network you type does not exist on this machine, the field tells you the container will not start without it and offers **Create network**; a volume row with a new name offers **Create it now**. What hive-am creates is marked *created by hive-am* and stays even if you cancel the form. In the suggestions, a network or a volume hive-am created that no container uses has a delete button: it asks first, and hive-am checks again before deleting. Networks and volumes that hive-am did not create, Docker's own networks and anything in use are never deleted.
+
+In **Create a container** mode you can pick the **Network** and set limits (memory, CPUs, log size, time to stop). If you change one, the container is created again the next time it starts or restarts, and what was inside it is lost.
+
+**Additional networks** connect the container to more networks than the main one: add them by name (or pick one of this machine) and remove them with the **×** of each chip. **More options of docker run** has a few more settings, each checked: user, working folder, entrypoint, hostname and labels. There is no field for other flags.
+
+**Change a container hive-am created.** In **Settings**, **Save** only saves: the next start uses the new settings. **Save and apply** changes the container now. Adding or removing an additional network happens in place, without creating the container again (it keeps its id, running or stopped). Anything else needs the container to be created again, so hive-am first shows a confirmation with what changes, what is lost (files written inside it, its logs, restart count, id and IP), the anonymous volumes that would be left unmounted, and the commands it will run. Nothing happens in Docker until you confirm. Named volumes and folders are kept, even one you took out. The time to stop applies the next time it stops.
+
+**An existing container is never changed by hive-am.** To change how it runs, use **Create a managed copy** (in **More**, or in its **Settings**): the form of a new container opens filled in from the existing one (image, ports, volumes, variables, networks, limits and options), with a list of what could not be copied. The original is only read. Its ports stay taken while it runs, so change them in the copy or stop the original first.
 
 The **Summary** of a Docker resource adds processes, network and disk, and shows the image, the ports and the number of restarts.
+
+**Inspect** (in **More**, for a created or an existing container) shows two panels: **Configured in hive-am**, what you set up (always there, even if the container does not exist), and **What Docker says**, the live detail with its variables, ports, mounts, networks, health checks and **Labels**. If Docker does not have the container yet (it is created the first time you start it), cannot find it, or is not running, Inspect says so instead of failing. If you changed the settings since the container was created, it warns that the container will be created again on the next start.
+
+Its **Raw JSON** tab shows everything `docker inspect` says, highlighted, with a search box that jumps to each match and a **Copy JSON** button that copies what you see. Variables whose name looks like a secret (passwords, tokens, keys) arrive hidden, and so does the password inside a URL such as `postgres://user:password@host/db`; press **Reveal** to see them. Labels and the command are not hidden, so check them before sharing the JSON. Each compose service has the same tab.
+
+**Relations.** Every Docker resource has a **Relations** tab with a map of what it uses and who shares it: images on the left, containers in the middle, and on the right its volumes, the folders of your machine it mounts (shown apart from volumes, with a folder icon and a dashed border) and its networks. Choose any of them to light up what it is joined to and see its detail under the map; **Inspect** opens right there. The map only shows this resource's neighbourhood: a volume or network shared by many containers shows 12 of them and says how many more, and Docker's own networks (`bridge`, `host`, `none`) only say how many containers use them. A container of a hive-am resource offers **Edit settings**. It is read only: nothing changes from the map.
 
 ![Summary of the Cart Redis Docker resource: status, CPU and memory, network and disk, and details such as container, image and ports](img/recurso-docker.jpg)
 
 *Summary of "Cart Redis", an existing container (Managed as: Existing container). Note the usage (CPU, memory, processes, network and disk) and the details with the redis:7-alpine image and the published ports.*
 
-**From a template.** When you create a Docker resource, the **From a template** option offers ready-made services (Redis, Valkey, PostgreSQL, MariaDB, MySQL, MongoDB, RabbitMQ, MinIO, Nginx, Mailpit, Adminer). You fill in a few values (version, ports, user, password) and hive-am creates a compose resource that you start whenever you want.
-
 A compose resource lists its **services**, and each one has its own actions to start, stop, restart and see logs. Each service also offers **Inspect**, a shell inside the container, **Create again** and **Build again and create**.
+
+**Edit the compose file.** A compose resource has a **File** tab with its compose file in the code editor (highlighted, with line numbers; the theme and whitespace come from the code settings). The path and size are at the top. **Save** asks first, naming the file it replaces, and writes it on disk (you can tick *Do not ask again for this file in this session*); **Ctrl+S** (**Cmd+S**) does the same. **Discard** goes back to what was saved. Saving does not touch Docker: if services are running, a notice says they keep the previous definition and offers **Create again** (with its usual confirmation). If Docker cannot read the file, it is saved anyway and the notice shows Docker's error, so you can fix it. If the file changed on disk since you opened it (another editor, for instance), hive-am does not overwrite it: choose **Reload** or **Overwrite** (after a confirmation). In **Settings**, **Edit the file** next to the compose file opens this tab.
+
+**Save as copy** writes the text in the editor (saved or not) next to the original with the name you choose (`docker-compose.copy.yml` by default); the original does not change. With **Use the copy in this resource** (on by default) the resource uses the copy from then on, without touching Docker: the next **Start** or **Create again** uses it. A name that already exists is only replaced after you confirm it. If services are running when the resource switches to the copy, the same notice offers **Create again**. An existing container has no file to edit.
+
+A file with Windows line endings keeps them when you save it. Going to another resource from the list does not ask about unsaved changes in the **File** tab: save them first.
 
 ## HTTP requests
 

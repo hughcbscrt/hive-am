@@ -52,6 +52,10 @@ export interface DockerConfig {
   /** Only for a container hive-am creates: limits and where it is attached. They apply the next time it is started (it is created again). */
   memory?: string; cpus?: number; network?: string;
   stopTimeoutSec?: number; logMaxMb?: number;
+  /** Networks it is connected to besides `network`: connected and disconnected in place (`docker network connect`), never recreated for. */
+  extraNetworks?: string[];
+  /** The other options of `docker run` hive-am supports (a fixed list, no free flags). Changing one creates the container again. */
+  labels?: Record<string, string>; user?: string; workdir?: string; entrypoint?: string; hostname?: string;
 }
 
 /** A folder of `.http` / `.rest` files whose requests can be run (the IntelliJ / VS Code REST client format). */
@@ -100,8 +104,8 @@ export type ObjectView = ObjectRow & { state: ObjectState; manager_id: string | 
 export const NAME_MAX = 60;
 const ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const PORT_SPEC = /^((\d{1,3}\.){3}\d{1,3}:)?\d{1,5}:\d{1,5}(\/(tcp|udp))?$/;
-const IMAGE = /^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,199}$/;
-const CONTAINER = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
+export const IMAGE = /^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,199}$/;
+export const CONTAINER = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
 const PROJECT = /^[a-z0-9][a-z0-9_-]{0,62}$/;
 
 const str = (v: unknown, what: string, max = 2000): string => {
@@ -182,6 +186,8 @@ export function parseDocker(c: any): DockerConfig {
     if (project && !PROJECT.test(project)) throw new ObjectError('The project name must be lowercase letters, digits, - or _');
     return { mode, file, project, stopTimeoutSec: num(c?.stopTimeoutSec, 'The stop timeout', 1, 300), services: list(c?.services, 'Services', (s) => { if (!CONTAINER.test(s)) throw new ObjectError(`"${s}" is not a valid service name`); return s; }) };
   }
+  const unknown = Object.keys(c ?? {}).filter((k) => !CONTAINER_KEYS.includes(k));
+  if (unknown.length) throw new ObjectError(`${unknown.map((k) => `"${k}"`).join(', ')} ${unknown.length === 1 ? 'is not an option' : 'are not options'} hive-am passes to docker run`);
   const image = str(c?.image, 'The image');
   if (!IMAGE.test(image)) throw new ObjectError('The image name is not valid');
   const restart = optStr(c?.restart, 'The restart policy');
@@ -192,8 +198,58 @@ export function parseDocker(c: any): DockerConfig {
     cpus: num(c?.cpus, 'The CPU limit', 0.01, 256), network: ((v) => { if (v && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(v)) throw new ObjectError('The network name is not valid'); return v; })(optStr(c?.network, 'The network', 64)),
     stopTimeoutSec: num(c?.stopTimeoutSec, 'The stop timeout', 1, 300), logMaxMb: num(c?.logMaxMb, 'The log size', 0.05, 500),
     ports: list(c?.ports, 'Ports', (s) => { if (!PORT_SPEC.test(s)) throw new ObjectError(`"${s}" is not a port mapping (use 8080:80)`); return s; }),
-    volumes: list(c?.volumes, 'Volumes', (s) => { if (s.startsWith('-') || !s.includes(':')) throw new ObjectError(`"${s}" is not a volume (use /host/path:/in/container)`); return s; }),
+    volumes: list(c?.volumes, 'Volumes', (s) => {
+      if (s.startsWith('-') || !s.includes(':')) throw new ObjectError(`"${s}" is not a volume (use /host/path:/in/container)`);
+      // `data:` or `:/data` would only fail later, in `docker run`.
+      const [from, to] = s.split(':'); if (!from.trim() || !to.trim()) throw new ObjectError(`"${s}" needs both sides: a volume or folder, and the path in the container`);
+      return s;
+    }),
+    ...runOptions(c),
   };
+}
+
+/** Every key a container hive-am creates can have: anything else (`privileged`, `cap_add`, free flags…) is refused, not ignored. */
+const CONTAINER_KEYS = ['mode', 'image', 'ports', 'volumes', 'env', 'restart', 'command', 'memory', 'cpus', 'network', 'stopTimeoutSec', 'logMaxMb', 'extraNetworks', 'labels', 'user', 'workdir', 'entrypoint', 'hostname'];
+const NETWORK = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
+const LABEL_KEY = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/;
+const USER = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}(:[A-Za-z0-9_][A-Za-z0-9_.-]{0,63})?$/;
+const HOSTNAME = /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
+
+/** The supported options of `docker run` beyond the basic ones: each is validated here, and only what is set is kept. */
+function runOptions(c: any): Pick<DockerConfig, 'extraNetworks' | 'labels' | 'user' | 'workdir' | 'entrypoint' | 'hostname'> {
+  const primary = typeof c?.network === 'string' && c.network.trim() ? c.network.trim() : 'bridge';
+  const extraNetworks = list(c?.extraNetworks, 'Additional networks', (s) => {
+    if (!NETWORK.test(s)) throw new ObjectError(`"${s}" is not a valid network name`);
+    if (s === 'host' || s === 'none') throw new ObjectError(`A container cannot be connected to the network ${s} besides another one`);
+    if (s === primary) throw new ObjectError(`${s} is already the main network`);
+    return s;
+  });
+  if (extraNetworks && (primary === 'host' || primary === 'none')) throw new ObjectError(`A container on the network ${primary} cannot be connected to other networks`);
+  if (extraNetworks && new Set(extraNetworks).size !== extraNetworks.length) throw new ObjectError('An additional network is listed twice');
+  let labels: Record<string, string> | undefined;
+  if (c?.labels !== undefined && c?.labels !== null) {
+    if (typeof c.labels !== 'object' || Array.isArray(c.labels)) throw new ObjectError('Labels must be name: value pairs');
+    const entries = Object.entries(c.labels as Record<string, unknown>);
+    if (entries.length > 50) throw new ObjectError('Labels has too many entries');
+    labels = {};
+    for (const [k, v] of entries) {
+      if (!LABEL_KEY.test(k)) throw new ObjectError(`"${k}" is not a valid label name`);
+      if (k.startsWith('hive-am.')) throw new ObjectError(`Labels starting with hive-am. are hive-am's own (${k})`);
+      const val = str(String(v ?? ''), `The label ${k}`, 1000);
+      if (/[\r\n]/.test(val)) throw new ObjectError(`The label ${k} must be one line`);
+      labels[k] = val;
+    }
+    if (!Object.keys(labels).length) labels = undefined;
+  }
+  const user = optStr(c?.user, 'The user', 130);
+  if (user && !USER.test(user)) throw new ObjectError('The user must be a name or id, optionally with a group (app, 1000 or 1000:1000)');
+  const workdir = optStr(c?.workdir, 'The working folder', 500);
+  if (workdir && (!workdir.startsWith('/') || /[\r\n]/.test(workdir))) throw new ObjectError('The working folder inside the container must be an absolute path');
+  const entrypoint = optStr(c?.entrypoint, 'The entrypoint', 500);
+  if (entrypoint && (entrypoint.startsWith('-') || /\s/.test(entrypoint))) throw new ObjectError('The entrypoint is one program (its arguments go in the command)');
+  const hostname = optStr(c?.hostname, 'The hostname', 253);
+  if (hostname && !HOSTNAME.test(hostname)) throw new ObjectError('The hostname is not valid (letters, digits, - and dots)');
+  return { extraNetworks, labels, user, workdir, entrypoint, hostname };
 }
 
 const ENV_NAME = /^[\w.$-]{1,60}$/, VAR_NAME = /^[A-Za-z_][\w.-]{0,80}$/;

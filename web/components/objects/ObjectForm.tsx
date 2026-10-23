@@ -1,27 +1,31 @@
 'use client';
 import { ManagerField, MANAGEABLE } from './ManagerField';
 import { useState } from 'react';
-import { ChevronRight, RefreshCw } from 'lucide-react';
+import { ChevronRight, FilePen, RefreshCw } from 'lucide-react';
 import { CheckRow, Field, FolderPicker, PathPicker, Segmented } from '@/components/ui';
 import { useComposeServices, useDockerLists } from '@/lib/useDocker';
+import { canCreate } from '@/lib/dockerLists';
 import { Suggest } from './Suggest';
-import { TemplatePicker } from './TemplatePicker';
+import { VolumeRows } from './VolumeRows';
+import { DockerBuild, useDockerMake } from './DockerMake';
+import { ExtraNetworks, RunOptions } from './DockerOptions';
+import { ManagedCopyButton } from './ManagedCopy';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
+import { useQueryState } from '@/lib/hooks/useQueryState';
 import type { ClusterConfig, DatabaseConfig, DbEngine, DockerConfig, HttpConfig, HttpScan, ObjectKind, ObjectView, ServerConfig } from '@/lib/types';
 import { KIND, envToText, lines, textToEnv } from './meta';
 import { VarsEditor, type Vars } from './VarsEditor';
 import { DatabaseCards, suggestDbName } from './DatabaseCards';
 
-type Mode = NonNullable<DockerConfig['mode']> | 'template';
 export interface Draft {
   name: string; colony_id: string; kind: ObjectKind; manager: string;
   cwd: string; start: string; stop: string; port: string; env: string;
   restart: string; maxRestarts: string; healthKind: string; healthTarget: string; healthInterval: string; healthTimeout: string; healthRetries: string; healthRestart: boolean; stopTimeout: string; logMax: string;
   folder: string; defEnv: string; variables: Vars; members: string[];
-  template: string; tplValues: Record<string, string>;
-  mode: Mode; image: string; ports: string; volumes: string; dockerRestart: string; command: string; file: string; project: string; services: string; container: string;
+  mode: NonNullable<DockerConfig['mode']>; image: string; ports: string; volumes: string; dockerRestart: string; command: string; file: string; project: string; services: string; container: string;
   memory: string; cpus: string; network: string;
+  extraNetworks: string[]; labels: string; user: string; workdir: string; entrypoint: string; hostname: string;
   engine: DbEngine; dbHost: string; dbPort: string; dbUser: string; dbPassword: string; dbPasswordSet: boolean; dbName: string; dbFile: string; dbSsl: boolean; dbTrust: boolean; dbReadOnly: boolean; dbTimeout: string; dbMaxRows: string; dbProps: Record<string, string>;
 }
 const n = (v: number | undefined) => (v === undefined ? '' : String(v));
@@ -39,16 +43,20 @@ export const draftFrom = (o?: ObjectView, colony?: string, kind?: ObjectKind): D
     restart: s.restart ?? 'no', maxRestarts: n(s.maxRestarts), healthKind: s.health?.kind ?? '', healthTarget: s.health?.target ?? '', healthInterval: n(s.health?.intervalSec), healthTimeout: n(s.health?.timeoutSec), healthRetries: n(s.health?.retries), healthRestart: !!s.health?.restartWhenUnhealthy,
     stopTimeout: n(o?.kind === 'server' ? s.stopTimeoutSec : d.stopTimeoutSec), logMax: n(o?.kind === 'server' ? s.logMaxMb : d.logMaxMb),
     folder: h.folder ?? '', defEnv: h.env ?? '', variables: (h.variables ?? {}) as Vars, members: c.members ?? [],
-    template: '', tplValues: {},
-    mode: d.mode ?? (o ? 'container' : 'template'), image: d.image ?? '', ports: (d.ports ?? []).join('\n'), volumes: (d.volumes ?? []).join('\n'), dockerRestart: d.restart ?? 'no', command: d.command ?? '',
+    mode: d.mode ?? 'container', image: d.image ?? '', ports: (d.ports ?? []).join('\n'), volumes: (d.volumes ?? []).join('\n'), dockerRestart: d.restart ?? 'no', command: d.command ?? '',
     file: d.file ?? '', project: d.project ?? '', services: (d.services ?? []).join(', '), container: d.container ?? '',
     memory: d.memory ?? '', cpus: n(d.cpus), network: d.network ?? '',
+    extraNetworks: d.extraNetworks ?? [], labels: envToText(d.labels), user: d.user ?? '', workdir: d.workdir ?? '', entrypoint: d.entrypoint ?? '', hostname: d.hostname ?? '',
     engine: q.engine ?? 'postgresql', dbHost: q.host ?? '', dbPort: n(q.port), dbUser: q.user ?? '', dbPassword: '', dbPasswordSet: !!q.passwordSet, dbName: q.database ?? '', dbFile: q.file ?? '',
     dbSsl: !!q.ssl, dbTrust: !!q.trustCert, dbReadOnly: q.readOnly !== false, dbTimeout: n(q.timeoutSec), dbMaxRows: n(q.maxRows), dbProps: { ...(q.props ?? {}) },
   };
 };
 
 const num = (v: string) => (v.trim() === '' ? undefined : Number(v));
+
+/** A new container hive-am creates, filled with `config` (a managed copy of an existing container). */
+export const draftFromDocker = (config: DockerConfig, name: string, colony?: string): Draft =>
+  ({ ...draftFrom({ id: '', colony_id: colony ?? null, kind: 'docker', name, config, state: { status: 'stopped' }, manager_id: null, created_at: 0, updated_at: 0 }), manager: '' });
 
 /** The body the server expects for this draft. */
 export function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | DatabaseConfig | ClusterConfig {
@@ -62,12 +70,13 @@ export function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | D
       health: d.healthKind && d.healthTarget.trim() ? { kind: d.healthKind as 'http', target: d.healthTarget.trim(), intervalSec: num(d.healthInterval), timeoutSec: num(d.healthTimeout), retries: num(d.healthRetries), restartWhenUnhealthy: d.healthRestart || undefined } : undefined,
     };
   }
-  if (d.mode === 'template') return { mode: 'compose' };   // creating from a template goes through its own call (see ObjectEditor)
   if (d.mode === 'existing') return { mode: 'existing', container: d.container.trim(), stopTimeoutSec: num(d.stopTimeout) };
   if (d.mode === 'compose') return { mode: 'compose', file: d.file.trim(), project: d.project.trim() || undefined, services: d.services.split(',').map((x) => x.trim()).filter(Boolean), stopTimeoutSec: num(d.stopTimeout) };
   return {
     mode: 'container', image: d.image.trim(), ports: lines(d.ports), volumes: lines(d.volumes), env: textToEnv(d.env), restart: (d.dockerRestart || 'no') as DockerConfig['restart'], command: d.command.trim() || undefined,
     memory: d.memory.trim() || undefined, cpus: num(d.cpus), network: d.network.trim() || undefined, stopTimeoutSec: num(d.stopTimeout), logMaxMb: num(d.logMax),
+    extraNetworks: d.extraNetworks.length ? d.extraNetworks : undefined, labels: textToEnv(d.labels),
+    user: d.user.trim() || undefined, workdir: d.workdir.trim() || undefined, entrypoint: d.entrypoint.trim() || undefined, hostname: d.hostname.trim() || undefined,
   };
 }
 
@@ -85,6 +94,13 @@ export const dbConfigOf = (d: Draft): DatabaseConfig => {
 export const Card = ({ title, hint, wide = false, children }: { title: string; hint?: string; wide?: boolean; children: React.ReactNode }) => (
   <section className={`of-card ${wide ? 'wide' : ''}`} id={`of-${title.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-')}`} data-title={title}><header><h4>{title}</h4>{hint && <p className="muted small">{hint}</p>}</header>{children}</section>
 );
+
+/** In the settings of a compose resource: opens its File tab, where the saved compose file is edited. */
+function FileTabLink() {
+  const { t } = useI18n();
+  const [, setTab] = useQueryState('tab', 'summary');
+  return <p className="muted small res-m0"><button type="button" className="btn ghost sm" onClick={() => setTab('file')}><FilePen size={14} />{t('fe.openTab')}</button> {t('fe.openTab.hint')}</p>;
+}
 
 /** The services of a compose file, to pick (none picked = all of them). */
 function ServicePicker({ file, project, services, onServices, onProject }: { file: string; project: string; services: string; onServices: (v: string) => void; onProject: (v: string) => void }) {
@@ -121,6 +137,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
   const { colonies, objects } = useHive();
   const needsDocker = d.kind === 'docker' && (d.mode === 'existing' || d.mode === 'container');
   const docker = useDockerLists(needsDocker);
+  const make = useDockerMake(docker.reload);
   const text = (k: keyof Draft, props: { placeholder?: string; mono?: boolean; type?: string } = {}) => (
     <input className={`input ${props.mono ? 'mono' : ''}`} type={props.type} value={d[k] as string} placeholder={props.placeholder} onChange={(e) => set(k, e.target.value as never)} />
   );
@@ -217,27 +234,29 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
         </Card>
       </>) : (<>
         <Card title={t('obj.f.mode')}>
-          <Segmented value={d.mode} onChange={(v) => set('mode', v)} options={[...(showKind ? [{ id: 'template' as const, label: t('obj.mode.template') }] : []), { id: 'container', label: t('obj.mode.container') }, { id: 'compose', label: t('obj.mode.compose') }, { id: 'existing', label: t('obj.mode.existing') }]} />
+          <Segmented value={d.mode} onChange={(v) => set('mode', v)} options={[{ id: 'container', label: t('obj.mode.container') }, { id: 'compose', label: t('obj.mode.compose') }, { id: 'existing', label: t('obj.mode.existing') }]} />
         </Card>
-        {d.mode === 'template' && (
-          <Card title={t('obj.mode.template')} hint={t('tpl.hint')}>
-            <TemplatePicker template={d.template} values={d.tplValues}
-              onPick={(x) => setD((p) => ({ ...p, template: x.id, tplValues: Object.fromEntries(x.fields.map((f) => [f.key, f.default])), name: p.name.trim() ? p.name : x.name }))}
-              onValue={(k, v) => setD((p) => ({ ...p, tplValues: { ...p.tplValues, [k]: v } }))} />
-          </Card>
-        )}
         {d.mode === 'container' && (<>
           <Card title={t('of.image')}>
             <Field label={t('obj.f.image')}>
               <div className="row gap-s"><div className="grow"><Suggest value={d.image} onChange={(v) => set('image', v)} mono placeholder={t('dk.pickImage')} ariaLabel={t('obj.f.image')}
-                options={(docker.images ?? []).map((i) => ({ value: i.ref, hint: `${i.size}${i.created ? ` · ${i.created}` : ''}` }))} /></div>{refresh}</div>
+                options={(docker.images ?? []).map((i) => ({ value: i.ref, hint: [i.size, i.created, t('dk.inUse', { count: i.inUse })].filter(Boolean).join(' · ') }))} /></div>{refresh}</div>
               {dockerNote}
             </Field>
+            <DockerBuild onBuilt={(tag) => { set('image', tag); docker.reload(); }} />
             <Field label={t('obj.f.ports')} hint={t('obj.f.ports.hint')}><textarea className="textarea mono" rows={2} value={d.ports} onChange={(e) => set('ports', e.target.value)} placeholder="8080:80" /></Field>
-            <Field label={t('obj.f.volumes')} hint={t('obj.f.volumes.hint')}>
-              <textarea className="textarea mono" rows={2} value={d.volumes} onChange={(e) => set('volumes', e.target.value)} />
-              <PathPicker bare value="" buttonLabel={t('obj.f.volumes.add')} onChange={(v) => set('volumes', `${d.volumes.trimEnd()}${d.volumes.trim() ? '\n' : ''}${v}:/data`)} />
+          </Card>
+          <Card title={t('of.network')}>
+            <Field label={t('obj.dk.network')} hint={t('dk.net.hint')}>
+              <Suggest value={d.network} onChange={(v) => set('network', v)} mono placeholder={t('dk.pickNetwork')} ariaLabel={t('obj.dk.network')}
+                options={(docker.networks ?? []).map((x) => ({ value: x.name, hint: [x.driver, t('dk.inUse', { count: x.inUse }), x.managed ? t('dk.managed') : ''].filter(Boolean).join(' · '), action: make.removeAction('network', x) }))} />
+              {/* Unlike a volume, a network Docker does not have makes the container fail to start: say so, with the way to create it. */}
+              {canCreate('network', d.network, docker.networks) && <div className="dk-make"><p className="muted small res-m0">{t('dk.net.new', { name: d.network.trim() })}</p>{make.createButton('network', d.network, docker.networks, t('dk.make.network', { name: d.network.trim() }))}</div>}
             </Field>
+            <ExtraNetworks value={d.extraNetworks} onChange={(v) => set('extraNetworks', v)} main={d.network} networks={docker.networks} make={make} />
+          </Card>
+          <Card title={t('obj.f.volumes')} hint={t('obj.f.volumes.hint')} wide>
+            <VolumeRows value={d.volumes} onChange={(v) => set('volumes', v)} volumes={docker.volumes} make={make} />
           </Card>
           <Card title={t('of.env')}>
             <Field label={t('obj.f.env')} hint={t('obj.f.env.hint')}><textarea className="textarea mono" rows={4} value={d.env} onChange={(e) => set('env', e.target.value)} /></Field>
@@ -245,12 +264,12 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
               <select className="select" value={d.dockerRestart} onChange={(e) => set('dockerRestart', e.target.value)}>{['no', 'always', 'unless-stopped', 'on-failure'].map((r) => <option key={r} value={r}>{r}</option>)}</select>
             </Field>
             <Field label={t('obj.f.command')}>{text('command', { mono: true })}</Field>
+            <RunOptions d={d} set={set} />
           </Card>
           <Card title={t('of.limits')} hint={t('obj.dk.limits.hint')}>
             <div className="of-grid2">
               <Field label={t('obj.dk.memory')}>{text('memory', { placeholder: '512m' })}</Field>
               <Field label={t('obj.dk.cpus')}>{text('cpus', { placeholder: '1.5' })}</Field>
-              <Field label={t('obj.dk.network')}>{text('network', { placeholder: 'bridge' })}</Field>
               <Field label={t('obj.sup.stopTimeout')}>{text('stopTimeout', { placeholder: '10' })}</Field>
               <Field label={t('obj.sup.logMax')}>{text('logMax', { placeholder: '10' })}</Field>
             </div>
@@ -259,6 +278,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
         {d.mode === 'compose' && (
           <Card title={t('obj.mode.compose')}>
             <PathPicker mode="file" exts={['yml', 'yaml']} value={d.file} onChange={(v) => set('file', v)} label={t('obj.f.file')} hint={t('obj.f.file.hint')} placeholder="/home/you/app/docker-compose.yml" />
+            {objectId && <FileTabLink />}
             <ServicePicker file={d.file} project={d.project} services={d.services} onServices={(v) => set('services', v)} onProject={(v) => set('project', v)} />
             <Field label={t('obj.sup.stopTimeout')} hint={t('obj.sup.stopTimeout.hint')}>{text('stopTimeout', { placeholder: '10' })}</Field>
           </Card>
@@ -271,9 +291,11 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
               {dockerNote}
             </Field>
             <Field label={t('obj.sup.stopTimeout')} hint={t('obj.sup.stopTimeout.hint')}>{text('stopTimeout', { placeholder: '10' })}</Field>
+            {objectId && <ManagedCopyButton objectId={objectId} />}
           </Card>
         )}
       </>)}
+      {make.dialog}
     </div>
   );
 }

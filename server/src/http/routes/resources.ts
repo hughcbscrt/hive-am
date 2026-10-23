@@ -1,9 +1,11 @@
 import { notifyAgentsChanged } from '../../runtime.js';
 import { DRIVER_PROPS } from '../../objects/driver-props.js';
-import { composeServices, listContainers, listImages } from '../../objects/docker-info.js';
+import { composeServices, inspectMachine, listContainers, listImages, listNetworks, listVolumes } from '../../objects/docker-info.js';
+import { buildImage, createMade, removeMade } from '../../objects/docker.js';
+import { copySource, readSource, writeSource } from '../../objects/files.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from '../../objects/agent.js';
 import { agentDb } from '../../objects/agent-db.js';
-import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, objectInspect, objectLogs, removeObject, updateObject } from '../../objects/index.js';
+import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, composeFileCopy, composeFileRead, composeFileWrite, objectApply, objectInspect, objectManagedCopy, objectPlan, objectInspectRaw, objectLogs, removeObject, updateObject } from '../../objects/index.js';
 import { body, type Body } from '../body.js';
 import { notFound } from '../errors.js';
 import { requireLocal } from '../guards.js';
@@ -30,16 +32,41 @@ route('GET', '/api/objects', () => listObjects());
 write('POST', '/api/objects', (b) => createObject(b as Parameters<typeof createObject>[0]));
 write('PATCH', '/api/objects/:id', (b, { params }) => updateObject(params[0], b as Parameters<typeof updateObject>[1]));
 route('DELETE', '/api/objects/:id', async ({ req, params }) => { local(req); if (!(await removeObject(params[0]))) throw notFound('Object not found'); return { ok: true }; });
-route('GET', '/api/object-templates', () => listTemplates());
 write('PUT', '/api/objects/:id/manager', (b, { params }) => { const r = setObjectManager(params[0], b.agent_id); if (r.skillAdded) notifyAgentsChanged(); return r; });
 write('PUT', '/api/agents/:id/resources', (b, { params }) => { const r = setAgentObjects(params[0], b.object_ids); if (r.skillAdded) notifyAgentsChanged(); return r; });
-write('POST', '/api/objects/from-template', (b) => createFromTemplate(b as Parameters<typeof createFromTemplate>[0]));
+// Reads, open like the other reads of resources (the app is also reached by other names on the network). Secret-looking variables and the
+// passwords of URLs come hidden in the raw one unless `reveal=1`.
 route('GET', '/api/objects/:id/inspect', ({ params, url }) => objectInspect(params[0], p(url, 'service')));
+route('GET', '/api/objects/:id/inspect/raw', ({ params, url }) => objectInspectRaw(params[0], p(url, 'service'), url.searchParams.get('reveal') === '1'));
+// The whole `docker inspect` of anything on this machine (container, image, volume, network).
+route('GET', '/api/docker/inspect', ({ url }) => inspectMachine(url.searchParams.get('kind') ?? '', url.searchParams.get('ref') ?? '', url.searchParams.get('reveal') === '1'));
 write('POST', '/api/objects/:id/service', (b, { params }) => objectServiceAction(params[0], b.service, b.action));
 write('POST', '/api/objects/:id/action', (b, { params }) => objectAction(params[0], b.action));
-// What Docker knows, to suggest in the forms (containers, images, the services of a compose file).
+// Changing a container hive-am created (local app only): what applying the settings in the form would do (Docker only read), then applying
+// the saved ones (recreating needs `confirm: true`). An existing container is never changed: it is read to fill the form of a managed copy.
+write('POST', '/api/objects/:id/docker/plan', (b, { params }) => objectPlan(params[0], b.config));
+write('POST', '/api/objects/:id/docker/apply', (b, { params }) => objectApply(params[0], b));
+guarded('/api/objects/:id/docker/managed-copy', ({ params }) => objectManagedCopy(params[0]));
+// What Docker knows, to suggest in the forms (containers, images, volumes, networks, the services of a compose file).
 route('GET', '/api/docker/containers', () => listContainers());
 route('GET', '/api/docker/images', () => listImages());
+route('GET', '/api/docker/volumes', () => listVolumes());
+route('GET', '/api/docker/networks', () => listNetworks());
+// What the Docker form creates when asked (local app only): a network, a volume, an image from a Dockerfile. A network or a volume is
+// removed only if hive-am created it and no container uses it (checked in objects/docker.ts, against Docker).
+write('POST', '/api/docker/networks', (b) => createMade('network', b.name));
+write('POST', '/api/docker/volumes', (b) => createMade('volume', b.name));
+guarded('/api/docker/networks/:name', ({ params }) => removeMade('network', params[0]), 'DELETE');
+guarded('/api/docker/volumes/:name', ({ params }) => removeMade('volume', params[0]), 'DELETE');
+write('POST', '/api/docker/images/build', (b) => buildImage(b));
+// Editing the compose file of a resource (its path is the saved one) and a Dockerfile (path from the page, checked by name in objects/files.ts),
+// in place or as a copy next to it. They are the person's own files, which may hold secrets: local app only, reading included. A stale etag is 409.
+guarded('/api/objects/:id/docker/file', ({ params }) => composeFileRead(params[0]));
+write('PUT', '/api/objects/:id/docker/file', (b, { params }) => composeFileWrite(params[0], b.content, b.etag));
+write('POST', '/api/objects/:id/docker/file/copy', (b, { params }) => composeFileCopy(params[0], b));
+guarded('/api/docker/dockerfile', ({ url }) => readSource('dockerfile', url.searchParams.get('path') ?? ''));
+write('PUT', '/api/docker/dockerfile', (b) => writeSource('dockerfile', b.path, b.content, b.etag));
+write('POST', '/api/docker/dockerfile/copy', (b) => copySource('dockerfile', b.path, b.name, b.content, b.overwrite === true));
 route('GET', '/api/docker/compose-services', ({ url }) => composeServices(url.searchParams.get('file') ?? ''));
 route('GET', '/api/objects/:id/stats', ({ params }) => statsOf(params[0]));
 route('GET', '/api/objects/:id/http', ({ params }) => httpScan(params[0]));

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { Hammer, Info, Loader2, Play, PlugZap, RefreshCcw, RotateCw, Square } from 'lucide-react';
+import { CopyPlus, Hammer, Info, Loader2, Play, PlugZap, RefreshCcw, RotateCw, Square } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
@@ -18,9 +18,15 @@ import { TerminalButton } from '@/components/dock/TerminalButton';
 import { HttpWorkspace } from './HttpWorkspace';
 import { HttpVars } from './HttpVars';
 import { DbWorkspace } from './DbWorkspace';
+import { FileEditor } from './FileEditor';
+import { DockerMap } from './DockerMap';
+import { useManagedCopy } from './ManagedCopy';
+import { copyCompose, readCompose, saveCompose } from '@/lib/dockerFiles';
 
-type Tab = 'summary' | 'logs' | 'config' | 'requests' | 'history' | 'vars' | 'query' | 'schema';
-const tabsOf = (o: ObjectView): Tab[] => (o.kind === 'http' ? ['requests', 'history', 'vars', 'config'] : o.kind === 'database' ? ['query', 'schema', 'history', 'config'] : ['summary', 'logs', 'config']);
+type Tab = 'summary' | 'logs' | 'file' | 'relations' | 'config' | 'requests' | 'history' | 'vars' | 'query' | 'schema';
+// Only a compose resource has a file of its own to edit (an existing container has none). Every Docker resource has its relations map.
+const tabsOf = (o: ObjectView): Tab[] => (o.kind === 'http' ? ['requests', 'history', 'vars', 'config'] : o.kind === 'database' ? ['query', 'schema', 'history', 'config']
+  : o.kind === 'docker' ? ((o.config as DockerConfig).mode === 'compose' ? ['summary', 'logs', 'file', 'relations', 'config'] : ['summary', 'logs', 'relations', 'config']) : ['summary', 'logs', 'config']);
 
 /** One object on a whole screen, like an agent: the list at the left, and its tabs (summary, logs, settings, or requests and variables). */
 export function ObjectWorkspace({ id }: { id?: string }) {
@@ -60,6 +66,12 @@ function Screen({ object: o }: { object: ObjectView }) {
   const [logFilter, setLogFilter] = useState('');
   const [inspecting, setInspecting] = useState(false);
   const [recreating, setRecreating] = useState(false);
+  // Unsaved edits of the File tab: leaving it for another tab asks first.
+  const [fileDirty, setFileDirty] = useState(false);
+  const [leaving, setLeaving] = useState<Tab | null>(null);
+  // A copy the resource now uses, made while services ran: the editor of the copy opens with the notice that they run the old definition.
+  const [copyRunning, setCopyRunning] = useState(false);
+  const go = (x: Tab) => { if (x === 'logs') setLogFilter(''); setCopyRunning(false); setTab(x); };
   const [busy, setBusy] = useState<string | null>(null);
   const { icon: Icon, color } = KIND[o.kind];
   const st = o.state.status, live = st === 'running' || st === 'starting';
@@ -81,12 +93,15 @@ function Screen({ object: o }: { object: ObjectView }) {
   const canShell = o.kind === 'server' || (o.kind === 'docker' && (o.config as DockerConfig).mode !== 'compose');
 
   const docker = o.kind === 'docker' ? (o.config as DockerConfig) : null;
+  const copy = useManagedCopy(o.id);
   const actions: HeaderAction[] = [];
   if (o.kind !== 'http' && o.kind !== 'database') {
     actions.push({ id: 'stop', label: t(cluster ? 'obj.act.stopAll' : 'obj.act.stop'), icon: <Square size={14} />, disabled: !!busy || (!live && st !== 'error'), onClick: () => void act('stop') });
     actions.push({ id: 'restart', label: t(cluster ? 'obj.act.restartAll' : 'obj.act.restart'), icon: <RotateCw size={14} />, disabled: !!busy, onClick: () => void act('restart') });
   }
-  if (docker && docker.mode === 'container') actions.push({ id: 'inspect', label: t('svc.inspect'), icon: <Info size={14} />, onClick: () => setInspecting(true) });
+  if (docker && docker.mode !== 'compose') actions.push({ id: 'inspect', label: t('svc.inspect'), icon: <Info size={14} />, onClick: () => setInspecting(true) });
+  // An existing container is never changed by hive-am: to change how it runs, a container hive-am creates is made from it.
+  if (docker && docker.mode === 'existing') actions.push({ id: 'copy', label: t('mc.go'), icon: <CopyPlus size={14} />, hint: t('mc.hint'), disabled: copy.busy, onClick: () => void copy.open() });
   if (docker && docker.mode !== 'existing') actions.push({ id: 'recreate', label: t('obj.act.recreate'), icon: <RefreshCcw size={14} />, danger: true, hint: t('svc.recreate.hint'), disabled: !!busy, onClick: () => setRecreating(true) });
   if (docker && docker.mode === 'compose') actions.push({ id: 'rebuild', label: t('obj.act.rebuild'), icon: <Hammer size={14} />, hint: t('svc.rebuild.hint'), disabled: !!busy, onClick: () => void act('rebuild') });
   const primary = (<>
@@ -113,18 +128,28 @@ function Screen({ object: o }: { object: ObjectView }) {
         primary={primary}
         actions={actions}
       />
-      <Tabs idPrefix="ow" label={t('rs.tabs')} value={tab} onChange={(x) => { if (x === 'logs') setLogFilter(''); setTab(x); }} tabs={tabs.map((x) => ({ id: x, label: t(`ow.tab.${x}`) }))} />
-      <div className={`ow-body ${tab === 'logs' || tab === 'requests' || tab === 'history' || tab === 'query' || tab === 'schema' ? 'full' : ''}`}>
+      <Tabs idPrefix="ow" label={t('rs.tabs')} value={tab} onChange={(x) => { if (tab === 'file' && fileDirty && x !== 'file') setLeaving(x as Tab); else go(x as Tab); }} tabs={tabs.map((x) => ({ id: x, label: t(`ow.tab.${x}`) }))} />
+      <div className={`ow-body ${tab === 'logs' || tab === 'file' || tab === 'requests' || tab === 'history' || tab === 'query' || tab === 'schema' ? 'full' : ''}`}>
         <TabPanel id={tab} value={tab} idPrefix="ow">
           {tab === 'summary' && <ObjectSummary object={o} onSeeLogs={(filter) => { setLogFilter(filter ?? ''); setTab('logs'); }} />}
           {tab === 'logs' && <LogPane key={logFilter} id={o.id} members={cluster ? memberNames : undefined} initialFilter={logFilter || undefined} />}
+          {tab === 'file' && docker?.mode === 'compose' && (
+            <FileEditor key={docker.file} kind="compose" load={() => readCompose(o.id)} save={(content, etag) => saveCompose(o.id, content, etag)} copy={(p) => copyCompose(o.id, p)}
+              repointOption startRunning={copyRunning} onCopied={(r, repointed) => setCopyRunning(repointed && !!r.running)} onRecreate={() => setRecreating(true)} onDirty={setFileDirty} />
+          )}
+          {tab === 'relations' && o.kind === 'docker' && <DockerMap object={o} />}
           {tab === 'config' && <ObjectConfig object={o} />}
           {o.kind === 'database' && (tab === 'query' || tab === 'schema' || tab === 'history') && <DbWorkspace object={o} pane={tab} onPane={setTab} />}
           {o.kind === 'http' && (tab === 'requests' || tab === 'history') && <HttpWorkspace object={o} pane={tab} onOpenVars={() => setTab('vars')} onGoRequests={() => setTab('requests')} />}
           {tab === 'vars' && <HttpVars object={o} />}
         </TabPanel>
       </div>
+      {copy.view}
       {inspecting && <ServiceDetail objectId={o.id} title={o.name} onClose={() => setInspecting(false)} />}
+      {leaving && (
+        <ConfirmDialog title={t('fe.leave.title')} body={t('fe.leave.body')} confirmLabel={t('common.discard')} danger
+          onConfirm={() => { setFileDirty(false); go(leaving); }} onClose={() => setLeaving(null)} />
+      )}
       {recreating && (
         <ConfirmDialog title={t('rs.recreate.title', { name: o.name })} body={t('svc.recreate.hint')} confirmLabel={t('obj.act.recreate')} danger
           onConfirm={() => act('recreate')} onClose={() => setRecreating(false)} />

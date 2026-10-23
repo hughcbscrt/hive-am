@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useDismiss } from '@/lib/useDismiss';
 import { useCombobox } from '@/components/ui';
 
-export interface Opt { value: string; label?: string; hint?: string }
+/** `action`: a small button at the end of the option (e.g. delete it), which does not pick it. */
+export interface Opt { value: string; label?: string; hint?: string; action?: { label: string; icon: ReactNode; onClick: () => void } }
 
 /**
  * A text field that suggests values (images, containers, variable names…) while still taking anything you type. Arrow keys and Enter pick,
@@ -41,10 +42,11 @@ export function Suggest({ value, onChange, options, placeholder, mono = false, a
         <ul className="sg-list" {...cb.listProps}>
           {shown.length === 0 && <li className="sg-empty" role="presentation">{empty}</li>}
           {shown.map((o, i) => (
-            <li key={o.value} {...cb.optionProps(i)}>
-              <button type="button" tabIndex={-1} className={`sg-opt ${i === hi ? 'hi' : ''}`} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setHi(i)} onClick={() => pick(o)}>
+            <li key={o.value} {...cb.optionProps(i)} className={o.action ? 'sg-li' : undefined}>
+              <button type="button" tabIndex={-1} className={`sg-opt ${i === hi ? 'hi' : ''}`} title={o.label ?? o.value} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setHi(i)} onClick={() => pick(o)}>
                 <span className={`nm ${mono ? 'mono' : ''}`}>{o.label ?? o.value}</span>{o.hint && <span className="hint">{o.hint}</span>}
               </button>
+              {o.action && <button type="button" className="btn ghost icon sm sg-act" aria-label={o.action.label} title={o.action.label} onMouseDown={(e) => e.preventDefault()} onClick={() => { setOpen(false); o.action!.onClick(); }}>{o.action.icon}</button>}
             </li>
           ))}
         </ul>
