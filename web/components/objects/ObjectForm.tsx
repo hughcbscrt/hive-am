@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { ChevronRight, RefreshCw } from 'lucide-react';
 import { CheckRow, Field, FolderPicker, PathPicker, Segmented } from '@/components/ui';
 import { useComposeServices, useDockerLists } from '@/lib/useDocker';
+import { canCreate } from '@/lib/dockerLists';
 import { Suggest } from './Suggest';
 import { VolumeRows } from './VolumeRows';
+import { useDockerMake } from './DockerMake';
 import { TemplatePicker } from './TemplatePicker';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
@@ -122,6 +124,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
   const { colonies, objects } = useHive();
   const needsDocker = d.kind === 'docker' && (d.mode === 'existing' || d.mode === 'container');
   const docker = useDockerLists(needsDocker);
+  const make = useDockerMake(docker.reload);
   const text = (k: keyof Draft, props: { placeholder?: string; mono?: boolean; type?: string } = {}) => (
     <input className={`input ${props.mono ? 'mono' : ''}`} type={props.type} value={d[k] as string} placeholder={props.placeholder} onChange={(e) => set(k, e.target.value as never)} />
   );
@@ -239,11 +242,13 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
           <Card title={t('of.network')}>
             <Field label={t('obj.dk.network')} hint={t('dk.net.hint')}>
               <Suggest value={d.network} onChange={(v) => set('network', v)} mono placeholder={t('dk.pickNetwork')} ariaLabel={t('obj.dk.network')}
-                options={(docker.networks ?? []).map((x) => ({ value: x.name, hint: [x.driver, t('dk.inUse', { count: x.inUse }), x.managed ? t('dk.managed') : ''].filter(Boolean).join(' · ') }))} />
+                options={(docker.networks ?? []).map((x) => ({ value: x.name, hint: [x.driver, t('dk.inUse', { count: x.inUse }), x.managed ? t('dk.managed') : ''].filter(Boolean).join(' · '), action: make.removeAction('network', x) }))} />
+              {/* Unlike a volume, a network Docker does not have makes the container fail to start: say so, with the way to create it. */}
+              {canCreate('network', d.network, docker.networks) && <div className="dk-make"><p className="muted small res-m0">{t('dk.net.new', { name: d.network.trim() })}</p>{make.createButton('network', d.network, docker.networks, t('dk.make.network', { name: d.network.trim() }))}</div>}
             </Field>
           </Card>
           <Card title={t('obj.f.volumes')} hint={t('obj.f.volumes.hint')} wide>
-            <VolumeRows value={d.volumes} onChange={(v) => set('volumes', v)} volumes={docker.volumes} />
+            <VolumeRows value={d.volumes} onChange={(v) => set('volumes', v)} volumes={docker.volumes} make={make} />
           </Card>
           <Card title={t('of.env')}>
             <Field label={t('obj.f.env')} hint={t('obj.f.env.hint')}><textarea className="textarea mono" rows={4} value={d.env} onChange={(e) => set('env', e.target.value)} /></Field>
@@ -279,6 +284,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
           </Card>
         )}
       </>)}
+      {make.dialog}
     </div>
   );
 }

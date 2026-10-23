@@ -124,6 +124,8 @@ Los formularios consultan a Docker para sugerirte lo que ya existe: imágenes lo
 
 En **Volúmenes**, pulsa **Agregar un volumen** y, en la fila, elige un volumen de esta máquina, escribe un nombre nuevo (Docker lo crea la primera vez que inicia el contenedor, y la fila te lo dice) o pulsa **Carpeta** para elegir una carpeta; luego escribe la ruta dentro del contenedor (una fila necesita los dos lados para guardarse, y te lo dice) y marca **Solo lectura** si el contenedor no debe escribir ahí. Un recurso que guardaste antes muestra sus volúmenes en estas filas.
 
+Si la red que escribes no existe en esta máquina, el campo te dice que el contenedor no iniciará sin ella y ofrece **Crear la red**; una fila de volumen con un nombre nuevo ofrece **Crearlo ahora**. Lo que crea hive-am aparece marcado *creado por hive-am* y se queda aunque canceles el formulario. En las sugerencias, una red o un volumen que creó hive-am y que ningún contenedor usa tiene un botón de eliminar: pregunta antes, y hive-am vuelve a comprobarlo antes de borrar. Las redes y volúmenes que no creó hive-am, las redes propias de Docker y lo que está en uso nunca se borran.
+
 En modo **Crear un contenedor** puedes elegir la **Red** y fijar límites (memoria, CPUs, tamaño del log, tiempo para detenerse). Si cambias uno, el contenedor se vuelve a crear la próxima vez que inicia o se reinicia, y lo que había dentro se pierde.
 
 El **Resumen** de un Docker añade procesos, red y disco, y muestra la imagen, los puertos y el número de reinicios.

@@ -274,6 +274,59 @@ export async function removeDocker(id: string, c: DockerConfig): Promise<void> {
   else if (c.mode === 'compose' && existsSync(c.file!)) await dk(composeArgs(c, ['stop', ...(c.services ?? [])]), { cwd: dirname(c.file!) }).catch(() => undefined);
 }
 
+// ---------------------------------------------------------------- networks and volumes made from the form
+/**
+ * What the person asks for from the Docker form, one button each: create a network or a volume. What hive-am creates carries
+ * the label `hive-am.created=1`, and only that can be removed from here, while no container (running or not) uses it. The checks are made
+ * here, against Docker, right before removing: never on what the page says.
+ */
+export type MadeKind = 'network' | 'volume';
+const CREATED = 'hive-am.created';
+const MADE_NAME: Record<MadeKind, RegExp> = { network: /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/, volume: /^[A-Za-z0-9][A-Za-z0-9_.-]{1,63}$/ };
+const BUILTIN_NETWORKS = ['bridge', 'host', 'none'];
+
+function madeName(kind: MadeKind, raw: unknown): string {
+  const name = typeof raw === 'string' ? raw.trim() : '';
+  if (!MADE_NAME[kind].test(name)) throw new ObjectError(`"${name}" is not a valid ${kind} name: letters, digits, _ . or -, starting with a letter or digit`);
+  if (kind === 'network' && BUILTIN_NETWORKS.includes(name)) throw new ObjectError(`${name} is one of Docker's own networks`);
+  if (kind === 'volume' && /^[0-9a-f]{64}$/.test(name)) throw new ObjectError('That name looks like an anonymous volume');
+  return name;
+}
+
+/** The labels of a network or a volume, or null when Docker has none with exactly that name (a network is also found by an id prefix: not that). */
+async function madeLabels(kind: MadeKind, name: string): Promise<Record<string, string> | null> {
+  const r = await dk([kind, 'inspect', '-f', '{{.Name}}|{{json .Labels}}', name], { timeout: 20_000 });
+  if (r.code !== 0) { if (NO_DAEMON.test(r.err)) throw fail(r, 'Docker is not answering'); return null; }
+  const at = r.out.indexOf('|');
+  if (r.out.slice(0, at).trim() !== name) return null;
+  try { return JSON.parse(r.out.slice(at + 1)) ?? {}; } catch { return {}; }
+}
+
+/** Creates a network or a volume with hive-am's label. One that already exists is left as it is (`created: false`). */
+export async function createMade(kind: MadeKind, raw: unknown): Promise<{ name: string; created: boolean }> {
+  const name = madeName(kind, raw);
+  if (await madeLabels(kind, name)) return { name, created: false };
+  const r = await dk([kind, 'create', '--label', `${CREATED}=1`, name], { timeout: 30_000 });
+  if (r.code !== 0) throw fail(r, `Could not create the ${kind} ${name}`);
+  return { name, created: true };
+}
+
+/** Removes a network or a volume, only if hive-am created it (its label) and no container, running or stopped, uses it. */
+export async function removeMade(kind: MadeKind, raw: unknown): Promise<{ name: string; removed: true }> {
+  const name = madeName(kind, raw);
+  const labels = await madeLabels(kind, name);
+  if (!labels) throw new ObjectError(`Docker has no ${kind} ${name}`);
+  if (labels[CREATED] !== '1' || 'com.docker.volume.anonymous' in labels) throw new ObjectError(`hive-am did not create the ${kind} ${name}, so it does not remove it`);
+  // Docker itself removes a network a stopped container is still attached to: ask which containers use it.
+  const users = await dk(['ps', '-a', '-q', '--filter', `${kind}=${name}`], { timeout: 20_000 });
+  if (users.code !== 0) throw fail(users, `Could not check which containers use the ${kind} ${name}`);
+  const n = users.out.split('\n').filter((l) => l.trim()).length;
+  if (n) throw new ObjectError(`The ${kind} ${name} is used by ${n} container${n === 1 ? '' : 's'}, so it is not removed`);
+  const r = await dk([kind, 'rm', name], { timeout: 30_000 });
+  if (r.code !== 0) throw fail(r, `Could not remove the ${kind} ${name}`);
+  return { name, removed: true };
+}
+
 const STAMP = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/;
 
 /**

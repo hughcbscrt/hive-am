@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { colonies } from '../src/db.js';
 import { composeServices, inspectMachine, listContainers, listImages, listNetworks, listVolumes, maskVar } from '../src/objects/docker-info.js';
+import { createMade, removeMade } from '../src/objects/docker.js';
 import { ObjectError, createObject, objectAction, objectInspect, objectInspectRaw, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
 import { HttpError } from '../src/http/errors.js';
 import { match } from '../src/http/router.js';
@@ -174,6 +175,55 @@ const inventoryWith = (env: NodeJS.ProcessEnv) => { const r = spawnSync(process.
 }
 check(await routeStatus('GET', '/api/docker/volumes', 'http://my-box.lan:4401', 'my-box.lan:4400') === 200 && await routeStatus('GET', '/api/docker/networks', 'http://my-box.lan:4401', 'my-box.lan:4400') === 200, 'the volume and network lists are open like the container and image lists');
 
+// ---------------------------------------------------------------- creating and removing networks and volumes, with a fake docker command
+// The fake knows four networks: mine (hive-am's, unused), busy (hive-am's, used by a stopped container), theirs (no label) and bridge. Every
+// command is written down, to prove what each action runs and that a refused removal never reaches `rm`.
+{
+  const bin = mkdtempSync(join(tmpdir(), 'fake-docker-make-')), log = join(bin, 'calls.log');
+  writeFileSync(join(bin, 'docker'), `#!/bin/sh
+echo "$*" >> ${JSON.stringify(log)}
+case "$1 $2" in
+  "network inspect"|"volume inspect") n="$5"; case "$n" in mine|busy) echo "$n|{\\"hive-am.created\\":\\"1\\"}" ;; theirs) echo "$n|{}" ;; bridge) echo "bridge|{}" ;; abc) echo "theirs|{\\"hive-am.created\\":\\"1\\"}" ;; *) echo "Error: No such $1: $n" >&2; exit 1 ;; esac ;;
+  "ps -a") [ "$5" = "network=busy" ] && echo 0123456789ab; exit 0 ;;
+  "network create"|"volume create"|"network rm"|"volume rm") exit 0 ;;
+  *) exit 1 ;;
+esac
+`);
+  chmodSync(join(bin, 'docker'), 0o755);
+  const ops = join(dir, 'make.mts');
+  writeFileSync(ops, `import * as d from ${JSON.stringify(join(dirname(fileURLToPath(import.meta.url)), '../src/objects/docker.ts'))};
+const out: Record<string, unknown> = {};
+const tryIt = async (k: string, f: () => Promise<unknown>) => { try { out[k] = await f(); } catch (e) { out[k] = { error: (e as Error).message }; } };
+await tryIt('createNew', () => d.createMade('network', 'fresh'));
+await tryIt('createAgain', () => d.createMade('network', 'mine'));
+await tryIt('removeMine', () => d.removeMade('network', 'mine'));
+await tryIt('removeBusy', () => d.removeMade('network', 'busy'));
+await tryIt('removeTheirs', () => d.removeMade('network', 'theirs'));
+await tryIt('removeByIdPrefix', () => d.removeMade('network', 'abc'));
+await tryIt('removeBridge', () => d.removeMade('network', 'bridge'));
+await tryIt('removeAnonymous', () => d.removeMade('volume', '${'f'.repeat(64)}'));
+await tryIt('createOption', () => d.createMade('volume', '--help'));
+console.log(JSON.stringify(out));`);
+  const r = spawnSync(process.execPath, ['--import', 'tsx', ops], { cwd: join(dirname(fileURLToPath(import.meta.url)), '..'), env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, encoding: 'utf8', timeout: 60000 });
+  let o: any = {}; try { o = JSON.parse(r.stdout.trim().split('\n').pop() ?? ''); } catch { console.log(r.stderr); }
+  const calls = readFileSync(log, 'utf8').trim().split('\n');
+  const net = (n: string) => `network inspect -f {{.Name}}|{{json .Labels}} ${n}`;
+  check(o.createNew?.created === true && o.createAgain?.created === false, 'a new network is created, one that exists is left alone (created: false)');
+  check(o.removeMine?.removed === true, 'hive-am\'s own network with no container is removed');
+  check(/used by 1 container/.test(o.removeBusy?.error) && /did not create/.test(o.removeTheirs?.error) && /has no network abc/.test(o.removeByIdPrefix?.error) && /Docker's own/.test(o.removeBridge?.error) && /anonymous/.test(o.removeAnonymous?.error) && /not a valid volume name/.test(o.createOption?.error), 'one in use (even by a stopped container), one hive-am did not create, an id prefix of another network (not that name), bridge, an anonymous volume or a name like an option are refused');
+  const want = [
+    net('fresh'), 'network create --label hive-am.created=1 fresh',
+    net('mine'),
+    net('mine'), 'ps -a -q --filter network=mine', 'network rm mine',
+    net('busy'), 'ps -a -q --filter network=busy',
+    net('theirs'),
+    net('abc'),
+  ];
+  check(JSON.stringify(calls) === JSON.stringify(want), 'each action runs exactly its docker commands; refused removals never reach rm, and bridge, anonymous names and option-like names never reach Docker');
+  if (JSON.stringify(calls) !== JSON.stringify(want)) console.log(calls);
+}
+check(await routeStatus('POST', '/api/docker/networks', 'https://evil.example') === 403 && await routeStatus('POST', '/api/docker/volumes', 'https://evil.example') === 403 && await routeStatus('DELETE', '/api/docker/volumes/x', 'https://evil.example') === 403 && await routeStatus('DELETE', '/api/docker/networks/x', 'https://evil.example') === 403, 'creating and removing only from the local app, like every change to resources');
+
 // ---------------------------------------------------------------- docker
 const image = process.env.HIVE_TEST_IMAGE ?? 'nginx:1.25-alpine';
 const dockerOk = (() => { try { execFileSync('docker', ['image', 'inspect', image], { stdio: 'ignore', timeout: 15000 }); return true; } catch { return false; } })();
@@ -277,6 +327,28 @@ else {
   const proj = (objectsStore.get(comp.id)!.config as any).project;
   await removeObject(comp.id);
   try { execFileSync('docker', ['compose', '-f', join(cdir, 'docker-compose.yml'), '-p', proj, 'down', '-v'], { stdio: 'ignore', timeout: 60000 }); } catch { /* cleanup */ }
+
+  // creating and removing with real Docker: hive-am's own volume and network, a foreign volume, and a container that uses them
+  const mk = Date.now().toString(36), mvol = `hive-am-test-mkvol-${mk}`, mnet = `hive-am-test-mknet-${mk}`, fvol = `hive-am-test-foreign-${mk}`, mcon = `hive-am-test-mk-${mk}`;
+  try {
+    const v1 = await createMade('volume', mvol), n1 = await createMade('network', mnet);
+    const v2 = await createMade('volume', mvol), n2 = await createMade('network', mnet);
+    check(v1.created && n1.created && !v2.created && !n2.created, 'with real Docker a volume and a network are created, and asking again changes nothing');
+    check(execFileSync('docker', ['volume', 'inspect', '-f', '{{index .Labels "hive-am.created"}}', mvol], { encoding: 'utf8' }).trim() === '1' && execFileSync('docker', ['network', 'inspect', '-f', '{{index .Labels "hive-am.created"}}', mnet], { encoding: 'utf8' }).trim() === '1', 'both carry the label hive-am.created=1');
+    const [lv, ln] = await Promise.all([listVolumes(), listNetworks()]);
+    check(!!lv.volumes.find((v) => v.name === mvol)?.managed && !!ln.networks.find((x) => x.name === mnet)?.managed, 'and the lists mark them as created by hive-am (managed)');
+    execFileSync('docker', ['volume', 'create', fvol], { stdio: 'ignore', timeout: 30000 });
+    execFileSync('docker', ['create', '--name', mcon, '-v', `${mvol}:/data`, '--network', mnet, image], { stdio: 'ignore', timeout: 30000 });
+    check(await rejects(() => removeMade('volume', mvol), /used by 1 container/) && await rejects(() => removeMade('network', mnet), /used by 1 container/), 'a volume and a network a stopped container uses are not removed');
+    check(await rejects(() => removeMade('volume', fvol), /did not create/) && await rejects(() => removeMade('network', 'bridge'), /Docker's own/), 'a volume hive-am did not create, and bridge, are not removed');
+    check(spawnSync('docker', ['volume', 'inspect', mvol], { stdio: 'ignore' }).status === 0 && spawnSync('docker', ['volume', 'inspect', fvol], { stdio: 'ignore' }).status === 0 && spawnSync('docker', ['network', 'inspect', mnet], { stdio: 'ignore' }).status === 0, 'and they are all still there');
+    execFileSync('docker', ['rm', '-f', mcon], { stdio: 'ignore', timeout: 30000 });
+    const rv = await removeMade('volume', mvol), rn = await removeMade('network', mnet);
+    check(rv.removed && rn.removed && spawnSync('docker', ['volume', 'inspect', mvol], { stdio: 'ignore' }).status !== 0 && spawnSync('docker', ['network', 'inspect', mnet], { stdio: 'ignore' }).status !== 0, 'once no container uses them, hive-am\'s own volume and network are removed');
+  } finally {
+    for (const args of [['rm', '-f', mcon], ['volume', 'rm', mvol], ['volume', 'rm', fvol], ['network', 'rm', mnet]]) try { execFileSync('docker', args, { stdio: 'ignore', timeout: 30000 }); } catch { /* cleanup */ }
+  }
+  check([['volume', mvol], ['volume', fvol], ['network', mnet]].every(([k, n]) => spawnSync('docker', [k, 'inspect', n], { stdio: 'ignore' }).status !== 0), 'the test removes what it created');
 
   updateObject(cont.id, { config: { ...(objectsStore.get(cont.id)!.config as any), env: { HELLO: 'changed' } } });
   const ist = await objectInspect(cont.id);

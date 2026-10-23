@@ -3,7 +3,7 @@
 // Usage: HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-web-docker.ts
 import './_guard.js';
 import { emptyRow, isFolder, isIncomplete, isNewVolume, isReadOnly, parseVolumeLine, parseVolumes, volumesText, withReadOnly } from '../../web/lib/dockerVolumes.ts';
-import { whenAvailable } from '../../web/lib/dockerLists.ts';
+import { canCreate, canRemove, validName, whenAvailable } from '../../web/lib/dockerLists.ts';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `got ${JSON.stringify(got)} want ${JSON.stringify(want)}`); if (!ok) fail++; };
 
@@ -38,6 +38,14 @@ eq('so no row says its volume is missing (the one notice is Docker\'s)', isNewVo
 eq('with Docker up the list is kept as it came', whenAvailable({ available: true }, vols), vols);
 eq('a row with only one side is incomplete; a full one, an empty one or one kept as typed is not',
   [parseVolumeLine('data:'), parseVolumeLine(':/d'), parseVolumeLine('data:/d'), emptyRow(), parseVolumeLine('/data')].map(isIncomplete), [true, true, false, false, false]);
+
+const nets = [{ name: 'bridge' }, { name: 'appnet' }];
+eq('create is offered for a valid name Docker does not have', [canCreate('network', 'newnet', nets), canCreate('network', ' newnet ', nets)], [true, true]);
+eq('not for one it has, an invalid name or one like an option, nor while Docker is not answering',
+  [canCreate('network', 'appnet', nets), canCreate('network', 'my net', nets), canCreate('network', '-x', nets), canCreate('network', '', nets), canCreate('network', 'newnet', null)], [false, false, false, false, false]);
+eq('a volume needs two characters and is never a 64-hex name (that is an anonymous one)', [validName('volume', 'a'), validName('volume', 'ab'), validName('volume', 'f'.repeat(64)), validName('network', 'a')], [false, true, false, true]);
+eq('delete is offered only on what hive-am created and nothing uses',
+  [canRemove({ managed: true, inUse: 0 }), canRemove({ managed: true, inUse: 1 }), canRemove({ managed: false, inUse: 0 }), canRemove({ managed: true, inUse: 0, builtin: true }), canRemove({ managed: true, inUse: 0, anonymous: true })], [true, false, false, false, false]);
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

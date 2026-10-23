@@ -124,6 +124,8 @@ The forms ask Docker to suggest what already exists: local images, networks and 
 
 In **Volumes**, press **Add a volume** and, in the row, pick a volume of this machine, type a new name (Docker creates it the first time the container starts, and the row tells you) or press **Folder** to choose a folder; then write the path inside the container (a row needs both sides to be saved, and says so) and tick **Read only** if the container should not write there. A resource you saved before shows its volumes in these rows.
 
+If the network you type does not exist on this machine, the field tells you the container will not start without it and offers **Create network**; a volume row with a new name offers **Create it now**. What hive-am creates is marked *created by hive-am* and stays even if you cancel the form. In the suggestions, a network or a volume hive-am created that no container uses has a delete button: it asks first, and hive-am checks again before deleting. Networks and volumes that hive-am did not create, Docker's own networks and anything in use are never deleted.
+
 In **Create a container** mode you can pick the **Network** and set limits (memory, CPUs, log size, time to stop). If you change one, the container is created again the next time it starts or restarts, and what was inside it is lost.
 
 The **Summary** of a Docker resource adds processes, network and disk, and shows the image, the ports and the number of restarts.
