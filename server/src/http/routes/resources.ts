@@ -19,8 +19,6 @@ const write = (method: string, path: string, fn: (b: Body, ctx: Ctx) => unknown)
   route(method, path, async (ctx) => { local(ctx.req); return fn(await body(ctx.req), ctx); });
 /** A route that answers from a resource but is still local only (it reaches a database with its saved password). */
 const guarded = (path: string, fn: (ctx: Ctx) => unknown, method = 'GET') => route(method, path, (ctx) => { local(ctx.req); return fn(ctx); });
-/** A read of what Docker has on this machine: local only with the Host pinned too, like terminals (a page that reached us through another name, DNS rebinding, is refused). */
-const pinned = (path: string, fn: (ctx: Ctx) => unknown) => route('GET', path, (ctx) => { requireLocal(ctx.req, 'Docker can only be read from the local app', { strict: true }); return fn(ctx); });
 
 // The agents' side (tools `object_list`, `object_action`, `object_logs`): `from` is the agent; scope and permission are checked in objects/agent.ts.
 route('POST', '/api/agent-objects/list', async ({ req }) => { const b = await body(req); return { objects: agentObjects(b.from) }; });
@@ -36,19 +34,19 @@ route('GET', '/api/object-templates', () => listTemplates());
 write('PUT', '/api/objects/:id/manager', (b, { params }) => { const r = setObjectManager(params[0], b.agent_id); if (r.skillAdded) notifyAgentsChanged(); return r; });
 write('PUT', '/api/agents/:id/resources', (b, { params }) => { const r = setAgentObjects(params[0], b.object_ids); if (r.skillAdded) notifyAgentsChanged(); return r; });
 write('POST', '/api/objects/from-template', (b) => createFromTemplate(b as Parameters<typeof createFromTemplate>[0]));
-// Inspect carries the container's environment variables in the clear (and the raw one, when revealed), so it is local only with the Host pinned.
-pinned('/api/objects/:id/inspect', ({ params, url }) => objectInspect(params[0], p(url, 'service')));
-pinned('/api/objects/:id/inspect/raw', ({ params, url }) => objectInspectRaw(params[0], p(url, 'service'), url.searchParams.get('reveal') === '1'));
-// The whole `docker inspect` of anything on this machine (container, image, volume, network): the same guard.
-pinned('/api/docker/inspect', ({ url }) => inspectMachine(url.searchParams.get('kind') ?? '', url.searchParams.get('ref') ?? '', url.searchParams.get('reveal') === '1'));
+// Reads, open like the other reads of resources (the app is also reached by other names on the network). Secret-looking variables and the
+// passwords of URLs come hidden in the raw one unless `reveal=1`.
+route('GET', '/api/objects/:id/inspect', ({ params, url }) => objectInspect(params[0], p(url, 'service')));
+route('GET', '/api/objects/:id/inspect/raw', ({ params, url }) => objectInspectRaw(params[0], p(url, 'service'), url.searchParams.get('reveal') === '1'));
+// The whole `docker inspect` of anything on this machine (container, image, volume, network).
+route('GET', '/api/docker/inspect', ({ url }) => inspectMachine(url.searchParams.get('kind') ?? '', url.searchParams.get('ref') ?? '', url.searchParams.get('reveal') === '1'));
 write('POST', '/api/objects/:id/service', (b, { params }) => objectServiceAction(params[0], b.service, b.action));
 write('POST', '/api/objects/:id/action', (b, { params }) => objectAction(params[0], b.action));
-// What Docker knows, to suggest in the forms (containers, images, the services of a compose file).
+// What Docker knows, to suggest in the forms (containers, images, volumes, networks, the services of a compose file).
 route('GET', '/api/docker/containers', () => listContainers());
 route('GET', '/api/docker/images', () => listImages());
-// The volumes and networks of this machine (for the form's pickers): local only with the Host pinned, like inspect.
-pinned('/api/docker/volumes', () => listVolumes());
-pinned('/api/docker/networks', () => listNetworks());
+route('GET', '/api/docker/volumes', () => listVolumes());
+route('GET', '/api/docker/networks', () => listNetworks());
 route('GET', '/api/docker/compose-services', ({ url }) => composeServices(url.searchParams.get('file') ?? ''));
 route('GET', '/api/objects/:id/stats', ({ params }) => statsOf(params[0]));
 route('GET', '/api/objects/:id/http', ({ params }) => httpScan(params[0]));

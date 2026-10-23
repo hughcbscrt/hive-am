@@ -112,18 +112,15 @@ for (const o of [srv, stub, bad, ok0, cs, other]) await removeObject(o.id);
 check(objectsStore.list().filter((o) => o.kind === 'server').length === 0, 'deleting removes the objects (and stops what was running)');
 check(!existsProcess(pid2), 'deleting a running server stops its process');
 
-// ---------------------------------------------------------------- inspect is local only, and says "Docker is off" without an error
+// ---------------------------------------------------------------- inspect is open like the other reads, and says "Docker is off" without an error
 const routeStatus = async (method: string, path: string, origin?: string, host = '127.0.0.1:4400') => {
   const url = new URL(`http://127.0.0.1:4400${path}`), m = match(method, url.pathname); if (!m) return 404;
   try { await m.route.handler({ req: { headers: { host, ...(origin ? { origin } : {}) } } as unknown as IncomingMessage, res: null as never, params: m.params, url }); return 200; }
   catch (e) { return e instanceof HttpError ? e.status : e instanceof ObjectError ? 400 : 500; }
 };
-check(await routeStatus('GET', '/api/objects/nope/inspect', 'https://evil.example') === 403, 'inspect answers 403 to a page that is not the local app');
-check(await routeStatus('GET', '/api/objects/nope/inspect', 'http://localhost:4401') === 400, 'and reaches the resource lookup from the local app');
-check(await routeStatus('GET', '/api/objects/nope/inspect/raw', 'https://evil.example') === 403 && await routeStatus('GET', '/api/docker/inspect?kind=image&ref=x', 'https://evil.example') === 403, 'the raw docker inspect routes are local only too');
-const rebound = await Promise.all(['/api/objects/nope/inspect', '/api/objects/nope/inspect/raw?reveal=1', '/api/docker/inspect?kind=image&ref=x&reveal=1'].map((u) => routeStatus('GET', u, 'http://evil.example', 'evil.example')));
-check(rebound.every((s) => s === 403), 'a page that reached hive-am through another name (DNS rebinding: Host and Origin both evil.example) gets 403 from every inspect route');
-check(await routeStatus('GET', '/api/objects/nope/inspect/raw', 'http://localhost:4401') === 400 && await routeStatus('GET', '/api/objects/nope/inspect', undefined, 'localhost:4400') === 400, 'while the local app (and a program with no origin) still reach them');
+// The app is also opened through other names on the network, so these reads have no guard, like the other reads of resources.
+const named = await Promise.all(['/api/objects/nope/inspect', '/api/objects/nope/inspect/raw', '/api/docker/inspect?kind=image&ref=-x'].map((u) => routeStatus('GET', u, 'http://my-box.lan:4401', 'my-box.lan:4400')));
+check(named.every((s) => s === 400), 'the inspect routes answer a page that opened hive-am by another name (they reach the lookup: 400, not 403)');
 check(await routeStatus('GET', '/api/docker/inspect?kind=container&ref=-f') === 400 && await routeStatus('GET', '/api/docker/inspect?kind=network&ref=--help') === 400 && await routeStatus('GET', '/api/docker/inspect?kind=image&ref=') === 400, 'a reference that looks like an option (or is empty) is refused with 400');
 check(maskVar('DB_PASSWORD=hunter2') === 'DB_PASSWORD=••••••••' && maskVar('HELLO=world') === 'HELLO=world' && maskVar('NOVALUE') === 'NOVALUE', 'a secret-looking variable is hidden whole, an ordinary one is left alone');
 check(maskVar('DATABASE_URL=postgres://u:urlpass@h/db') === 'DATABASE_URL=postgres://u:••••••••@h/db' && maskVar('OPTS=--a=redis://:p4ss@cache:6379/0 --b=amqp://guest:g@mq') === 'OPTS=--a=redis://:••••••••@cache:6379/0 --b=amqp://guest:••••••••@mq', 'the password of a URL with credentials is hidden, wherever it sits in the value');
@@ -175,7 +172,7 @@ const inventoryWith = (env: NodeJS.ProcessEnv) => { const r = spawnSync(process.
   const none = inventoryWith({ ...process.env, PATH: mkdtempSync(join(tmpdir(), 'no-docker-')) });
   check(none.every((r: any) => r.available === false && /not installed/.test(r.error)) && none[0].containers.length === 0 && none[1].images.length === 0 && none[2].volumes.length === 0 && none[3].networks.length === 0, 'without Docker every list is empty, with available: false and why');
 }
-check(await routeStatus('GET', '/api/docker/volumes', 'https://evil.example') === 403 && await routeStatus('GET', '/api/docker/networks', 'http://evil.example', 'evil.example') === 403, 'the volume and network lists are local only, with the Host pinned');
+check(await routeStatus('GET', '/api/docker/volumes', 'http://my-box.lan:4401', 'my-box.lan:4400') === 200 && await routeStatus('GET', '/api/docker/networks', 'http://my-box.lan:4401', 'my-box.lan:4400') === 200, 'the volume and network lists are open like the container and image lists');
 
 // ---------------------------------------------------------------- docker
 const image = process.env.HIVE_TEST_IMAGE ?? 'nginx:1.25-alpine';
