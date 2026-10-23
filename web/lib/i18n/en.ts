@@ -766,6 +766,11 @@ export const en = {
   "colony.task.done": "Done",
   "colony.task.failed": "Failed",
   "colony.task.interrupted": "Interrupted: hive-am restarted while it ran",
+  "colony.task.cancelled": "Cancelled: taken back before it finished",
+  "colony.cancelTask": "Cancel this task",
+  "colony.cancelRunning.title": "Stop this task?",
+  "colony.cancelRunning.body": "{name} is working on it now. It stops at once and the orchestrator is told; what it already changed stays in the folder.",
+  "colony.cancelRunning.confirm": "Stop task",
 
   // ---- agents ----
   "agents.subtitle": "Each agent is a pointer to a native CLI session. Close the browser or lose power. Reopening an agent resumes its real conversation.",
