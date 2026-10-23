@@ -245,9 +245,21 @@ async function update(list) {
   if (kind === 'source') fail('This is a source checkout: update it with `git pull` and `npm install`, then rebuild.');
   if (kind !== 'global') fail(`hive-am was not installed globally with npm (${root}), so it cannot update itself. Install the new version the way you installed this one: npm install -g ${pkg.name}@${latest}`);
 
-  console.log(`Installing ${pkg.name}@${latest} ...`);
-  const r = npm(['install', '-g', `${pkg.name}@${latest}`], { stdio: 'inherit', encoding: undefined });
-  if (r.status !== 0) fail(`npm could not install ${pkg.name}@${latest} (exit ${r.status}). If it is a permissions error, see https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally`);
+  // the install gets its own limit: a slow registry or a big download easily takes longer than the 2 minutes of the quick queries
+  const raw = process.env.HIVE_AM_INSTALL_TIMEOUT;
+  const secs = raw === undefined || raw === '' ? 900 : Number(raw);
+  if (!Number.isFinite(secs) || secs < 0) fail(`HIVE_AM_INSTALL_TIMEOUT must be a number of seconds (0 for no limit), not "${raw}".`);
+  console.log(`Installing ${pkg.name}@${latest} ... this can take a few minutes (Ctrl+C stops it).`);
+  // stderr is piped so a permissions error can be told apart, and written back so npm's own text is not lost
+  const r = npm(['install', '-g', `${pkg.name}@${latest}`], { stdio: ['inherit', 'inherit', 'pipe'], timeout: secs * 1000 });
+  if (r.stderr) process.stderr.write(r.stderr);
+  const manual = `The install may be incomplete: run it yourself with npm install -g ${pkg.name}@${latest}`;
+  if (r.error?.code === 'ETIMEDOUT') fail(`npm was stopped after ${secs} seconds without finishing the install of ${pkg.name}@${latest} (raise the limit with HIVE_AM_INSTALL_TIMEOUT, in seconds, 0 for none). ${manual}`);
+  if (r.signal) fail(`npm was stopped by ${r.signal} while installing ${pkg.name}@${latest}. ${manual}`);
+  if (r.status !== 0) {
+    const perms = /\bE(ACCES|PERM)\b/.test(r.stderr ?? '') ? ' It is a permissions error: see https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally' : '';
+    fail(`npm could not install ${pkg.name}@${latest} (exit ${r.status ?? r.error?.message}).${perms}`);
+  }
   let now = latest;
   try { now = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version; } catch { /* the folder was replaced: keep what npm installed */ }
   console.log(`hive-am updated: ${pkg.version} -> ${now}`);

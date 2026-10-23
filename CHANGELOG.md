@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Fixed
 
 - **Long prompts no longer cover the editor's footer.** In **Preview** and **Split**, a long system prompt was drawn over the word count and tips line under the editor. Each pane now scrolls on its own inside the editor and the footer stays visible below it.
+- **`hive-am update` no longer cuts the install off after 2 minutes.** The install now has its own limit of 15 minutes (`HIVE_AM_INSTALL_TIMEOUT`, in seconds, `0` for none) and says beforehand that it can take a few minutes. When npm runs past the limit or is stopped by a signal, the message says so, warns the install may be incomplete and gives the command to run by hand, instead of `exit null` and a permissions hint; that hint now only shows when npm reports `EACCES` or `EPERM`.
 
 ## [1.10.0] - 2026-10-22
 
