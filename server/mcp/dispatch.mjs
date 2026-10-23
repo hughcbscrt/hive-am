@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Minimal MCP stdio server for hive-am agents. Tool groups come from HIVE_CAPS:
-//   dispatch → list_agents, dispatch, dispatch_status (orchestrators with a team)
+//   dispatch → list_agents, dispatch, dispatch_status, dispatch_list, dispatch_cancel (orchestrators with a team)
 //   channel  → channel_reply, channel_send_file, channel_react, channel_mute (agents linked to Telegram/Slack)
 //   wake     → wake_me, wake_when_done, schedule_create, schedule_list, schedule_cancel (agents with the Wake-ups skill: to be woken later in the same place)
 //   objects  → object_list, object_logs, object_action (agents with the Colony objects skill: the servers and containers of their colony)
@@ -39,13 +39,30 @@ const allTools = [
   {
     cap: 'dispatch',
     name: 'dispatch_status',
-    description: 'State of a task you delegated: queued, running, done, failed or interrupted, with the result once it has finished. With wait_seconds it waits up to that long for the end before answering.',
+    description: 'State of a task you delegated: queued, running, done, failed, interrupted or cancelled, with the result once it has finished. With wait_seconds it waits up to that long for the end before answering.',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'string', description: 'The task id that dispatch returned' },
         wait_seconds: { type: 'number', minimum: 0, maximum: 60, description: 'Wait up to this many seconds (0 to 60, default 0) for the task to finish.' },
       },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    cap: 'dispatch',
+    name: 'dispatch_list',
+    description: 'List the tasks you delegated that have not finished yet (queued or running), with their id, subagent, state and age, oldest first.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    cap: 'dispatch',
+    name: 'dispatch_cancel',
+    description: 'Cancel a task you delegated that is no longer needed (sent by mistake, wrong context, or the plan changed). A queued task never starts; a running one is stopped at once, and what the subagent already changed stays in the folder, so check it before delegating again. A task that already finished is left as it is and its state is answered. You are not sent a message about a task you cancel.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'The task id that dispatch returned' } },
       required: ['id'],
       additionalProperties: false,
     },
@@ -333,11 +350,34 @@ async function call(name, args) {
       }
       if (s.status === 'done') return s.result;
       if (s.status === 'failed' || s.status === 'interrupted') throw new Error(`${j.agent} did not finish the task (${s.status}): ${s.result}`);
+      if (s.status === 'cancelled') throw new Error(`${j.agent} task was cancelled: ${s.result}`);
     }
   }
   if (name === 'dispatch_status') {
     const s = await taskStatus(args.id, args.wait_seconds);
     return `Task ${s.id} for ${s.agent}: ${s.status}.${s.note ? ` ${s.note}` : ''}${s.result !== undefined ? ` Result:\n${s.result}` : ' Not finished yet.'}`;
+  }
+  if (name === 'dispatch_list') {
+    const r = await fetch(`${API}/api/dispatch/list`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: FROM }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `dispatch_list failed (${r.status})`);
+    const age = (s) => (s < 60 ? `${s} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`);
+    return j.length ? j.map((t) => `${t.id} · ${t.agent} · ${t.status} · ${t.mode} · ${age(t.age_s)} ago\n  ${t.task.replace(/\s+/g, ' ')}`).join('\n') : 'You have no delegated tasks that have not finished.';
+  }
+  if (name === 'dispatch_cancel') {
+    const r = await fetch(`${API}/api/dispatch/cancel`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: FROM, id: args.id }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `dispatch_cancel failed (${r.status})`);
+    if (!j.cancelled) return `Task ${j.id} for ${j.agent} had already finished (${j.status}); nothing changed.${j.result !== undefined ? ` Result:\n${j.result}` : ''}`;
+    return j.was === 'running'
+      ? `Task ${j.id} for ${j.agent} cancelled: ${j.agent} was working on it and was stopped. What it already changed stays in the folder; check it before delegating again.`
+      : `Task ${j.id} for ${j.agent} cancelled before it started.`;
   }
   if (name === 'channel_reply') {
     const r = await fetch(`${API}/api/channel/reply`, {

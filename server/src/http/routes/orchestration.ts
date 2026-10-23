@@ -1,5 +1,5 @@
 import { agents, dispatches } from '../../db.js';
-import { startTask, taskStatus } from '../../dispatches.js';
+import { cancelTask, openTasks, startTask, taskStatus } from '../../dispatches.js';
 import { dispatch, liveTurn, notifyAgentsChanged } from '../../runtime.js';
 import { agentOrFail } from '../../services/agents.js';
 import { body } from '../body.js';
@@ -31,4 +31,17 @@ route('POST', '/api/dispatch/status', async ({ req }) => {
   if (!from) throw bad('from is required');
   return taskStatus(text(from), text(id), wait_seconds);
 });
+// Cancelling answers the final state: `cancelled`, or the one the task already had (it is not an error).
+route('POST', '/api/dispatch/cancel', async ({ req }) => {
+  const { from, id } = await body(req);
+  if (!from) throw bad('from is required');
+  return cancelTask(text(from), text(id));
+});
+route('POST', '/api/dispatch/list', async ({ req }) => {
+  const { from } = await body(req);
+  if (!from) throw bad('from is required');
+  return openTasks(text(from));
+});
 route('GET', '/api/dispatches', () => dispatches.recent());
+// From the web: the person can cancel any task, as they can stop any agent.
+route('POST', '/api/dispatches/:id/cancel', ({ params }) => cancelTask(null, params[0]));

@@ -1,6 +1,6 @@
 import { agents, dispatches, type DispatchRow } from './db.js';
 import { threads } from './connections/store.js';
-import { liveOrigin, notifyAgentsChanged, startDispatch } from './runtime.js';
+import { abortDispatch, cancelQueued, liveOrigin, notifyAgentsChanged, startDispatch } from './runtime.js';
 import { deliverTo, type Destination } from './wake.js';
 import { DomainError } from './errors.js';
 
@@ -16,7 +16,7 @@ export const MAX_BACKGROUND = 10;     // unfinished background tasks per orchest
 export const MAX_WAIT_S = 60;         // the longest one `dispatch_status` call waits
 const POLL_MS = 250;
 const RETRY_MS = Number(process.env.HIVE_AM_WAKE_RETRY_MS) || 5000;   // wait before trying a delivery again (as wake-ups do)
-const FINISHED = new Set(['done', 'failed', 'interrupted']);
+const FINISHED = new Set(['done', 'failed', 'interrupted', 'cancelled']);
 const NO_TEXT = '(the subagent finished without a text answer)';
 
 interface StoredOrigin { connection_id: string; thread_id: string; req_id: string | null; req_name: string | null }
@@ -67,6 +67,41 @@ export async function taskStatus(fromId: string, id: string, waitSeconds?: unkno
   return out;
 }
 
+const CANCELLED_BY = { orchestrator: 'Cancelled by the orchestrator before it finished.', person: 'Cancelled by the person before it finished.' };
+
+export interface TaskCancel extends TaskStatus { was: string; cancelled: boolean }
+
+/**
+ * Takes a delegated task back. A queued one leaves the worker's queue and never starts; a running one has its turn aborted (only that turn).
+ * One already finished is left as it is and its state is answered, so cancelling twice is harmless. The row is closed by the same conditional
+ * update as the end of the turn, so whichever comes first sets the one final state. `by` is the orchestrator that started it, or null for the
+ * person (from the web), who may cancel any task; cancelled by the person, the orchestrator is told once.
+ */
+export function cancelTask(by: string | null, id: string): TaskCancel {
+  if (!id) throw new DispatchError('id is required');
+  const row = dispatches.get(id);
+  if (!row) throw new DispatchError(`There is no delegated task with id "${id}".`, 'not_found');
+  if (by !== null && row.from_id !== by) throw new DispatchError(`Task "${id}" was not started by you.`, 'forbidden');
+  const was = row.status;
+  const cancelled = !FINISHED.has(was) && dispatches.cancel(id, by === null ? CANCELLED_BY.person : CANCELLED_BY.orchestrator, by !== null);
+  if (cancelled) {
+    if (was === 'queued') cancelQueued(row.to_id, id);
+    else abortDispatch(row.to_id, id);
+    notifyAgentsChanged();
+    // At once, not when the turn ends: a queued task only settles when the worker's queue reaches it.
+    if (by === null) void announce(id);
+  }
+  const now = dispatches.get(id) ?? row;
+  return { id, agent: nameOf(now.to_id), status: now.status, mode: now.mode, was, cancelled, ...(FINISHED.has(now.status) ? { result: resultText(now) } : {}) };
+}
+
+export interface OpenTask { id: string; agent: string; status: string; mode: string; task: string; age_s: number }
+
+/** The tasks of an orchestrator that have not finished, oldest first, so it can tell which one to cancel. */
+export function openTasks(fromId: string): OpenTask[] {
+  return dispatches.open(fromId).map((r) => ({ id: r.id, agent: nameOf(r.to_id), status: r.status, mode: r.mode, task: r.task.length > 200 ? `${r.task.slice(0, 200)}…` : r.task, age_s: Math.max(0, Math.round((Date.now() - r.created_at) / 1000)) }));
+}
+
 /** What a finished task says: its answer, its error, or why it stopped. */
 function resultText(row: DispatchRow): string {
   if (row.status === 'interrupted') return `hive-am restarted while ${nameOf(row.to_id)} was working on it; check the branch or the files and send the task again if needed.`;
@@ -78,12 +113,21 @@ const noticeText = (row: DispatchRow) => `Delegated task ${row.id} to ${nameOf(r
 const NEXT = 'Carry on with the work this task was part of and tell the person what came of it';
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
+const delivering = new Set<string>();
 
 /** Hands the result of a finished background task to the orchestrator, once. Tried again while the platform is not connected yet. */
 async function announce(id: string, tries = 0): Promise<void> {
+  // A second call while the first is still delivering (a cancel, then the end of the aborted turn) or waiting to try again does nothing.
+  if (delivering.has(id) || (!tries && timers.has(id))) return;
   timers.delete(id);
   const row = dispatches.get(id);
   if (!row || row.mode !== 'background' || row.notified_at || !FINISHED.has(row.status)) return;
+  delivering.add(id);
+  try { await deliver(row, tries); } finally { delivering.delete(id); }
+}
+
+async function deliver(row: DispatchRow, tries: number): Promise<void> {
+  const id = row.id;
   const o: StoredOrigin | null = row.origin ? JSON.parse(row.origin) : null;
   const to: Destination = { agent_id: row.from_id, connection_id: o?.connection_id ?? null, thread_id: o?.thread_id ?? null, req_id: o?.req_id ?? null, req_name: o?.req_name ?? null };
   const again = () => {
