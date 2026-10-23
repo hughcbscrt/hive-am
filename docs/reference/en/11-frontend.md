@@ -252,6 +252,7 @@ t('chat.tools', { count: 3 })                // plural: "3 tools" / "3 herramien
 - **Plurals:** if `params.count` is a number, `key_one` or `key_other` is used according to `Intl.PluralRules`; both must exist in the two catalogs. If the text must show the number with separators, an already formatted parameter is also passed (e.g. `n: fmtNum(...)`).
 - **Dynamic keys:** allowed when all variants exist (`t(\`role.${role}\`)`, `t(\`status.${status}\`)`, `permission.<id>.label`, `provider.<id>.blurb`).
 - **Outside components** (utilities such as `ago()`, the tools' `describe()`, validations): `translate` from `lib/i18n/core` is used at render time; the component that calls them uses `useI18n()` to re-render when the language changes. Memoized components that show translated text call `useI18n()` (context consumers update even inside `memo`).
+- **`t` in memos:** the `t` from `useI18n()` gets a new identity each time the language changes, so a `useMemo` or `useCallback` that builds text with it and lists `t` as a dependency recomputes at once.
 - **Dates:** `intlLocale()` gives `es-MX` / `en-US` for `toLocaleDateString`.
 
 ### Server errors

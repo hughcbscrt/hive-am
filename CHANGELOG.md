@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Lists follow the language at once.** Changing the language with the app open left some names in the old language until a reload: the **No colony** group in the chat's agent list and in **Resources**, and the colony hints in the agent form and the resource manager field. They now change right away.
+
 ## [1.10.1] - 2026-10-23
 
 ### Fixed

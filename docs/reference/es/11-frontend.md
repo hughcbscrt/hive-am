@@ -252,6 +252,7 @@ t('chat.tools', { count: 3 })                // plural: "3 tools" / "3 herramien
 - **Plurales:** si `params.count` es un número, se usa `clave_one` o `clave_other` según `Intl.PluralRules`; ambas deben existir en los dos catálogos. Si el texto debe mostrar el número con separadores, se pasa además un parámetro ya formateado (p. ej. `n: fmtNum(...)`).
 - **Claves dinámicas:** se permiten cuando todas las variantes existen (`t(\`role.${rol}\`)`, `t(\`status.${estado}\`)`, `permission.<id>.label`, `provider.<id>.blurb`).
 - **Fuera de componentes** (utilidades como `ago()`, `describe()` de herramientas, validaciones): se usa `translate` de `lib/i18n/core` en el momento de renderizar; el componente que las llama usa `useI18n()` para volver a renderizarse al cambiar de idioma. Los componentes memoizados que muestran texto traducido llaman a `useI18n()` (los consumidores de contexto se actualizan aunque estén en `memo`).
+- **`t` en memos:** el `t` de `useI18n()` cambia de identidad cada vez que cambia el idioma, así que un `useMemo` o `useCallback` que arma texto con él y lista `t` como dependencia se recalcula al instante.
 - **Fechas:** `intlLocale()` da `es-MX` / `en-US` para `toLocaleDateString`.
 
 ### Errores del servidor
