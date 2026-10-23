@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Check, Eye, EyeOff, Pencil, Search, X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/index';
 import type { VarInfo, VarSource } from '@/lib/types';
+import { NO_VALUE } from '@/lib/meta';
 
 export const SOURCE_TONE: Record<VarSource, string> = { session: 'sess', file: 'file', envfile: 'env', hive: 'hive', response: 'resp', dynamic: 'dyn', missing: 'miss' };
 
@@ -52,14 +53,14 @@ export function VarsTable({ vars, onSet, onForget, onRun, compact = false }: {
                     {editing === v.name ? (
                       <span className="row gap-s"><input className="input mono" autoFocus value={draft} placeholder={t('hw.session.value')} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(null); }} />
                         <button className="btn primary icon sm" onClick={save} aria-label={t('iv.save')}><Check size={14} /></button><button className="btn ghost icon sm" onClick={() => setEditing(null)} aria-label={t('hw2.cancel')}><X size={14} /></button></span>
-                    ) : v.source === 'missing' ? <span className="muted">—</span>
+                    ) : v.source === 'missing' ? <span className="muted">{NO_VALUE}</span>
                       : v.source === 'dynamic' ? <span className="muted small">{t('iv.generated')}</span>
                       : v.hidden ? <span className="muted small" title={t('iv.hidden')}>•••••• <i>({t('iv.hidden')})</i></span>
                       : <span className="mono ivt-text" title={masked ? undefined : v.value ?? ''}>{masked ? '••••••••' : v.value}</span>}
                   </td>
                   <td>
                     <span className={`ivt-src ${SOURCE_TONE[v.source]}`}>{sourceLabel(t, v.source, v.from)}</span>
-                    {v.overridden.length > 0 && <div className="ivt-over">{v.overridden.map((o, i) => <div key={i} className="small"><b>{sourceLabel(t, o.source, o.from)}</b> {t('iv.alsoDefines')}{o.value !== null && <> <code className="mono">{o.value}</code></>} — {t('iv.winsOver', { who: sourceLabel(t, v.source, v.from) })}</div>)}</div>}
+                    {v.overridden.length > 0 && <div className="ivt-over">{v.overridden.map((o, i) => <div key={i} className="small"><b>{sourceLabel(t, o.source, o.from)}</b> {t('iv.alsoDefines')}{o.value !== null && <> <code className="mono">{o.value}</code></>} · {t('iv.winsOver', { who: sourceLabel(t, v.source, v.from) })}</div>)}</div>}
                     {v.source === 'missing' && v.hint?.startsWith('run:') && onRun && <button className="btn sm" style={{ marginTop: 4 }} onClick={() => onRun(v.hint!.slice(4))}>{t('iv.run', { name: v.hint.slice(4) })}</button>}
                   </td>
                   {!compact && <td className="muted small">{v.usedBy || ''}</td>}

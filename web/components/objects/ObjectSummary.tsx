@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { usePolling } from '@/lib/hooks/usePolling';
 import { useI18n } from '@/lib/i18n/index';
 import { useLogStream } from '@/lib/useLogStream';
-import { ago, shortPath } from '@/lib/meta';
+import { NO_VALUE, ago, shortPath } from '@/lib/meta';
 import { fmtBytes } from '@/lib/format';
 import type { ClusterConfig, DockerConfig, ObjectStats, ObjectView, ServerConfig } from '@/lib/types';
 import { StatusDot } from './ObjectPanel';
@@ -99,9 +99,9 @@ export function ObjectSummary({ object: o, onSeeLogs }: { object: ObjectView; on
           <section className="ov-card">
             <div className="eyebrow">{t('ow.usage')}</div>
             {!live && stats?.cpu === null ? <p className="muted small" style={{ margin: 0 }}>{t('ow.noUsage')}</p> : (<>
-              <div className="ov-meter"><span>{t('ow.cpu')}</span><b>{stats?.cpu !== null && stats?.cpu !== undefined ? `${stats.cpu}%` : '—'}</b></div>
+              <div className="ov-meter"><span>{t('ow.cpu')}</span><b>{stats?.cpu !== null && stats?.cpu !== undefined ? `${stats.cpu}%` : NO_VALUE}</b></div>
               <Spark values={cpu} color="var(--p-opencode)" />
-              <div className="ov-meter"><span>{t('ow.mem')}</span><b>{stats?.memBytes != null ? `${fmtBytes(stats.memBytes)}${stats.memLimitBytes ? ` / ${fmtBytes(stats.memLimitBytes)}` : ''}` : '—'}</b></div>
+              <div className="ov-meter"><span>{t('ow.mem')}</span><b>{stats?.memBytes != null ? `${fmtBytes(stats.memBytes)}${stats.memLimitBytes ? ` / ${fmtBytes(stats.memLimitBytes)}` : ''}` : NO_VALUE}</b></div>
               <Spark values={mem} color="var(--ok)" />
               <dl className="ov-dl">
                 {stats?.pids != null && <Row k={t('ow.procs')} v={stats.pids} />}

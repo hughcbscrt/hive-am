@@ -51,7 +51,7 @@ export function NewRequest({ objectId, files, defaultFile, onClose, onCreated }:
             </div>
           </Field>
           <Field label={t('obj.f.name')}><input className="input" value={r.name} onChange={(e) => setR({ ...r, name: e.target.value })} placeholder="login" autoFocus /></Field>
-          <div className="row gap-s"><select className="select" style={{ width: 120 }} value={r.method} onChange={(e) => setR({ ...r, method: e.target.value })} aria-label="Method">{METHODS.map((m) => <option key={m}>{m}</option>)}</select>
+          <div className="row gap-s"><select className="select" style={{ width: 120 }} value={r.method} onChange={(e) => setR({ ...r, method: e.target.value })} aria-label={t('a11y.method')}>{METHODS.map((m) => <option key={m}>{m}</option>)}</select>
             <input className="input mono" style={{ flex: 1 }} value={r.url} onChange={(e) => setR({ ...r, url: e.target.value })} placeholder="{{host}}/path" aria-label="URL" /></div>
           <Field label={t('http.headers')} hint={t('hw2.new.headersHint')}><textarea className="input mono" rows={3} value={headersText} onChange={(e) => setHeadersText(e.target.value)} placeholder="Content-Type: application/json" /></Field>
           <Field label={t('http.requestBody')}><textarea className="input mono" rows={4} value={r.body} onChange={(e) => setR({ ...r, body: e.target.value })} /></Field>

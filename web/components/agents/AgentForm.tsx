@@ -7,7 +7,7 @@ import { EffortField, Field, FolderPicker, ModelField, PermissionField, Provider
 import { useHiveData } from '@/lib/store';
 import { MemberPick } from './MemberPick';
 import type { Agent, AgentType, Colony, InheritField, Permission, Provider, Role, SkillLoad } from '@/lib/types';
-import { defaultModel, permissionLabel, shortPath } from '@/lib/meta';
+import { NO_VALUE, defaultModel, permissionLabel, shortPath } from '@/lib/meta';
 import { PickSearch } from '@/components/PickSearch';
 import { CheckRow } from '@/components/Primitives';
 import { MANAGEABLE } from '@/components/objects/ManagerField';
@@ -152,7 +152,7 @@ function InheritRow({ colony, on, onChange, label, value, note, mono }: { colony
       <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
       <span className="grow">
         <b>{label} <span className="muted fw-500">{t('inherit.from')}</span> <i className="cdot" style={{ background: colony.color || 'var(--honey)' }} />{colony.name}</b>
-        <span className={`inh-val ${mono ? 'mono' : ''}`}>{value || '—'}</span>
+        <span className={`inh-val ${mono ? 'mono' : ''}`}>{value || NO_VALUE}</span>
         {note && <span className="hint">{note}</span>}
       </span>
       <span className="inh-state">{on ? t('inherit.following') : t('inherit.own')}</span>

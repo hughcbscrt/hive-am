@@ -273,6 +273,11 @@ El backend responde en inglés. `lib/api.ts` pasa cada mensaje por `translateSer
 1. Escribe la clave y su texto en **`en.ts`** y su traducción en **`es.ts`** (misma clave, mismos `{parámetros}`).
 2. Úsala con `t('…')`. No escribas texto visible directamente en JSX, atributos (`placeholder`, `aria-label`, `title`), avisos (`toast`) ni mensajes de validación.
 3. Ejecuta `npm run typecheck`: detecta claves inexistentes y diferencias entre catálogos.
+4. Ejecuta el check de i18n desde `server/`: `HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-web-i18n.ts`. Falla cuando `en.ts` y `es.ts` tienen claves distintas, cuando un `.tsx` de `web/components` o `web/app` tiene un `title`, `aria-label`, `placeholder`, `alt` o texto de elemento (`>Texto<`) literal fuera de las excepciones de abajo, y cuando algún `.ts`, `.tsx` o `.css` de `web/components`, `web/app` o `web/lib` contiene la raya larga (U+2014). Lee el código con expresiones regulares, así que no ve el texto armado en cadenas de JavaScript (`'…'` dentro de una expresión).
+
+**Términos técnicos que se quedan en inglés en los dos idiomas** (la lista `EXCEPTIONS` del check; mantén las dos iguales): `HTTP`, `JSON`, `CSV`, `NULL`, `URL`, `IP`, `API key`, `Bearer token`, `Basic`, `Token` (nombres de protocolos, formatos y esquemas de autenticación), `App Home` (el nombre de una pantalla de Slack), `hive-am`, `true` y `false`, los nombres de teclas de `Ctrl+Enter` y `Ctrl/⌘ + Enter`, y los valores de ejemplo `login` y `dev` de dos placeholders (un nombre de petición y un nombre de entorno).
+
+**Valores vacíos:** una celda, valor o medidor sin nada que mostrar usa `NO_VALUE` de `lib/meta.ts` (un guion normal, `-`, igual en los dos idiomas); una lista vacía lo dice con un texto del diccionario (por ejemplo `ow.d.none`).
 
 Convención de claves: `<área>.<elemento>`, por ejemplo `agent.sessions.empty`, `colony.err.name`, `tool.k.path`. Textos compartidos viven en `common.*`, `role.*`, `status.*` y `permission.*`.
 

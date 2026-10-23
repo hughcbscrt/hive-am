@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, File, Folder, FolderOpen, GitBranch, Search,
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { fmtDateTime } from '@/lib/format';
-import { ago } from '@/lib/meta';
+import { NO_VALUE, ago } from '@/lib/meta';
 import { buildTree, flatten } from '@/lib/git/gitTree';
 import type { Agent, GitTagInfo } from '@/lib/types';
 import { Segmented, useToast } from '@/components/ui';
@@ -37,7 +37,7 @@ export function TagList({ agent, sel, onSelect, onLoaded }: { agent: Agent; sel:
         {shown.map((x) => (
           <button key={x.name} role="option" aria-selected={sel === x.name} className={`gx-commit ${sel === x.name ? 'sel' : ''}`} onClick={() => onSelect(x)}>
             <span className="subj"><Tag size={13} style={{ verticalAlign: '-2px', marginRight: 5 }} />{x.name}</span>
-            <span className="meta">{x.subject || '—'}</span>
+            <span className="meta">{x.subject || NO_VALUE}</span>
             <span className="meta"><span className="mono sha">{x.sha.slice(0, 8)}</span> · {ago(Date.parse(x.date))}</span>
           </button>
         ))}

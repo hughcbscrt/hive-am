@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, ExternalLink, MoreHorizo
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
-import { ago, shortPath } from '@/lib/meta';
+import { NO_VALUE, ago, shortPath } from '@/lib/meta';
 import { fmtBytes } from '@/lib/format';
 import type { ClusterConfig, DockerConfig, ObjectStats, ObjectView, ServerConfig } from '@/lib/types';
 import { useToast } from '@/components/ui';
@@ -86,11 +86,11 @@ export function ClusterMembers({ cluster }: { cluster: ObjectView }) {
                     <td><span className="row gap-s">
                       {sv && sv.length > 0 ? <button className="cm-chev" onClick={() => toggle(m.id)} aria-expanded={expanded} aria-label={expanded ? t('svc.collapse') : t('svc.expand')} title={expanded ? t('svc.collapse') : t('svc.expand')}>{expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</button> : <span style={{ width: 20 }} />}
                       <Link href={`/resources/${m.id}`} className="cm-name"><Icon size={15} style={{ color }} /><b>{m.name}</b></Link></span></td>
-                    <td className="mono small svc-img" title={summaryOf(m, st)}>{summaryOf(m, st) || '—'}</td>
+                    <td className="mono small svc-img" title={summaryOf(m, st)}>{summaryOf(m, st) || NO_VALUE}</td>
                     <td><span className="row gap-s small"><StatusDot status={m.state.status} />{t(`obj.status.${m.state.status}`)}</span>
                       <span className="muted small">{[detailText(t, m.state.detail), m.state.since && live ? t('obj.since', { time: ago(m.state.since) }) : ''].filter(Boolean).join(' · ')}</span></td>
-                    <td className="num mono small">{st?.cpu != null ? `${st.cpu}%` : '—'}</td>
-                    <td className="num mono small">{st?.memBytes != null ? fmtBytes(st.memBytes) : '—'}</td>
+                    <td className="num mono small">{st?.cpu != null ? `${st.cpu}%` : NO_VALUE}</td>
+                    <td className="num mono small">{st?.memBytes != null ? fmtBytes(st.memBytes) : NO_VALUE}</td>
                     <td className="cm-act">
                       {live
                         ? <button className="btn ghost icon sm" disabled={!!busy} onClick={() => void act(m, 'stop')} aria-label={t('obj.act.stop')} title={t('obj.act.stop')}><Square size={14} /></button>

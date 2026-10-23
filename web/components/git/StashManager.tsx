@@ -4,7 +4,7 @@ import { ArchiveRestore, PackagePlus, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { parseDiff } from '@/lib/git/diff';
-import { ago } from '@/lib/meta';
+import { NO_VALUE, ago } from '@/lib/meta';
 import type { Agent, GitCommitDetail, GitDiffResult, StashDetail, StashItem } from '@/lib/types';
 import { ConfirmDialog, Modal } from '@/components/ui';
 import { DiffView } from './DiffView';
@@ -21,7 +21,7 @@ export function StashList({ stashes, sel, onSelect, onSave, canSave }: { stashes
         <div className="gx-hist" role="listbox" aria-label={t('git.tab.stashes')}>
           {stashes.map((s) => (
             <button key={s.sha} role="option" aria-selected={sel === s.sha} className={`gx-commit ${sel === s.sha ? 'sel' : ''}`} onClick={() => onSelect(s.sha)}>
-              <span className="subj">{s.message || '—'}</span>
+              <span className="subj">{s.message || NO_VALUE}</span>
               <span className="meta">{s.branch && <>{s.branch} · </>}{ago(Date.parse(s.date))}</span>
               {s.smart && <span className="refs"><i className="ref">{t('git.stash.smart')}</i></span>}
             </button>
@@ -79,7 +79,7 @@ export function StashPreview({ agent, stash, a }: { agent: Agent; stash: StashIt
   return (
     <section className="gx-preview gx-commitview" aria-label={stash.message}>
       <header className="gx-chead">
-        <h3>{stash.message || '—'}</h3>
+        <h3>{stash.message || NO_VALUE}</h3>
         <div className="muted small row gap-s wrap"><span>{stash.branch && `${stash.branch} · `}{ago(Date.parse(stash.date))}</span>{detail && <span>· {t('git.hist.files', { count })}</span>}</div>
         <div className="row gap-s wrap">
           <button className="btn sm" disabled={busy} title={t('git.stash.apply.hint')} onClick={() => apply(false)}><ArchiveRestore size={14} />{t('git.stash.apply')}</button>
@@ -104,7 +104,7 @@ export function StashPreview({ agent, stash, a }: { agent: Agent; stash: StashIt
       )}
       {file && <div className="gx-body">{!parsed ? <p className="gx-note">{t('git.loading')}</p> : parsed.binary ? <p className="gx-note">{t('git.diff.binary')}</p> : parsed.hunks.length === 0 ? <p className="gx-note">{t('git.diff.empty')}</p> : <DiffView parsed={parsed} layout="unified" path={file.path} cutOff={!!diff?.truncated} />}</div>}
       {confirmDrop && (
-        <ConfirmDialog danger title={t('git.stash.drop.title')} body={t('git.stash.drop.body', { name: stash.message || '—' })} confirmLabel={t('git.stash.drop')} onClose={() => setConfirmDrop(false)}
+        <ConfirmDialog danger title={t('git.stash.drop.title')} body={t('git.stash.drop.body', { name: stash.message || NO_VALUE })} confirmLabel={t('git.stash.drop')} onClose={() => setConfirmDrop(false)}
           onConfirm={() => { if (!busy) void a.run('stash', t('git.stash.dropped'), 'stash-drop', { sha: stash.sha }); }}>
           <p className="gx-lost">{t('git.discard.all.warn')}</p>
         </ConfirmDialog>

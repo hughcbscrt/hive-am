@@ -4,7 +4,7 @@ import { Check, ChevronDown, GitBranch, Search, Tag } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useDismiss } from '@/lib/useDismiss';
-import { ago } from '@/lib/meta';
+import { NO_VALUE, ago } from '@/lib/meta';
 import type { Agent, GitRefs, RefInfo } from '@/lib/types';
 
 /** Every branch and tag of the agent's repository, loaded once (and again when `stamp` changes: a commit, a pull, a switch). */
@@ -46,7 +46,7 @@ export function RefPicker({ refs, value, onChange, label, extra, icon = true, co
   const row = (r: RefInfo, kind: 'branch' | 'tag' | 'remote') => (
     <button key={`${kind}:${r.name}`} type="button" role="option" aria-selected={value === r.name} className={`gx-refrow ${value === r.name ? 'sel' : ''}`} onClick={() => pick(r.name)} title={r.subject}>
       <span className="nm">{value === r.name ? <Check size={13} /> : kind === 'tag' ? <Tag size={13} /> : <GitBranch size={13} />}{r.name}</span>
-      <span className="sub">{r.subject || '—'} · {ago(Date.parse(r.date))}</span>
+      <span className="sub">{r.subject || NO_VALUE} · {ago(Date.parse(r.date))}</span>
     </button>
   );
   return (
