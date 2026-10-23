@@ -116,13 +116,15 @@ A Docker resource manages containers. It needs the `docker` command on your mach
 
 | Mode | What hive-am does | When you delete the resource |
 |---|---|---|
-| **Create a container** | Creates the container from an **Image**, with **Ports** (`8080:80`), **Volumes** (`/host/path:/in/container`), environment variables, **Restart policy** and **Command (optional)**. | The container is removed. |
+| **Create a container** | Creates the container from an **Image**, with **Ports** (`8080:80`), **Volumes** (one row each: a volume or a folder, and where it goes), environment variables, **Restart policy** and **Command (optional)**. | The container is removed. |
 | **Compose project** | Manages a **Compose file**, with **Project name (optional)** and **Services (optional)** (empty means all). | The project is stopped, not removed. |
 | **Existing container** | Only starts, stops and restarts it, and reads its logs. | It is left as it is. It is never removed. |
 
-The forms ask Docker to suggest what already exists: local images, existing containers (the ones hive-am created are marked) and, when you pick a compose file, its services. If Docker is not available, the lists are empty and you can always type the value by hand.
+The forms ask Docker to suggest what already exists: local images, networks and volumes (each says how many containers use it), existing containers (the ones hive-am created are marked) and, when you pick a compose file, its services. If Docker is not available, the lists are empty and you can always type the value by hand.
 
-In **Create a container** mode you can set limits and network (memory, CPUs, network, log size, time to stop). If you change one, the container is created again the next time it starts or restarts, and what was inside it is lost.
+In **Volumes**, press **Add a volume** and, in the row, pick a volume of this machine, type a new name (Docker creates it the first time the container starts, and the row tells you) or press **Folder** to choose a folder; then write the path inside the container and tick **Read only** if the container should not write there. A resource you saved before shows its volumes in these rows.
+
+In **Create a container** mode you can pick the **Network** and set limits (memory, CPUs, log size, time to stop). If you change one, the container is created again the next time it starts or restarts, and what was inside it is lost.
 
 The **Summary** of a Docker resource adds processes, network and disk, and shows the image, the ports and the number of restarts.
 

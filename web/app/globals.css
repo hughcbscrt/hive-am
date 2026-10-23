@@ -1194,6 +1194,11 @@ button.mini-sep .pip.unread { right: auto; left: 1px; background: var(--ok); ani
 .vars-table { display: flex; flex-direction: column; gap: 6px; }
 .vars-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(160px, 2fr) auto auto auto; gap: 6px; align-items: center; } .vars-row .input { padding: 6px 10px; font-size: var(--fs-ui); }
 .vars-note { grid-column: 1 / -1; font-size: var(--fs-caption); color: var(--p-kiro); margin: -2px 0 2px 4px; }
+/* The volume rows of a Docker container: source (with its folder button), path inside, read only, delete. The folder picker and the note open on a line of their own. */
+.vrows { display: flex; flex-direction: column; gap: 6px; }
+.vrow { display: grid; grid-template-columns: minmax(0, 2fr) auto minmax(0, 1.4fr) auto auto; gap: 6px; align-items: center; } .vrow .input { padding: 6px 10px; font-size: var(--fs-ui); }
+.vrow-pick, .vrow-pick > div { display: contents; } .vrow .picker { grid-column: 1 / -1; order: 1; }
+.vrow-raw { grid-column: 1 / 5; } .vrow-note { grid-column: 1 / -1; order: 2; margin: -2px 0 2px 4px; }
 /* HTTP screen */
 .hw-list { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--bg-deep); }
 .hw-env { display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; } .hw-hint { padding: 4px 14px 8px; margin: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }

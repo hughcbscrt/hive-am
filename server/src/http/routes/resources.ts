@@ -1,6 +1,6 @@
 import { notifyAgentsChanged } from '../../runtime.js';
 import { DRIVER_PROPS } from '../../objects/driver-props.js';
-import { composeServices, inspectMachine, listContainers, listImages } from '../../objects/docker-info.js';
+import { composeServices, inspectMachine, listContainers, listImages, listNetworks, listVolumes } from '../../objects/docker-info.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from '../../objects/agent.js';
 import { agentDb } from '../../objects/agent-db.js';
 import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, objectInspect, objectInspectRaw, objectLogs, removeObject, updateObject } from '../../objects/index.js';
@@ -46,6 +46,9 @@ write('POST', '/api/objects/:id/action', (b, { params }) => objectAction(params[
 // What Docker knows, to suggest in the forms (containers, images, the services of a compose file).
 route('GET', '/api/docker/containers', () => listContainers());
 route('GET', '/api/docker/images', () => listImages());
+// The volumes and networks of this machine (for the form's pickers): local only with the Host pinned, like inspect.
+pinned('/api/docker/volumes', () => listVolumes());
+pinned('/api/docker/networks', () => listNetworks());
 route('GET', '/api/docker/compose-services', ({ url }) => composeServices(url.searchParams.get('file') ?? ''));
 route('GET', '/api/objects/:id/stats', ({ params }) => statsOf(params[0]));
 route('GET', '/api/objects/:id/http', ({ params }) => httpScan(params[0]));

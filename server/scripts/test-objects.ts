@@ -5,14 +5,14 @@
 // touches a container it did not create.
 import './_guard.js';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, existsSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import type { IncomingMessage } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { colonies } from '../src/db.js';
-import { composeServices, inspectMachine, listContainers, listImages, maskVar } from '../src/objects/docker-info.js';
+import { composeServices, inspectMachine, listContainers, listImages, listNetworks, listVolumes, maskVar } from '../src/objects/docker-info.js';
 import { ObjectError, createObject, objectAction, objectInspect, objectInspectRaw, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
 import { HttpError } from '../src/http/errors.js';
 import { match } from '../src/http/router.js';
@@ -138,6 +138,43 @@ check(noBin.exists === false && noBin.reason === 'no-docker' && /not installed/.
 const noDaemon = probeWith({ ...process.env, DOCKER_HOST: `unix://${join(dir, 'no-docker.sock')}` });
 check(noDaemon.exists === false && noDaemon.reason === 'no-docker' && noDaemon.configured?.env?.[0]?.name === 'HELLO', 'with the Docker daemon not answering, the same notice (not an error)');
 
+// ---------------------------------------------------------------- what Docker has (inventory), read-only, with a fake docker command
+// The fake answers the four listings from canned output and writes down every command it gets, to prove the listings never change anything.
+const fakeBin = mkdtempSync(join(tmpdir(), 'fake-docker-')), fakeLog = join(fakeBin, 'calls.log');
+const canned = {
+  ps: [
+    { ID: 'a'.repeat(64), Names: 'web', Image: 'nginx', State: 'running', Status: 'Up', Ports: '', Labels: 'hive-am.object=abc,hive-am.cfg=1', Mounts: 'appdata,/srv/site', Networks: 'appnet,bridge' },
+    { ID: 'b'.repeat(64), Names: 'db', Image: 'postgres:16', State: 'exited', Status: 'Exited (0)', Ports: '', Labels: '', Mounts: 'appdata,' + 'f'.repeat(64), Networks: 'appnet' },
+  ],
+  images: [{ Repository: 'nginx', Tag: 'latest', ID: 'i1', Size: '40MB', CreatedSince: '1 day ago' }, { Repository: 'postgres', Tag: '16', ID: 'i2', Size: '400MB', CreatedSince: '2 days ago' }, { Repository: 'redis', Tag: '7', ID: 'i3', Size: '30MB', CreatedSince: '3 days ago' }],
+  volume: [{ Name: 'appdata', Driver: 'local', Labels: 'hive-am.created=1' }, { Name: 'f'.repeat(64), Driver: 'local', Labels: 'com.docker.volume.anonymous=' }, { Name: 'spare', Driver: 'local', Labels: '' }],
+  network: [{ Name: 'appnet', ID: 'n1', Driver: 'bridge', Scope: 'local', Labels: '' }, { Name: 'bridge', ID: 'n2', Driver: 'bridge', Scope: 'local', Labels: '' }, { Name: 'host', ID: 'n3', Driver: 'host', Scope: 'local', Labels: '' }],
+};
+for (const [k, rows] of Object.entries(canned)) writeFileSync(join(fakeBin, `${k}.out`), rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+writeFileSync(join(fakeBin, 'docker'), `#!/bin/sh\necho "$*" >> ${JSON.stringify(fakeLog)}\ncase "$1" in ps|images) cat ${JSON.stringify(fakeBin)}/$1.out ;; volume|network) [ "$2" = ls ] && cat ${JSON.stringify(fakeBin)}/$1.out || exit 1 ;; *) exit 1 ;; esac\n`);
+chmodSync(join(fakeBin, 'docker'), 0o755);
+const inventory = join(dir, 'inventory.mts');
+writeFileSync(inventory, `import * as di from ${JSON.stringify(join(here, '../src/objects/docker-info.ts'))};\nconsole.log(JSON.stringify(await Promise.all([di.listContainers(), di.listImages(), di.listVolumes(), di.listNetworks()])));`);
+const inventoryWith = (env: NodeJS.ProcessEnv) => { const r = spawnSync(process.execPath, ['--import', 'tsx', inventory], { cwd: join(here, '..'), env, encoding: 'utf8', timeout: 60000 }); try { return JSON.parse(r.stdout.trim().split('\n').pop() ?? ''); } catch { return [{}, {}, {}, {}]; } };
+{
+  const [fc, fi, fv, fn] = inventoryWith({ ...process.env, PATH: `${fakeBin}:${process.env.PATH}` });
+  const web = fc.containers?.find((c: any) => c.name === 'web'), db = fc.containers?.find((c: any) => c.name === 'db');
+  check(fc.available && web?.mounts.join() === 'appdata,/srv/site' && web.networks.join() === 'appnet,bridge' && web.managed && web.id.length === 12 && db?.networks.join() === 'appnet' && !db.managed, 'each container lists its mounts (volume names and host folders) and networks, with the short id');
+  const img = (ref: string) => fi.images?.find((i: any) => i.ref === ref)?.inUse;
+  check(fi.available && img('nginx:latest') === 1 && img('postgres:16') === 1 && img('redis:7') === 0, 'each image says how many containers use it (nginx and nginx:latest are the same)');
+  const vol = (name: string) => fv.volumes?.find((v: any) => v.name === name);
+  check(fv.available && vol('appdata')?.inUse === 2 && vol('appdata')?.managed && vol('spare')?.inUse === 0 && !vol('spare')?.managed && vol('f'.repeat(64))?.anonymous && !vol('appdata')?.anonymous && fv.volumes.at(-1)?.anonymous, 'volumes: how many containers mount each, which hive-am created, and the anonymous ones last');
+  const net = (name: string) => fn.networks?.find((x: any) => x.name === name);
+  check(fn.available && net('appnet')?.inUse === 2 && !net('appnet')?.builtin && net('bridge')?.builtin && net('bridge')?.inUse === 1 && net('host')?.builtin && net('host')?.inUse === 0 && fn.networks[0]?.builtin, 'networks: how many containers use each, and Docker\'s own (bridge, host, none) marked builtin and first');
+  const calls = readFileSync(fakeLog, 'utf8').trim().split('\n');
+  check(calls.length > 0 && calls.every((c) => /^(ps -a --no-trunc|images|volume ls|network ls) --format \{\{json \.\}\}$/.test(c)), 'the listings only ever run read-only commands (ps, images, volume ls, network ls)');
+}
+{
+  const none = inventoryWith({ ...process.env, PATH: mkdtempSync(join(tmpdir(), 'no-docker-')) });
+  check(none.every((r: any) => r.available === false && /not installed/.test(r.error)) && none[0].containers.length === 0 && none[1].images.length === 0 && none[2].volumes.length === 0 && none[3].networks.length === 0, 'without Docker every list is empty, with available: false and why');
+}
+check(await routeStatus('GET', '/api/docker/volumes', 'https://evil.example') === 403 && await routeStatus('GET', '/api/docker/networks', 'http://evil.example', 'evil.example') === 403, 'the volume and network lists are local only, with the Host pinned');
+
 // ---------------------------------------------------------------- docker
 const image = process.env.HIVE_TEST_IMAGE ?? 'nginx:1.25-alpine';
 const dockerOk = (() => { try { execFileSync('docker', ['image', 'inspect', image], { stdio: 'ignore', timeout: 15000 }); return true; } catch { return false; } })();
@@ -213,6 +250,21 @@ else {
   const cb = await composeServices(join(cdir, 'broken.yml'));
   check(cb.services.join() === 'alpha,beta' && cb.source === 'file', 'when Docker cannot read it, the services are taken from the file itself');
   check(await rejects(() => composeServices('/etc/passwd'), /compose file/) && await rejects(() => composeServices(join(cdir, 'nope.yml')), /does not exist/), 'only existing .yml / .yaml files are read');
+  // the inventory with real Docker: a volume, a network and a container (created, never started) made by this test, then removed
+  const tag = Date.now().toString(36), tvol = `hive-am-test-vol-${tag}`, tnet = `hive-am-test-net-${tag}`, tcon = `hive-am-test-inv-${tag}`;
+  try {
+    execFileSync('docker', ['volume', 'create', tvol], { stdio: 'ignore', timeout: 30000 });
+    execFileSync('docker', ['network', 'create', tnet], { stdio: 'ignore', timeout: 30000 });
+    execFileSync('docker', ['create', '--name', tcon, '-v', `${tvol}:/data`, '-v', `${cdir}:/site:ro`, '--network', tnet, image], { stdio: 'ignore', timeout: 30000 });
+    const [rc, rv, rn, ri] = await Promise.all([listContainers(), listVolumes(), listNetworks(), listImages()]);
+    const tc = rc.containers.find((c) => c.name === tcon);
+    check(!!tc && tc.mounts.includes(tvol) && tc.mounts.includes(cdir) && tc.networks.join() === tnet, 'with real Docker a container lists its volume, its host folder (in full) and its network');
+    check(rv.available && rv.volumes.find((v) => v.name === tvol)?.inUse === 1 && rn.available && rn.networks.find((x) => x.name === tnet)?.inUse === 1 && rn.networks.some((x) => x.name === 'bridge' && x.builtin), 'and the volume and the network say one container uses them');
+    check((ri.images.find((i) => i.ref === image)?.inUse ?? 0) >= 1, 'the image it was created from counts it');
+  } finally {
+    for (const args of [['rm', '-f', tcon], ['volume', 'rm', tvol], ['network', 'rm', tnet]]) try { execFileSync('docker', args, { stdio: 'ignore', timeout: 30000 }); } catch { /* cleanup */ }
+  }
+  check(spawnSync('docker', ['volume', 'inspect', tvol], { stdio: 'ignore' }).status !== 0 && spawnSync('docker', ['network', 'inspect', tnet], { stdio: 'ignore' }).status !== 0, 'the test removes what it created');
   const lc = await listContainers(); const li = await listImages();
   check(lc.available && lc.containers.some((c) => c.name === cname && c.managed) && li.images.some((i) => i.ref === image), 'the containers and images of this machine are listed (and the ones hive-am created are marked)');
   const kst = await statsOf(comp.id);

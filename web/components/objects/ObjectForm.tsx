@@ -5,6 +5,7 @@ import { ChevronRight, RefreshCw } from 'lucide-react';
 import { CheckRow, Field, FolderPicker, PathPicker, Segmented } from '@/components/ui';
 import { useComposeServices, useDockerLists } from '@/lib/useDocker';
 import { Suggest } from './Suggest';
+import { VolumeRows } from './VolumeRows';
 import { TemplatePicker } from './TemplatePicker';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
@@ -230,14 +231,19 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
           <Card title={t('of.image')}>
             <Field label={t('obj.f.image')}>
               <div className="row gap-s"><div className="grow"><Suggest value={d.image} onChange={(v) => set('image', v)} mono placeholder={t('dk.pickImage')} ariaLabel={t('obj.f.image')}
-                options={(docker.images ?? []).map((i) => ({ value: i.ref, hint: `${i.size}${i.created ? ` · ${i.created}` : ''}` }))} /></div>{refresh}</div>
+                options={(docker.images ?? []).map((i) => ({ value: i.ref, hint: [i.size, i.created, t('dk.inUse', { count: i.inUse })].filter(Boolean).join(' · ') }))} /></div>{refresh}</div>
               {dockerNote}
             </Field>
             <Field label={t('obj.f.ports')} hint={t('obj.f.ports.hint')}><textarea className="textarea mono" rows={2} value={d.ports} onChange={(e) => set('ports', e.target.value)} placeholder="8080:80" /></Field>
-            <Field label={t('obj.f.volumes')} hint={t('obj.f.volumes.hint')}>
-              <textarea className="textarea mono" rows={2} value={d.volumes} onChange={(e) => set('volumes', e.target.value)} />
-              <PathPicker bare value="" buttonLabel={t('obj.f.volumes.add')} onChange={(v) => set('volumes', `${d.volumes.trimEnd()}${d.volumes.trim() ? '\n' : ''}${v}:/data`)} />
+          </Card>
+          <Card title={t('of.network')}>
+            <Field label={t('obj.dk.network')} hint={t('dk.net.hint')}>
+              <Suggest value={d.network} onChange={(v) => set('network', v)} mono placeholder={t('dk.pickNetwork')} ariaLabel={t('obj.dk.network')}
+                options={(docker.networks ?? []).map((x) => ({ value: x.name, hint: [x.driver, t('dk.inUse', { count: x.inUse }), x.managed ? t('dk.managed') : ''].filter(Boolean).join(' · ') }))} />
             </Field>
+          </Card>
+          <Card title={t('obj.f.volumes')} hint={t('obj.f.volumes.hint')} wide>
+            <VolumeRows value={d.volumes} onChange={(v) => set('volumes', v)} volumes={docker.volumes} />
           </Card>
           <Card title={t('of.env')}>
             <Field label={t('obj.f.env')} hint={t('obj.f.env.hint')}><textarea className="textarea mono" rows={4} value={d.env} onChange={(e) => set('env', e.target.value)} /></Field>
@@ -250,7 +256,6 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
             <div className="of-grid2">
               <Field label={t('obj.dk.memory')}>{text('memory', { placeholder: '512m' })}</Field>
               <Field label={t('obj.dk.cpus')}>{text('cpus', { placeholder: '1.5' })}</Field>
-              <Field label={t('obj.dk.network')}>{text('network', { placeholder: 'bridge' })}</Field>
               <Field label={t('obj.sup.stopTimeout')}>{text('stopTimeout', { placeholder: '10' })}</Field>
               <Field label={t('obj.sup.logMax')}>{text('logMax', { placeholder: '10' })}</Field>
             </div>

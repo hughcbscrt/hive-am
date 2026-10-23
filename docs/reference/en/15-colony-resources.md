@@ -62,7 +62,7 @@ Needs the `docker` command. Every value is passed as a separate argument (no she
 | **Compose project** (file, project name, services) | `docker compose -f file [-p project] up -d / stop / restart` | The project is stopped, **not** removed. |
 | **Existing container** (name or id) | Only `start` / `stop` / `restart` and reading its logs | Left as it is. **Never removed.** |
 
-**Limits and network** (a container hive-am creates): memory (`512m`), CPUs, network, log size (`--log-opt max-size`, 3 files) and the time it gets to stop (`--stop-timeout`). They are part of what the container was created with: if you change one, the container is **created again** the next time it starts or restarts (what was inside it is lost, as with any recreate); a container created by an older version is left as it is. For *existing* and *compose* only the stop timeout applies.
+**Limits** (a container hive-am creates), and the **Network** card: memory (`512m`), CPUs, network, log size (`--log-opt max-size`, 3 files) and the time it gets to stop (`--stop-timeout`). They are part of what the container was created with: if you change one, the container is **created again** the next time it starts or restarts (what was inside it is lost, as with any recreate); a container created by an older version is left as it is. For *existing* and *compose* only the stop timeout applies.
 
 State comes from `docker inspect` (running, restarting, exited with a code, unhealthy / health check pending) or, for compose, from `docker compose ps`. A container that is not there is **Stopped** (created ones) or **Unknown** (existing ones).
 
@@ -96,12 +96,15 @@ Groups servers and Docker containers **of the same colony** (not other clusters,
 
 The forms ask Docker (read-only) so you do not have to type what already exists:
 
-- **Image** (create a container): the images on this machine, with their size and age; anything else can still be typed (it will be pulled).
+- **Image** (create a container): the images on this machine, with their size, age and how many containers use them; anything else can still be typed (it will be pulled).
+- **Network** (create a container): the networks of this machine, with their driver and how many containers use them (Docker's own, `bridge`, `host` and `none`, first); any name can be typed.
+- **Volumes** (create a container): one row each, with its source (a volume of this machine, with how many containers mount it, or a folder picked with the folder button), the path inside the container and **Read only**. A name that is not a volume yet is allowed (Docker creates it on the first start) and the row says so. The rows edit the same `volumes` list as before (`source:target[:options]`, other options such as `z` are kept), so a resource saved earlier shows as rows unchanged; a line the rows cannot show is kept as typed. Anonymous volumes (a 64-character name) are not offered.
 - **Existing container:** the containers on this machine, with their image and state; the ones hive-am created are marked. A refresh button reloads the list.
 - **Compose project:** once the file is chosen, its **services** appear as chips to pick (none picked = all of them) and the project name is suggested from the folder. They come from `docker compose config --services`; when Docker cannot read the file (a variable without a value, for instance) they are read from the file itself and it says so.
-- If Docker is not available the lists are empty and the form says why; you can always type.
+- If Docker is not available the lists are empty and the form says why (once); you can always type.
+- How many containers use an image, a volume or a network comes from `docker ps -a --no-trunc` (its `Image`, `Mounts` and `Networks`; without `--no-trunc` Docker cuts the mounts). An image counts the containers whose `Image` is its reference (`nginx` and `nginx:latest` are the same); a container created from a tag that moved since is not counted. A folder whose path has a comma is not told apart from two mounts.
 
-API: `GET /api/docker/containers`, `GET /api/docker/images`, `GET /api/docker/compose-services?file=`.
+API: `GET /api/docker/containers` (each with `mounts` and `networks`), `GET /api/docker/images` (each with `inUse`), `GET /api/docker/volumes` (`{ available, error?, volumes: [{ name, driver, anonymous, managed, inUse }] }`), `GET /api/docker/networks` (`{ available, error?, networks: [{ name, id, driver, scope, builtin, managed, inUse }] }`), `GET /api/docker/compose-services?file=`. The volume and network lists are local app only with the Host pinned, like inspect. `managed` means the label `hive-am.created=1`. Read-only: they run only `docker ps`, `images`, `volume ls` and `network ls`.
 
 ## 15.3 State, logs and live updates
 
@@ -148,7 +151,7 @@ Every field that holds a path uses the same picker (`PathPicker` in `web/compone
 
 ## 15.7 Tests
 
-`server/scripts/test-objects.ts`, `test-object-kinds.ts` (HTTP files, environments, variables and secrets, handlers and chains, running against a local server, clusters), `test-http-script.ts` (the handler interpreter and everything it refuses), `test-object-supervision.ts` (restart policies, health checks, log size, stop timeout, Docker limits) and `test-object-tools.ts` (no model; the last goes through the real MCP script and HTTP API): runs real processes (state, port wait, logs by cursor, stop with grace and kill, restart, exit codes, custom stop command, a server started by another process and found again) and real Docker containers named `hive-am-*` from a local image (create, port mapping, label, logs without timestamps, restart, adopt an existing one, compose), plus the input validation. It skips the Docker part if Docker or the image is missing and never touches a container it did not create.
+`server/scripts/test-objects.ts`, `test-object-kinds.ts` (HTTP files, environments, variables and secrets, handlers and chains, running against a local server, clusters), `test-http-script.ts` (the handler interpreter and everything it refuses), `test-object-supervision.ts` (restart policies, health checks, log size, stop timeout, Docker limits) and `test-object-tools.ts` (no model; the last goes through the real MCP script and HTTP API): runs real processes (state, port wait, logs by cursor, stop with grace and kill, restart, exit codes, custom stop command, a server started by another process and found again) and real Docker containers named `hive-am-*` from a local image (create, port mapping, label, logs without timestamps, restart, adopt an existing one, compose, the lists of containers, images, volumes and networks with a volume, a network and a container `hive-am-test-*` it creates and removes), plus the input validation; the listings are also checked against a fake `docker` command that records every call (only read-only commands) and with no `docker` at all. It skips the real Docker part if Docker or the image is missing and never touches a container it did not create. `test-web-docker.ts` (no server) checks the volume rows of the form (`web/lib/dockerVolumes.ts`): a saved list shows as rows and comes back the same.
 
 ## 15.8 Not there yet
 

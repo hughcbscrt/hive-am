@@ -2,13 +2,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api';
 
-export interface DockerContainer { id: string; name: string; image: string; state: string; status: string; ports: string; managed: boolean }
-export interface DockerImage { ref: string; id: string; size: string; created: string }
+export interface DockerContainer { id: string; name: string; image: string; state: string; status: string; ports: string; managed: boolean; mounts: string[]; networks: string[] }
+export interface DockerImage { ref: string; id: string; size: string; created: string; inUse: number }
+export interface DockerVolume { name: string; driver: string; anonymous: boolean; managed: boolean; inUse: number }
+export interface DockerNetwork { name: string; id: string; driver: string; scope: string; builtin: boolean; managed: boolean; inUse: number }
 
 /** What Docker has on this machine, loaded when `enabled` (a form that needs it is open) and again on `reload`. */
 export function useDockerLists(enabled: boolean) {
   const [containers, setContainers] = useState<DockerContainer[] | null>(null);
   const [images, setImages] = useState<DockerImage[] | null>(null);
+  const [volumes, setVolumes] = useState<DockerVolume[] | null>(null);
+  const [networks, setNetworks] = useState<DockerNetwork[] | null>(null);
   const [error, setError] = useState('');
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -16,10 +20,12 @@ export function useDockerLists(enabled: boolean) {
     let dead = false;
     api.get<{ available: boolean; error?: string; containers: DockerContainer[] }>('/docker/containers').then((r) => { if (dead) return; setContainers(r.containers); setError(r.available ? '' : r.error ?? 'unavailable'); }).catch(() => !dead && setError('unavailable'));
     api.get<{ available: boolean; images: DockerImage[] }>('/docker/images').then((r) => !dead && setImages(r.images)).catch(() => undefined);
+    api.get<{ available: boolean; volumes: DockerVolume[] }>('/docker/volumes').then((r) => !dead && setVolumes(r.volumes)).catch(() => undefined);
+    api.get<{ available: boolean; networks: DockerNetwork[] }>('/docker/networks').then((r) => !dead && setNetworks(r.networks)).catch(() => undefined);
     return () => { dead = true; };
   }, [enabled, tick]);
   const reload = useCallback(() => setTick((x) => x + 1), []);
-  return { containers, images, error, reload };
+  return { containers, images, volumes, networks, error, reload };
 }
 
 export interface ComposeInfo { services: string[]; project: string; source: 'docker' | 'file'; error?: string }

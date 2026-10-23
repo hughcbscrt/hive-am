@@ -4,8 +4,8 @@ import { execCapture } from './exec.js';
 import { CONTAINER, IMAGE, ObjectError } from './model.js';
 
 /**
- * What Docker knows, to suggest in the forms: the containers on this machine, the images, and the services of a compose file. Read-only;
- * when Docker is not available the lists are empty and say why.
+ * What Docker knows, to suggest in the forms: the containers on this machine, the images, volumes and networks (each with how many
+ * containers use it), and the services of a compose file. Read-only; when Docker is not available the lists are empty and say why.
  */
 const run = async (args: string[], o: { cwd?: string; timeout?: number } = {}) => {
   const r = await execCapture('docker', args, { cwd: o.cwd, timeout: o.timeout ?? 15_000, env: { ...process.env, DOCKER_CLI_HINTS: 'false' } });
@@ -28,21 +28,61 @@ export function maskVar(item: string): string {
   return item.slice(0, i + 1) + item.slice(i + 1).replace(URL_PASSWORD, `$1${MASK}@`);
 }
 
-export interface ContainerInfo { id: string; name: string; image: string; state: string; status: string; ports: string; /** Created by hive-am for one of its objects. */ managed: boolean }
-export interface ImageInfo { ref: string; id: string; size: string; created: string }
+export interface ContainerInfo {
+  id: string; name: string; image: string; state: string; status: string; ports: string; /** Created by hive-am for one of its objects. */ managed: boolean;
+  /** What it mounts: volume names and host paths (the sources, not where they go inside). */ mounts: string[]; /** The networks it is connected to. */ networks: string[];
+}
+export interface ImageInfo { ref: string; id: string; size: string; created: string; /** How many containers (running or not) were created from it. */ inUse: number }
+export interface VolumeInfo { name: string; driver: string; /** A volume Docker named itself (64 hex characters) for an anonymous mount. */ anonymous: boolean; /** Created by hive-am. */ managed: boolean; inUse: number }
+export interface NetworkInfo { name: string; id: string; driver: string; scope: string; /** One of Docker's own: bridge, host, none. */ builtin: boolean; /** Created by hive-am. */ managed: boolean; inUse: number }
+
+const failed = (r: { err: string }) => r.err.trim().split('\n').pop()?.slice(0, 200);
+const list = (v: unknown) => String(v ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+const labelled = (labels: unknown, re: RegExp) => re.test(String(labels ?? ''));
+const BUILTIN = ['bridge', 'host', 'none'];
 
 export async function listContainers(): Promise<{ available: boolean; error?: string; containers: ContainerInfo[] }> {
-  const r = await run(['ps', '-a', '--format', '{{json .}}']);
-  if (r.code !== 0) return { available: false, error: r.err.trim().split('\n').pop()?.slice(0, 200), containers: [] };
-  const containers = lines(r.out).map((j) => ({ id: String(j.ID), name: String(j.Names), image: String(j.Image), state: String(j.State), status: String(j.Status), ports: String(j.Ports ?? ''), managed: /(^|,)hive-am\.object=/.test(String(j.Labels ?? '')) }));
-  return { available: true, containers: containers.sort((a, b) => a.name.localeCompare(b.name)) };
+  // --no-trunc: without it Docker cuts the mounts to a few characters ("/home/you/Doc…").
+  const r = await run(['ps', '-a', '--no-trunc', '--format', '{{json .}}']);
+  if (r.code !== 0) return { available: false, error: failed(r), containers: [] };
+  const all = lines(r.out).map((j) => ({
+    id: String(j.ID).slice(0, 12), name: String(j.Names), image: String(j.Image), state: String(j.State), status: String(j.Status), ports: String(j.Ports ?? ''),
+    managed: labelled(j.Labels, /(^|,)hive-am\.object=/), mounts: list(j.Mounts), networks: list(j.Networks),
+  }));
+  return { available: true, containers: all.sort((a, b) => a.name.localeCompare(b.name)) };
 }
 
+/** `nginx` and `nginx:latest` are the same image for counting who uses it. */
+const sameImage = (ref: string, image: string) => ref === image || ref === `${image}:latest`;
+
 export async function listImages(): Promise<{ available: boolean; error?: string; images: ImageInfo[] }> {
-  const r = await run(['images', '--format', '{{json .}}']);
-  if (r.code !== 0) return { available: false, error: r.err.trim().split('\n').pop()?.slice(0, 200), images: [] };
-  const images = lines(r.out).filter((j) => j.Repository && j.Repository !== '<none>').map((j) => ({ ref: j.Tag && j.Tag !== '<none>' ? `${j.Repository}:${j.Tag}` : String(j.Repository), id: String(j.ID), size: String(j.Size ?? ''), created: String(j.CreatedSince ?? '') }));
+  const [r, c] = await Promise.all([run(['images', '--format', '{{json .}}']), listContainers()]);
+  if (r.code !== 0) return { available: false, error: failed(r), images: [] };
+  const images = lines(r.out).filter((j) => j.Repository && j.Repository !== '<none>').map((j) => {
+    const ref = j.Tag && j.Tag !== '<none>' ? `${j.Repository}:${j.Tag}` : String(j.Repository);
+    return { ref, id: String(j.ID), size: String(j.Size ?? ''), created: String(j.CreatedSince ?? ''), inUse: c.containers.filter((x) => sameImage(ref, x.image)).length };
+  });
   return { available: true, images: [...new Map(images.map((i) => [i.ref, i])).values()].sort((a, b) => a.ref.localeCompare(b.ref)) };
+}
+
+export async function listVolumes(): Promise<{ available: boolean; error?: string; volumes: VolumeInfo[] }> {
+  const [r, c] = await Promise.all([run(['volume', 'ls', '--format', '{{json .}}']), listContainers()]);
+  if (r.code !== 0) return { available: false, error: failed(r), volumes: [] };
+  const volumes = lines(r.out).map((j) => {
+    const name = String(j.Name);
+    return { name, driver: String(j.Driver ?? ''), anonymous: /^[0-9a-f]{64}$/.test(name) || labelled(j.Labels, /(^|,)com\.docker\.volume\.anonymous=/), managed: labelled(j.Labels, /(^|,)hive-am\.created=1(,|$)/), inUse: c.containers.filter((x) => x.mounts.includes(name)).length };
+  });
+  return { available: true, volumes: volumes.sort((a, b) => Number(a.anonymous) - Number(b.anonymous) || a.name.localeCompare(b.name)) };
+}
+
+export async function listNetworks(): Promise<{ available: boolean; error?: string; networks: NetworkInfo[] }> {
+  const [r, c] = await Promise.all([run(['network', 'ls', '--format', '{{json .}}']), listContainers()]);
+  if (r.code !== 0) return { available: false, error: failed(r), networks: [] };
+  const networks = lines(r.out).map((j) => {
+    const name = String(j.Name);
+    return { name, id: String(j.ID), driver: String(j.Driver ?? ''), scope: String(j.Scope ?? ''), builtin: BUILTIN.includes(name), managed: labelled(j.Labels, /(^|,)hive-am\.created=1(,|$)/), inUse: c.containers.filter((x) => x.networks.includes(name)).length };
+  });
+  return { available: true, networks: networks.sort((a, b) => Number(b.builtin) - Number(a.builtin) || a.name.localeCompare(b.name)) };
 }
 
 /** Without Docker's help: the keys under a top-level `services:` (enough for ordinary compose files). */
