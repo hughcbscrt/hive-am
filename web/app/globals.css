@@ -1358,7 +1358,8 @@ button.mini-sep .pip.unread { right: auto; left: 1px; background: var(--ok); ani
 .oc-body .oc-form { padding: 0; max-width: none; }
 .oc-body .of { display: block; }
 .oc-body .of > * { margin-bottom: 14px; break-inside: avoid; }
-@container (min-width: 900px) { .oc-body .of { column-count: 2; column-gap: 14px; } .oc-body .of > .of-card.wide, .oc-body .of > :not(.of-card) { column-span: all; } }
+/* A column drops the bottom margin of its last card, so a full-width card right after a column would touch it: the full-width ones carry their own top margin (it collapses with the previous one's bottom margin when they follow each other). */
+@container (min-width: 900px) { .oc-body .of { column-count: 2; column-gap: 14px; } .oc-body .of > .of-card.wide, .oc-body .of > :not(.of-card) { column-span: all; } .oc-body .of > .of-card.wide:not(:first-child), .oc-body .of > :not(.of-card):not(:first-child) { margin-top: 14px; } }
 
 .modal.wide { top: 6vh; width: min(860px, calc(100vw - 32px)); max-height: 88vh; overflow: auto; }
 
