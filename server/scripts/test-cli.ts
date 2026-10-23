@@ -3,7 +3,7 @@
 //   HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-cli.ts
 import './_guard.js';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { chmodSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -139,9 +139,9 @@ check(r.code === 0 && code === 0 && !existsSync(run.stateFile()), 'stop ends a f
 // ---- update: the npm of the stand-in decides what is "latest", and records what it was asked to install ----
 const npmLog = join(run.runDir(), 'npm.log');
 const fakeNpm = join(run.runDir(), 'fake-npm.sh');
-writeFileSync(fakeNpm, `#!/bin/sh\ncase "$1" in view) [ -n "$STUB_LATEST" ] && echo "$STUB_LATEST" || exit 1;; root) echo /nowhere;; install) echo "$@" >> "${npmLog}";; esac\n`);
+writeFileSync(fakeNpm, `#!/bin/sh\ncase "$1" in view) [ -n "$STUB_LATEST" ] && echo "$STUB_LATEST" || exit 1;; root) echo /nowhere;; install) case "$STUB_INSTALL" in slow) sleep 2;; hang) exec sleep 30;; signal) kill -TERM $$;; eacces) echo "npm error code EACCES" >&2; exit 1;; fail) echo "npm error code E404" >&2; exit 1;; esac; echo "$@" >> "${npmLog}";; esac\n`);
 chmodSync(fakeNpm, 0o755);
-const updateEnv = (latest: string, install = 'global') => ({ ...env, HIVE_AM_NPM: fakeNpm, STUB_LATEST: latest, HIVE_AM_LAUNCHER_INSTALL: install });
+const updateEnv = (latest: string, install = 'global', extra: NodeJS.ProcessEnv = {}) => ({ ...env, HIVE_AM_NPM: fakeNpm, STUB_LATEST: latest, HIVE_AM_LAUNCHER_INSTALL: install, ...extra });
 const upd = (e: NodeJS.ProcessEnv, ...a: string[]) => { const x = spawnSync(process.execPath, [bin, 'update', ...a], { env: e, encoding: 'utf8', timeout: 60_000 }); return { code: x.status, out: `${x.stdout}${x.stderr}` }; };
 const installs = () => (existsSync(npmLog) ? readFileSync(npmLog, 'utf8').trim().split('\n').filter(Boolean) : []);
 
@@ -157,6 +157,27 @@ u = upd(updateEnv(''));
 check(u.code === 1 && /Could not ask npm/.test(u.out), 'an unreachable registry is an error, not a crash');
 u = upd(updateEnv('99.0.0'));
 check(u.code === 0 && /updated/.test(u.out) && installs().join('|') === 'install -g hive-am@99.0.0', 'update installs exactly the version it found, globally');
+check(/can take a few minutes/.test(u.out) && u.out.indexOf('few minutes') < u.out.indexOf('updated'), 'update warns the install can take a few minutes before npm runs');
+
+// the install has its own limit (15 minutes unless HIVE_AM_INSTALL_TIMEOUT says otherwise); the quick queries keep 2 minutes
+const launcher = readFileSync(bin, 'utf8');
+check(/timeout: 120_000/.test(launcher) && /\? 900 :/.test(launcher), 'npm view and npm root -g keep 120 s and the install defaults to 900 s');
+const perms = /permissions error/;
+const slow = (extra: NodeJS.ProcessEnv) => { rmSync(npmLog, { force: true }); return upd(updateEnv('99.0.0', 'global', extra)); };
+u = slow({ STUB_INSTALL: 'slow', HIVE_AM_INSTALL_TIMEOUT: '5' });
+check(u.code === 0 && u.out.includes(`hive-am updated: ${version} -> `) && installs().length === 1, 'an install slower than the quick limit but inside its own finishes and says updated');
+u = slow({ STUB_INSTALL: 'slow', HIVE_AM_INSTALL_TIMEOUT: '0' });
+check(u.code === 0 && /updated/.test(u.out), 'HIVE_AM_INSTALL_TIMEOUT=0 means no limit');
+u = slow({ STUB_INSTALL: 'hang', HIVE_AM_INSTALL_TIMEOUT: '1' });
+check(u.code === 1 && /stopped after 1 seconds/.test(u.out) && /may be incomplete/.test(u.out) && u.out.includes('npm install -g hive-am@99.0.0') && !perms.test(u.out) && !/exit null/.test(u.out), 'an install past its limit says npm was stopped after N seconds, may be incomplete and how to run it by hand');
+u = slow({ STUB_INSTALL: 'signal' });
+check(u.code === 1 && /SIGTERM/.test(u.out) && /may be incomplete/.test(u.out) && !perms.test(u.out) && !/exit null/.test(u.out), 'an install killed by a signal names the signal, never exit null');
+u = slow({ STUB_INSTALL: 'eacces' });
+check(u.code === 1 && /exit 1/.test(u.out) && perms.test(u.out) && /npm error code EACCES/.test(u.out), 'an EACCES from npm gets the permissions hint and npm\'s own text still shows');
+u = slow({ STUB_INSTALL: 'fail' });
+check(u.code === 1 && /could not install/.test(u.out) && /exit 1/.test(u.out) && !perms.test(u.out) && /E404/.test(u.out), 'any other npm failure says exit N without the permissions hint');
+u = slow({ HIVE_AM_INSTALL_TIMEOUT: 'soon' });
+check(u.code === 1 && /HIVE_AM_INSTALL_TIMEOUT/.test(u.out) && installs().length === 0, 'a HIVE_AM_INSTALL_TIMEOUT that is not a number is refused before installing');
 
 // with a run going: it says the run is on the old version, and --restart replaces it
 r = hive('start', '--background');

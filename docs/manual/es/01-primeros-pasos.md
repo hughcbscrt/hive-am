@@ -47,7 +47,7 @@ Cuando arranque, abre <http://127.0.0.1:4401> en tu navegador.
 ### Detener, actualizar y ayuda
 
 - Detén hive-am con **Ctrl+C** en la terminal donde lo arrancaste. Para dejarlo corriendo sin mantener una terminal abierta, arráncalo con `hive-am start --background`: te dice dónde está su log, y después `hive-am status` indica si está corriendo, `hive-am logs -f` muestra lo que imprime y `hive-am stop` lo detiene (`hive-am restart` hace ambas cosas). Los servidores y contenedores que hayas dejado como recursos siguen corriendo.
-- Actualiza con `hive-am update` (consulta npm por una versión más nueva y la instala; `hive-am update --check` solo dice si la hay, y `hive-am update --restart` además reinicia un hive-am que dejaste corriendo en segundo plano). Con npx: `npx hive-am@latest`. `hive-am version` imprime la versión que tienes.
+- Actualiza con `hive-am update` (consulta npm por una versión más nueva y la instala; `hive-am update --check` solo dice si la hay, y `hive-am update --restart` además reinicia un hive-am que dejaste corriendo en segundo plano). La instalación puede tardar unos minutos; **Ctrl+C** la detiene, y si se queda a medias hive-am te da el `npm install -g` para correrlo tú. Con npx: `npx hive-am@latest`. `hive-am version` imprime la versión que tienes.
 - `hive-am --help` muestra las opciones y `hive-am --version` la versión instalada.
 
 ### Dónde se guardan los datos

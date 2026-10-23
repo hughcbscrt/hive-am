@@ -99,7 +99,7 @@ export function MarkdownEditor({ value, onChange, placeholder, defaultView = 'sp
         </div>
       </div>
       <div className={`mde-body v-${view}`} style={{ minHeight }}>
-        {view !== 'preview' && <textarea ref={ta} className="mde-text mono" data-hotkeys="own" style={{ minHeight }} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKey} placeholder={placeholder} spellCheck={false} />}
+        {view !== 'preview' && <textarea ref={ta} className="mde-text mono" data-hotkeys="own" value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={onKey} placeholder={placeholder} spellCheck={false} />}
         {view !== 'write' && <div className="mde-prev md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{value || t('skills.previewEmpty')}</ReactMarkdown></div>}
       </div>
       <div className="mde-foot muted">{t('md.stats', { words, chars: value.length })} · {t('md.tips')}</div>
