@@ -10,15 +10,17 @@
 
 ## 9.2 Cómo delega un orquestador
 
-El orquestador recibe tres herramientas, expuestas por un **servidor MCP** (`server/mcp/dispatch.mjs`) con el nombre `hive`. El mismo servidor anuncia además las herramientas de las conexiones ([documento 14](14-conexiones-externas.md)), del cuaderno y de las skills a demanda ([7.3](07-agentes-tipos-skills-colonias.md#73-skills)) según las capacidades del agente (`HIVE_CAPS`):
+El orquestador recibe cinco herramientas, expuestas por un **servidor MCP** (`server/mcp/dispatch.mjs`) con el nombre `hive`. El mismo servidor anuncia además las herramientas de las conexiones ([documento 14](14-conexiones-externas.md)), del cuaderno y de las skills a demanda ([7.3](07-agentes-tipos-skills-colonias.md#73-skills)) según las capacidades del agente (`HIVE_CAPS`):
 
 | Herramienta | Qué hace |
 |---|---|
 | `list_agents` | Devuelve (JSON) los subagentes directos del orquestador: `name`, `role`, `description`, `provider`, `busy`. |
 | `dispatch` `{ agent, task, background? }` | Envía una tarea autocontenida a un subagente por **nombre exacto**. Por defecto (`background` en true) vuelve enseguida con el id de la tarea y la respuesta llega después como mensaje; con `background: false` espera la respuesta final ([9.3](#93-flujo-de-una-delegación)). |
-| `dispatch_status` `{ id, wait_seconds? }` | Estado de una tarea que delegó el orquestador (`queued`, `running`, `done`, `failed`, `interrupted`) y su resultado al terminar. Con `wait_seconds` (0 a 60) espera hasta ese tiempo a que termine; más de 60 se recorta a 60 y la respuesta lo dice. |
+| `dispatch_status` `{ id, wait_seconds? }` | Estado de una tarea que delegó el orquestador (`queued`, `running`, `done`, `failed`, `interrupted`, `cancelled`) y su resultado al terminar. Con `wait_seconds` (0 a 60) espera hasta ese tiempo a que termine; más de 60 se recorta a 60 y la respuesta lo dice. |
+| `dispatch_list` | Las tareas del orquestador que no han terminado (`queued` o `running`), la más antigua primero: id, subagente, estado, modo, antigüedad y el inicio de la tarea. |
+| `dispatch_cancel` `{ id }` | Cancela una tarea que delegó el orquestador ([9.3](#93-flujo-de-una-delegación)). Una en cola nunca empieza; una en curso se aborta; una ya terminada se deja como está y se responde su estado (no es error). Dice si el worker estaba trabajando. |
 
-En los CLIs aparecen como `mcp__hive__list_agents`, `mcp__hive__dispatch` y `mcp__hive__dispatch_status`.
+En los CLIs aparecen como `mcp__hive__list_agents`, `mcp__hive__dispatch`, `mcp__hive__dispatch_status`, `mcp__hive__dispatch_list` y `mcp__hive__dispatch_cancel`.
 
 ### El servidor MCP
 
@@ -27,8 +29,10 @@ En los CLIs aparecen como `mcp__hive__list_agents`, `mcp__hive__dispatch` y `mcp
   - `list_agents` → `GET /api/orchestrators/<HIVE_AGENT_ID>/workers`
   - `dispatch` con `background: false` → `POST /api/dispatch { from: HIVE_AGENT_ID, agent, task, poll: true }` y luego `POST /api/dispatch/status { from, id, wait_seconds }` en bucle hasta que la tarea termina (cada llamada espera como mucho `HIVE_AM_DISPATCH_POLL_S` segundos, 25 por defecto). Por defecto (`background` distinto de false): `POST /api/dispatch { …, background: true }` y nada más.
   - `dispatch_status` → `POST /api/dispatch/status { from: HIVE_AGENT_ID, id, wait_seconds }`
+  - `dispatch_list` → `POST /api/dispatch/list { from: HIVE_AGENT_ID }`
+  - `dispatch_cancel` → `POST /api/dispatch/cancel { from: HIVE_AGENT_ID, id }`
 - Si la API responde error, devuelve al modelo un resultado `isError` con el mensaje (p. ej. *"X is not assigned to Y"*).
-- Un `dispatch` síncrono devuelve la respuesta final del worker; si viene vacía: *"(the subagent finished without a text answer)"*. Una tarea que termina `failed` o `interrupted` es un resultado `isError` con el motivo. Si la API no responde durante un rato mientras espera, el error lleva el id de la tarea para que el orquestador pregunte con `dispatch_status`.
+- Un `dispatch` síncrono devuelve la respuesta final del worker; si viene vacía: *"(the subagent finished without a text answer)"*. Una tarea que termina `failed` o `interrupted` es un resultado `isError` con el motivo; una `cancelled` es un resultado `isError` *"<name> task was cancelled: Cancelled by … before it finished."* Si la API no responde durante un rato mientras espera, el error lleva el id de la tarea para que el orquestador pregunte con `dispatch_status`.
 - Un `dispatch` en segundo plano devuelve `Task <id> sent to <name> (running|queued). You will be woken with the result when it finishes; you can also ask with dispatch_status.`
 
 ### Cómo se inyecta según el proveedor
@@ -108,23 +112,24 @@ Detalles:
 - **Sin peticiones largas:** cada llamada vuelve en un minuto como mucho (`dispatch_status` espera 60 s como máximo). El resultado no depende de quien llama: si se va, la fila se termina igual y se puede leer después con `dispatch_status`. `POST /api/dispatch` sin `poll` ni `background` sigue reteniendo la petición hasta que el worker responde, para clientes antiguos; el servidor MCP ya no la usa.
 - **Lo que el modo síncrono no arregla:** el CLI del propio orquestador no imprime nada mientras espera una herramienta, y un CLI callado 10 minutos se corta ([documento 6](06-proveedores.md)). Por eso `background` es true por defecto y las instrucciones le dicen al orquestador que use `background: false` solo para una tarea muy corta cuya respuesta necesita ya.
 - **El aviso** (`dispatches.ts`, solo en segundo plano): cuando la tarea termina (done, failed o interrumpida por un reinicio) el orquestador recibe un mensaje `Delegated task <id> to <name> finished (<status>). Result:` seguido del resultado (recortado a 20.000 caracteres, como el guardado). Va al sitio donde se hizo el dispatch, como un despertador ([14.6.7](14-conexiones-externas.md#1467-avisar-después-la-skill-wake-ups-y-wake_me)): el hilo de chat que el orquestador estaba atendiendo (mencionando a quien pidió, en un grupo) o un mensaje de su conversación web. Si el orquestador está a mitad de un turno, el mensaje espera en su cola. Reutiliza `deliverTo` de `wake.ts`: con `retry` (la plataforma aún no está conectada) reintenta cada `HIVE_AM_WAKE_RETRY_MS`, 12 veces; con `dropped` (el hilo ya no existe, está silenciado o la conexión es ahora de otro agente) desiste, y el resultado sigue legible con `dispatch_status`. `notified_at` se escribe justo antes de entregar el mensaje, así que un reinicio ni lo pierde ni lo manda dos veces.
-- **Propiedad:** solo el orquestador que inició una tarea puede leerla (`403` si no); un id desconocido da `404`.
-- **Límite:** como mucho **10 tareas en segundo plano sin terminar** por orquestador; la 11.ª se rechaza con un 400 que dice el límite. Las síncronas no cuentan.
-- **Reinicio** (`armDispatchNotices()` al arrancar): toda tarea que quedó `queued` o `running` se marca `interrupted` (nunca se reanuda); las de segundo plano se avisan con *"hive-am restarted while <name> was working on it; check the branch or the files and send the task again if needed."*, y las de segundo plano terminadas cuyo aviso no se entregó todavía se avisan en ese momento.
-- **Registro:** `dispatches` guarda tarea, estado (`queued` → `running` → `done`/`failed`; `interrupted` si el servidor cayó), resultado, `session_id`, `mode` (`sync` o `background`), `origin`, `notified_at` y `read_at` ([documento 4](04-almacenamiento.md#tabla-dispatches)).
+- **Propiedad:** solo el orquestador que inició una tarea puede leerla, listarla o cancelarla (`403` si no); un id desconocido da `404`. La persona puede cancelar cualquier tarea desde la web.
+- **Cancelar** (`cancelTask` en `dispatches.ts`, desde `dispatch_cancel` o `POST /api/dispatches/:id/cancel`): una tarea `queued` sale de la cola del worker en el acto (`runtime.cancelQueued`: el contador `queued` baja y sale un evento `status` ya; cuando la cadena llega a ella el turno se salta y nunca se llama al proveedor); a una `running` se le aborta el turno (`runtime.abortDispatch`), solo si el turno que corre en el worker es el de esa tarea, así que cancelar una tarea nunca detiene otra. La fila queda `cancelled`, con `finished_at` y un resultado fijo, *"Cancelled by the orchestrator before it finished."* o *"Cancelled by the person before it finished."* (el texto parcial del worker no se guarda). Lo que el worker ya cambió se queda en la carpeta. Tanto la cancelación como el fin del turno escriben el estado final solo si la fila sigue `queued` o `running`, así que gana la primera, el turno abortado no convierte `cancelled` en `failed`, y cancelar dos veces o justo cuando la tarea termina deja un solo estado y como mucho un aviso. Una tarea ya terminada no cambia: la respuesta da su estado. Si la cancela su orquestador, `notified_at` se pone en la misma actualización (la llamada a la herramienta ya se lo dijo); si la cancela la persona, una tarea en segundo plano se avisa en el acto, aunque estuviera en cola, con *"Delegated task <id> to <name> finished (cancelled). Result: Cancelled by the person before it finished."* Un segundo aviso de la misma tarea mientras el primero se está entregando se ignora.
+- **Límite:** como mucho **10 tareas en segundo plano sin terminar** por orquestador; la 11.ª se rechaza con un 400 que dice el límite. Las síncronas no cuentan, y una tarea cancelada libera su lugar en el acto.
+- **Reinicio** (`armDispatchNotices()` al arrancar): toda tarea que quedó `queued` o `running` se marca `interrupted` (nunca se reanuda); las de segundo plano se avisan con *"hive-am restarted while <name> was working on it; check the branch or the files and send the task again if needed."*, y las de segundo plano terminadas cuyo aviso no se entregó todavía (también una cancelación de la persona) se avisan en ese momento. Una fila `cancelled` ya está terminada: no se toca.
+- **Registro:** `dispatches` guarda tarea, estado (`queued` → `running` → `done`/`failed`; `interrupted` si el servidor cayó; `cancelled` si se retiró), resultado, `session_id`, `mode` (`sync` o `background`), `origin`, `notified_at` y `read_at` ([documento 4](04-almacenamiento.md#tabla-dispatches)).
 
 ## 9.4 Cola por agente
 
 `runtime.ts` mantiene, por agente, una cadena de promesas:
 
 ```ts
-State = { chain: Promise, controller: AbortController | null, queued: number, live: Live | null }
+State = { chain: Promise, controller: AbortController | null, dispatchId: string | null, queued: number, live: Live | null, cancelled: Set<string> }
 ```
 
 - **Un solo turno a la vez por agente.** Si llega un mensaje (tuyo o una delegación) mientras hay uno en curso, se **encola** y se ejecuta después, en orden. `queued` se expone en la API y en la interfaz ("N queued").
 - Agentes distintos corren en **paralelo** entre sí.
 - Un turno cuyo CLI no imprime nada durante 10 minutos se corta y se reporta como fallido (`<cmd> stopped answering`), y la cola sigue con el siguiente mensaje. La cola vive en memoria: un reinicio pierde los mensajes que no habían empezado.
-- **Stop** (`POST …/stop`) aborta solo el turno **en curso** (`SIGTERM` al CLI). Los turnos ya encolados **siguen** y se ejecutarán a continuación.
+- **Stop** (`POST …/stop`) aborta solo el turno **en curso** (`SIGTERM` al CLI). Los turnos ya encolados **siguen** y se ejecutarán a continuación. Una delegación detenida así termina `failed` con el texto parcial del worker; para retirar una tarea concreta, en cola o en curso, cancélala (`dispatch_cancel`, o *Delegaciones recientes* en la web).
 - Una delegación a un worker ocupado espera su turno en la misma cola, con estado `queued` en `dispatches` hasta que empieza. Un `dispatch` síncrono deja esperando al orquestador mientras tanto; uno en segundo plano no.
 - Cada turno emite `turn_start`, eventos y `status` por WebSocket, y guarda `live` (eventos acumulados) para poder reconstruir la vista si el navegador recarga.
 
@@ -132,7 +137,7 @@ State = { chain: Promise, controller: AbortController | null, queued: number, li
 
 `composeInstructions` añade una sección **Your team** que depende del estado actual:
 
-- **Con subagentes:** lista `- **nombre**: descripción` de **solo** los conectados; indica que son los *únicos* a los que puede delegar; le ordena delegar con `dispatch` en vez de hacer el trabajo, avisa que cada delegación abre una conversación nueva (hay que dar todo el contexto en la tarea), le explica que `dispatch` vuelve enseguida y el resultado llega como mensaje (o con `dispatch_status`), y que use `background: false` solo para una tarea muy corta y que, si le preguntan por sus agentes, debe **llamar a `list_agents` y responder exactamente con lo que devuelva**, nunca con una lista antigua, y no mencionar ni usar agentes fuera de esa lista.
+- **Con subagentes:** lista `- **nombre**: descripción` de **solo** los conectados; indica que son los *únicos* a los que puede delegar; le ordena delegar con `dispatch` en vez de hacer el trabajo, avisa que cada delegación abre una conversación nueva (hay que dar todo el contexto en la tarea), le explica que `dispatch` vuelve enseguida y el resultado llega como mensaje (o con `dispatch_status`), que use `background: false` solo para una tarea muy corta, que una tarea que ya no hace falta se retira con `dispatch_cancel` (y `dispatch_list` lista las que no han terminado; lo que el subagente ya cambió se queda en la carpeta) y que, si le preguntan por sus agentes, debe **llamar a `list_agents` y responder exactamente con lo que devuelva**, nunca con una lista antigua, y no mencionar ni usar agentes fuera de esa lista.
 - **Sin subagentes:** le indica que no puede delegar y que no afirme conocer otros agentes.
 
 **Actualización cuando cambian las conexiones:** los CLIs fijan las instrucciones cuando empieza la sesión (Claude ignora `--append-system-prompt` al reanudar; OpenCode y Kiro las reciben dentro del mensaje); por eso se compara la huella (`instr_hash`) y, si cambió el equipo (o las skills, o el cuaderno editado desde fuera), el siguiente mensaje lleva un bloque `<instructions update="true">` que sustituye al anterior ([documento 6](06-proveedores.md#67-preámbulo-de-instrucciones-providerspreamblets)).
@@ -176,6 +181,6 @@ Las relaciones se dibujan **encima** de las celdas del panal:
 |---|---|
 | Chat del orquestador | Fila **Delegate** (herramienta `dispatch`) con el worker y la tarea; al abrirla, la salida es la respuesta del worker (o, en segundo plano, el id de la tarea). El resultado de una tarea en segundo plano llega después como un mensaje nuevo que empieza con "Delegated task …" |
 | Chat del worker, mientras corre | Tarjeta **"Delegated task from X"** con la tarea; desaparece al terminar porque no pertenece a su conversación directa |
-| Colony → *Recent delegations* | Últimas 6: de → a, tarea, hace cuánto, estado (animado: en curso; hueco: en cola; verde: terminada; rojo: falló o se interrumpió; al pasar sobre el punto se nombra) |
+| Colony → *Recent delegations* | Primero las que no han terminado (el límite nunca las oculta) y luego las últimas hasta 6: de → a, tarea, hace cuánto, estado (animado: en curso; hueco: en cola; verde: terminada; gris: cancelada; rojo: falló o se interrumpió; al pasar sobre el punto se nombra). Las filas en cola y en curso tienen un botón Cancelar (`POST /api/dispatches/:id/cancel`); una en curso pregunta antes |
 | Settings → Sessions del worker | La sesión de la tarea, en *Delegated tasks* |
 | Lista de agentes (selector lateral) | Mientras trabaja, el subtítulo del worker dice "Delegated task · …" |

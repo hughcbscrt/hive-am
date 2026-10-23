@@ -24,7 +24,7 @@ Swarm map and detail panel.
 - **Loading and errors:** a skeleton while the API has not answered and, if it fails, an error banner with a *Retry* button (never an empty colony).
 - **Honeycomb:** one hexagonal cell per agent, grouped by colony (see 11.2). Besides dragging, colonies (by their name) and free hexagons can be **moved with the arrow keys** (Shift for bigger steps).
 - **Right panel:** when a cell is selected it shows description, provider, model, effective folder ("· from colony" if inherited), session, team (orchestrators), a **colony selector** (moves the agent), an **Open chat** button and, in the top right corner, the **settings** button that opens `AgentEditDrawer`.
-- **Recent delegations:** the last 6, taken from the store (`dispatches`, refreshed by the WebSocket, no polling), with links to the agent and the session (`components/RecentDelegations.tsx`, shared with Home).
+- **Recent delegations:** the unfinished ones first (never cut by the limit), then the latest up to 6, taken from the store (`dispatches`, refreshed by the WebSocket, no polling), with links to the agent and the session (`components/RecentDelegations.tsx`, shared with Home). Queued and running rows have a **×** button that calls `POST /api/dispatches/:id/cancel`; a running one asks first with a `ConfirmDialog danger`. A cancelled task has a grey dot (`.dot.off`).
 
 ### Agents (`/agents`)
 
@@ -208,8 +208,8 @@ A summary of what each screen needs from the backend, for whoever touches the AP
 | Screen | Endpoints |
 |---|---|
 | All | `GET /api/agents`, `/types`, `/skills`, `/colonies`, `/providers`, WebSocket |
-| Home | `GET /api/dispatches` (through the store, nothing of its own) |
-| Colony | `GET /api/dispatches`; `PATCH /api/agents/:id` (move colony); `POST/PATCH/DELETE /api/colonies` |
+| Home | `GET /api/dispatches` (through the store); `POST /api/dispatches/:id/cancel` |
+| Colony | `GET /api/dispatches`; `POST /api/dispatches/:id/cancel`; `PATCH /api/agents/:id` (move colony); `POST/PATCH/DELETE /api/colonies` |
 | Agent | `GET …/history`, `…/stats`, `…/live`, `…/sessions`; `POST …/messages`, `…/stop`, `…/new-session`, `…/resume-session`; `PATCH/DELETE /api/agents/:id` |
 | Types | `POST/PATCH/DELETE /api/types` |
 | Skills | `GET /api/skills/usage`; `POST/PATCH/DELETE /api/skills` |
@@ -298,4 +298,4 @@ When hovering (or focusing with the keyboard) over an agent in the **side list**
 - `web/components/agents/AgentCard.tsx`: hook `useAgentCard()` (returns `bind(id)` and `node`) and the card, rendered with `createPortal` in `<body>` and positioned to the right of the element (to the left if it does not fit).
 - It opens after ~280 ms (no delay when moving from one agent to another), closes with `Esc`, scroll, resize, click or on leaving. It ignores touch pointers and is not shown on screens < 760 px.
 - `web/lib/activity.ts`: `activity()` (formerly inside `AgentSwitcher`), shared with the list.
-- The line under each name is `statusLine()` (`lib/attentionRules.ts`), the same in the list and in the **Now** section of the Activity panel: open delegations of the agent (`dispatches` with `from_id` = the agent, `queued` or `running`, the oldest first, targets that no longer exist left out), then `activity()`, then an unread `done` notice, then the error status, then the description. Delegations come from the store's `dispatches`, the 50 most recent. `.sw-sub` and `.sw-meta` are one line each (the model is cut before the time), so a row is about 72 px whatever its state; the group heading shows `.sg-unread` (`attn.group.unread`) and the folded list's heading a green or red dot.
+- The line under each name is `statusLine()` (`lib/attentionRules.ts`), the same in the list and in the **Now** section of the Activity panel: open delegations of the agent (`dispatches` with `from_id` = the agent, `queued` or `running`, the oldest first, targets that no longer exist left out), then `activity()`, then an unread `done` notice, then the error status, then the description. Delegations come from the store's `dispatches`, the 50 most recent plus any older one that has not finished. `.sw-sub` and `.sw-meta` are one line each (the model is cut before the time), so a row is about 72 px whatever its state; the group heading shows `.sg-unread` (`attn.group.unread`) and the folded list's heading a green or red dot.

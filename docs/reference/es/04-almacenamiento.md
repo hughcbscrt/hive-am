@@ -152,12 +152,12 @@ Registro de delegaciones: quién pidió qué a quién.
 | `id` | UUID |
 | `from_id`, `to_id` | Orquestador y worker (sin clave foránea: el registro sobrevive si se borra un agente) |
 | `task` | Texto completo de la tarea |
-| `status` | `queued` (espera detrás de otros turnos del worker) \| `running` \| `done` \| `failed` \| `interrupted` |
+| `status` | `queued` (espera detrás de otros turnos del worker) \| `running` \| `done` \| `failed` \| `interrupted` \| `cancelled` (la retiró su orquestador o la persona; `result` dice quién). Solo una fila todavía `queued` o `running` recibe un estado final, así que el fin de un turno y una cancelación nunca se pisan |
 | `result` | Respuesta final del worker, recortada a 20 000 caracteres |
 | `session_id` | Sesión nativa del worker donde se ejecutó (migración) |
 | `mode` | `sync` (la respuesta vuelve a la llamada de la herramienta) o `background` (se avisa al orquestador cuando termina). Migración 9; las filas anteriores son `sync` |
 | `origin` | Solo en segundo plano: JSON con el hilo de chat donde se le pidió al orquestador (`connection_id`, `thread_id`, `req_id`, `req_name`); `NULL` para su conversación web |
-| `notified_at` | Cuándo se le entregó al orquestador el resultado de una tarea en segundo plano (o se desistió porque no había a quién avisar) |
+| `notified_at` | Cuándo se le entregó al orquestador el resultado de una tarea en segundo plano (o se desistió porque no había a quién avisar); se pone junto con la cancelación cuando la canceló el propio orquestador |
 | `read_at` | Cuándo el orquestador leyó el resultado terminado con `dispatch_status` |
 | `created_at`, `finished_at` | |
 

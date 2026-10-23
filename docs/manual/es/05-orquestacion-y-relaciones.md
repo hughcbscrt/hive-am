@@ -19,20 +19,31 @@ Un orquestador solo puede delegar a los workers **conectados directamente a él*
 
 ## Cómo delega un orquestador
 
-Cuando un orquestador tiene al menos un worker conectado, recibe tres herramientas:
+Cuando un orquestador tiene al menos un worker conectado, recibe estas herramientas:
 
 | Herramienta | Qué hace |
 |---|---|
 | `list_agents` | Le devuelve la lista de sus workers directos, con nombre, descripción, proveedor y si están ocupados. |
 | `dispatch` | Envía una tarea a un worker por su nombre exacto. Por defecto no espera: recibe el id de la tarea y la respuesta le llega después como mensaje. Con `background: false` espera la respuesta final. |
-| `dispatch_status` | Dice el estado de una tarea que delegó (en cola, en curso, terminada, fallida o interrumpida) y, al terminar, su resultado. Puede esperar hasta un minuto a que termine. |
+| `dispatch_status` | Dice el estado de una tarea que delegó (en cola, en curso, terminada, fallida, interrumpida o cancelada) y, al terminar, su resultado. Puede esperar hasta un minuto a que termine. |
+| `dispatch_list` | Lista sus tareas que todavía no han terminado, con su id, worker, estado y antigüedad. |
+| `dispatch_cancel` | Cancela una de sus tareas que ya no hace falta. |
 
 Lo que debes saber:
 
 - **Cada delegación abre una sesión nativa nueva del worker.** El worker no recuerda delegaciones anteriores, así que el orquestador debe incluir todo el contexto en la tarea. Tu conversación directa con ese worker no cambia.
 - **Una delegación va en segundo plano por defecto.** El orquestador recibe enseguida el id de la tarea, puede seguir hablando contigo o delegar a otros workers mientras tanto, y cuando el worker termina le llega un mensaje *"Delegated task … to Backend finished (done). Result: …"* en el mismo sitio donde se lo pediste (el chat web, o el mismo hilo de Telegram o Slack), y sigue desde ahí.
 - **El resultado no se pierde.** Se guarda en hive-am, no en la llamada: si hive-am se reinicia mientras un worker está con una tarea en segundo plano, la tarea queda **interrumpida** (no se reanuda) y al orquestador se le avisa, para que revise el trabajo y la vuelva a mandar si hace falta. Un resultado nunca se manda dos veces. Si el hilo donde se pidió ya no existe o está silenciado, el orquestador aún puede leer el resultado con `dispatch_status`.
-- **Límite:** un orquestador puede tener como mucho 10 tareas en segundo plano sin terminar; pasado eso se le pide que espere.
+- **Límite:** un orquestador puede tener como mucho 10 tareas en segundo plano sin terminar; pasado eso se le pide que espere. Una tarea cancelada libera su lugar.
+
+## Cancelar una tarea delegada
+
+Una tarea enviada por error, con el contexto equivocado o que ya no hace falta se puede retirar, esté esperando o en curso:
+
+- **Desde la web:** en **Delegaciones recientes** (pantalla Colony e Inicio), cada tarea en cola o en curso tiene un botón **×**. Una tarea en cola se cancela al instante; una en curso pregunta antes, porque detiene trabajo en marcha. La tarea aparece como **cancelada** (punto gris) y el orquestador recibe un mensaje *"Delegated task … finished (cancelled). Result: Cancelled by the person before it finished."* en el lugar donde la delegó, para que sepa que no debe esperarla. Puedes cancelar cualquier tarea.
+- **Desde el orquestador:** pídeselo en el chat ("cancela la tarea de Backend"). Usa `dispatch_list` para encontrar la tarea y `dispatch_cancel` para retirarla; solo puede cancelar sus propias tareas y no recibe ningún mensaje extra por una tarea que canceló él mismo. No hay un comando nuevo de Telegram ni de Slack para esto.
+- **Qué le pasa al worker:** una tarea en cola nunca empieza y el worker sigue con la siguiente. Una en curso se detiene en el acto y el worker queda libre para la siguiente tarea. Lo que ya cambió (archivos, commits) **se queda en la carpeta**: revísalo antes de volver a delegar. Una tarea que ya había terminado se queda como estaba.
+- **Detener es distinto:** el botón Detener del chat de un worker para solo el turno en curso y la siguiente tarea en cola empieza justo después; una delegación detenida así queda como **fallida**. Para retirar una tarea concreta, cancélala.
 - **Un agente hace un turno a la vez.** Si el worker está ocupado (con un mensaje tuyo u otra delegación), la tarea espera su turno en la cola, marcada **en cola**.
 - **Agentes distintos trabajan en paralelo.**
 - El equipo del orquestador se actualiza solo: si conectas o desconectas un worker, el siguiente mensaje del orquestador ya lo sabe.
@@ -94,7 +105,7 @@ La pantalla **Colonia** dibuja las relaciones sobre el panal.
 - Pasa el mouse sobre un agente para resaltar sus conexiones. Una línea en movimiento indica que hay una tarea en curso.
 - El icono **?** junto al título explica cómo leer el mapa.
 - Las tarjetas de arriba cuentan los agentes, colonias, recursos, orquestadores, agentes trabajando y **tareas en curso**.
-- La lista **Delegaciones recientes** muestra las últimas delegaciones: de quién a quién, la tarea, hace cuánto y su estado: un punto que late mientras corre, uno hueco mientras espera a un worker ocupado (en cola), verde al terminar y rojo si falló o se interrumpió. Pasa el puntero sobre el punto para leer el estado.
+- La lista **Delegaciones recientes** muestra las últimas delegaciones: de quién a quién, la tarea, hace cuánto y su estado: un punto que late mientras corre, uno hueco mientras espera a un worker ocupado (en cola), verde al terminar, gris si se canceló y rojo si falló o se interrumpió. Pasa el puntero sobre el punto para leer el estado. Las tareas que no han terminado van primero y el límite de la lista nunca las oculta; cada una tiene un botón **×** para cancelarla ([Cancelar una tarea delegada](#cancelar-una-tarea-delegada)).
 
 Al hacer clic en un agente se abre su tarjeta.
 

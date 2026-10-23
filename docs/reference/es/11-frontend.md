@@ -24,7 +24,7 @@ Mapa del enjambre y panel de detalle.
 - **Carga y errores:** un esqueleto mientras la API no ha respondido y, si falla, un aviso de error con botón *Reintentar* (nunca una colonia vacía).
 - **Panal:** una celda hexagonal por agente, agrupadas por colonia (ver 11.2). Además de arrastrar, las colonias (por su nombre) y los hexágonos libres se pueden **mover con las flechas del teclado** (Mayús para pasos mayores).
 - **Panel derecho:** al seleccionar una celda muestra descripción, proveedor, modelo, carpeta efectiva ("· from colony" si es heredada), sesión, equipo (orquestadores), un **selector de colonia** (mueve al agente), botón **Open chat** y, en la esquina superior derecha, el botón de **ajustes** que abre `AgentEditDrawer`.
-- **Recent delegations:** las últimas 6, tomadas del store (`dispatches`, que refresca el WebSocket, sin sondeo), con enlaces al agente y a la sesión (`components/RecentDelegations.tsx`, compartido con Inicio).
+- **Recent delegations:** primero las que no han terminado (el límite nunca las corta) y luego las últimas hasta 6, tomadas del store (`dispatches`, que refresca el WebSocket, sin sondeo), con enlaces al agente y a la sesión (`components/RecentDelegations.tsx`, compartido con Inicio). Las filas en cola y en curso tienen un botón **×** que llama a `POST /api/dispatches/:id/cancel`; una en curso pregunta antes con un `ConfirmDialog danger`. Una tarea cancelada lleva el punto gris (`.dot.off`).
 
 ### Agents (`/agents`)
 
@@ -208,8 +208,8 @@ Resumen de lo que cada pantalla necesita del backend, para quien toque la API:
 | Pantalla | Endpoints |
 |---|---|
 | Todas | `GET /api/agents`, `/types`, `/skills`, `/colonies`, `/providers`, WebSocket |
-| Inicio | `GET /api/dispatches` (a través del store, nada propio) |
-| Colony | `GET /api/dispatches`; `PATCH /api/agents/:id` (mover de colonia); `POST/PATCH/DELETE /api/colonies` |
+| Inicio | `GET /api/dispatches` (a través del store); `POST /api/dispatches/:id/cancel` |
+| Colony | `GET /api/dispatches`; `POST /api/dispatches/:id/cancel`; `PATCH /api/agents/:id` (mover de colonia); `POST/PATCH/DELETE /api/colonies` |
 | Agente | `GET …/history`, `…/stats`, `…/live`, `…/sessions`; `POST …/messages`, `…/stop`, `…/new-session`, `…/resume-session`; `PATCH/DELETE /api/agents/:id` |
 | Types | `POST/PATCH/DELETE /api/types` |
 | Skills | `GET /api/skills/usage`; `POST/PATCH/DELETE /api/skills` |
@@ -298,4 +298,4 @@ Al pasar el mouse (o enfocar con el teclado) sobre un agente en la **lista later
 - `web/components/agents/AgentCard.tsx`: hook `useAgentCard()` (devuelve `bind(id)` y `node`) y la tarjeta, renderizada con `createPortal` en `<body>` y posicionada a la derecha del elemento (a la izquierda si no cabe).
 - Se abre con ~280 ms de retraso (sin retraso al pasar de un agente a otro), se cierra con `Esc`, scroll, redimensionar, clic o al salir. Ignora el puntero y no se muestra en pantallas < 760 px.
 - `web/lib/activity.ts`: `activity()` (antes dentro de `AgentSwitcher`), compartida con la lista.
-- La línea bajo cada nombre es `statusLine()` (`lib/attentionRules.ts`), la misma en la lista y en la sección **Ahora** del panel Actividad: delegaciones abiertas del agente (`dispatches` con `from_id` = el agente, `queued` o `running`, la más antigua primero, sin los destinos que ya no existen), luego `activity()`, luego un aviso `done` sin leer, luego el estado de error, luego la descripción. Las delegaciones salen de `dispatches` del store, las 50 más recientes. `.sw-sub` y `.sw-meta` ocupan una línea cada una (el modelo se recorta antes que la hora), así que una fila mide unos 72 px en cualquier estado; la cabecera de grupo muestra `.sg-unread` (`attn.group.unread`) y la de la lista plegada un punto verde o rojo.
+- La línea bajo cada nombre es `statusLine()` (`lib/attentionRules.ts`), la misma en la lista y en la sección **Ahora** del panel Actividad: delegaciones abiertas del agente (`dispatches` con `from_id` = el agente, `queued` o `running`, la más antigua primero, sin los destinos que ya no existen), luego `activity()`, luego un aviso `done` sin leer, luego el estado de error, luego la descripción. Las delegaciones salen de `dispatches` del store, las 50 más recientes y cualquier otra más antigua que no haya terminado. `.sw-sub` y `.sw-meta` ocupan una línea cada una (el modelo se recorta antes que la hora), así que una fila mide unos 72 px en cualquier estado; la cabecera de grupo muestra `.sg-unread` (`attn.group.unread`) y la de la lista plegada un punto verde o rojo.

@@ -19,20 +19,31 @@ An orchestrator can only delegate to the workers **connected directly to it**. I
 
 ## How an orchestrator delegates
 
-When an orchestrator has at least one worker connected, it gets three tools:
+When an orchestrator has at least one worker connected, it gets these tools:
 
 | Tool | What it does |
 |---|---|
 | `list_agents` | Returns the list of its direct workers, with name, description, provider and whether they are busy. |
 | `dispatch` | Sends a task to a worker by its exact name. By default it does not wait: it gets a task id and the answer reaches it later as a message. With `background: false` it waits for the final answer. |
-| `dispatch_status` | Tells the state of a task it delegated (queued, running, done, failed or interrupted) and, once finished, its result. It can wait up to a minute for the end. |
+| `dispatch_status` | Tells the state of a task it delegated (queued, running, done, failed, interrupted or cancelled) and, once finished, its result. It can wait up to a minute for the end. |
+| `dispatch_list` | Lists its tasks that have not finished yet, with their id, worker, state and age. |
+| `dispatch_cancel` | Cancels one of its tasks that is no longer needed. |
 
 What you should know:
 
 - **Every delegation opens a new native session of the worker.** The worker does not remember earlier delegations, so the orchestrator must include all the context in the task. Your direct conversation with that worker does not change.
 - **A delegation goes in the background by default.** The orchestrator gets a task id at once, can keep talking to you or delegate to other workers meanwhile, and when the worker finishes it receives a message *"Delegated task … to Backend finished (done). Result: …"* in the same place where you asked it (the web chat, or the same Telegram or Slack thread), and carries on from there.
 - **The result is not lost.** It is kept in hive-am, not in the call: if hive-am restarts while a worker is on a background task, the task is marked **interrupted** (it is not resumed) and the orchestrator is told so, to check the work and send it again if needed. A result is never sent twice. If the thread where it was asked no longer exists or is muted, the orchestrator can still read the result with `dispatch_status`.
-- **Limit:** an orchestrator can have at most 10 background tasks that have not finished; beyond that it is told to wait.
+- **Limit:** an orchestrator can have at most 10 background tasks that have not finished; beyond that it is told to wait. A cancelled task frees its place.
+
+## Cancelling a delegated task
+
+A task sent by mistake, with the wrong context or no longer needed can be taken back, whether it is waiting or running:
+
+- **From the web:** in **Recent delegations** (Colony screen and Home), each queued or running task has a **×** button. A queued task is cancelled right away; a running one asks first, because it stops work in progress. The task shows as **cancelled** (grey dot), and the orchestrator gets one message *"Delegated task … finished (cancelled). Result: Cancelled by the person before it finished."* in the place where it delegated it, so it knows not to wait for it. You can cancel any task.
+- **From the orchestrator:** ask it in the chat ("cancel the task for Backend"). It uses `dispatch_list` to find the task and `dispatch_cancel` to take it back; it can only cancel its own tasks, and it gets no extra message for a task it cancelled itself. There is no new Telegram or Slack command for it.
+- **What happens to the worker:** a queued task never starts, and the worker goes on with the next one. A running one is stopped at once and the worker is free for the next task. What it already changed (files, commits) **stays in the folder**: check it before delegating again. A task that had already finished is left as it was.
+- **Stop is different:** the Stop button in a worker's chat stops only the turn in progress and the next queued task starts right after; a delegation stopped that way is marked **failed**. To take back one particular task, cancel it.
 - **An agent handles one turn at a time.** If the worker is busy (with a message from you or another delegation), the task waits its turn in the queue, marked **queued**.
 - **Different agents work in parallel.**
 - The orchestrator's team updates itself: if you connect or disconnect a worker, the orchestrator's next message already knows about it.
@@ -94,7 +105,7 @@ The **Colony** screen draws the relations on the honeycomb.
 - Hover over an agent to highlight its connections. A moving line means a task is in progress.
 - The **?** icon next to the title explains how to read the map.
 - The cards at the top count agents, colonies, resources, orchestrators, working agents and **tasks in flight**.
-- The **Recent delegations** list shows the latest delegations: from whom to whom, the task, how long ago and its status: a pulsing dot while it runs, a hollow one while it waits for a busy worker (queued), green when done and red when it failed or was interrupted. Point at the dot to read the status.
+- The **Recent delegations** list shows the latest delegations: from whom to whom, the task, how long ago and its status: a pulsing dot while it runs, a hollow one while it waits for a busy worker (queued), green when done, grey when cancelled and red when it failed or was interrupted. Point at the dot to read the status. Tasks that have not finished come first and are never hidden by the list's limit; each has a **×** button to cancel it ([Cancelling a delegated task](#cancelling-a-delegated-task)).
 
 Click an agent to open its card.
 
