@@ -15,7 +15,7 @@
 - **Layout:** each tab uses the whole width and height of the screen: the latest output of the Summary grows to fill what is left, Logs fill the screen, and Settings flow into as many columns of cards as fit (*General*, *How it runs*, *Environment*, *Keeping it healthy*… one column in the creation drawer). State details the server writes in English ("2/3 running", "exited with code 3") are shown in the language of the interface.
 - **Summary:** the state (and for how long it has been running), what it uses (CPU and memory with a short history, processes, network and disk for Docker), its details (command, folder, port, restart policy, health check; or image, ports, network, restart count, limits) and its latest output. A compose project lists its services; a cluster lists its members (15.2c).
 - **Logs:** the whole screen. Search with highlighting (or *only matches*), error and warning lines coloured, follow the end (it stops following when you scroll up), wrap lines, text size, pause, clear the view, copy and download. It keeps the last 800 000 characters and draws the last 4 000 lines. For a cluster, each member has its colour and a chip to hide it.
-- **Settings:** the same fields as when creating, in place, with a bar that says whether something is unsaved (*Save*, *Discard*, and *Save and restart* when it is running) and *Delete*. Changes to a running resource apply when it is restarted.
+- **Settings:** the same fields as when creating, in place, with a bar that says whether something is unsaved (*Save*, *Discard*, and *Save and restart* when it is running, or *Save and apply* for a container hive-am creates, see 15.2f) and *Delete*. Changes to a running resource apply when it is restarted.
 
 
 Besides agents, a colony can hold **resources**: things hive-am keeps running or watches next to them. Four kinds exist: **servers**, **Docker**, **HTTP requests** and **clusters** (called *boss* in the first version: the API still accepts that name, and existing ones were converted). They appear on the Colony map as hexagons (with the kind's colour and a state dot), inside the colony they belong to or free. Click one to see its state, start / stop / restart it and read its logs; the pencil edits it.
@@ -62,7 +62,7 @@ Needs the `docker` command. Every value is passed as a separate argument (no she
 | **Compose project** (file, project name, services) | `docker compose -f file [-p project] up -d / stop / restart` | The project is stopped, **not** removed. |
 | **Existing container** (name or id) | Only `start` / `stop` / `restart` and reading its logs | Left as it is. **Never removed.** |
 
-**Limits** (a container hive-am creates), and the **Network** card: memory (`512m`), CPUs, network, log size (`--log-opt max-size`, 3 files) and the time it gets to stop (`--stop-timeout`). They are part of what the container was created with: if you change one, the container is **created again** the next time it starts or restarts (what was inside it is lost, as with any recreate); a container created by an older version is left as it is. For *existing* and *compose* only the stop timeout applies.
+**Limits** (a container hive-am creates), and the **Network** card: memory (`512m`), CPUs, network, log size (`--log-opt max-size`, 3 files) and the time it gets to stop (`--stop-timeout`). They are part of what the container was created with: if you change one, the container is **created again** the next time it starts or restarts (what was inside it is lost, as with any recreate), or right away, after a confirmation, with **Save and apply** (see 15.2f); a container created by an older version is left as it is. For *existing* and *compose* only the stop timeout applies.
 
 State comes from `docker inspect` (running, restarting, exited with a code, unhealthy / health check pending) or, for compose, from `docker compose ps`. A container that is not there is **Stopped** (created ones) or **Unknown** (existing ones).
 
@@ -131,6 +131,26 @@ API (local app only, reading included: these files may hold secrets):
 | `PUT /api/docker/dockerfile` | `{ path, content, etag }` → `{ path, etag, bytes }`. |
 | `POST /api/docker/dockerfile/copy` | `{ path, name, content?, overwrite? }` → `{ path, etag, bytes }`. |
 
+## 15.2f Changing a container and making a managed copy
+
+A **container hive-am creates** can be changed from its **Settings**. **Save** only saves (Docker is not touched; the next start applies it). **Save and apply** (the old *Save and restart*, now for every state of the container) first asks the server what would change (`POST /api/objects/:id/docker/plan`, Docker only read) and then:
+
+| Change | In Docker | What it does |
+|---|---|---|
+| Add or remove an **additional network** | `docker network connect / disconnect` | In place: same container (same id), running or stopped, no confirmation. |
+| Main network, image, ports, volumes, variables, command, restart policy, memory, CPUs, log size, and the options below | `rm -f` + `run` | **Created again**, only after a confirmation. |
+| Time to stop | not part of the hash | Applies the next time it stops. |
+
+The confirmation lists each setting that changes (before and after, with secret-looking variables hidden) and its kind, what is lost with the old container (files written inside it outside volumes and folders, its logs, its restart count, its id and IP), the **anonymous volumes** it mounts (a `volume` mount named with 64 hexadecimal characters: `rm -f` without `-v` does not remove them, and the new container does not mount them, so their data stays on the machine, disconnected) and the commands that will run (`docker run`, or `docker create`, `network connect` and `start` when it has additional networks), with secrets hidden. Named volumes and folders are never removed, even one taken out of the settings. Without the confirmation nothing in Docker is touched, and the server refuses a recreate that is not confirmed (`POST /api/objects/:id/docker/apply` needs `confirm: true`). The container stays running or stopped as it was. If it was saved earlier without applying, the confirmation says so (`stale`).
+
+**Additional networks** (`extraNetworks`) are attached after creating the container and before starting it, so its program finds them from the start (Docker 28 connects and disconnects a stopped container too). Containers created from this version carry the label `hive-am.networks=1`: hive-am keeps their networks as configured, so a network connected by hand is disconnected on the next start or apply. One created by an older version loses an additional network only when it is taken out of the settings and applied. `host` and `none` cannot be additional networks, and a container on one of them has none.
+
+**Other options of `docker run`**, a fixed list with each value checked (there is no free field for flags): **labels** (`name=value`, not starting with `hive-am.`), **user** (`name`, `uid` or `uid:gid`), **working folder** (absolute), **entrypoint** (one program, its arguments go in the command) and **hostname**. Any other key in the settings of a container (for example `privileged`) is refused with 400 instead of being ignored.
+
+**The hash does not change for what was saved before.** A container records the settings it was created with in the label `hive-am.cfg`. The new options count only when they are set, after the old ones, so a configuration without them gives exactly the hash it gave before and no container is created again by updating hive-am (`test-objects.ts` checks it against values computed with the previous code). Additional networks and the time to stop are not part of it.
+
+**An existing container is never changed:** no plan, no apply, no disconnecting, no recreating. **Create a managed copy** (in **More** and in its Settings) reads its `docker inspect` and its image's (`GET /api/objects/:id/docker/managed-copy`, local app only, it carries the variables) and opens the form of a new container hive-am creates, filled in: image, published ports, named volumes and folders, its own variables (not the image's), restart policy, command and entrypoint when they differ from the image's, memory, CPUs, main and other networks, labels (not the image's, compose's or hive-am's), user, working folder and hostname. What cannot be copied is listed: anonymous volumes (the copy gets a new, empty one), a port published on a random host port, an entrypoint of several words, the network of another container, or a value the form would refuse. The original is only read; its ports stay taken while it runs, and the variables copied are saved in hive-am's settings.
+
 ## 15.3 State, logs and live updates
 
 - A background check runs every 3 s (`HIVE_AM_OBJECT_POLL_MS`) and tells the interface over the WebSocket (`objects_changed`) only when something changed; listing never waits on `docker` or a port.
@@ -149,6 +169,9 @@ API (local app only, reading included: these files may hold secrets):
 | `GET /api/objects/:id/inspect?service=` | Docker only (a compose resource needs `service`). Always `configured` (what hive-am has for it); with `exists: true`, what `docker inspect` says plus `cfgStale`; with `exists: false`, `reason` (`not-created`, `not-found`, `no-service`, `no-docker`). |
 | `GET /api/objects/:id/inspect/raw?service=&reveal=1` | The whole `docker inspect` of its container (or of one compose service) as indented JSON: `{ available, error?, text, masked }`; secrets hidden unless `reveal=1`. |
 | `GET /api/docker/inspect?kind=&ref=&reveal=1` | The same for anything on this machine: `kind` is `container`, `image`, `volume` or `network`; `ref` must be a valid name (one that starts with `-` is refused with 400). `available: false` when Docker is not available. |
+| `POST /api/objects/:id/docker/plan` | `{ config }` (the settings in the form, not saved) → `{ exists, running, recreate, stale, changes, connect, disconnect, later, anonymous, preview }`; Docker is only read (see 15.2f). |
+| `POST /api/objects/:id/docker/apply` | `{ confirm?, drop? }` → `{ applied: "nothing" \| "recreated" \| "networks", connected, disconnected }`: applies the saved settings; recreating needs `confirm: true`. |
+| `GET /api/objects/:id/docker/managed-copy` | An existing container as the settings of one hive-am would create: `{ name, colony_id, config, skipped }`. Only reads. |
 | `POST /api/agent-objects/db/:op` | The tools of the Database management skill (see 15.12): `{ from: <agent id>, name?, … }`. |
 | `GET /api/objects/:id/stats` | What a server or Docker resource uses now: `{ cpu, memBytes, memLimitBytes, pids, net, block, info, services? }` |
 

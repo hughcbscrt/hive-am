@@ -13,14 +13,15 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { colonies } from '../src/db.js';
 import { composeServices, inspectMachine, listContainers, listImages, listNetworks, listVolumes, maskVar } from '../src/objects/docker-info.js';
-import { DOCKERFILE_NAME, buildImage, createMade, removeMade } from '../src/objects/docker.js';
+import { DOCKERFILE_NAME, applyDocker, buildImage, cfgHash, createMade, managedCopy, planChange, removeMade, runArgs } from '../src/objects/docker.js';
 import { assertCopyName, copySource, etagOf, readSource, writeSource } from '../src/objects/files.js';
-import { ObjectError, composeFileCopy, composeFileRead, composeFileWrite, createObject, objectAction, objectInspect, objectInspectRaw, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
+import { ObjectError, objectApply, objectManagedCopy, objectPlan, composeFileCopy, composeFileRead, composeFileWrite, createObject, objectAction, objectInspect, objectInspectRaw, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
 import { HttpError } from '../src/http/errors.js';
 import { match } from '../src/http/router.js';
 import '../src/http/routes/resources.js';
 import '../src/http/routes/fs.js';
 import { objectsStore } from '../src/objects/store.js';
+import { parseDocker } from '../src/objects/model.js';
 
 let fail = 0;
 const check = (ok: boolean, what: string) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); if (!ok) fail++; };
@@ -344,6 +345,35 @@ console.log(JSON.stringify({ check: await d.composeCheck(c), running: await d.co
   if (JSON.stringify(calls) !== JSON.stringify([`compose -f ${yml} -p p1 config -q`, `compose -f ${yml} -p p1 ps --all --format json`])) console.log(calls);
 }
 
+// ---------------------------------------------------------------- changing a container hive-am created: the options, the hash, the commands
+{
+  // The hash of a configuration saved before the new options existed must not change, or every container would be created again after an
+  // update. The expected values were computed with the code of main before this change.
+  const sample = parseDocker({ mode: 'container', image: 'nginx:1.25-alpine', ports: ['127.0.0.1:8080:80'], volumes: ['data:/data', '/srv/site:/usr/share/nginx/html:ro'], env: { HELLO: 'world' }, restart: 'unless-stopped', command: 'nginx -g daemon off;', memory: '256m', cpus: 0.5, network: 'appnet', logMaxMb: 5, stopTimeoutSec: 7 });
+  check(cfgHash(sample) === 'bbbb1a2c8ad9' && cfgHash(parseDocker({ mode: 'container', image: 'nginx' })) === '35b5556307d7', 'the hash of a configuration without the new options is exactly the one of before (no container is created again after updating)');
+  check(cfgHash({ ...sample, extraNetworks: ['other'] }) === cfgHash(sample) && cfgHash({ ...sample, stopTimeoutSec: 30 }) === cfgHash(sample), 'additional networks and the stop timeout are not in the hash (they never create the container again)');
+  check(['labels', 'user', 'workdir', 'entrypoint', 'hostname'].every((k) => cfgHash({ ...sample, [k]: k === 'labels' ? { a: 'b' } : k === 'workdir' ? '/app' : 'x' } as any) !== cfgHash(sample)), 'each new option, once set, changes the hash (it creates the container again)');
+  const full = parseDocker({ mode: 'container', image: 'nginx:1', env: { DB_PASSWORD: 'hunter2' }, extraNetworks: ['backend'], labels: { 'com.example.team': 'web' }, user: '1000:1000', workdir: '/app', entrypoint: '/docker-entrypoint.sh', hostname: 'web-1', command: 'nginx -g "daemon off;"' });
+  const ra = runArgs('abcdef0123456789', full);
+  const at = (flag: string) => ra[ra.indexOf(flag) + 1];
+  check(at('--user') === '1000:1000' && at('--workdir') === '/app' && at('--entrypoint') === '/docker-entrypoint.sh' && at('--hostname') === 'web-1' && ra.includes('com.example.team=web') && ra.includes('hive-am.networks=1') && !ra.includes('backend'), 'docker run gets each supported option as its own argument (additional networks are connected after, not passed here)');
+  check(JSON.stringify(ra.slice(ra.indexOf('nginx:1'))) === JSON.stringify(['nginx:1', 'nginx', '-g', 'daemon off;']), 'the image and the command come last, as before');
+  const bad: [Record<string, unknown>, RegExp][] = [
+    [{ privileged: true }, /"privileged" is not an option/], [{ capAdd: ['ALL'], runArgs: '--pid=host' }, /"capAdd", "runArgs" are not options/],
+    [{ extraNetworks: ['-x'] }, /not a valid network name/], [{ extraNetworks: ['host'] }, /cannot be connected to the network host/], [{ network: 'none', extraNetworks: ['a'] }, /on the network none/],
+    [{ network: 'appnet', extraNetworks: ['appnet'] }, /already the main network/], [{ extraNetworks: ['a', 'a'] }, /listed twice/],
+    [{ labels: { 'hive-am.object': 'x' } }, /hive-am's own/], [{ labels: { 'bad key': 'x' } }, /not a valid label name/], [{ labels: { a: 'one\ntwo' } }, /one line/],
+    [{ user: 'root; rm' }, /user must be/], [{ workdir: 'app' }, /absolute path/], [{ entrypoint: '--privileged' }, /one program/], [{ entrypoint: 'sh -c' }, /one program/], [{ hostname: 'bad_host!' }, /hostname is not valid/],
+  ];
+  const refusedOpts = await Promise.all(bad.map(([extra, re]) => rejects(() => parseDocker({ mode: 'container', image: 'nginx', ...extra }), re)));
+  check(refusedOpts.every(Boolean), 'an option hive-am does not support is refused (not ignored), and each supported one is validated');
+  if (!refusedOpts.every(Boolean)) console.log(bad.filter((_, i) => !refusedOpts[i]).map(([x]) => JSON.stringify(x)));
+  const ex = parseDocker({ mode: 'existing', container: 'theirs' });
+  check(await rejects(() => planChange('abcdef0123456789', ex, ex), /never changed by hive-am/) && await rejects(() => applyDocker('abcdef0123456789', ex, { confirm: true }), /never changed by hive-am/), 'an existing container is never planned for nor applied to (it is never recreated or disconnected)');
+  check(await rejects(() => managedCopy(parseDocker({ mode: 'container', image: 'nginx' })), /Only an existing container/), 'only an existing container is copied into a managed one');
+  check(await routeStatus('POST', '/api/objects/x/docker/plan', 'https://evil.example') === 403 && await routeStatus('POST', '/api/objects/x/docker/apply', 'https://evil.example') === 403 && await routeStatus('GET', '/api/objects/x/docker/managed-copy', 'https://evil.example') === 403, 'planning, applying and reading a managed copy only from the local app');
+}
+
 // ---------------------------------------------------------------- docker
 const image = process.env.HIVE_TEST_IMAGE ?? 'nginx:1.25-alpine';
 const dockerOk = (() => { try { execFileSync('docker', ['image', 'inspect', image], { stdio: 'ignore', timeout: 15000 }); return true; } catch { return false; } })();
@@ -485,6 +515,78 @@ else {
     for (const args of [['rm', '-f', mcon], ['volume', 'rm', mvol], ['volume', 'rm', fvol], ['network', 'rm', mnet], ['rmi', mimg]]) try { execFileSync('docker', args, { stdio: 'ignore', timeout: 30000 }); } catch { /* cleanup */ }
   }
   check([['volume', mvol], ['volume', fvol], ['network', mnet], ['image', mimg]].every(([k, n]) => spawnSync('docker', [k, 'inspect', n], { stdio: 'ignore' }).status !== 0), 'the test removes what it created');
+
+  // Changing a container hive-am created, with real Docker: additional networks in place (same container), the rest created again only
+  // after a confirmation, named volumes kept, anonymous ones reported; and a managed copy of an existing container that leaves it alone.
+  const rc = Date.now().toString(36), n1 = `hive-am-test-n1-${rc}`, n2 = `hive-am-test-n2-${rc}`, kvol = `hive-am-test-keep-${rc}`, vimg = `hive-am-test-volimg-${rc}:1`;
+  let mc: ReturnType<typeof createObject> | null = null, ex2: ReturnType<typeof createObject> | null = null, copyOf: ReturnType<typeof createObject> | null = null;
+  try {
+    for (const n of [n1, n2]) execFileSync('docker', ['network', 'create', n], { stdio: 'ignore', timeout: 30000 });
+    const vdir = mkdtempSync(join(tmpdir(), 'volimg-'));
+    writeFileSync(join(vdir, 'Dockerfile'), `FROM ${image}\nVOLUME /cache\n`);
+    execFileSync('docker', ['build', '-q', '-t', vimg, vdir], { stdio: 'ignore', timeout: 120000 });
+    mc = createObject({ name: 'test-reconfig', kind: 'docker', config: { mode: 'container', image: vimg, volumes: [`${kvol}:/data`], extraNetworks: [n1], env: { A: '1' } } });
+    const mname = `hive-am-${mc.id.slice(0, 8)}`;
+    const cid = () => execFileSync('docker', ['inspect', '-f', '{{.Id}}', mname], { encoding: 'utf8' }).trim();
+    const nets = () => Object.keys(JSON.parse(execFileSync('docker', ['inspect', '-f', '{{json .NetworkSettings.Networks}}', mname], { encoding: 'utf8' }))).sort().join();
+    const p0 = await objectPlan(mc.id, objectsStore.get(mc.id)!.config);
+    check(!p0.exists && !p0.recreate && /^docker create .* --label hive-am\.networks=1 /.test(p0.preview[0]) && p0.preview[1] === `docker network connect ${n1} ${mname}` && p0.preview[2] === `docker start ${mname}`, 'a container not created yet: nothing is recreated, and the preview shows how it will be created (create, connect, start)');
+    await objectAction(mc.id, 'start');
+    check(await until(async () => (await st(mc!.id)) === 'running') && nets() === ['bridge', n1].sort().join(), 'with an additional network it is created, connected to it and started');
+    const id0 = cid();
+    const cfg = () => objectsStore.get(mc!.id)!.config as any;
+    const p1 = await objectPlan(mc.id, { ...cfg(), extraNetworks: [n1, n2] });
+    check(p1.exists && p1.running && !p1.recreate && p1.connect.join() === n2 && !p1.disconnect.length && !p1.changes.length, 'adding a network is planned as a connection in place, nothing recreated');
+    updateObject(mc.id, { config: { ...cfg(), extraNetworks: [n1, n2] } });
+    const a1 = await objectApply(mc.id, {});
+    check(a1.applied === 'networks' && a1.connected.join() === n2 && cid() === id0 && nets() === ['bridge', n1, n2].sort().join(), 'applying it connects the network without creating the container again (same id)');
+    const p2 = await objectPlan(mc.id, { ...cfg(), extraNetworks: [n2] });
+    check(!p2.recreate && p2.disconnect.join() === n1 && !p2.connect.length, 'taking one out is planned as a disconnection');
+    updateObject(mc.id, { config: { ...cfg(), extraNetworks: [n2] } });
+    await objectApply(mc.id, { drop: [n1] });
+    check(cid() === id0 && nets() === ['bridge', n2].sort().join(), 'and applying disconnects it, same container');
+    // Stopped: a network is still changed in place, and the container stays stopped.
+    await objectAction(mc.id, 'stop');
+    updateObject(mc.id, { config: { ...cfg(), extraNetworks: [n1, n2] } });
+    const a2 = await objectApply(mc.id, {});
+    check(a2.applied === 'networks' && cid() === id0 && nets() === ['bridge', n1, n2].sort().join() && (await st(mc.id)) === 'stopped', 'a stopped container is connected in place too, and stays stopped');
+    // Saved without applying: the next start makes the networks match (hive-am keeps them as configured).
+    updateObject(mc.id, { config: { ...cfg(), extraNetworks: [n1] } });
+    await objectAction(mc.id, 'start');
+    check(await until(async () => (await st(mc!.id)) === 'running') && cid() === id0 && nets() === ['bridge', n1].sort().join(), 'saved without applying, the next start connects and disconnects to match, without recreating');
+    // A change that recreates: planned with what changes and what is left behind, refused without confirmation, then done.
+    const p3 = await objectPlan(mc.id, { ...cfg(), env: { A: '2', DB_PASSWORD: 'hunter2' }, volumes: [], workdir: '/tmp' });
+    const fields = p3.changes.map((x) => x.field).sort().join();
+    check(p3.recreate && !p3.stale && fields === 'env,volumes,workdir' && p3.anonymous.length === 1 && p3.anonymous[0].destination === '/cache' && /^[0-9a-f]{64}$/.test(p3.anonymous[0].name), 'a variable, a volume and the working folder change: recreate, each field listed, and the anonymous volume at /cache reported');
+    check(p3.changes.find((x) => x.field === 'env')?.to === 'A=2, DB_PASSWORD=••••••••' && p3.preview.length === 3 && p3.preview[0].startsWith('docker create ') && p3.preview[0].includes('DB_PASSWORD=••••••••') && !p3.preview.join().includes('hunter2') && p3.preview[0].includes('--workdir /tmp'), 'the change and the docker run preview hide the secret-looking variable');
+    updateObject(mc.id, { config: { ...cfg(), env: { A: '2', DB_PASSWORD: 'hunter2' }, volumes: [], workdir: '/tmp' } });
+    const p3b = await objectPlan(mc.id, cfg());
+    check(p3b.recreate && p3b.stale && !p3b.changes.length, 'saved but not applied: the plan says it is created again because of what was saved before (stale)');
+    check(await rejects(() => objectApply(mc!.id, {}), /confirm it first/) && cid() === id0, 'applying a change that recreates is refused without confirmation, and the container is not touched');
+    const anon = p3.anonymous[0].name;
+    const a3 = await objectApply(mc.id, { confirm: true });
+    const id1 = cid();
+    check(a3.applied === 'recreated' && id1 !== id0 && await until(async () => (await st(mc!.id)) === 'running') && execFileSync('docker', ['inspect', '-f', '{{.Config.WorkingDir}}', mname], { encoding: 'utf8' }).trim() === '/tmp', 'with confirmation it is created again (new id), running as it was, with the new settings');
+    check(nets() === ['bridge', n1].sort().join(), 'and with its additional network connected again');
+    check(spawnSync('docker', ['volume', 'inspect', kvol], { stdio: 'ignore' }).status === 0 && spawnSync('docker', ['volume', 'inspect', anon], { stdio: 'ignore' }).status === 0, 'the named volume taken out of the settings is not removed, and the anonymous one is left behind as reported');
+    try { execFileSync('docker', ['volume', 'rm', anon], { stdio: 'ignore', timeout: 30000 }); } catch { /* cleanup */ }
+    // An existing container is never changed; a managed copy is read from it and the original is left alone.
+    execFileSync('docker', ['network', 'connect', n2, cname], { stdio: 'ignore', timeout: 30000 });
+    ex2 = createObject({ name: 'test-existing-copy', kind: 'docker', config: { mode: 'existing', container: cname } });
+    const before = execFileSync('docker', ['inspect', '-f', '{{.Id}} {{.State.Status}} {{json .NetworkSettings.Networks}}', cname], { encoding: 'utf8' });
+    check(await rejects(() => objectPlan(ex2!.id, { mode: 'existing', container: cname }), /never changed by hive-am/) && await rejects(() => objectApply(ex2!.id, { confirm: true }), /never changed by hive-am/), 'an existing container refuses a plan and an apply, even confirmed');
+    const copy = await objectManagedCopy(ex2.id);
+    const cc = copy.config;
+    check(cc.mode === 'container' && cc.image === image && cc.ports?.[0] === `127.0.0.1:${hp}:80` && cc.env?.HELLO === 'world' && !('PATH' in (cc.env ?? {})) && cc.extraNetworks?.join() === n2 && copy.name === `${cname}-copy`, 'a managed copy is read from the existing container: image, ports, its own variables (not the image\'s), its other network, and a name');
+    check(execFileSync('docker', ['inspect', '-f', '{{.Id}} {{.State.Status}} {{json .NetworkSettings.Networks}}', cname], { encoding: 'utf8' }) === before, 'reading it does not touch the original');
+    copyOf = createObject({ name: 'test-managed-copy', kind: 'docker', config: { ...cc, ports: [] } });
+    check((objectsStore.get(copyOf.id)!.config as any).image === image, 'the copy is saved as a container hive-am creates');
+  } finally {
+    for (const o of [mc, ex2, copyOf]) if (o) await removeObject(o.id).catch(() => undefined);
+    try { execFileSync('docker', ['network', 'disconnect', n2, cname], { stdio: 'ignore', timeout: 30000 }); } catch { /* cleanup */ }
+    for (const args of [['volume', 'rm', kvol], ['network', 'rm', n1], ['network', 'rm', n2], ['rmi', vimg]]) try { execFileSync('docker', args, { stdio: 'ignore', timeout: 30000 }); } catch { /* cleanup */ }
+  }
+  check([['volume', kvol], ['network', n1], ['network', n2], ['image', vimg]].every(([k, n]) => spawnSync('docker', [k, 'inspect', n], { stdio: 'ignore' }).status !== 0) && (!mc || spawnSync('docker', ['inspect', `hive-am-${mc.id.slice(0, 8)}`], { stdio: 'ignore' }).status !== 0), 'the test removes what it created');
 
   updateObject(cont.id, { config: { ...(objectsStore.get(cont.id)!.config as any), env: { HELLO: 'changed' } } });
   const ist = await objectInspect(cont.id);

@@ -138,6 +138,16 @@ export interface DockerConfig {
   image?: string; ports?: string[]; volumes?: string[]; env?: Record<string, string>; restart?: 'no' | 'always' | 'unless-stopped' | 'on-failure'; command?: string;
   file?: string; project?: string; services?: string[]; container?: string;
   memory?: string; cpus?: number; network?: string; stopTimeoutSec?: number; logMaxMb?: number;
+  /** Connected and disconnected in place, never recreated for. */ extraNetworks?: string[];
+  /** The other supported options of `docker run`: changing one creates the container again. */
+  labels?: Record<string, string>; user?: string; workdir?: string; entrypoint?: string; hostname?: string;
+}
+/** What applying settings would do to a container hive-am created (see `planChange` in server/src/objects/docker.ts). */
+export interface DockerPlanItem { field: string; from: string; to: string }
+export interface DockerPlan {
+  exists: boolean; running: boolean; recreate: boolean; stale: boolean;
+  changes: DockerPlanItem[]; connect: string[]; disconnect: string[]; later: DockerPlanItem[];
+  anonymous: { name: string; destination: string }[]; preview: string[];
 }
 export interface HttpVariable { value: string; secret?: boolean; set?: boolean }
 export interface HttpConfig { folder: string; env?: string; variables?: Record<string, Record<string, HttpVariable>> }
@@ -172,6 +182,7 @@ export interface DockerInspected {
 export interface DockerConfigured {
   name: string; image?: string; ports: string[]; volumes: string[]; networks: string[]; env: { name: string; value: string }[];
   restart?: string; command?: string; memory?: string; cpus?: number; logMaxMb?: number; stopTimeoutSec?: number; error?: string;
+  user?: string; workdir?: string; entrypoint?: string; hostname?: string; labels?: Record<string, string>;
 }
 /** Inspect: what is configured, always; what Docker says when it has the container, or why it does not. */
 export type DockerInspect =

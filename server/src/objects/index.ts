@@ -4,12 +4,12 @@ import { DATA_DIR, agents, resolved } from '../db.js';
 import { DATABASES_SKILL_ID, OBJECTS_SKILL_ID } from '../skills/defaults.js';
 import { bus } from '../runtime.js';
 import { renderTemplate, listTemplates } from './templates.js';
-import { composeCheck, composeRunning, composeServiceAction, inspectDocker, inspectRaw, recreateDocker, type DockerAction, dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
+import { applyDocker, composeCheck, composeRunning, composeServiceAction, inspectDocker, inspectRaw, managedCopy, planChange, recreateDocker, type DockerAction, dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
 import { recordRun, listHistory, clearHistory } from './http-history.js';
 import { dbColumns, dbQuery, dbSchema, dbState, dbTest, forgetDatabase } from './database.js';
 import { addSaved, clearQueries, forgetQueries, listQueries, listSaved, recordQuery, removeSaved, updateSaved } from './db-history.js';
 import { exportCollection, parseHttpFile, createHttpFile, exportHttp, type ExportFormat, describeHttp, dropSession, inspectHttp, readHttpFile, runHttp, scanHttp, writeHttpFile, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
-import { ObjectError, parseDatabase, type ClusterConfig, type DatabaseConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
+import { ObjectError, parseDatabase, parseDocker, type ClusterConfig, type DatabaseConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
 import { copySource, readSource, writeSource } from './files.js';
 import { forgetServer, serverLogs, restartServer, serverState, startServer, stopServer } from './runner.js';
 import { forgetSupervision, resetSupervision, supervise } from './supervisor.js';
@@ -153,6 +153,26 @@ export async function objectInspectRaw(id: string, service: string | undefined, 
   const o = get(id);
   if (o.kind !== 'docker') throw new ObjectError('Only a Docker resource can be inspected');
   return inspectRaw(o.id, o.config as DockerConfig, service, reveal);
+}
+
+/** A container hive-am creates: what applying `config` (the settings in the form, not saved yet) would do to it. Docker is only read. */
+export async function objectPlan(id: string, config: unknown) {
+  const o = get(id);
+  if (o.kind !== 'docker') throw new ObjectError('Only a Docker resource has a container to change');
+  return planChange(o.id, o.config as DockerConfig, parseDocker(config));
+}
+/** Applies the saved settings to the container (see applyDocker: recreating needs `confirm`). */
+export async function objectApply(id: string, p: { confirm?: unknown; drop?: unknown }) {
+  const o = get(id);
+  if (o.kind !== 'docker') throw new ObjectError('Only a Docker resource has a container to change');
+  try { return await applyDocker(o.id, o.config as DockerConfig, { confirm: p.confirm === true, drop: Array.isArray(p.drop) ? p.drop.map(String) : [] }); }
+  finally { await refreshStates().catch(() => undefined); changed(); }
+}
+/** An existing container as the settings of one hive-am would create: to open the form with them. The original is only read. */
+export async function objectManagedCopy(id: string) {
+  const o = get(id);
+  if (o.kind !== 'docker') throw new ObjectError('Only a Docker resource can be copied');
+  return { colony_id: o.colony_id, ...(await managedCopy(o.config as DockerConfig)) };
 }
 
 /** The compose file of a compose resource: the path is always the one saved in it, never one from the request. Other modes have no file. */

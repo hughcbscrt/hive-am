@@ -8,6 +8,8 @@ import { canCreate } from '@/lib/dockerLists';
 import { Suggest } from './Suggest';
 import { VolumeRows } from './VolumeRows';
 import { DockerBuild, useDockerMake } from './DockerMake';
+import { ExtraNetworks, RunOptions } from './DockerOptions';
+import { ManagedCopyButton } from './ManagedCopy';
 import { TemplatePicker } from './TemplatePicker';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
@@ -26,6 +28,7 @@ export interface Draft {
   template: string; tplValues: Record<string, string>;
   mode: Mode; image: string; ports: string; volumes: string; dockerRestart: string; command: string; file: string; project: string; services: string; container: string;
   memory: string; cpus: string; network: string;
+  extraNetworks: string[]; labels: string; user: string; workdir: string; entrypoint: string; hostname: string;
   engine: DbEngine; dbHost: string; dbPort: string; dbUser: string; dbPassword: string; dbPasswordSet: boolean; dbName: string; dbFile: string; dbSsl: boolean; dbTrust: boolean; dbReadOnly: boolean; dbTimeout: string; dbMaxRows: string; dbProps: Record<string, string>;
 }
 const n = (v: number | undefined) => (v === undefined ? '' : String(v));
@@ -47,12 +50,17 @@ export const draftFrom = (o?: ObjectView, colony?: string, kind?: ObjectKind): D
     mode: d.mode ?? (o ? 'container' : 'template'), image: d.image ?? '', ports: (d.ports ?? []).join('\n'), volumes: (d.volumes ?? []).join('\n'), dockerRestart: d.restart ?? 'no', command: d.command ?? '',
     file: d.file ?? '', project: d.project ?? '', services: (d.services ?? []).join(', '), container: d.container ?? '',
     memory: d.memory ?? '', cpus: n(d.cpus), network: d.network ?? '',
+    extraNetworks: d.extraNetworks ?? [], labels: envToText(d.labels), user: d.user ?? '', workdir: d.workdir ?? '', entrypoint: d.entrypoint ?? '', hostname: d.hostname ?? '',
     engine: q.engine ?? 'postgresql', dbHost: q.host ?? '', dbPort: n(q.port), dbUser: q.user ?? '', dbPassword: '', dbPasswordSet: !!q.passwordSet, dbName: q.database ?? '', dbFile: q.file ?? '',
     dbSsl: !!q.ssl, dbTrust: !!q.trustCert, dbReadOnly: q.readOnly !== false, dbTimeout: n(q.timeoutSec), dbMaxRows: n(q.maxRows), dbProps: { ...(q.props ?? {}) },
   };
 };
 
 const num = (v: string) => (v.trim() === '' ? undefined : Number(v));
+
+/** A new container hive-am creates, filled with `config` (a managed copy of an existing container). */
+export const draftFromDocker = (config: DockerConfig, name: string, colony?: string): Draft =>
+  ({ ...draftFrom({ id: '', colony_id: colony ?? null, kind: 'docker', name, config, state: { status: 'stopped' }, manager_id: null, created_at: 0, updated_at: 0 }), manager: '' });
 
 /** The body the server expects for this draft. */
 export function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | DatabaseConfig | ClusterConfig {
@@ -72,6 +80,8 @@ export function toConfig(d: Draft): ServerConfig | DockerConfig | HttpConfig | D
   return {
     mode: 'container', image: d.image.trim(), ports: lines(d.ports), volumes: lines(d.volumes), env: textToEnv(d.env), restart: (d.dockerRestart || 'no') as DockerConfig['restart'], command: d.command.trim() || undefined,
     memory: d.memory.trim() || undefined, cpus: num(d.cpus), network: d.network.trim() || undefined, stopTimeoutSec: num(d.stopTimeout), logMaxMb: num(d.logMax),
+    extraNetworks: d.extraNetworks.length ? d.extraNetworks : undefined, labels: textToEnv(d.labels),
+    user: d.user.trim() || undefined, workdir: d.workdir.trim() || undefined, entrypoint: d.entrypoint.trim() || undefined, hostname: d.hostname.trim() || undefined,
   };
 }
 
@@ -255,6 +265,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
               {/* Unlike a volume, a network Docker does not have makes the container fail to start: say so, with the way to create it. */}
               {canCreate('network', d.network, docker.networks) && <div className="dk-make"><p className="muted small res-m0">{t('dk.net.new', { name: d.network.trim() })}</p>{make.createButton('network', d.network, docker.networks, t('dk.make.network', { name: d.network.trim() }))}</div>}
             </Field>
+            <ExtraNetworks value={d.extraNetworks} onChange={(v) => set('extraNetworks', v)} main={d.network} networks={docker.networks} make={make} />
           </Card>
           <Card title={t('obj.f.volumes')} hint={t('obj.f.volumes.hint')} wide>
             <VolumeRows value={d.volumes} onChange={(v) => set('volumes', v)} volumes={docker.volumes} make={make} />
@@ -265,6 +276,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
               <select className="select" value={d.dockerRestart} onChange={(e) => set('dockerRestart', e.target.value)}>{['no', 'always', 'unless-stopped', 'on-failure'].map((r) => <option key={r} value={r}>{r}</option>)}</select>
             </Field>
             <Field label={t('obj.f.command')}>{text('command', { mono: true })}</Field>
+            <RunOptions d={d} set={set} />
           </Card>
           <Card title={t('of.limits')} hint={t('obj.dk.limits.hint')}>
             <div className="of-grid2">
@@ -291,6 +303,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
               {dockerNote}
             </Field>
             <Field label={t('obj.sup.stopTimeout')} hint={t('obj.sup.stopTimeout.hint')}>{text('stopTimeout', { placeholder: '10' })}</Field>
+            {objectId && <ManagedCopyButton objectId={objectId} />}
           </Card>
         )}
       </>)}

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { Hammer, Info, Loader2, Play, PlugZap, RefreshCcw, RotateCw, Square } from 'lucide-react';
+import { CopyPlus, Hammer, Info, Loader2, Play, PlugZap, RefreshCcw, RotateCw, Square } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
@@ -19,6 +19,7 @@ import { HttpWorkspace } from './HttpWorkspace';
 import { HttpVars } from './HttpVars';
 import { DbWorkspace } from './DbWorkspace';
 import { FileEditor } from './FileEditor';
+import { useManagedCopy } from './ManagedCopy';
 import { copyCompose, readCompose, saveCompose } from '@/lib/dockerFiles';
 
 type Tab = 'summary' | 'logs' | 'file' | 'config' | 'requests' | 'history' | 'vars' | 'query' | 'schema';
@@ -91,12 +92,15 @@ function Screen({ object: o }: { object: ObjectView }) {
   const canShell = o.kind === 'server' || (o.kind === 'docker' && (o.config as DockerConfig).mode !== 'compose');
 
   const docker = o.kind === 'docker' ? (o.config as DockerConfig) : null;
+  const copy = useManagedCopy(o.id);
   const actions: HeaderAction[] = [];
   if (o.kind !== 'http' && o.kind !== 'database') {
     actions.push({ id: 'stop', label: t(cluster ? 'obj.act.stopAll' : 'obj.act.stop'), icon: <Square size={14} />, disabled: !!busy || (!live && st !== 'error'), onClick: () => void act('stop') });
     actions.push({ id: 'restart', label: t(cluster ? 'obj.act.restartAll' : 'obj.act.restart'), icon: <RotateCw size={14} />, disabled: !!busy, onClick: () => void act('restart') });
   }
   if (docker && docker.mode !== 'compose') actions.push({ id: 'inspect', label: t('svc.inspect'), icon: <Info size={14} />, onClick: () => setInspecting(true) });
+  // An existing container is never changed by hive-am: to change how it runs, a container hive-am creates is made from it.
+  if (docker && docker.mode === 'existing') actions.push({ id: 'copy', label: t('mc.go'), icon: <CopyPlus size={14} />, hint: t('mc.hint'), disabled: copy.busy, onClick: () => void copy.open() });
   if (docker && docker.mode !== 'existing') actions.push({ id: 'recreate', label: t('obj.act.recreate'), icon: <RefreshCcw size={14} />, danger: true, hint: t('svc.recreate.hint'), disabled: !!busy, onClick: () => setRecreating(true) });
   if (docker && docker.mode === 'compose') actions.push({ id: 'rebuild', label: t('obj.act.rebuild'), icon: <Hammer size={14} />, hint: t('svc.rebuild.hint'), disabled: !!busy, onClick: () => void act('rebuild') });
   const primary = (<>
@@ -138,6 +142,7 @@ function Screen({ object: o }: { object: ObjectView }) {
           {tab === 'vars' && <HttpVars object={o} />}
         </TabPanel>
       </div>
+      {copy.view}
       {inspecting && <ServiceDetail objectId={o.id} title={o.name} onClose={() => setInspecting(false)} />}
       {leaving && (
         <ConfirmDialog title={t('fe.leave.title')} body={t('fe.leave.body')} confirmLabel={t('common.discard')} danger

@@ -130,6 +130,12 @@ If the network you type does not exist on this machine, the field tells you the 
 
 In **Create a container** mode you can pick the **Network** and set limits (memory, CPUs, log size, time to stop). If you change one, the container is created again the next time it starts or restarts, and what was inside it is lost.
 
+**Additional networks** connect the container to more networks than the main one: add them by name (or pick one of this machine) and remove them with the **×** of each chip. **More options of docker run** has a few more settings, each checked: user, working folder, entrypoint, hostname and labels. There is no field for other flags.
+
+**Change a container hive-am created.** In **Settings**, **Save** only saves: the next start uses the new settings. **Save and apply** changes the container now. Adding or removing an additional network happens in place, without creating the container again (it keeps its id, running or stopped). Anything else needs the container to be created again, so hive-am first shows a confirmation with what changes, what is lost (files written inside it, its logs, restart count, id and IP), the anonymous volumes that would be left unmounted, and the commands it will run. Nothing happens in Docker until you confirm. Named volumes and folders are kept, even one you took out. The time to stop applies the next time it stops.
+
+**An existing container is never changed by hive-am.** To change how it runs, use **Create a managed copy** (in **More**, or in its **Settings**): the form of a new container opens filled in from the existing one (image, ports, volumes, variables, networks, limits and options), with a list of what could not be copied. The original is only read. Its ports stay taken while it runs, so change them in the copy or stop the original first.
+
 The **Summary** of a Docker resource adds processes, network and disk, and shows the image, the ports and the number of restarts.
 
 **Inspect** (in **More**, for a created or an existing container) shows two panels: **Configured in hive-am**, what you set up (always there, even if the container does not exist), and **What Docker says**, the live detail with its variables, ports, mounts, networks, health checks and **Labels**. If Docker does not have the container yet (it is created the first time you start it), cannot find it, or is not running, Inspect says so instead of failing. If you changed the settings since the container was created, it warns that the container will be created again on the next start.

@@ -5,7 +5,7 @@ import { buildImage, createMade, removeMade } from '../../objects/docker.js';
 import { copySource, readSource, writeSource } from '../../objects/files.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from '../../objects/agent.js';
 import { agentDb } from '../../objects/agent-db.js';
-import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, composeFileCopy, composeFileRead, composeFileWrite, objectInspect, objectInspectRaw, objectLogs, removeObject, updateObject } from '../../objects/index.js';
+import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, composeFileCopy, composeFileRead, composeFileWrite, objectApply, objectInspect, objectManagedCopy, objectPlan, objectInspectRaw, objectLogs, removeObject, updateObject } from '../../objects/index.js';
 import { body, type Body } from '../body.js';
 import { notFound } from '../errors.js';
 import { requireLocal } from '../guards.js';
@@ -44,6 +44,11 @@ route('GET', '/api/objects/:id/inspect/raw', ({ params, url }) => objectInspectR
 route('GET', '/api/docker/inspect', ({ url }) => inspectMachine(url.searchParams.get('kind') ?? '', url.searchParams.get('ref') ?? '', url.searchParams.get('reveal') === '1'));
 write('POST', '/api/objects/:id/service', (b, { params }) => objectServiceAction(params[0], b.service, b.action));
 write('POST', '/api/objects/:id/action', (b, { params }) => objectAction(params[0], b.action));
+// Changing a container hive-am created (local app only): what applying the settings in the form would do (Docker only read), then applying
+// the saved ones (recreating needs `confirm: true`). An existing container is never changed: it is read to fill the form of a managed copy.
+write('POST', '/api/objects/:id/docker/plan', (b, { params }) => objectPlan(params[0], b.config));
+write('POST', '/api/objects/:id/docker/apply', (b, { params }) => objectApply(params[0], b));
+guarded('/api/objects/:id/docker/managed-copy', ({ params }) => objectManagedCopy(params[0]));
 // What Docker knows, to suggest in the forms (containers, images, volumes, networks, the services of a compose file).
 route('GET', '/api/docker/containers', () => listContainers());
 route('GET', '/api/docker/images', () => listImages());

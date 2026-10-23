@@ -108,6 +108,11 @@ function Configured({ c, value, reveal }: { c: DockerConfigured; value: (name: s
         {c.restart && <><dt>{t('obj.f.restart')}</dt><dd className="mono">{c.restart}</dd></>}
         {c.command && <><dt>{t('ow.d.command')}</dt><dd className="mono">{c.command}</dd></>}
         {limits.length > 0 && <><dt>{t('of.limits')}</dt><dd>{limits.join(' · ')}</dd></>}
+        {c.user && <><dt>{t('dk.opts.user')}</dt><dd className="mono">{c.user}</dd></>}
+        {c.workdir && <><dt>{t('dk.opts.workdir')}</dt><dd className="mono">{c.workdir}</dd></>}
+        {c.entrypoint && <><dt>{t('dk.opts.entrypoint')}</dt><dd className="mono">{c.entrypoint}</dd></>}
+        {c.hostname && <><dt>{t('dk.opts.hostname')}</dt><dd className="mono">{c.hostname}</dd></>}
+        {c.labels && Object.keys(c.labels).length > 0 && <><dt>{t('dk.opts.labels')}</dt><dd className="mono">{Object.entries(c.labels).map(([k, v]) => `${k}=${v}`).join(', ')}</dd></>}
       </dl>
       {c.env.length > 0 && (<section className="sd-sec"><div className="row gap-s"><div className="eyebrow grow">{t('of.env')} · {c.env.length}</div>{reveal}</div>
         <table className="sd-table"><tbody>{c.env.map((e) => <tr key={e.name}><td className="mono"><b>{e.name}</b></td><td className="mono">{value(e.name, e.value)}</td></tr>)}</tbody></table></section>)}
