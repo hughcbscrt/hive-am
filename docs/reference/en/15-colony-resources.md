@@ -109,6 +109,27 @@ The forms ask Docker (read-only) so you do not have to type what already exists:
 
 API: `GET /api/docker/containers` (each with `mounts` and `networks`), `GET /api/docker/images` (each with `inUse`), `GET /api/docker/volumes` (`{ available, error?, volumes: [{ name, driver, anonymous, managed, inUse }] }`), `GET /api/docker/networks` (`{ available, error?, networks: [{ name, id, driver, scope, builtin, managed, inUse }] }`), `GET /api/docker/compose-services?file=`; `POST /api/docker/networks` and `POST /api/docker/volumes` (`{ name }`, answer `{ name, created }`), `DELETE /api/docker/networks/:name` and `DELETE /api/docker/volumes/:name` (`{ name, removed }`, 400 with the reason when refused), `POST /api/docker/images/build` (`{ dockerfile, context?, tag }`, answers `{ tag, output }`; an absolute existing file, an existing folder and a valid image name, or 400), local app only like every change to resources. `managed` means the label `hive-am.created=1`. The lists are read-only: they run only `docker ps`, `images`, `volume ls` and `network ls`.
 
+## 15.2e Editing the compose file and a Dockerfile
+
+The compose file of a compose resource and a Dockerfile picked to build can be **edited in place** or **saved as a copy** next to the original. hive-am writes one of these files only when you press Save or Save as copy; it never generates or rewrites them on its own. An **existing container** has no file of its own, so it offers no editing.
+
+- **Which file.** The compose file is always the one saved in the resource (`file`): the page sends only the resource id, never a path, and its name (also after following a link) must end in `.yml` or `.yaml`. A Dockerfile path comes from the page, so the server requires an absolute path to an existing regular file named `Dockerfile`, `Containerfile`, `Dockerfile.<suffix>` or `<name>.Dockerfile` (any case), checked again on its real path (a link named `Dockerfile` that leads to `notes.txt` is refused) and written on that real path. The limit is the name, not a folder: it is not a writer of any file. Both: up to 512 KB of UTF-8 text with no NUL.
+- **Saving.** Reading answers an `etag` (sha256 of the bytes on disk). Saving sends it back and is refused with **409** if the file changed on disk since it was read, so an edit made outside hive-am is not overwritten without knowing. The text is written to a temporary file in the same folder (`.<name>.hive-tmp-<pid>`, with the original's mode), flushed and renamed over the file: if anything fails the temporary file is removed and the original stays as it was. A temporary file left by a hive-am that died while saving is removed on the next save of that file (only that exact prefix).
+- **What it changes.** Saving the compose file does not touch Docker. Afterwards the server runs `docker compose -f <file> config -q` and answers `check: { ok, error? }` (`null` without Docker): a file Docker cannot read **is saved anyway** (you may be halfway) and marked with the error. It also answers `running: true` when services are running, which keep the definition they were created with until they are recreated. A Dockerfile is used by the next build; images and containers already made do not change.
+- **Copies.** A copy goes in the **same folder** as the original (its real folder), so the relative paths of a compose file and the build folder of a Dockerfile still hold. The name is only a file name: no `/` or `..`, not starting with `-` or `.`, up to 100 characters, different from the original and of the same kind (`.yml` / `.yaml`, or named like a Dockerfile). A name that exists is a **409** unless `overwrite` is sent (a folder or a link is never replaced). With `repoint`, the compose resource points to the copy, saved like any change of its settings (Docker is not touched; the next Start or Recreate uses it; the project name does not change, the folder being the same).
+- **Not atomic against everything:** between comparing the etag and renaming, another program could still write the file; the window is the time of one write.
+
+API (local app only, reading included: these files may hold secrets):
+
+| Route | What it does |
+|---|---|
+| `GET /api/objects/:id/docker/file` | The compose file of a compose resource: `{ path, content, etag, bytes }`. |
+| `PUT /api/objects/:id/docker/file` | `{ content, etag }` → `{ path, etag, bytes, check, running }`; 409 if the etag is stale. |
+| `POST /api/objects/:id/docker/file/copy` | `{ name, content?, overwrite?, repoint? }` → `{ path, etag, bytes, check, object? }`; 409 if it exists without `overwrite`. |
+| `GET /api/docker/dockerfile?path=` | A Dockerfile: `{ path, content, etag, bytes }`. |
+| `PUT /api/docker/dockerfile` | `{ path, content, etag }` → `{ path, etag, bytes }`. |
+| `POST /api/docker/dockerfile/copy` | `{ path, name, content?, overwrite? }` → `{ path, etag, bytes }`. |
+
 ## 15.3 State, logs and live updates
 
 - A background check runs every 3 s (`HIVE_AM_OBJECT_POLL_MS`) and tells the interface over the WebSocket (`objects_changed`) only when something changed; listing never waits on `docker` or a port.

@@ -2,9 +2,10 @@ import { notifyAgentsChanged } from '../../runtime.js';
 import { DRIVER_PROPS } from '../../objects/driver-props.js';
 import { composeServices, inspectMachine, listContainers, listImages, listNetworks, listVolumes } from '../../objects/docker-info.js';
 import { buildImage, createMade, removeMade } from '../../objects/docker.js';
+import { copySource, readSource, writeSource } from '../../objects/files.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from '../../objects/agent.js';
 import { agentDb } from '../../objects/agent-db.js';
-import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, objectInspect, objectInspectRaw, objectLogs, removeObject, updateObject } from '../../objects/index.js';
+import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, composeFileCopy, composeFileRead, composeFileWrite, objectInspect, objectInspectRaw, objectLogs, removeObject, updateObject } from '../../objects/index.js';
 import { body, type Body } from '../body.js';
 import { notFound } from '../errors.js';
 import { requireLocal } from '../guards.js';
@@ -55,6 +56,14 @@ write('POST', '/api/docker/volumes', (b) => createMade('volume', b.name));
 guarded('/api/docker/networks/:name', ({ params }) => removeMade('network', params[0]), 'DELETE');
 guarded('/api/docker/volumes/:name', ({ params }) => removeMade('volume', params[0]), 'DELETE');
 write('POST', '/api/docker/images/build', (b) => buildImage(b));
+// Editing the compose file of a resource (its path is the saved one) and a Dockerfile (path from the page, checked by name in objects/files.ts),
+// in place or as a copy next to it. They are the person's own files, which may hold secrets: local app only, reading included. A stale etag is 409.
+guarded('/api/objects/:id/docker/file', ({ params }) => composeFileRead(params[0]));
+write('PUT', '/api/objects/:id/docker/file', (b, { params }) => composeFileWrite(params[0], b.content, b.etag));
+write('POST', '/api/objects/:id/docker/file/copy', (b, { params }) => composeFileCopy(params[0], b));
+guarded('/api/docker/dockerfile', ({ url }) => readSource('dockerfile', url.searchParams.get('path') ?? ''));
+write('PUT', '/api/docker/dockerfile', (b) => writeSource('dockerfile', b.path, b.content, b.etag));
+write('POST', '/api/docker/dockerfile/copy', (b) => copySource('dockerfile', b.path, b.name, b.content, b.overwrite === true));
 route('GET', '/api/docker/compose-services', ({ url }) => composeServices(url.searchParams.get('file') ?? ''));
 route('GET', '/api/objects/:id/stats', ({ params }) => statsOf(params[0]));
 route('GET', '/api/objects/:id/http', ({ params }) => httpScan(params[0]));

@@ -4,12 +4,13 @@ import { DATA_DIR, agents, resolved } from '../db.js';
 import { DATABASES_SKILL_ID, OBJECTS_SKILL_ID } from '../skills/defaults.js';
 import { bus } from '../runtime.js';
 import { renderTemplate, listTemplates } from './templates.js';
-import { composeServiceAction, inspectDocker, inspectRaw, recreateDocker, type DockerAction, dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
+import { composeCheck, composeRunning, composeServiceAction, inspectDocker, inspectRaw, recreateDocker, type DockerAction, dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
 import { recordRun, listHistory, clearHistory } from './http-history.js';
 import { dbColumns, dbQuery, dbSchema, dbState, dbTest, forgetDatabase } from './database.js';
 import { addSaved, clearQueries, forgetQueries, listQueries, listSaved, recordQuery, removeSaved, updateSaved } from './db-history.js';
 import { exportCollection, parseHttpFile, createHttpFile, exportHttp, type ExportFormat, describeHttp, dropSession, inspectHttp, readHttpFile, runHttp, scanHttp, writeHttpFile, sessionClear, sessionOf, sessionSet, sessionView } from './http.js';
 import { ObjectError, parseDatabase, type ClusterConfig, type DatabaseConfig, type DockerConfig, type HttpConfig, type ObjectRow, type ObjectState, type ObjectView, type ServerConfig } from './model.js';
+import { copySource, readSource, writeSource } from './files.js';
 import { forgetServer, serverLogs, restartServer, serverState, startServer, stopServer } from './runner.js';
 import { forgetSupervision, resetSupervision, supervise } from './supervisor.js';
 import { maskConfig, objectsStore } from './store.js';
@@ -152,6 +153,29 @@ export async function objectInspectRaw(id: string, service: string | undefined, 
   const o = get(id);
   if (o.kind !== 'docker') throw new ObjectError('Only a Docker resource can be inspected');
   return inspectRaw(o.id, o.config as DockerConfig, service, reveal);
+}
+
+/** The compose file of a compose resource: the path is always the one saved in it, never one from the request. Other modes have no file. */
+function composeOf(id: string): DockerConfig {
+  const o = get(id);
+  const c = o.config as DockerConfig;
+  if (o.kind !== 'docker' || c.mode !== 'compose') throw new ObjectError('Only a compose resource has a file to edit');
+  return c;
+}
+export const composeFileRead = (id: string) => readSource('compose', composeOf(id).file);
+/** Saves the compose file (nothing in Docker changes) and says whether Docker can read it and whether services are running with the old one. */
+export async function composeFileWrite(id: string, content: unknown, etag: unknown) {
+  const c = composeOf(id);
+  const r = writeSource('compose', c.file, content, etag);
+  const [check, running] = await Promise.all([composeCheck(c), composeRunning(id, c)]);
+  return { ...r, check, running };
+}
+/** A copy next to the compose file; with `repoint`, the resource uses it from then on (saved like any change of settings: Docker is not touched). */
+export async function composeFileCopy(id: string, p: { name?: unknown; content?: unknown; overwrite?: unknown; repoint?: unknown }) {
+  const c = composeOf(id);
+  const r = copySource('compose', c.file, p.name, p.content, p.overwrite === true);
+  const object = p.repoint === true ? updateObject(id, { config: { ...c, file: r.path } }) : undefined;
+  return { ...r, check: await composeCheck({ ...c, file: r.path }), object };
 }
 
 export { listTemplates };

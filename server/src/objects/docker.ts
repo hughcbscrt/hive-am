@@ -268,6 +268,21 @@ function inspected(j: any): Inspected {
   };
 }
 
+/**
+ * After the compose file is saved: `docker compose config -q` says whether Docker can read it (`null` when Docker is not there to ask), and
+ * whether services are running, which keep the definition they were created with until they are recreated. Neither changes anything.
+ */
+export async function composeCheck(c: DockerConfig): Promise<{ ok: boolean; error?: string } | null> {
+  try {
+    const r = await dk(composeArgs(c, ['config', '-q']), { cwd: dirname(c.file!), timeout: 20_000 });
+    return r.code === 0 ? { ok: true } : { ok: false, error: (r.err || r.out).trim().split('\n').slice(-3).join('\n').slice(0, 600) || `docker exited with ${r.code}` };
+  } catch { return null; }
+}
+export async function composeRunning(id: string, c: DockerConfig): Promise<boolean> {
+  const s = await dockerState(id, c);
+  return s.status === 'running' || s.status === 'starting';
+}
+
 /** A container hive-am created goes away with its object; a compose project is only stopped; an existing container is left alone. */
 export async function removeDocker(id: string, c: DockerConfig): Promise<void> {
   if (c.mode === 'container') await dk(['rm', '-f', containerName(id)]).catch(() => undefined);

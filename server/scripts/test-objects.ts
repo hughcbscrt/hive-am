@@ -5,7 +5,7 @@
 // touches a container it did not create.
 import './_guard.js';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync, existsSync } from 'node:fs';
+import { chmodSync, statSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync, existsSync } from 'node:fs';
 import type { IncomingMessage } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -14,7 +14,8 @@ import { fileURLToPath } from 'node:url';
 import { colonies } from '../src/db.js';
 import { composeServices, inspectMachine, listContainers, listImages, listNetworks, listVolumes, maskVar } from '../src/objects/docker-info.js';
 import { DOCKERFILE_NAME, buildImage, createMade, removeMade } from '../src/objects/docker.js';
-import { ObjectError, createObject, objectAction, objectInspect, objectInspectRaw, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
+import { assertCopyName, copySource, etagOf, readSource, writeSource } from '../src/objects/files.js';
+import { ObjectError, composeFileCopy, composeFileRead, composeFileWrite, createObject, objectAction, objectInspect, objectInspectRaw, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
 import { HttpError } from '../src/http/errors.js';
 import { match } from '../src/http/router.js';
 import '../src/http/routes/resources.js';
@@ -251,6 +252,89 @@ writeFileSync(join(dir, 'Dockerfile'), 'FROM scratch\n');
 check(await rejects(() => buildImage({ dockerfile: join(dir, 'Dockerfile'), tag: '-t' }), /image name/) && await rejects(() => buildImage({ dockerfile: join(dir, 'Dockerfile'), tag: 'x', context: join(dir, 'nope') }), /not a folder/), 'an image name like an option, or a build folder that is not there, is refused');
 check(await routeStatus('POST', '/api/docker/networks', 'https://evil.example') === 403 && await routeStatus('POST', '/api/docker/volumes', 'https://evil.example') === 403 && await routeStatus('DELETE', '/api/docker/volumes/x', 'https://evil.example') === 403 && await routeStatus('DELETE', '/api/docker/networks/x', 'https://evil.example') === 403 && await routeStatus('POST', '/api/docker/images/build', 'https://evil.example') === 403, 'creating, removing and building only from the local app, like every change to resources');
 
+// ---------------------------------------------------------------- editing or copying the compose file and a Dockerfile (temporary folders only)
+{
+  const fdir = mkdtempSync(join(tmpdir(), 'files-')), yml = join(fdir, 'docker-compose.yml'), dfile = join(fdir, 'Dockerfile');
+  writeFileSync(yml, 'services:\n  web:\n    image: nginx:1\n'); chmodSync(yml, 0o640);
+  writeFileSync(dfile, 'FROM scratch\n');
+  const comp = createObject({ name: 'files-compose', kind: 'docker', config: { mode: 'compose', file: yml, project: 'hivefiles' } });
+  const ex = createObject({ name: 'files-existing', kind: 'docker', config: { mode: 'existing', container: 'hive-am-test-nope' } });
+  const ctr = createObject({ name: 'files-container', kind: 'docker', config: { mode: 'container', image: 'nginx:1' } });
+  const r1 = composeFileRead(comp.id);
+  check(r1.path === yml && r1.content.includes('image: nginx:1') && r1.etag === etagOf(readFileSync(yml)) && r1.bytes === readFileSync(yml).length, 'the compose file of a resource is read from its saved path, with an etag of its bytes');
+  check(await rejects(() => composeFileRead(ex.id), /Only a compose resource/) && await rejects(() => composeFileRead(ctr.id), /Only a compose resource/) && await rejects(() => composeFileWrite(ex.id, 'x', 'y'), /Only a compose resource/), 'an existing container (or one hive-am creates) has no file to edit');
+  const w1 = await composeFileWrite(comp.id, 'services:\n  web:\n    image: nginx:2\n', r1.etag);
+  check(readFileSync(yml, 'utf8').includes('nginx:2') && w1.etag === etagOf(readFileSync(yml)) && (statSync(yml).mode & 0o777) === 0o640 && w1.running === false, 'saving writes the file, keeps its mode, answers the new etag and, with nothing created, no running warning');
+  check(w1.check === null || w1.check.ok === true, 'a valid file passes docker compose config (or the check is skipped without Docker)');
+  check(!readdirSync(fdir).some((f) => f.includes('.hive-tmp-')), 'no temporary file is left after saving');
+  // Someone else changed it: the etag read before is stale.
+  writeFileSync(yml, 'services:\n  web:\n    image: edited-elsewhere\n');
+  let stale: unknown = null; try { await composeFileWrite(comp.id, 'services: {}\n', w1.etag); } catch (e) { stale = e; }
+  check(stale instanceof ObjectError && stale.kind === 'conflict' && /changed on disk/.test(stale.message) && readFileSync(yml, 'utf8').includes('edited-elsewhere'), 'a stale etag is a conflict (409) and the file is not changed');
+  check(await rejects(() => composeFileWrite(comp.id, 'services: {}\n', undefined), /Open the file/) && readFileSync(yml, 'utf8').includes('edited-elsewhere'), 'saving without an etag is refused');
+  const bad = await composeFileWrite(comp.id, 'services:\n  web:\n    image: [unclosed\n', composeFileRead(comp.id).etag);
+  check(readFileSync(yml, 'utf8').includes('[unclosed') && (bad.check === null || (bad.check.ok === false && !!bad.check.error)), 'a YAML Docker cannot read is saved anyway and marked with the error of docker compose config');
+  // A failure while saving (a folder that cannot be written) leaves the original as it was, and no temporary file.
+  const before = readFileSync(yml, 'utf8');
+  writeFileSync(join(fdir, '.docker-compose.yml.hive-tmp-99999'), 'left by a crash');
+  chmodSync(fdir, 0o555);
+  let ro: unknown = null; try { await composeFileWrite(comp.id, 'services: {}\n', composeFileRead(comp.id).etag); } catch (e) { ro = e; }
+  chmodSync(fdir, 0o755);
+  check(ro instanceof ObjectError && /cannot be written/.test(ro.message) && readFileSync(yml, 'utf8') === before, 'a save that fails (read-only folder) keeps the original intact');
+  check(readdirSync(fdir).filter((f) => f.includes('.hive-tmp-')).join() === '.docker-compose.yml.hive-tmp-99999', 'and leaves no temporary file of its own');
+  await composeFileWrite(comp.id, before, composeFileRead(comp.id).etag);
+  check(!readdirSync(fdir).some((f) => f.includes('.hive-tmp-')), 'the next save removes a temporary file a crash left (that exact prefix only)');
+  // Copies: next to the original, never over another file without overwrite, the original intact; with repoint the resource uses it.
+  const orig = readFileSync(yml, 'utf8');
+  const cp = await composeFileCopy(comp.id, { name: 'docker-compose.copy.yml', content: 'services:\n  web:\n    image: nginx:3\n', repoint: false });
+  check(cp.path === join(fdir, 'docker-compose.copy.yml') && readFileSync(cp.path, 'utf8').includes('nginx:3') && readFileSync(yml, 'utf8') === orig && (objectsStore.get(comp.id)!.config as any).file === yml && !cp.object, 'a copy is written next to the original, which is left intact; without repoint the resource keeps its file');
+  let exists: unknown = null; try { await composeFileCopy(comp.id, { name: 'docker-compose.copy.yml', content: 'x: 1\n' }); } catch (e) { exists = e; }
+  check(exists instanceof ObjectError && exists.kind === 'conflict' && readFileSync(cp.path, 'utf8').includes('nginx:3'), 'a copy with the name of a file that exists is a conflict (409) and does not replace it');
+  const cp2 = await composeFileCopy(comp.id, { name: 'docker-compose.copy.yml', content: 'services:\n  web:\n    image: nginx:4\n', overwrite: true, repoint: true });
+  check(readFileSync(cp.path, 'utf8').includes('nginx:4') && (objectsStore.get(comp.id)!.config as any).file === cp.path && cp2.object?.id === comp.id, 'with overwrite it is replaced; with repoint the resource points to the copy');
+  check(composeFileRead(comp.id).path === cp.path, 'and its file is read from the copy from then on');
+  const cpNew = await composeFileCopy(comp.id, { name: 'other.yaml' });
+  check(readFileSync(cpNew.path, 'utf8') === readFileSync(cp.path, 'utf8'), 'a copy without content takes the text of the file');
+  const names = ['../x.yml', 'sub/x.yml', '-x.yml', '.x.yml', 'x.sh', 'docker-compose.copy.yml', '', 'a'.repeat(101) + '.yml'];
+  const refused = await Promise.all(names.map((n) => rejects(() => composeFileCopy(comp.id, { name: n, overwrite: true }), /.+/)));
+  check(refused.every(Boolean), 'a copy name with / or .., starting with - or ., of another kind, equal to the original, empty or too long is refused');
+  check(assertCopyName('dockerfile', '/a/Dockerfile', 'Dockerfile.copy') === 'Dockerfile.copy' && await rejects(() => assertCopyName('dockerfile', '/a/Dockerfile', 'copy.txt'), /not a Dockerfile/) && await rejects(() => assertCopyName('compose', '/a/c.yml', 'c.yml'), /different from the original/), 'a Dockerfile copy keeps a Dockerfile name; the original name is refused');
+  // Dockerfiles: the path comes from the page, so only a regular file named like a Dockerfile (its real name too), up to 512 KB.
+  const d1 = readSource('dockerfile', dfile);
+  const dw = writeSource('dockerfile', dfile, 'FROM scratch\nLABEL x=1\n', d1.etag);
+  check(readFileSync(dfile, 'utf8').includes('LABEL x=1') && dw.etag === etagOf(readFileSync(dfile)), 'a Dockerfile is read and saved with its etag');
+  const dc = copySource('dockerfile', dfile, 'Dockerfile.copy', undefined, false);
+  check(dc.path === join(fdir, 'Dockerfile.copy') && readFileSync(dc.path, 'utf8') === readFileSync(dfile, 'utf8'), 'a Dockerfile copy is written next to it');
+  mkdirSync(join(fdir, 'Dockerfile.dir')); writeFileSync(join(fdir, 'notes.txt'), 'secret\n'); mkdirSync(join(fdir, 'ln')); symlinkSync(join(fdir, 'notes.txt'), join(fdir, 'ln', 'Dockerfile'));
+  writeFileSync(join(fdir, 'big.Dockerfile'), 'x'.repeat(512 * 1024 + 1)); writeFileSync(join(fdir, 'bin.Dockerfile'), Buffer.from([0x46, 0x00, 0x41]));
+  const paths: [unknown, RegExp][] = [['Dockerfile', /absolute/], ['/etc/passwd', /not a Dockerfile/], [join(fdir, 'x.sh'), /not a Dockerfile/], [join(fdir, 'nope', 'Dockerfile'), /does not exist/], [join(fdir, 'Dockerfile.dir'), /not a file/], [join(fdir, 'ln', 'Dockerfile'), /leads to notes\.txt/], [join(fdir, 'big.Dockerfile'), /512 KB/], [join(fdir, 'bin.Dockerfile'), /not a text file/]];
+  const why = await Promise.all(paths.map(([p, re]) => rejects(() => readSource('dockerfile', p), re)));
+  check(why.every(Boolean), 'a Dockerfile path that is relative, not named like one, missing, a folder, a link to another name, over 512 KB or binary is refused');
+  if (!why.every(Boolean)) console.log(why);
+  check(await rejects(() => writeSource('dockerfile', dfile, 'a\0b', readSource('dockerfile', dfile).etag), /NUL/) && await rejects(() => writeSource('dockerfile', dfile, 'x'.repeat(512 * 1024 + 1), readSource('dockerfile', dfile).etag), /512 KB/), 'content with NUL or over 512 KB is not saved');
+  const sixRoutes: [string, string][] = [['GET', `/api/objects/${comp.id}/docker/file`], ['PUT', `/api/objects/${comp.id}/docker/file`], ['POST', `/api/objects/${comp.id}/docker/file/copy`], ['GET', `/api/docker/dockerfile?path=${encodeURIComponent(dfile)}`], ['PUT', '/api/docker/dockerfile'], ['POST', '/api/docker/dockerfile/copy']];
+  const evil = await Promise.all(sixRoutes.map(([m, u]) => routeStatus(m, u, 'https://evil.example')));
+  check(evil.every((x) => x === 403), 'the six file routes only answer the local app (403 to another origin), reading included');
+  check(await routeStatus('GET', `/api/objects/${comp.id}/docker/file`) === 200 && await routeStatus('GET', `/api/docker/dockerfile?path=${encodeURIComponent('/etc/passwd')}`) === 400, 'and the local app reads through them (a bad path is a 400)');
+  for (const o of [comp, ex, ctr]) await removeObject(o.id);
+}
+// Saving the compose file asks Docker only to read: `compose config -q` and `compose ps`, nothing that creates or recreates.
+{
+  const bin = mkdtempSync(join(tmpdir(), 'fake-docker-files-')), log = join(bin, 'calls.log'), yml = join(bin, 'c.yml');
+  writeFileSync(join(bin, 'docker'), `#!/bin/sh\necho "$*" >> ${JSON.stringify(log)}\ncase "$*" in *" config -q") echo "yaml: line 3: did not find expected node content" >&2; exit 15 ;; *" ps "*) echo '{"State":"running"}' ;; esac\n`);
+  chmodSync(join(bin, 'docker'), 0o755); writeFileSync(yml, 'x: [\n');
+  const probeF = join(dir, 'files.mts');
+  writeFileSync(probeF, `import * as d from ${JSON.stringify(join(dirname(fileURLToPath(import.meta.url)), '../src/objects/docker.ts'))};
+const c = { mode: 'compose' as const, file: ${JSON.stringify(yml)}, project: 'p1' };
+console.log(JSON.stringify({ check: await d.composeCheck(c), running: await d.composeRunning('abc', c) }));`);
+  const r = spawnSync(process.execPath, ['--import', 'tsx', probeF], { cwd: join(dirname(fileURLToPath(import.meta.url)), '..'), env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, encoding: 'utf8', timeout: 60000 });
+  let o: any = {}; try { o = JSON.parse(r.stdout.trim().split('\n').pop() ?? ''); } catch { console.log(r.stderr); }
+  const calls = readFileSync(log, 'utf8').trim().split('\n');
+  check(o.check?.ok === false && /did not find expected/.test(o.check.error) && o.running === true, 'the check carries the error of docker compose config, and running services are reported');
+  check(JSON.stringify(calls) === JSON.stringify([`compose -f ${yml} -p p1 config -q`, `compose -f ${yml} -p p1 ps --all --format json`]), 'and only those two reads reach Docker');
+  if (JSON.stringify(calls) !== JSON.stringify([`compose -f ${yml} -p p1 config -q`, `compose -f ${yml} -p p1 ps --all --format json`])) console.log(calls);
+}
+
 // ---------------------------------------------------------------- docker
 const image = process.env.HIVE_TEST_IMAGE ?? 'nginx:1.25-alpine';
 const dockerOk = (() => { try { execFileSync('docker', ['image', 'inspect', image], { stdio: 'ignore', timeout: 15000 }); return true; } catch { return false; } })();
@@ -318,6 +402,12 @@ else {
   check(await rejects(() => objectInspectRaw(comp.id, 'web', false), /has no container/), 'the raw inspect of a service with no container says to start it');
   await objectAction(comp.id, 'start');
   check(await until(async () => (await st(comp.id)) === 'running'), 'a compose project can be started');
+  {
+    const ids = () => execFileSync('docker', ['compose', '-f', join(cdir, 'docker-compose.yml'), '-p', (objectsStore.get(comp.id)!.config as any).project, 'ps', '-q'], { encoding: 'utf8', timeout: 30000 }).trim();
+    const was = ids(), f = await composeFileRead(comp.id);
+    const sv = await composeFileWrite(comp.id, `${f.content}# edited from hive-am\n`, f.etag);
+    check(sv.running === true && sv.check?.ok === true && !!was && ids() === was, 'saving the file of a running compose project warns that it is running and does not recreate anything (same container)');
+  }
   check((await fetch(`http://127.0.0.1:${cport}/`).then((r) => r.status).catch(() => 0)) === 200, 'and serves');
   check((await objectLogs(comp.id, { tail: 20 })).text.length >= 0, 'its logs can be read');
   const cs = await composeServices(join(cdir, 'docker-compose.yml'));
