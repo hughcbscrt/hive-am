@@ -1217,8 +1217,9 @@ button.mini-sep .pip.unread { right: auto; left: 1px; background: var(--ok); ani
 /* Cards of the object form, suggestions, variables */
 .of { display: flex; flex-direction: column; gap: 14px; }
 .of-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; scroll-margin-top: 16px; } .of-card.wide { }
-.of-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
-.of-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 14px; }
+/* minmax(0, …): a column may be narrower than an input's default width, so three fields fit a narrow drawer instead of spilling out of the card. */
+.of-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.of-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 14px; }
 .of-card > header h4 { font-family: var(--font-display); font-size: var(--fs-lead); margin: 0; } .of-card > header p { margin: 3px 0 0; }
 .sg { position: relative; } .sg-list { position: absolute; z-index: var(--z-drop); left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; max-height: 280px; overflow-y: auto; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px; box-shadow: 0 14px 34px -12px rgba(0, 0, 0, .35); }
 .sg-opt { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; border: 0; background: none; color: inherit; font: inherit; padding: 6px 9px; border-radius: 7px; cursor: pointer; text-align: left; } .sg-opt.hi { background: color-mix(in srgb, var(--honey) 22%, var(--surface)); }
