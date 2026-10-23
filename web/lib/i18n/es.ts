@@ -1155,6 +1155,9 @@ export const es: Record<DictKey, string> = {
   "ow.d.compose": "Archivo compose",
   "ow.d.services": "Servicios",
   "ow.d.none": "ninguno",
+  "ow.d.entrypoint": "Punto de entrada",
+  "ow.d.gateway": "Puerta de enlace",
+  "ow.d.aliases": "Alias",
   "ow.cfg.dirty": "Cambios sin guardar",
   "ow.cfg.saved": "Todo guardado",
   "ow.cfg.save": "Guardar",
@@ -2151,4 +2154,8 @@ export const es: Record<DictKey, string> = {
   "diffc.msg.code": "Código:",
   "diffc.msg.more_one": "… {count} línea más",
   "diffc.msg.more_other": "… {count} líneas más",
+
+  // ---- accessible names of controls without visible text ----
+  "a11y.scrollSideways": "Desplazar hacia los lados",
+  "a11y.method": "Método",
 };

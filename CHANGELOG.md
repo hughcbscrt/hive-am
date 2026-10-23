@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Lists follow the language at once.** Changing the language with the app open left some names in the old language until a reload: the **No colony** group in the chat's agent list and in **Resources**, and the colony hints in the agent form and the resource manager field. They now change right away.
+- **Collapsing the agent list clears its search.** A search typed in the chat's agent list kept filtering the collapsed list, which has no search box, so agents and groups seemed to vanish and the group headings stayed disabled. Collapsing now clears the search, and expanding shows the full list with an empty box.
+- **More of the interface follows the language.** The **Entrypoint**, **Gateway** and **Aliases** labels of a service's details, and the names screen readers hear for the method picker of a new HTTP request and for the sideways scroll bar of the diff view, were always in English; a request that failed in an HTTP file showed `error` in English too. They now come from the dictionaries. Empty cells and values show a plain hyphen instead of a long dash, and a service's empty lists (health log, variables, ports, mounts, networks) say **none**.
+
 ## [1.10.1] - 2026-10-23
 
 ### Fixed

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/index';
-import { ago } from '@/lib/meta';
+import { NO_VALUE, ago } from '@/lib/meta';
 import type { Agent, GitCommitInfo, GitRefs } from '@/lib/types';
 import { RefPicker } from './RefPicker';
 
@@ -60,7 +60,7 @@ export function HistoryList({ agent, head, sel, onSelect, refs, path, onClearPat
         <div className="gx-hist" role="listbox" aria-label={t('git.tab.history')}>
           {commits.map((c) => (
             <button key={c.sha} role="option" aria-selected={sel === c.sha} className={`gx-commit ${sel === c.sha ? 'sel' : ''}`} onClick={() => onSelect(c.sha)}>
-              <span className="subj">{c.subject || '—'}</span>
+              <span className="subj">{c.subject || NO_VALUE}</span>
               <span className="meta"><span className="mono sha">{c.short}</span> · {c.author} · {ago(Date.parse(c.date))}</span>
               {(c.refs.length > 0 || c.merge) && <span className="refs">{c.merge && <i className="ref">{t('git.hist.merge')}</i>}{c.refs.slice(0, 3).map((r) => <i key={r} className="ref">{r}</i>)}</span>}
             </button>

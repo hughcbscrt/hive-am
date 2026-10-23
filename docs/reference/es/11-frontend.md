@@ -252,6 +252,7 @@ t('chat.tools', { count: 3 })                // plural: "3 tools" / "3 herramien
 - **Plurales:** si `params.count` es un número, se usa `clave_one` o `clave_other` según `Intl.PluralRules`; ambas deben existir en los dos catálogos. Si el texto debe mostrar el número con separadores, se pasa además un parámetro ya formateado (p. ej. `n: fmtNum(...)`).
 - **Claves dinámicas:** se permiten cuando todas las variantes existen (`t(\`role.${rol}\`)`, `t(\`status.${estado}\`)`, `permission.<id>.label`, `provider.<id>.blurb`).
 - **Fuera de componentes** (utilidades como `ago()`, `describe()` de herramientas, validaciones): se usa `translate` de `lib/i18n/core` en el momento de renderizar; el componente que las llama usa `useI18n()` para volver a renderizarse al cambiar de idioma. Los componentes memoizados que muestran texto traducido llaman a `useI18n()` (los consumidores de contexto se actualizan aunque estén en `memo`).
+- **`t` en memos:** el `t` de `useI18n()` cambia de identidad cada vez que cambia el idioma, así que un `useMemo` o `useCallback` que arma texto con él y lista `t` como dependencia se recalcula al instante.
 - **Fechas:** `intlLocale()` da `es-MX` / `en-US` para `toLocaleDateString`.
 
 ### Errores del servidor
@@ -272,6 +273,11 @@ El backend responde en inglés. `lib/api.ts` pasa cada mensaje por `translateSer
 1. Escribe la clave y su texto en **`en.ts`** y su traducción en **`es.ts`** (misma clave, mismos `{parámetros}`).
 2. Úsala con `t('…')`. No escribas texto visible directamente en JSX, atributos (`placeholder`, `aria-label`, `title`), avisos (`toast`) ni mensajes de validación.
 3. Ejecuta `npm run typecheck`: detecta claves inexistentes y diferencias entre catálogos.
+4. Ejecuta el check de i18n desde `server/`: `HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-web-i18n.ts`. Falla cuando `en.ts` y `es.ts` tienen claves distintas, cuando un `.tsx` de `web/components` o `web/app` tiene un `title`, `aria-label`, `placeholder`, `alt` o texto de elemento (`>Texto<`) literal fuera de las excepciones de abajo, y cuando algún `.ts`, `.tsx` o `.css` de `web/components`, `web/app` o `web/lib` contiene la raya larga (U+2014). Lee el código con expresiones regulares, así que no ve el texto armado en cadenas de JavaScript (`'…'` dentro de una expresión).
+
+**Términos técnicos que se quedan en inglés en los dos idiomas** (la lista `EXCEPTIONS` del check; mantén las dos iguales): `HTTP`, `JSON`, `CSV`, `NULL`, `URL`, `IP`, `API key`, `Bearer token`, `Basic`, `Token` (nombres de protocolos, formatos y esquemas de autenticación), `App Home` (el nombre de una pantalla de Slack), `hive-am`, `true` y `false`, los nombres de teclas de `Ctrl+Enter` y `Ctrl/⌘ + Enter`, y los valores de ejemplo `login` y `dev` de dos placeholders (un nombre de petición y un nombre de entorno).
+
+**Valores vacíos:** una celda, valor o medidor sin nada que mostrar usa `NO_VALUE` de `lib/meta.ts` (un guion normal, `-`, igual en los dos idiomas); una lista vacía lo dice con un texto del diccionario (por ejemplo `ow.d.none`).
 
 Convención de claves: `<área>.<elemento>`, por ejemplo `agent.sessions.empty`, `colony.err.name`, `tool.k.path`. Textos compartidos viven en `common.*`, `role.*`, `status.*` y `permission.*`.
 

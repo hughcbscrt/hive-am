@@ -2,6 +2,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { CodeEditor } from '@/components/git/CodeEditor';
 import type { VarInfo } from '@/lib/types';
+import { NO_VALUE } from '@/lib/meta';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 const HEADERS = ['Accept', 'Accept-Language', 'Authorization', 'Cache-Control', 'Content-Type', 'Cookie', 'If-None-Match', 'Origin', 'Referer', 'User-Agent', 'X-Api-Key', 'X-Requested-With'];
@@ -20,7 +21,7 @@ function suggest(text: string, caret: number, vars: VarInfo[], named: string[]):
   if (v) {
     const q = v[1].toLowerCase(), from = caret - v[1].length;
     const items: Item[] = [
-      ...vars.filter((x) => !x.name.includes('.response.') && !x.name.startsWith('$')).map((x) => ({ label: x.name, insert: `${x.name}}}`, hint: x.source === 'missing' ? '—' : x.secret || x.hidden ? '••••' : (x.value ?? '').slice(0, 30) })),
+      ...vars.filter((x) => !x.name.includes('.response.') && !x.name.startsWith('$')).map((x) => ({ label: x.name, insert: `${x.name}}}`, hint: x.source === 'missing' ? NO_VALUE : x.secret || x.hidden ? '••••' : (x.value ?? '').slice(0, 30) })),
       ...named.map((n) => ({ label: `${n}.response.body.`, insert: `${n}.response.body.`, hint: 'answer' })),
       ...DYNAMIC.map((d) => ({ label: d, insert: `${d}}}`, hint: 'generated' })),
     ].filter((i) => i.label.toLowerCase().includes(q) && i.label.toLowerCase() !== q).slice(0, 12);

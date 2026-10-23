@@ -10,13 +10,14 @@ import { useToast } from '@/components/ui';
 import { Menu, MenuItem, MenuSep } from '@/components/Menu';
 import { ServiceDetail } from './ServiceDetail';
 import { StatusDot } from './ObjectPanel';
+import { NO_VALUE } from '@/lib/meta';
 
 const tone = (s: ServiceStat) => (s.state === 'running' ? (/unhealthy/i.test(s.health) ? 'error' : /starting/i.test(s.health) ? 'starting' : 'running') : s.state === 'exited' || s.state === 'dead' ? 'error' : s.state === 'restarting' ? 'starting' : 'stopped');
 
 /** "16379->6379, 16380->6379": each published port opens on this machine. */
 function Ports({ ports }: { ports: string }) {
   const list = ports.split(',').map((p) => p.trim()).filter(Boolean);
-  if (!list.length) return <span className="muted">—</span>;
+  if (!list.length) return <span className="muted">{NO_VALUE}</span>;
   return <span className="svc-ports">{list.map((p) => { const host = /^(\d+)(?:->|→)/.exec(p)?.[1]; return host ? <a key={p} className="mono" href={`http://localhost:${host}`} target="_blank" rel="noreferrer" title={`http://localhost:${host}`}>{p}</a> : <span key={p} className="mono">{p}</span>; })}</span>;
 }
 
@@ -44,11 +45,11 @@ export function ServicesTable({ objectId, services, onLogs, onChanged }: { objec
         return (
           <tr key={s.name}>
             <td><span className="row gap-s"><StatusDot status={tone(s)} /><span className="svc-name"><b>{s.name}</b><small className="mono muted">{s.container}</small></span></span></td>
-            <td className="mono small svc-img" title={s.image}>{s.image || '—'}</td>
+            <td className="mono small svc-img" title={s.image}>{s.image || NO_VALUE}</td>
             <td><span className="small">{s.state}{s.health ? ` · ${s.health}` : ''}</span><div className="muted small">{s.status}</div></td>
             <td><Ports ports={s.ports} /></td>
-            <td className="num mono small">{s.cpu !== null ? `${s.cpu}%` : '—'}</td>
-            <td className="num mono small">{s.memBytes !== null ? fmtBytes(s.memBytes) : '—'}</td>
+            <td className="num mono small">{s.cpu !== null ? `${s.cpu}%` : NO_VALUE}</td>
+            <td className="num mono small">{s.memBytes !== null ? fmtBytes(s.memBytes) : NO_VALUE}</td>
             <td className="cm-act">
               {live
                 ? <button className="btn ghost icon sm" disabled={!!busy} onClick={() => void act(s.name, 'stop')} aria-label={t('obj.act.stop')} title={t('obj.act.stop')}><Square size={14} /></button>

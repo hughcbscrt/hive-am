@@ -15,7 +15,7 @@ import { TagList, TagView } from './TagBrowser';
 import { CommitPreview } from './ChangesPreview';
 import { CompareList, CompareView, type CompareSel } from './Compare';
 import { useRefs } from './RefPicker';
-import { ago } from '@/lib/meta';
+import { NO_VALUE, ago } from '@/lib/meta';
 import { ConfirmDialog } from '@/components/ui';
 import { ConflictResolver } from './ConflictResolver';
 import { SwitchDialog } from './SwitchDialog';
@@ -233,7 +233,7 @@ export function GitExplorer({ agent, git, comments }: { agent: Agent; git: Retur
           <div><dt>{t('git.info.upstreamLabel')}</dt><dd>{!status.upstream ? <span className="muted">{t('git.info.noUpstream')}</span> : status.upstream.ahead === 0 && status.upstream.behind === 0 ? t('git.info.inSync') : t('git.info.upstreamStatus', { ahead: status.upstream.ahead, behind: status.upstream.behind })}</dd></div>
           {status.head ? (<>
             <div><dt>{t('git.info.commit')}</dt><dd className="mono">{status.head.sha}<CopyBtn text={status.head.sha} label={t('git.info.copySha')} /></dd></div>
-            <div><dt>{t('git.info.message')}</dt><dd className="msg">{status.head.subject || <span className="muted">—</span>}</dd></div>
+            <div><dt>{t('git.info.message')}</dt><dd className="msg">{status.head.subject || <span className="muted">{NO_VALUE}</span>}</dd></div>
             <div><dt>{t('git.info.author')}</dt><dd>{status.head.author}</dd></div>
             <div><dt>{t('git.info.when')}</dt><dd>{fmtDateTime(status.head.when)} <span className="muted">· {ago(Date.parse(status.head.when))}</span></dd></div>
           </>) : <div><dt>{t('git.info.commit')}</dt><dd className="muted">{t('git.noCommits')}</dd></div>}

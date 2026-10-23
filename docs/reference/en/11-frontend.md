@@ -252,6 +252,7 @@ t('chat.tools', { count: 3 })                // plural: "3 tools" / "3 herramien
 - **Plurals:** if `params.count` is a number, `key_one` or `key_other` is used according to `Intl.PluralRules`; both must exist in the two catalogs. If the text must show the number with separators, an already formatted parameter is also passed (e.g. `n: fmtNum(...)`).
 - **Dynamic keys:** allowed when all variants exist (`t(\`role.${role}\`)`, `t(\`status.${status}\`)`, `permission.<id>.label`, `provider.<id>.blurb`).
 - **Outside components** (utilities such as `ago()`, the tools' `describe()`, validations): `translate` from `lib/i18n/core` is used at render time; the component that calls them uses `useI18n()` to re-render when the language changes. Memoized components that show translated text call `useI18n()` (context consumers update even inside `memo`).
+- **`t` in memos:** the `t` from `useI18n()` gets a new identity each time the language changes, so a `useMemo` or `useCallback` that builds text with it and lists `t` as a dependency recomputes at once.
 - **Dates:** `intlLocale()` gives `es-MX` / `en-US` for `toLocaleDateString`.
 
 ### Server errors
@@ -272,6 +273,11 @@ The backend answers in English. `lib/api.ts` passes each message through `transl
 1. Write the key and its text in **`en.ts`** and its translation in **`es.ts`** (same key, same `{parameters}`).
 2. Use it with `t('…')`. Do not write visible text directly in JSX, attributes (`placeholder`, `aria-label`, `title`), notices (`toast`) or validation messages.
 3. Run `npm run typecheck`: it detects nonexistent keys and differences between catalogs.
+4. Run the i18n check from `server/`: `HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-web-i18n.ts`. It fails when `en.ts` and `es.ts` differ in keys, when a `.tsx` under `web/components` or `web/app` has a literal `title`, `aria-label`, `placeholder`, `alt` or element text (`>Text<`) outside the exceptions below, and when any `.ts`, `.tsx` or `.css` under `web/components`, `web/app` or `web/lib` contains the long dash (U+2014). It reads the source with regular expressions, so text built in JavaScript strings (`'…'` inside an expression) is not seen.
+
+**Technical terms that stay in English in both languages** (the `EXCEPTIONS` list of the check; keep both in step): `HTTP`, `JSON`, `CSV`, `NULL`, `URL`, `IP`, `API key`, `Bearer token`, `Basic`, `Token` (names of protocols, formats and authentication schemes), `App Home` (the name of a Slack screen), `hive-am`, `true` and `false`, the key names in `Ctrl+Enter` and `Ctrl/⌘ + Enter`, and the example values `login` and `dev` of two placeholders (a request name and an environment name).
+
+**Empty values:** a cell, value or meter with nothing to show uses `NO_VALUE` from `lib/meta.ts` (a plain hyphen, `-`, the same in both languages); an empty list says so with a text from the dictionary (for example `ow.d.none`).
 
 Key convention: `<area>.<element>`, for example `agent.sessions.empty`, `colony.err.name`, `tool.k.path`. Shared texts live in `common.*`, `role.*`, `status.*` and `permission.*`.
 

@@ -21,8 +21,11 @@ export const permissionHint = (p: Permission) => t(`permission.${p}.hint`);
 /** Translated at call time, so call it during render (inside a component that uses `useI18n`). */
 export const permissions = () => PERMISSION_IDS.map((id) => ({ id, label: permissionLabel(id), hint: permissionHint(id) }));
 
+/** What a cell, value or meter shows when there is nothing to show: a plain hyphen, the same in every language. */
+export const NO_VALUE = '-';
+
 export function ago(ts: number | null | undefined): string {
-  if (!ts) return '—';
+  if (!ts) return NO_VALUE;
   const s = Math.max(1, Math.round((Date.now() - ts) / 1000));
   if (s < 60) return t('time.justNow');
   const m = Math.round(s / 60); if (m < 60) return t('time.minutesAgo', { count: m });

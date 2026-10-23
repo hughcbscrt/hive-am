@@ -366,7 +366,7 @@ export function DiffView({ parsed, layout, path, cutOff = false, firstIndex = 0,
       )}
       {cm && <div className="sr-only" aria-live="polite">{said}</div>}
       {layout === 'split' && slide.max > 0 && (
-        <div className="hbar" ref={bar} onScroll={(e) => box.current?.style.setProperty('--hx', `${e.currentTarget.scrollLeft}px`)} aria-label="Scroll sideways">
+        <div className="hbar" ref={bar} onScroll={(e) => box.current?.style.setProperty('--hx', `${e.currentTarget.scrollLeft}px`)} aria-label={t('a11y.scrollSideways')}>
           <div style={{ width: slide.track + slide.max, height: 1 }} />
         </div>
       )}

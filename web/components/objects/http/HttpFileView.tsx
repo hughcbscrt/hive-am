@@ -8,6 +8,7 @@ import { FileMenu } from '../FileMenu';
 import { methodTone, tone } from './httpUi';
 import { WithVars } from './WithVars';
 import type { HttpWs } from './useHttpWorkspace';
+import { NO_VALUE } from '@/lib/meta';
 
 /** A picked .http file: run it whole, and see its requests with the last result, its variables or its source. */
 export function HttpFileView({ ws, picked }: { ws: HttpWs; picked: HttpFile }) {
@@ -30,8 +31,8 @@ export function HttpFileView({ ws, picked }: { ws: HttpWs; picked: HttpFile }) {
           {picked.requests.map((r) => { const x = results[r.id]; const ts = testsOf(x); return (
             <tr key={r.id} className="hw-trow" onClick={() => { setSel(r); setTab('body'); }}>
               <td><span className={`hr-m ${methodTone(r.method)}`}>{r.method}</span></td><td><b>{r.name}</b><div className="muted small mono hw-url"><WithVars text={r.url} /></div></td>
-              <td>{ts.length ? <span className={`hr-st ${ts.every((y) => y.passed) ? 'ok' : 'err'}`}>{ts.filter((y) => y.passed).length}/{ts.length}</span> : <span className="muted small">—</span>}</td>
-              <td>{x ? (x.run ? <span className={`hr-st ${tone(x)}`}><b>{x.run.status}</b> <span className="muted">{x.run.durationMs} ms</span></span> : <span className="hr-st err" title={x.error}>error</span>) : <span className="muted small">{t('hw.notRun')}</span>}</td></tr>); })}
+              <td>{ts.length ? <span className={`hr-st ${ts.every((y) => y.passed) ? 'ok' : 'err'}`}>{ts.filter((y) => y.passed).length}/{ts.length}</span> : <span className="muted small">{NO_VALUE}</span>}</td>
+              <td>{x ? (x.run ? <span className={`hr-st ${tone(x)}`}><b>{x.run.status}</b> <span className="muted">{x.run.durationMs} ms</span></span> : <span className="hr-st err" title={x.error}>{t('obj.status.error')}</span>) : <span className="muted small">{t('hw.notRun')}</span>}</td></tr>); })}
         </tbody></table>)}
       </div>
   );

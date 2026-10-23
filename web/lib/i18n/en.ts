@@ -1157,6 +1157,9 @@ export const en = {
   "ow.d.compose": "Compose file",
   "ow.d.services": "Services",
   "ow.d.none": "none",
+  "ow.d.entrypoint": "Entrypoint",
+  "ow.d.gateway": "Gateway",
+  "ow.d.aliases": "Aliases",
   "ow.cfg.dirty": "Unsaved changes",
   "ow.cfg.saved": "All saved",
   "ow.cfg.save": "Save",
@@ -2153,6 +2156,10 @@ export const en = {
   "diffc.msg.code": "Code:",
   "diffc.msg.more_one": "… {count} more line",
   "diffc.msg.more_other": "… {count} more lines",
+
+  // ---- accessible names of controls without visible text ----
+  "a11y.scrollSideways": "Scroll sideways",
+  "a11y.method": "Method",
 };
 
 export type DictKey = keyof typeof en;

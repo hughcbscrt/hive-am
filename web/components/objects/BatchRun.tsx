@@ -7,6 +7,7 @@ import { parseRows } from '@/lib/dataRows';
 import type { HttpFile, HttpRun } from '@/lib/types';
 import { CheckRow, Modal } from '@/components/ui';
 import { HelpPopover } from '@/components/HelpPopover';
+import { NO_VALUE } from '@/lib/meta';
 
 interface Cell { status?: number; ok: boolean; tests: string; error?: string }
 const MAX_ROWS = 200;
@@ -78,7 +79,7 @@ export function BatchRun({ objectId, file, env, onClose, onDone }: { objectId: s
             <table className="cm-table"><thead><tr><th>#</th>{parsed.columns.slice(0, 2).map((c) => <th key={c}>{c}</th>)}{file.requests.map((r) => <th key={r.id} title={r.name}>{r.name.slice(0, 18)}</th>)}</tr></thead>
               <tbody>{results.map((cells, i) => (
                 <tr key={i}><td>{i + 1}</td>{parsed!.columns.slice(0, 2).map((c) => <td key={c} className="mono small">{parsed!.rows[i][c]}</td>)}
-                  {cells.map((c, n) => <td key={n} title={c.error ?? ''}><span className={`hr-st ${c.ok ? 'ok' : 'err'}`}>{c.error ? '—' : c.status}{c.tests ? ` · ${c.tests}` : ''}</span></td>)}</tr>))}</tbody></table>
+                  {cells.map((c, n) => <td key={n} title={c.error ?? ''}><span className={`hr-st ${c.ok ? 'ok' : 'err'}`}>{c.error ? NO_VALUE : c.status}{c.tests ? ` · ${c.tests}` : ''}</span></td>)}</tr>))}</tbody></table>
           </div>
         </>)}
       </div>

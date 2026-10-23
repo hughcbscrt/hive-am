@@ -25,7 +25,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(LOCALE_KEY, l); } catch { /* storage unavailable: the choice lasts until reload */ }
   }, []);
 
-  const value = useMemo<Ctx>(() => ({ locale, setLocale, t: translate }), [locale, setLocale]);
+  // A new `t` per language, so every memo or callback that lists it recomputes when the language changes.
+  const t = useCallback<Ctx['t']>((key, params) => translate(key, params), [locale]); // eslint-disable-line react-hooks/exhaustive-deps
+  const value = useMemo<Ctx>(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
   return <C.Provider value={value}>{children}</C.Provider>;
 }
 

@@ -10,6 +10,7 @@ import { HelpPopover } from '@/components/HelpPopover';
 import { GitSettings } from '@/components/git/GitSettings';
 import { useGitPrefs } from '@/lib/git/gitPrefs';
 import { sourceLabel, SOURCE_TONE } from './VarsTable';
+import { NO_VALUE } from '@/lib/meta';
 
 /**
  * The .http file as text, the way an editor shows it: a ▶ where each request starts (with how its last run went), `{{variables}}` marked
@@ -40,7 +41,7 @@ export function HttpSource({ objectId, file, vars, onRun, status, onSaved }: {
 
   const tip = (name: string) => {
     const v = byName.get(name); if (!v) return '';
-    const val = v.hidden ? t('iv.hidden') : v.source === 'missing' ? '—' : v.source === 'dynamic' ? t('iv.generated') : v.secret ? '••••••••' : v.value ?? '';
+    const val = v.hidden ? t('iv.hidden') : v.source === 'missing' ? NO_VALUE : v.source === 'dynamic' ? t('iv.generated') : v.secret ? '••••••••' : v.value ?? '';
     return `${name} = ${val}\n${sourceLabel(t, v.source, v.from)}`;
   };
   const renderLine = (line: string) => {
