@@ -7,7 +7,7 @@ import { useComposeServices, useDockerLists } from '@/lib/useDocker';
 import { canCreate } from '@/lib/dockerLists';
 import { Suggest } from './Suggest';
 import { VolumeRows } from './VolumeRows';
-import { useDockerMake } from './DockerMake';
+import { DockerBuild, useDockerMake } from './DockerMake';
 import { TemplatePicker } from './TemplatePicker';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
@@ -237,6 +237,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
                 options={(docker.images ?? []).map((i) => ({ value: i.ref, hint: [i.size, i.created, t('dk.inUse', { count: i.inUse })].filter(Boolean).join(' · ') }))} /></div>{refresh}</div>
               {dockerNote}
             </Field>
+            <DockerBuild onBuilt={(tag) => { set('image', tag); docker.reload(); }} />
             <Field label={t('obj.f.ports')} hint={t('obj.f.ports.hint')}><textarea className="textarea mono" rows={2} value={d.ports} onChange={(e) => set('ports', e.target.value)} placeholder="8080:80" /></Field>
           </Card>
           <Card title={t('of.network')}>

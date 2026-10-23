@@ -3,7 +3,7 @@
 // Usage: HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-web-docker.ts
 import './_guard.js';
 import { emptyRow, isFolder, isIncomplete, isNewVolume, isReadOnly, parseVolumeLine, parseVolumes, volumesText, withReadOnly } from '../../web/lib/dockerVolumes.ts';
-import { canCreate, canRemove, validName, whenAvailable } from '../../web/lib/dockerLists.ts';
+import { canCreate, canRemove, imageNameFor, validName, whenAvailable } from '../../web/lib/dockerLists.ts';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `got ${JSON.stringify(got)} want ${JSON.stringify(want)}`); if (!ok) fail++; };
 
@@ -46,6 +46,7 @@ eq('not for one it has, an invalid name or one like an option, nor while Docker 
 eq('a volume needs two characters and is never a 64-hex name (that is an anonymous one)', [validName('volume', 'a'), validName('volume', 'ab'), validName('volume', 'f'.repeat(64)), validName('network', 'a')], [false, true, false, true]);
 eq('delete is offered only on what hive-am created and nothing uses',
   [canRemove({ managed: true, inUse: 0 }), canRemove({ managed: true, inUse: 1 }), canRemove({ managed: false, inUse: 0 }), canRemove({ managed: true, inUse: 0, builtin: true }), canRemove({ managed: true, inUse: 0, anonymous: true })], [true, false, false, false, false]);
+eq('an image name is suggested from the Dockerfile\'s folder', [imageNameFor('/home/you/My App/Dockerfile'), imageNameFor('/srv/api/web.Dockerfile'), imageNameFor('/Dockerfile'), imageNameFor('')], ['my-app:latest', 'api:latest', '', '']);
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

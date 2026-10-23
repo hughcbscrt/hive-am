@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { existsSync, statSync } from 'node:fs';
+import { dirname, isAbsolute } from 'node:path';
 import { inspectMachine, NO_DAEMON } from './docker-info.js';
 import { execCapture } from './exec.js';
-import { ObjectError, splitArgs, type DockerConfig, type ObjectState } from './model.js';
+import { IMAGE, ObjectError, splitArgs, type DockerConfig, type ObjectState } from './model.js';
 
 /**
  * A Docker object drives the `docker` command (never a shell, every value is one argument): start, stop, restart, status and logs of a
@@ -274,9 +274,9 @@ export async function removeDocker(id: string, c: DockerConfig): Promise<void> {
   else if (c.mode === 'compose' && existsSync(c.file!)) await dk(composeArgs(c, ['stop', ...(c.services ?? [])]), { cwd: dirname(c.file!) }).catch(() => undefined);
 }
 
-// ---------------------------------------------------------------- networks and volumes made from the form
+// ---------------------------------------------------------------- networks, volumes and images made from the form
 /**
- * What the person asks for from the Docker form, one button each: create a network or a volume. What hive-am creates carries
+ * What the person asks for from the Docker form, one button each: create a network or a volume, build an image. What hive-am creates carries
  * the label `hive-am.created=1`, and only that can be removed from here, while no container (running or not) uses it. The checks are made
  * here, against Docker, right before removing: never on what the page says.
  */
@@ -325,6 +325,26 @@ export async function removeMade(kind: MadeKind, raw: unknown): Promise<{ name: 
   const r = await dk([kind, 'rm', name], { timeout: 30_000 });
   if (r.code !== 0) throw fail(r, `Could not remove the ${kind} ${name}`);
   return { name, removed: true };
+}
+
+/**
+ * `docker build -t tag -f dockerfile context`: the context is the Dockerfile's folder unless another is given. It runs the Dockerfile's
+ * `RUN` steps on this machine and may download base images, so it can take long (up to 15 minutes, like rebuilding a compose project). On
+ * failure the error carries the last lines of the output.
+ */
+export async function buildImage(o: { dockerfile?: unknown; context?: unknown; tag?: unknown }): Promise<{ tag: string; output: string }> {
+  const file = typeof o.dockerfile === 'string' ? o.dockerfile.trim() : '';
+  if (!file || !isAbsolute(file)) throw new ObjectError('Choose the Dockerfile (an absolute path)');
+  if (!existsSync(file)) throw new ObjectError(`The Dockerfile ${file} does not exist`);
+  if (!statSync(file).isFile()) throw new ObjectError(`${file} is not a file`);
+  const context = typeof o.context === 'string' && o.context.trim() ? o.context.trim() : dirname(file);
+  if (!isAbsolute(context) || !existsSync(context) || !statSync(context).isDirectory()) throw new ObjectError(`The build folder ${context} is not a folder of this machine`);
+  const tag = typeof o.tag === 'string' ? o.tag.trim() : '';
+  if (!IMAGE.test(tag)) throw new ObjectError('The image name is not valid (for example my-app:dev)');
+  const r = await dk(['build', '-t', tag, '-f', file, '--label', `${CREATED}=1`, context], { cwd: context, timeout: 900_000 });
+  const tail = (n: number) => `${r.out}\n${r.err}`.split('\n').filter((l) => l.trim()).slice(-n).join('\n');
+  if (r.code !== 0) throw new ObjectError(`The build failed:\n${tail(12).slice(-2000)}`);
+  return { tag, output: tail(20) };
 }
 
 const STAMP = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/;

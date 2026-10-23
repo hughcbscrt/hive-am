@@ -1,7 +1,7 @@
 import { notifyAgentsChanged } from '../../runtime.js';
 import { DRIVER_PROPS } from '../../objects/driver-props.js';
 import { composeServices, inspectMachine, listContainers, listImages, listNetworks, listVolumes } from '../../objects/docker-info.js';
-import { createMade, removeMade } from '../../objects/docker.js';
+import { buildImage, createMade, removeMade } from '../../objects/docker.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from '../../objects/agent.js';
 import { agentDb } from '../../objects/agent-db.js';
 import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, objectInspect, objectInspectRaw, objectLogs, removeObject, updateObject } from '../../objects/index.js';
@@ -48,12 +48,13 @@ route('GET', '/api/docker/containers', () => listContainers());
 route('GET', '/api/docker/images', () => listImages());
 route('GET', '/api/docker/volumes', () => listVolumes());
 route('GET', '/api/docker/networks', () => listNetworks());
-// What the Docker form creates when asked (local app only): a network or a volume. A network or a volume is
+// What the Docker form creates when asked (local app only): a network, a volume, an image from a Dockerfile. A network or a volume is
 // removed only if hive-am created it and no container uses it (checked in objects/docker.ts, against Docker).
 write('POST', '/api/docker/networks', (b) => createMade('network', b.name));
 write('POST', '/api/docker/volumes', (b) => createMade('volume', b.name));
 guarded('/api/docker/networks/:name', ({ params }) => removeMade('network', params[0]), 'DELETE');
 guarded('/api/docker/volumes/:name', ({ params }) => removeMade('volume', params[0]), 'DELETE');
+write('POST', '/api/docker/images/build', (b) => buildImage(b));
 route('GET', '/api/docker/compose-services', ({ url }) => composeServices(url.searchParams.get('file') ?? ''));
 route('GET', '/api/objects/:id/stats', ({ params }) => statsOf(params[0]));
 route('GET', '/api/objects/:id/http', ({ params }) => httpScan(params[0]));

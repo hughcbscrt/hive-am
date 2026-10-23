@@ -18,3 +18,10 @@ export const canCreate = (kind: MadeKind, name: string, list: { name: string }[]
 
 /** Only what hive-am created, unused, and neither Docker's own network nor an anonymous volume, offers delete (the server checks again). */
 export const canRemove = (x: { managed: boolean; inUse: number; builtin?: boolean; anonymous?: boolean }) => x.managed && x.inUse === 0 && !x.builtin && !x.anonymous;
+
+/** A name for an image built from a Dockerfile, from its folder: `/home/you/My App/Dockerfile` gives `my-app:latest`. */
+export const imageNameFor = (dockerfile: string) => {
+  const parts = dockerfile.split('/').filter(Boolean);
+  const base = (parts.at(-2) ?? '').toLowerCase().replace(/[^a-z0-9_.-]+/g, '-').replace(/^[^a-z0-9]+|-+$/g, '');
+  return base ? `${base}:latest` : '';
+};

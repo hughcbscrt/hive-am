@@ -13,11 +13,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { colonies } from '../src/db.js';
 import { composeServices, inspectMachine, listContainers, listImages, listNetworks, listVolumes, maskVar } from '../src/objects/docker-info.js';
-import { createMade, removeMade } from '../src/objects/docker.js';
+import { buildImage, createMade, removeMade } from '../src/objects/docker.js';
 import { ObjectError, createObject, objectAction, objectInspect, objectInspectRaw, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
 import { HttpError } from '../src/http/errors.js';
 import { match } from '../src/http/router.js';
 import '../src/http/routes/resources.js';
+import '../src/http/routes/fs.js';
 import { objectsStore } from '../src/objects/store.js';
 
 let fail = 0;
@@ -175,7 +176,7 @@ const inventoryWith = (env: NodeJS.ProcessEnv) => { const r = spawnSync(process.
 }
 check(await routeStatus('GET', '/api/docker/volumes', 'http://my-box.lan:4401', 'my-box.lan:4400') === 200 && await routeStatus('GET', '/api/docker/networks', 'http://my-box.lan:4401', 'my-box.lan:4400') === 200, 'the volume and network lists are open like the container and image lists');
 
-// ---------------------------------------------------------------- creating and removing networks and volumes, with a fake docker command
+// ---------------------------------------------------------------- creating and removing networks, volumes and images, with a fake docker command
 // The fake knows four networks: mine (hive-am's, unused), busy (hive-am's, used by a stopped container), theirs (no label) and bridge. Every
 // command is written down, to prove what each action runs and that a refused removal never reaches `rm`.
 {
@@ -186,10 +187,12 @@ case "$1 $2" in
   "network inspect"|"volume inspect") n="$5"; case "$n" in mine|busy) echo "$n|{\\"hive-am.created\\":\\"1\\"}" ;; theirs) echo "$n|{}" ;; bridge) echo "bridge|{}" ;; abc) echo "theirs|{\\"hive-am.created\\":\\"1\\"}" ;; *) echo "Error: No such $1: $n" >&2; exit 1 ;; esac ;;
   "ps -a") [ "$5" = "network=busy" ] && echo 0123456789ab; exit 0 ;;
   "network create"|"volume create"|"network rm"|"volume rm") exit 0 ;;
+  build*) case "$3" in bad:1) i=0; while [ $i -lt 30 ]; do echo "step $i" >&2; i=$((i+1)); done; echo "ERROR: failed to solve" >&2; exit 1 ;; *) echo "naming to $3 done" >&2 ;; esac ;;
   *) exit 1 ;;
 esac
 `);
   chmodSync(join(bin, 'docker'), 0o755);
+  const df = join(bin, 'Dockerfile'); writeFileSync(df, 'FROM scratch\n');
   const ops = join(dir, 'make.mts');
   writeFileSync(ops, `import * as d from ${JSON.stringify(join(dirname(fileURLToPath(import.meta.url)), '../src/objects/docker.ts'))};
 const out: Record<string, unknown> = {};
@@ -203,6 +206,8 @@ await tryIt('removeByIdPrefix', () => d.removeMade('network', 'abc'));
 await tryIt('removeBridge', () => d.removeMade('network', 'bridge'));
 await tryIt('removeAnonymous', () => d.removeMade('volume', '${'f'.repeat(64)}'));
 await tryIt('createOption', () => d.createMade('volume', '--help'));
+await tryIt('build', () => d.buildImage({ dockerfile: ${JSON.stringify(df)}, tag: 'my-app:dev' }));
+await tryIt('buildFails', () => d.buildImage({ dockerfile: ${JSON.stringify(df)}, tag: 'bad:1' }));
 console.log(JSON.stringify(out));`);
   const r = spawnSync(process.execPath, ['--import', 'tsx', ops], { cwd: join(dirname(fileURLToPath(import.meta.url)), '..'), env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, encoding: 'utf8', timeout: 60000 });
   let o: any = {}; try { o = JSON.parse(r.stdout.trim().split('\n').pop() ?? ''); } catch { console.log(r.stderr); }
@@ -218,11 +223,23 @@ console.log(JSON.stringify(out));`);
     net('busy'), 'ps -a -q --filter network=busy',
     net('theirs'),
     net('abc'),
+    `build -t my-app:dev -f ${df} --label hive-am.created=1 ${bin}`,
+    `build -t bad:1 -f ${df} --label hive-am.created=1 ${bin}`,
   ];
   check(JSON.stringify(calls) === JSON.stringify(want), 'each action runs exactly its docker commands; refused removals never reach rm, and bridge, anonymous names and option-like names never reach Docker');
   if (JSON.stringify(calls) !== JSON.stringify(want)) console.log(calls);
+  check(o.build?.tag === 'my-app:dev' && /naming to my-app:dev/.test(o.build.output) && /^The build failed:\n/.test(o.buildFails?.error) && /failed to solve/.test(o.buildFails.error) && !/step 10\b/.test(o.buildFails.error), 'a build answers with its tag and output; a failed one with only its last lines');
 }
-check(await routeStatus('POST', '/api/docker/networks', 'https://evil.example') === 403 && await routeStatus('POST', '/api/docker/volumes', 'https://evil.example') === 403 && await routeStatus('DELETE', '/api/docker/volumes/x', 'https://evil.example') === 403 && await routeStatus('DELETE', '/api/docker/networks/x', 'https://evil.example') === 403, 'creating and removing only from the local app, like every change to resources');
+check(await rejects(() => buildImage({ dockerfile: join(dir, 'nope', 'Dockerfile'), tag: 'x:1' }), /does not exist/) && await rejects(() => buildImage({ dockerfile: 'Dockerfile', tag: 'x:1' }), /absolute path/) && await rejects(() => buildImage({ dockerfile: dir, tag: 'x:1' }), /not a file/), 'a Dockerfile that is not there, a relative path or a folder is refused before Docker');
+writeFileSync(join(dir, 'Dockerfile'), 'FROM scratch\n');
+{
+  for (const f of ['web.Dockerfile', 'Containerfile', 'Dockerfile.prod', 'notes.txt']) writeFileSync(join(dir, f), '');
+  const u = new URL(`http://127.0.0.1:4400/api/fs/dirs?path=${encodeURIComponent(dir)}&files=dockerfile,containerfile`), m = match('GET', u.pathname)!;
+  const listed = await m.route.handler({ req: { headers: { host: '127.0.0.1:4400' } } as unknown as IncomingMessage, res: null as never, params: m.params, url: u }) as { files: { name: string }[] };
+  check(listed.files.map((f) => f.name).join() === 'Containerfile,Dockerfile,web.Dockerfile', 'the file picker can list Dockerfiles (Dockerfile, Containerfile, name.Dockerfile)');
+}
+check(await rejects(() => buildImage({ dockerfile: join(dir, 'Dockerfile'), tag: '-t' }), /image name/) && await rejects(() => buildImage({ dockerfile: join(dir, 'Dockerfile'), tag: 'x', context: join(dir, 'nope') }), /not a folder/), 'an image name like an option, or a build folder that is not there, is refused');
+check(await routeStatus('POST', '/api/docker/networks', 'https://evil.example') === 403 && await routeStatus('POST', '/api/docker/volumes', 'https://evil.example') === 403 && await routeStatus('DELETE', '/api/docker/volumes/x', 'https://evil.example') === 403 && await routeStatus('DELETE', '/api/docker/networks/x', 'https://evil.example') === 403 && await routeStatus('POST', '/api/docker/images/build', 'https://evil.example') === 403, 'creating, removing and building only from the local app, like every change to resources');
 
 // ---------------------------------------------------------------- docker
 const image = process.env.HIVE_TEST_IMAGE ?? 'nginx:1.25-alpine';
@@ -328,8 +345,8 @@ else {
   await removeObject(comp.id);
   try { execFileSync('docker', ['compose', '-f', join(cdir, 'docker-compose.yml'), '-p', proj, 'down', '-v'], { stdio: 'ignore', timeout: 60000 }); } catch { /* cleanup */ }
 
-  // creating and removing with real Docker: hive-am's own volume and network, a foreign volume, and a container that uses them
-  const mk = Date.now().toString(36), mvol = `hive-am-test-mkvol-${mk}`, mnet = `hive-am-test-mknet-${mk}`, fvol = `hive-am-test-foreign-${mk}`, mcon = `hive-am-test-mk-${mk}`;
+  // creating and removing with real Docker: hive-am's own volume and network, a foreign volume, and a container that uses them; then an image
+  const mk = Date.now().toString(36), mvol = `hive-am-test-mkvol-${mk}`, mnet = `hive-am-test-mknet-${mk}`, fvol = `hive-am-test-foreign-${mk}`, mcon = `hive-am-test-mk-${mk}`, mimg = `hive-am-test-img-${mk}:1`;
   try {
     const v1 = await createMade('volume', mvol), n1 = await createMade('network', mnet);
     const v2 = await createMade('volume', mvol), n2 = await createMade('network', mnet);
@@ -345,10 +362,16 @@ else {
     execFileSync('docker', ['rm', '-f', mcon], { stdio: 'ignore', timeout: 30000 });
     const rv = await removeMade('volume', mvol), rn = await removeMade('network', mnet);
     check(rv.removed && rn.removed && spawnSync('docker', ['volume', 'inspect', mvol], { stdio: 'ignore' }).status !== 0 && spawnSync('docker', ['network', 'inspect', mnet], { stdio: 'ignore' }).status !== 0, 'once no container uses them, hive-am\'s own volume and network are removed');
+    const bdir = mkdtempSync(join(tmpdir(), 'build-'));
+    writeFileSync(join(bdir, 'Dockerfile'), `FROM ${image}\nLABEL hive-am-test=1\n`);
+    const b = await buildImage({ dockerfile: join(bdir, 'Dockerfile'), tag: mimg });
+    check(b.tag === mimg && (await listImages()).images.some((i) => i.ref === mimg), 'an image is built from a Dockerfile and shows in the image list');
+    writeFileSync(join(bdir, 'Broken.Dockerfile'), `FROM ${image}\nRUN exit 7\n`);
+    check(await rejects(() => buildImage({ dockerfile: join(bdir, 'Broken.Dockerfile'), tag: `${mimg}-broken` }), /The build failed/), 'a failing build says so, with its last lines');
   } finally {
-    for (const args of [['rm', '-f', mcon], ['volume', 'rm', mvol], ['volume', 'rm', fvol], ['network', 'rm', mnet]]) try { execFileSync('docker', args, { stdio: 'ignore', timeout: 30000 }); } catch { /* cleanup */ }
+    for (const args of [['rm', '-f', mcon], ['volume', 'rm', mvol], ['volume', 'rm', fvol], ['network', 'rm', mnet], ['rmi', mimg]]) try { execFileSync('docker', args, { stdio: 'ignore', timeout: 30000 }); } catch { /* cleanup */ }
   }
-  check([['volume', mvol], ['volume', fvol], ['network', mnet]].every(([k, n]) => spawnSync('docker', [k, 'inspect', n], { stdio: 'ignore' }).status !== 0), 'the test removes what it created');
+  check([['volume', mvol], ['volume', fvol], ['network', mnet], ['image', mimg]].every(([k, n]) => spawnSync('docker', [k, 'inspect', n], { stdio: 'ignore' }).status !== 0), 'the test removes what it created');
 
   updateObject(cont.id, { config: { ...(objectsStore.get(cont.id)!.config as any), env: { HELLO: 'changed' } } });
   const ist = await objectInspect(cont.id);

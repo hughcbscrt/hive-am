@@ -8,8 +8,9 @@ import { route } from '../router.js';
 route('GET', '/api/fs/dirs', ({ url }) => {
   const p = resolve(url.searchParams.get('path') || homedir());
   if (!existsSync(p) || !statSync(p).isDirectory()) throw bad('Not a folder');
-  // `files=yml,yaml` also lists the files with those extensions (to pick a file, e.g. a compose file).
-  const exts = (url.searchParams.get('files') ?? '').split(',').map((x) => x.trim().toLowerCase().replace(/^\./, '')).filter((x) => /^[a-z0-9]{1,8}$/.test(x));
+  // `files=yml,yaml` also lists the files with those extensions (to pick a file, e.g. a compose file). A name with no dot is its own
+  // extension, so `files=dockerfile,containerfile` lists `Dockerfile`, `Containerfile` and `web.Dockerfile`.
+  const exts = (url.searchParams.get('files') ?? '').split(',').map((x) => x.trim().toLowerCase().replace(/^\./, '')).filter((x) => /^[a-z0-9]{1,16}$/.test(x));
   let dirs: string[] = [], files: string[] = [];
   try {
     const all = readdirSync(p, { withFileTypes: true });
