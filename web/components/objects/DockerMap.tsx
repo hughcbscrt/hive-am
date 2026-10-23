@@ -112,7 +112,8 @@ function Lines({ g, active, children }: { g: DockerMapGraph; active: string | nu
   const [size, setSize] = useState({ w: 0, h: 0 });
   const measure = useCallback(() => {
     const el = box.current; if (!el) return;
-    const b = el.getBoundingClientRect();
+    // The SVG sits inside the map's border: measure from there.
+    const r0 = el.getBoundingClientRect(), b = { left: r0.left + el.clientLeft, top: r0.top + el.clientTop };
     setSize({ w: el.scrollWidth, h: el.scrollHeight });
     if (!active) { setPaths([]); return; }
     const at = (k: string) => { const n = el.querySelector<HTMLElement>(`[data-k="${CSS.escape(k)}"]`); if (!n) return null; const r = n.getBoundingClientRect(); return { l: r.left - b.left + el.scrollLeft, r: r.right - b.left + el.scrollLeft, y: r.top - b.top + el.scrollTop + r.height / 2 }; };

@@ -51,11 +51,13 @@ export function ExtraNetworks({ value, onChange, main, networks, make }: {
 export function RunOptions({ d, set }: { d: Draft; set: <K extends keyof Draft>(k: K, v: Draft[K]) => void }) {
   const { t } = useI18n();
   const count = [d.labels.trim(), d.user, d.workdir, d.entrypoint, d.hostname].filter((x) => x.trim()).length;
+  // Open when something is set as it is shown; after that it is the person's to open or close (emptying a field does not fold it away).
+  const [startOpen] = useState(count > 0);
   const input = (k: 'user' | 'workdir' | 'entrypoint' | 'hostname', placeholder: string) => (
     <input className="input mono" value={d[k]} placeholder={placeholder} spellCheck={false} onChange={(e) => set(k, e.target.value)} />
   );
   return (
-    <details className="fold of-fold" open={count > 0 || undefined}>
+    <details className="fold of-fold" open={startOpen || undefined}>
       <summary>{t('dk.opts')}{count > 0 ? ` · ${count}` : ''}<ChevronRight size={15} className="chev" aria-hidden /></summary>
       <p className="muted small res-m0">{t('dk.opts.hint')}</p>
       <div className="of-grid2">
