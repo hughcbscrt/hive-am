@@ -34,7 +34,8 @@ route('GET', '/api/object-templates', () => listTemplates());
 write('PUT', '/api/objects/:id/manager', (b, { params }) => { const r = setObjectManager(params[0], b.agent_id); if (r.skillAdded) notifyAgentsChanged(); return r; });
 write('PUT', '/api/agents/:id/resources', (b, { params }) => { const r = setAgentObjects(params[0], b.object_ids); if (r.skillAdded) notifyAgentsChanged(); return r; });
 write('POST', '/api/objects/from-template', (b) => createFromTemplate(b as Parameters<typeof createFromTemplate>[0]));
-route('GET', '/api/objects/:id/inspect', ({ params, url }) => objectInspect(params[0], p(url, 'service')));
+// Inspect carries the container's environment variables in the clear, so it is local only like the other routes that read secrets.
+guarded('/api/objects/:id/inspect', ({ params, url }) => objectInspect(params[0], p(url, 'service')));
 write('POST', '/api/objects/:id/service', (b, { params }) => objectServiceAction(params[0], b.service, b.action));
 write('POST', '/api/objects/:id/action', (b, { params }) => objectAction(params[0], b.action));
 // What Docker knows, to suggest in the forms (containers, images, the services of a compose file).

@@ -37,6 +37,7 @@ const nameOf = (id: string, c: DockerConfig) => (c.mode === 'existing' ? c.conta
 
 /** `docker compose -f file -p project` + what to do. The folder of the file is the working folder, as compose expects. */
 const composeArgs = (c: DockerConfig, rest: string[]) => ['compose', '-f', c.file!, ...(c.project ? ['-p', c.project] : []), ...rest];
+const SERVICE = /^[\w][\w.-]{0,80}$/;
 function checkCompose(c: DockerConfig) { if (!existsSync(c.file!)) throw new ObjectError(`The compose file ${c.file} does not exist`); }
 
 export async function dockerState(id: string, c: DockerConfig): Promise<ObjectState> {
@@ -119,7 +120,7 @@ export type DockerAction = 'start' | 'stop' | 'restart' | 'recreate' | 'rebuild'
 /** One service of a compose project, alone: start (creating it if needed), stop, restart, create it again, or build it again and create it. */
 export async function composeServiceAction(c: DockerConfig, service: string, action: DockerAction): Promise<void> {
   if (c.mode !== 'compose') throw new ObjectError('Only a compose project has services');
-  if (!/^[\w][\w.-]{0,80}$/.test(service)) throw new ObjectError('That is not a service name');
+  if (!SERVICE.test(service)) throw new ObjectError('That is not a service name');
   checkCompose(c);
   const rest = action === 'start' ? ['up', '-d', service]
     : action === 'recreate' ? ['up', '-d', '--force-recreate', service]
@@ -143,14 +144,21 @@ export async function recreateDocker(id: string, c: DockerConfig, build = false)
   await startDocker(id, c);
 }
 
+/** Docker is installed but its daemon does not answer (stopped, or no permission on its socket). */
+const NO_DAEMON = /Cannot connect to the Docker daemon|Is the docker daemon running|error during connect|permission denied while trying to connect/i;
+/** The id of the container of one service of a compose project, or '' when it has none. */
+async function serviceContainer(c: DockerConfig, service: string): Promise<{ cid: string; r: Out }> {
+  const r = await dk(composeArgs(c, ['ps', '-a', '-q', service]), { cwd: dirname(c.file!) });
+  return { cid: r.code === 0 ? r.out.trim().split('\n')[0] : '', r };
+}
+
 /** The id of the container behind an object (or behind one service of a compose project), or an error when there is none. */
 export async function containerOf(id: string, c: DockerConfig, service?: string): Promise<string> {
   if (c.mode !== 'compose') return nameOf(id, c);
-  if (!service || !/^[\w][\w.-]{0,80}$/.test(service)) throw new ObjectError('Say which service');
+  if (!service || !SERVICE.test(service)) throw new ObjectError('Say which service');
   checkCompose(c);
-  const r = await dk(composeArgs(c, ['ps', '-a', '-q', service]), { cwd: dirname(c.file!) });
-  const cid = r.out.trim().split('\n')[0];
-  if (r.code !== 0 || !cid) throw new ObjectError(`The service ${service} has no container: start it first`);
+  const { cid } = await serviceContainer(c, service);
+  if (!cid) throw new ObjectError(`The service ${service} has no container: start it first`);
   return cid;
 }
 
@@ -165,11 +173,83 @@ export interface Inspected {
   health?: { status: string; log: { at: string; exit: number; output: string }[] };
   labels: Record<string, string>;
 }
-export async function inspectDocker(id: string, c: DockerConfig, service?: string): Promise<Inspected> {
-  const ref = await containerOf(id, c, service);
-  const r = await dk(['inspect', ref]);
-  if (r.code !== 0) throw new ObjectError(`There is no container ${ref}`);
-  const j = JSON.parse(r.out)[0];
+/** What hive-am has configured for it (for a compose service, what `docker compose config` says; `error` when the file could not be read). */
+export interface Configured {
+  name: string; image?: string; ports: string[]; volumes: string[]; networks: string[]; env: { name: string; value: string }[];
+  restart?: string; command?: string; memory?: string; cpus?: number; logMaxMb?: number; stopTimeoutSec?: number; error?: string;
+}
+/**
+ * Inspect always says what is configured. `exists: false` when Docker has no container for it: `not-created` (hive-am creates it on the
+ * first start), `not-found` (an existing container that is not there), `no-service` (a compose service never started), `no-docker`.
+ * `cfgStale`: the settings changed since hive-am created the container, so it is created again on the next start.
+ */
+export type InspectResult =
+  | ({ exists: true; cfgStale: boolean; configured: Configured } & Inspected)
+  | { exists: false; reason: 'not-created' | 'not-found' | 'no-service' | 'no-docker'; error?: string; configured: Configured };
+
+const asEnv = (e: Record<string, string | null | undefined>) => Object.entries(e).map(([name, value]) => ({ name, value: value ?? '' }));
+
+/** One service of `docker compose config --format json` in the same terms as a container hive-am creates. */
+function composeConfigured(service: string, s: any): Configured {
+  const lim = s.deploy?.resources?.limits ?? {};
+  const mem = s.mem_limit ?? lim.memory;
+  return {
+    name: service, image: s.image ? String(s.image) : undefined,
+    ports: ((s.ports ?? []) as any[]).map((p) => `${p.host_ip ? `${p.host_ip}:` : ''}${p.published ? `${p.published}:` : ''}${p.target}${p.protocol && p.protocol !== 'tcp' ? `/${p.protocol}` : ''}`),
+    volumes: ((s.volumes ?? []) as any[]).map((v) => `${v.source ? `${v.source}:` : ''}${v.target}${v.read_only ? ':ro' : ''}`),
+    networks: Object.keys(s.networks ?? {}),
+    env: asEnv(Array.isArray(s.environment) ? Object.fromEntries((s.environment as string[]).map((e) => { const i = e.indexOf('='); return i < 0 ? [e, ''] : [e.slice(0, i), e.slice(i + 1)]; })) : s.environment ?? {}),
+    restart: s.restart ? String(s.restart) : undefined,
+    command: Array.isArray(s.command) ? s.command.join(' ') : s.command ? String(s.command) : undefined,
+    memory: mem === undefined || mem === null ? undefined : /^\d+$/.test(String(mem)) ? `${Math.round(Number(mem) / 1048576)}m` : String(mem),
+    cpus: (s.cpus ?? lim.cpus) ? Number(s.cpus ?? lim.cpus) : undefined,
+  };
+}
+
+async function configuredOf(id: string, c: DockerConfig, service?: string): Promise<Configured> {
+  if (c.mode === 'existing') return { name: c.container!, ports: [], volumes: [], networks: [], env: [] };
+  if (c.mode === 'container') {
+    return {
+      name: containerName(id), image: c.image, ports: c.ports ?? [], volumes: c.volumes ?? [], networks: c.network ? [c.network] : [], env: asEnv(c.env ?? {}),
+      restart: c.restart, command: c.command, memory: c.memory, cpus: c.cpus, logMaxMb: c.logMaxMb, stopTimeoutSec: c.stopTimeoutSec,
+    };
+  }
+  const only: Configured = { name: service!, ports: [], volumes: [], networks: [], env: [] };
+  try {
+    const r = await dk(composeArgs(c, ['config', '--format', 'json']), { cwd: dirname(c.file!), timeout: 20_000 });
+    if (r.code !== 0) return { ...only, error: fail(r, 'compose config failed').message };
+    const s = JSON.parse(r.out).services?.[service!];
+    return s ? composeConfigured(service!, s) : { ...only, error: `The compose file has no service ${service}` };
+  } catch (e) { return { ...only, error: e instanceof Error ? e.message : 'compose config failed' }; }
+}
+
+export async function inspectDocker(id: string, c: DockerConfig, service?: string): Promise<InspectResult> {
+  if (c.mode === 'compose') { if (!service || !SERVICE.test(service)) throw new ObjectError('Say which service'); checkCompose(c); }
+  const configured = await configuredOf(id, c, service);
+  try {
+    let ref = nameOf(id, c);
+    if (c.mode === 'compose') {
+      const { cid, r } = await serviceContainer(c, service!);
+      if (r.code !== 0) { if (NO_DAEMON.test(r.err)) return { exists: false, reason: 'no-docker', error: r.err.trim().split('\n').pop()?.slice(0, 200), configured }; throw fail(r, 'compose ps failed'); }
+      if (!cid) return { exists: false, reason: 'no-service', configured };
+      ref = cid;
+    }
+    const r = await dk(['inspect', '--type', 'container', ref]);
+    if (r.code !== 0) {
+      if (NO_DAEMON.test(r.err)) return { exists: false, reason: 'no-docker', error: r.err.trim().split('\n').pop()?.slice(0, 200), configured };
+      return { exists: false, reason: c.mode === 'existing' ? 'not-found' : c.mode === 'compose' ? 'no-service' : 'not-created', configured };
+    }
+    const d = inspected(JSON.parse(r.out)[0]);
+    const made = d.labels['hive-am.cfg'];
+    return { exists: true, cfgStale: c.mode === 'container' && !!made && made !== cfgHash(c), configured, ...d };
+  } catch (e) {
+    // `dk` only throws when Docker is missing or does not answer in time: one notice, not an error.
+    if (e instanceof ObjectError && /not installed|took too long/.test(e.message)) return { exists: false, reason: 'no-docker', error: e.message, configured };
+    throw e;
+  }
+}
+
+function inspected(j: any): Inspected {
   const cfg = j.Config ?? {}, st = j.State ?? {}, net = j.NetworkSettings ?? {};
   return {
     id: String(j.Id ?? '').slice(0, 12), name: String(j.Name ?? '').replace(/^\//, ''), image: String(cfg.Image ?? ''), status: String(st.Status ?? ''), created: String(j.Created ?? ''), started: String(st.StartedAt ?? ''),

@@ -159,7 +159,8 @@ export interface HttpRequestItem { id: string; index: number; name: string; meth
 export interface HttpFile { relFile: string; requests: HttpRequestItem[]; fileVariables: Record<string, string> }
 export interface HttpScan { folder: string; files: HttpFile[]; environments: string[]; envFiles: string[]; fileVars: Record<string, string[]>; setBy: Record<string, string[]>; used: { name: string; count: number }[]; fileDefined: string[]; truncated: boolean }
 export interface ServiceStat { name: string; container: string; image: string; state: string; health: string; status: string; ports: string; cpu: number | null; memBytes: number | null }
-export interface DockerInspect {
+/** What `docker inspect` says about a container, cut down to what is read. */
+export interface DockerInspected {
   id: string; name: string; image: string; status: string; created: string; started: string; restartPolicy: string; restarts: number;
   command: string; entrypoint: string; workdir: string; user: string;
   env: { name: string; value: string }[]; ports: { container: string; host: string }[];
@@ -167,6 +168,15 @@ export interface DockerInspect {
   networks: { name: string; ip: string; gateway: string; aliases: string[] }[];
   health?: { status: string; log: { at: string; exit: number; output: string }[] }; labels: Record<string, string>;
 }
+/** What hive-am has configured for a container (or, for a compose service, what the compose file says; `error` when it could not be read). */
+export interface DockerConfigured {
+  name: string; image?: string; ports: string[]; volumes: string[]; networks: string[]; env: { name: string; value: string }[];
+  restart?: string; command?: string; memory?: string; cpus?: number; logMaxMb?: number; stopTimeoutSec?: number; error?: string;
+}
+/** Inspect: what is configured, always; what Docker says when it has the container, or why it does not. */
+export type DockerInspect =
+  | ({ exists: true; cfgStale: boolean; configured: DockerConfigured } & DockerInspected)
+  | { exists: false; reason: 'not-created' | 'not-found' | 'no-service' | 'no-docker'; error?: string; configured: DockerConfigured };
 export interface ObjectStats {
   cpu: number | null; memBytes: number | null; memLimitBytes: number | null; pids: number | null; net?: string | null; block?: string | null;
   info: Record<string, string | number | null>; services?: ServiceStat[];

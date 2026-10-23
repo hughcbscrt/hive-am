@@ -1315,6 +1315,9 @@ button.mini-sep .pip.unread { right: auto; left: 1px; background: var(--ok); ani
 .sd-sec { display: flex; flex-direction: column; gap: 6px; } .sd-sec > .eyebrow { margin-top: 4px; }
 .sd-kv { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 12px; font-size: var(--fs-ui); margin: 0; } .sd-kv dt { color: var(--muted); } .sd-kv dd { margin: 0; overflow-wrap: anywhere; }
 .sd-table { width: 100%; border-collapse: collapse; font-size: var(--fs-hint); } .sd-table td, .sd-table th { text-align: left; padding: 4px 8px 4px 0; border-top: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; } .sd-table th { font-size: var(--fs-micro); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-top: 0; }
+.sd-pane { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.sd-pane-title { margin: 0; font-size: var(--fs-ui); font-weight: 700; }
+.sd-table tr.sd-group th { padding-top: 10px; border-top: 0; }
 .cm-act .menu { display: inline-block; vertical-align: middle; } .cm-act { white-space: nowrap; }
 
 .tpls { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }

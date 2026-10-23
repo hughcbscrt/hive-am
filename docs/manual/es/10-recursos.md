@@ -126,6 +126,8 @@ En modo **Crear un contenedor** puedes fijar límites y red (memoria, CPUs, red,
 
 El **Resumen** de un Docker añade procesos, red y disco, y muestra la imagen, los puertos y el número de reinicios.
 
+**Inspeccionar** (en **Más**, para un contenedor creado o uno existente) muestra dos paneles: **Configurado en hive-am**, lo que configuraste (siempre aparece, aunque el contenedor no exista), y **Lo que dice Docker**, el detalle en vivo con sus variables, puertos, montajes, redes, chequeos de salud y **Etiquetas**. Si Docker todavía no tiene el contenedor (se crea la primera vez que lo inicias), no lo encuentra o no está en marcha, Inspeccionar te lo dice en lugar de fallar. Si cambiaste los ajustes desde que se creó el contenedor, te avisa que se creará de nuevo al siguiente inicio.
+
 ![Resumen del recurso Docker Redis del carrito: estado, CPU y memoria, red y disco, y detalles como contenedor, imagen y puertos](img/recurso-docker.jpg)
 
 *Resumen de "Redis del carrito", un contenedor existente (Se maneja como: Contenedor existente). Fíjate en el uso (CPU, memoria, procesos, red y disco) y en los detalles de imagen redis:7-alpine y puertos publicados.*

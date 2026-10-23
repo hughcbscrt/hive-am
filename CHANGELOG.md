@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Inspect a Docker resource in every mode.** Inspect is now also in **More** for an existing container (it was only there for a container hive-am creates), and it shows the container's **Labels**, grouped as hive-am's, compose's and the rest. It has two panels: **Configured in hive-am**, always there (the settings of a container hive-am creates, the name of an existing one, or what the compose file says about a service), and **What Docker says**, the live detail. A stopped container is inspected as before, without the shell button.
+
+### Changed
+
+- **Inspect explains instead of failing.** A container hive-am has not created yet, an existing container Docker cannot find, a compose service with no container and Docker not installed or not running no longer show a bare error: Inspect shows what is configured and says why Docker has nothing. When the settings changed since hive-am created the container, it says the container will be created again on the next start.
+- **`GET /api/objects/:id/inspect` is local app only and changed shape.** It returns the container's variables in the clear, so, like the other routes that read secrets, a request from another origin now gets 403. It answers `{ exists, configured, ... }`: with `exists: true` the detail of `docker inspect` and `cfgStale`, with `exists: false` a `reason` (`not-created`, `not-found`, `no-service`, `no-docker`).
+
 ## [1.11.0] - 2026-10-23
 
 ### Added

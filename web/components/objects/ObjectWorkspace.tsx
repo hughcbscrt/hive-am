@@ -86,7 +86,7 @@ function Screen({ object: o }: { object: ObjectView }) {
     actions.push({ id: 'stop', label: t(cluster ? 'obj.act.stopAll' : 'obj.act.stop'), icon: <Square size={14} />, disabled: !!busy || (!live && st !== 'error'), onClick: () => void act('stop') });
     actions.push({ id: 'restart', label: t(cluster ? 'obj.act.restartAll' : 'obj.act.restart'), icon: <RotateCw size={14} />, disabled: !!busy, onClick: () => void act('restart') });
   }
-  if (docker && docker.mode === 'container') actions.push({ id: 'inspect', label: t('svc.inspect'), icon: <Info size={14} />, onClick: () => setInspecting(true) });
+  if (docker && docker.mode !== 'compose') actions.push({ id: 'inspect', label: t('svc.inspect'), icon: <Info size={14} />, onClick: () => setInspecting(true) });
   if (docker && docker.mode !== 'existing') actions.push({ id: 'recreate', label: t('obj.act.recreate'), icon: <RefreshCcw size={14} />, danger: true, hint: t('svc.recreate.hint'), disabled: !!busy, onClick: () => setRecreating(true) });
   if (docker && docker.mode === 'compose') actions.push({ id: 'rebuild', label: t('obj.act.rebuild'), icon: <Hammer size={14} />, hint: t('svc.rebuild.hint'), disabled: !!busy, onClick: () => void act('rebuild') });
   const primary = (<>

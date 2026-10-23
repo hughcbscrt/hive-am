@@ -126,6 +126,8 @@ In **Create a container** mode you can set limits and network (memory, CPUs, net
 
 The **Summary** of a Docker resource adds processes, network and disk, and shows the image, the ports and the number of restarts.
 
+**Inspect** (in **More**, for a created or an existing container) shows two panels: **Configured in hive-am**, what you set up (always there, even if the container does not exist), and **What Docker says**, the live detail with its variables, ports, mounts, networks, health checks and **Labels**. If Docker does not have the container yet (it is created the first time you start it), cannot find it, or is not running, Inspect says so instead of failing. If you changed the settings since the container was created, it warns that the container will be created again on the next start.
+
 ![Summary of the Cart Redis Docker resource: status, CPU and memory, network and disk, and details such as container, image and ports](img/recurso-docker.jpg)
 
 *Summary of "Cart Redis", an existing container (Managed as: Existing container). Note the usage (CPU, memory, processes, network and disk) and the details with the redis:7-alpine image and the published ports.*
