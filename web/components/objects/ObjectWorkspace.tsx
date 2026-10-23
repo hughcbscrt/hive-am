@@ -19,13 +19,14 @@ import { HttpWorkspace } from './HttpWorkspace';
 import { HttpVars } from './HttpVars';
 import { DbWorkspace } from './DbWorkspace';
 import { FileEditor } from './FileEditor';
+import { DockerMap } from './DockerMap';
 import { useManagedCopy } from './ManagedCopy';
 import { copyCompose, readCompose, saveCompose } from '@/lib/dockerFiles';
 
-type Tab = 'summary' | 'logs' | 'file' | 'config' | 'requests' | 'history' | 'vars' | 'query' | 'schema';
-// Only a compose resource has a file of its own to edit (an existing container has none).
+type Tab = 'summary' | 'logs' | 'file' | 'relations' | 'config' | 'requests' | 'history' | 'vars' | 'query' | 'schema';
+// Only a compose resource has a file of its own to edit (an existing container has none). Every Docker resource has its relations map.
 const tabsOf = (o: ObjectView): Tab[] => (o.kind === 'http' ? ['requests', 'history', 'vars', 'config'] : o.kind === 'database' ? ['query', 'schema', 'history', 'config']
-  : o.kind === 'docker' && (o.config as DockerConfig).mode === 'compose' ? ['summary', 'logs', 'file', 'config'] : ['summary', 'logs', 'config']);
+  : o.kind === 'docker' ? ((o.config as DockerConfig).mode === 'compose' ? ['summary', 'logs', 'file', 'relations', 'config'] : ['summary', 'logs', 'relations', 'config']) : ['summary', 'logs', 'config']);
 
 /** One object on a whole screen, like an agent: the list at the left, and its tabs (summary, logs, settings, or requests and variables). */
 export function ObjectWorkspace({ id }: { id?: string }) {
@@ -136,6 +137,7 @@ function Screen({ object: o }: { object: ObjectView }) {
             <FileEditor key={docker.file} kind="compose" load={() => readCompose(o.id)} save={(content, etag) => saveCompose(o.id, content, etag)} copy={(p) => copyCompose(o.id, p)}
               repointOption startRunning={copyRunning} onCopied={(r, repointed) => setCopyRunning(repointed && !!r.running)} onRecreate={() => setRecreating(true)} onDirty={setFileDirty} />
           )}
+          {tab === 'relations' && o.kind === 'docker' && <DockerMap object={o} />}
           {tab === 'config' && <ObjectConfig object={o} />}
           {o.kind === 'database' && (tab === 'query' || tab === 'schema' || tab === 'history') && <DbWorkspace object={o} pane={tab} onPane={setTab} />}
           {o.kind === 'http' && (tab === 'requests' || tab === 'history') && <HttpWorkspace object={o} pane={tab} onOpenVars={() => setTab('vars')} onGoRequests={() => setTab('requests')} />}

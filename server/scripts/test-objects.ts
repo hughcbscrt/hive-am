@@ -146,7 +146,7 @@ const fakeBin = mkdtempSync(join(tmpdir(), 'fake-docker-')), fakeLog = join(fake
 const canned = {
   ps: [
     { ID: 'a'.repeat(64), Names: 'web', Image: 'nginx', State: 'running', Status: 'Up', Ports: '', Labels: 'hive-am.object=abc,hive-am.cfg=1', Mounts: 'appdata,/srv/site', Networks: 'appnet,bridge' },
-    { ID: 'b'.repeat(64), Names: 'db', Image: 'postgres:16', State: 'exited', Status: 'Exited (0)', Ports: '', Labels: '', Mounts: 'appdata,' + 'f'.repeat(64), Networks: 'appnet' },
+    { ID: 'b'.repeat(64), Names: 'db', Image: 'postgres:16', State: 'exited', Status: 'Exited (0)', Ports: '', Labels: 'com.docker.compose.project=shop,com.docker.compose.service=db,com.docker.compose.oneoff=False', Mounts: 'appdata,' + 'f'.repeat(64), Networks: 'appnet' },
   ],
   images: [{ Repository: 'nginx', Tag: 'latest', ID: 'i1', Size: '40MB', CreatedSince: '1 day ago' }, { Repository: 'postgres', Tag: '16', ID: 'i2', Size: '400MB', CreatedSince: '2 days ago' }, { Repository: 'redis', Tag: '7', ID: 'i3', Size: '30MB', CreatedSince: '3 days ago' }],
   volume: [{ Name: 'appdata', Driver: 'local', Labels: 'hive-am.created=1' }, { Name: 'f'.repeat(64), Driver: 'local', Labels: 'com.docker.volume.anonymous=' }, { Name: 'spare', Driver: 'local', Labels: '' }],
@@ -162,6 +162,7 @@ const inventoryWith = (env: NodeJS.ProcessEnv) => { const r = spawnSync(process.
   const [fc, fi, fv, fn] = inventoryWith({ ...process.env, PATH: `${fakeBin}:${process.env.PATH}` });
   const web = fc.containers?.find((c: any) => c.name === 'web'), db = fc.containers?.find((c: any) => c.name === 'db');
   check(fc.available && web?.mounts.join() === 'appdata,/srv/site' && web.networks.join() === 'appnet,bridge' && web.managed && web.id.length === 12 && db?.networks.join() === 'appnet' && !db.managed, 'each container lists its mounts (volume names and host folders) and networks, with the short id');
+  check(web?.object === 'abc' && !web.project && db?.project === 'shop' && db.service === 'db' && !db.object, 'and the resource that created it, or its compose project and service (for the relations map)');
   const img = (ref: string) => fi.images?.find((i: any) => i.ref === ref)?.inUse;
   check(fi.available && img('nginx:latest') === 1 && img('postgres:16') === 1 && img('redis:7') === 0, 'each image says how many containers use it (nginx and nginx:latest are the same)');
   const vol = (name: string) => fv.volumes?.find((v: any) => v.name === name);

@@ -1217,6 +1217,31 @@ button.mini-sep .pip.unread { right: auto; left: 1px; background: var(--ok); ani
 .ap-preview { margin: 4px 0 0; padding: 8px 10px; max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--fs-caption); background: var(--bg-deep); border: 1px solid var(--line); border-radius: 8px; }
 /* Narrow (the creation drawer, a small window): the source gets a whole line with its folder button; path, read only and delete go under it. */
 @container vrows (max-width: 600px) { .vrow { grid-template-columns: minmax(0, 1fr) auto auto; } .vrow-src { grid-column: span 2; } .vrow-raw { grid-column: 1 / 3; } }
+/* The Relations tab of a Docker resource: three columns (images, containers, and volumes, folders and networks) with an SVG of lines over
+   them, and the detail of what is chosen below. Nodes cut long names instead of widening their column; the columns narrow with the screen. */
+.dm { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.dm-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; } .dm-head > p { flex: 1 1 260px; min-width: 0; }
+.dm-legend { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; } .dm-legend i { display: inline-block; margin-left: 8px; }
+.dm-own-mark { width: 4px; height: 14px; border-radius: 2px; background: var(--honey); } .dm-line-mark { width: 16px; border-top: 2.5px solid var(--honey); }
+.dm-map { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 clamp(28px, 7%, 90px); padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); min-width: 0; container: dmap / inline-size; }
+.dm-lines { position: absolute; inset: 0; pointer-events: none; z-index: 1; overflow: visible; }
+.dm-lines path { fill: none; stroke: var(--honey); stroke-width: 2.5; opacity: .9; }
+.dm-col, .dm-group { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 8px; min-width: 0; } .dm-group + .dm-group { margin-top: 14px; }
+.dm-node { display: flex; flex-direction: column; align-items: stretch; gap: 2px; width: 100%; min-width: 0; text-align: left; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); border-radius: 10px; padding: 7px 10px; cursor: pointer; font: inherit; transition: opacity .15s, border-color .15s, box-shadow .15s; }
+.dm-node:hover { border-color: var(--ink-2); } .dm-node:focus-visible { outline: 2px solid var(--honey); outline-offset: 2px; }
+.dm-node.own { border-left: 4px solid var(--honey); padding-left: 7px; }
+.dm-node.folder { border-style: dashed; } .dm-node.folder .dm-ico { color: var(--p-opencode); } .dm-node.volume .dm-ico { color: var(--p-kiro); } .dm-node.network .dm-ico { color: var(--ok); } .dm-node.image .dm-ico { color: var(--p-claude); }
+.dm-node.sel { border-color: var(--honey); box-shadow: 0 0 0 3px var(--honey-soft); } .dm-node.hot, .dm-node.lit { border-color: var(--ink-2); } .dm-node.dim { opacity: .4; }
+.dm-node-top { display: flex; align-items: center; gap: 6px; min-width: 0; } .dm-ico { flex: none; color: var(--muted); }
+.dm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: var(--fs-hint); }
+.dm-dot { flex: none; width: 8px; height: 8px; border-radius: 99px; background: var(--line-strong); } .dm-dot.run { background: var(--ok); }
+.dm-sub { font-size: var(--fs-caption); color: var(--muted); overflow-wrap: anywhere; }
+.dm-detail { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-deep); min-width: 0; }
+.dm-d-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; } .dm-d-title { flex: 1 1 220px; min-width: 0; } .dm-d-title b { overflow-wrap: anywhere; }
+.dm-joined .chip-pick { font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dm-inspect { min-width: 0; } .dm-inspect .dr { height: min(52vh, 480px); }
+@container dmap (max-width: 620px) { .dm-node { padding: 6px 8px; } .dm-sub { display: none; } }
+@media (prefers-reduced-motion: reduce) { .dm-node { transition: none; } }
 /* HTTP screen */
 .hw-list { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--bg-deep); }
 .hw-env { display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; } .hw-hint { padding: 4px 14px 8px; margin: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }

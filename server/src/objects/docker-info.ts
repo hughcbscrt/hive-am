@@ -31,6 +31,8 @@ export function maskVar(item: string): string {
 export interface ContainerInfo {
   id: string; name: string; image: string; state: string; status: string; ports: string; /** Created by hive-am for one of its objects. */ managed: boolean;
   /** What it mounts: volume names and host paths (the sources, not where they go inside). */ mounts: string[]; /** The networks it is connected to. */ networks: string[];
+  /** The hive-am resource that created it (label `hive-am.object`). */ object?: string;
+  /** The compose project and service it belongs to (labels `com.docker.compose.project` / `.service`). */ project?: string; service?: string;
 }
 export interface ImageInfo { ref: string; id: string; size: string; created: string; /** How many containers (running or not) were created from it. */ inUse: number }
 export interface VolumeInfo { name: string; driver: string; /** A volume Docker named itself (64 hex characters) for an anonymous mount. */ anonymous: boolean; /** Created by hive-am. */ managed: boolean; inUse: number }
@@ -39,6 +41,8 @@ export interface NetworkInfo { name: string; id: string; driver: string; scope: 
 const failed = (r: { err: string }) => r.err.trim().split('\n').pop()?.slice(0, 200);
 const list = (v: unknown) => String(v ?? '').split(',').map((x) => x.trim()).filter(Boolean);
 const labelled = (labels: unknown, re: RegExp) => re.test(String(labels ?? ''));
+/** One label of `docker ps` (`k=v,k=v`); a value with a comma is cut there, which these labels (ids and names) never have. */
+const label = (labels: unknown, key: string) => new RegExp(`(?:^|,)${key.replace(/\./g, '\\.')}=([^,]*)`).exec(String(labels ?? ''))?.[1] || undefined;
 const BUILTIN = ['bridge', 'host', 'none'];
 
 type Containers = { available: boolean; error?: string; containers: ContainerInfo[] };
@@ -59,6 +63,7 @@ async function readContainers(): Promise<Containers> {
   const all = lines(r.out).map((j) => ({
     id: String(j.ID).slice(0, 12), name: String(j.Names), image: String(j.Image), state: String(j.State), status: String(j.Status), ports: String(j.Ports ?? ''),
     managed: labelled(j.Labels, /(^|,)hive-am\.object=/), mounts: list(j.Mounts), networks: list(j.Networks),
+    object: label(j.Labels, 'hive-am.object'), project: label(j.Labels, 'com.docker.compose.project'), service: label(j.Labels, 'com.docker.compose.service'),
   }));
   return { available: true, containers: all.sort((a, b) => a.name.localeCompare(b.name)) };
 }

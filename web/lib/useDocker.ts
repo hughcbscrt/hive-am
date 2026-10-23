@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from './api';
 import { whenAvailable } from './dockerLists';
 
-export interface DockerContainer { id: string; name: string; image: string; state: string; status: string; ports: string; managed: boolean; mounts: string[]; networks: string[] }
+export interface DockerContainer { id: string; name: string; image: string; state: string; status: string; ports: string; managed: boolean; mounts: string[]; networks: string[]; object?: string; project?: string; service?: string }
 export interface DockerImage { ref: string; id: string; size: string; created: string; inUse: number }
 export interface DockerVolume { name: string; driver: string; anonymous: boolean; managed: boolean; inUse: number }
 export interface DockerNetwork { name: string; id: string; driver: string; scope: string; builtin: boolean; managed: boolean; inUse: number }

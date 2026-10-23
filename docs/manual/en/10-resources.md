@@ -142,6 +142,8 @@ The **Summary** of a Docker resource adds processes, network and disk, and shows
 
 Its **Raw JSON** tab shows everything `docker inspect` says, highlighted, with a search box that jumps to each match and a **Copy JSON** button that copies what you see. Variables whose name looks like a secret (passwords, tokens, keys) arrive hidden, and so does the password inside a URL such as `postgres://user:password@host/db`; press **Reveal** to see them. Labels and the command are not hidden, so check them before sharing the JSON. Each compose service has the same tab.
 
+**Relations.** Every Docker resource has a **Relations** tab with a map of what it uses and who shares it: images on the left, containers in the middle, and on the right its volumes, the folders of your machine it mounts (shown apart from volumes, with a folder icon and a dashed border) and its networks. Choose any of them to light up what it is joined to and see its detail under the map; **Inspect** opens right there. The map only shows this resource's neighbourhood: a volume or network shared by many containers shows 12 of them and says how many more, and Docker's own networks (`bridge`, `host`, `none`) only say how many containers use them. A container of a hive-am resource offers **Edit settings**. It is read only: nothing changes from the map.
+
 ![Summary of the Cart Redis Docker resource: status, CPU and memory, network and disk, and details such as container, image and ports](img/recurso-docker.jpg)
 
 *Summary of "Cart Redis", an existing container (Managed as: Existing container). Note the usage (CPU, memory, processes, network and disk) and the details with the redis:7-alpine image and the published ports.*
