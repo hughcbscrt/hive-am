@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-10-23
+
 ### Fixed
 
 - **Long prompts no longer cover the editor's footer.** In **Preview** and **Split**, a long system prompt was drawn over the word count and tips line under the editor. Each pane now scrolls on its own inside the editor and the footer stays visible below it.
@@ -288,7 +290,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.10.1...HEAD
+[1.10.1]: https://github.com/hughcbscrt/hive-am/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/hughcbscrt/hive-am/compare/v1.9.1...v1.10.0
 [1.9.1]: https://github.com/hughcbscrt/hive-am/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/hughcbscrt/hive-am/compare/v1.8.0...v1.9.0
