@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Added
 
 - **Inspect a Docker resource in every mode.** Inspect is now also in **More** for an existing container (it was only there for a container hive-am creates), and it shows the container's **Labels**, grouped as hive-am's, compose's and the rest. It has two panels: **Configured in hive-am**, always there (the settings of a container hive-am creates, the name of an existing one, or what the compose file says about a service), and **What Docker says**, the live detail. A stopped container is inspected as before, without the shell button.
+- **Raw `docker inspect`.** Inspect has a **Raw JSON** tab with the whole `docker inspect`, highlighted like the code explorer (same themes and whitespace setting, a Web Worker for big ones), with line numbers, a search box that jumps from match to match and **Copy JSON**, which copies exactly what is shown. The server hides the value of variables whose name looks like a secret until you press **Reveal**; labels and the command are not hidden. Each compose service has it from its own Inspect. New local-only routes: `GET /api/objects/:id/inspect/raw` and `GET /api/docker/inspect?kind=container|image|volume|network&ref=`.
 
 ### Changed
 

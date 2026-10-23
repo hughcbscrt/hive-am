@@ -128,6 +128,8 @@ El **Resumen** de un Docker añade procesos, red y disco, y muestra la imagen, l
 
 **Inspeccionar** (en **Más**, para un contenedor creado o uno existente) muestra dos paneles: **Configurado en hive-am**, lo que configuraste (siempre aparece, aunque el contenedor no exista), y **Lo que dice Docker**, el detalle en vivo con sus variables, puertos, montajes, redes, chequeos de salud y **Etiquetas**. Si Docker todavía no tiene el contenedor (se crea la primera vez que lo inicias), no lo encuentra o no está en marcha, Inspeccionar te lo dice en lugar de fallar. Si cambiaste los ajustes desde que se creó el contenedor, te avisa que se creará de nuevo al siguiente inicio.
 
+Su pestaña **JSON crudo** muestra todo lo que dice `docker inspect`, resaltado, con una caja de búsqueda que salta a cada coincidencia y un botón **Copiar JSON** que copia lo que ves. Las variables cuyo nombre parece un secreto (contraseñas, tokens, claves) llegan ocultas; pulsa **Mostrar** para verlas. Las etiquetas y el comando no se ocultan, así que revísalos antes de compartir el JSON. Cada servicio de compose tiene la misma pestaña.
+
 ![Resumen del recurso Docker Redis del carrito: estado, CPU y memoria, red y disco, y detalles como contenedor, imagen y puertos](img/recurso-docker.jpg)
 
 *Resumen de "Redis del carrito", un contenedor existente (Se maneja como: Contenedor existente). Fíjate en el uso (CPU, memoria, procesos, red y disco) y en los detalles de imagen redis:7-alpine y puertos publicados.*

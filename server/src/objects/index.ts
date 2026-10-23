@@ -4,7 +4,7 @@ import { DATA_DIR, agents, resolved } from '../db.js';
 import { DATABASES_SKILL_ID, OBJECTS_SKILL_ID } from '../skills/defaults.js';
 import { bus } from '../runtime.js';
 import { renderTemplate, listTemplates } from './templates.js';
-import { composeServiceAction, inspectDocker, recreateDocker, type DockerAction, dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
+import { composeServiceAction, inspectDocker, inspectRaw, recreateDocker, type DockerAction, dockerLogs, dockerState, removeDocker, restartDocker, startDocker, stopDocker } from './docker.js';
 import { recordRun, listHistory, clearHistory } from './http-history.js';
 import { dbColumns, dbQuery, dbSchema, dbState, dbTest, forgetDatabase } from './database.js';
 import { addSaved, clearQueries, forgetQueries, listQueries, listSaved, recordQuery, removeSaved, updateSaved } from './db-history.js';
@@ -146,6 +146,12 @@ export async function objectInspect(id: string, service?: string) {
   const o = get(id);
   if (o.kind !== 'docker') throw new ObjectError('Only a Docker resource can be inspected');
   return inspectDocker(o.id, o.config as DockerConfig, service);
+}
+/** The whole `docker inspect` of it, as JSON text (secret-looking variables hidden unless `reveal`). */
+export async function objectInspectRaw(id: string, service: string | undefined, reveal: boolean) {
+  const o = get(id);
+  if (o.kind !== 'docker') throw new ObjectError('Only a Docker resource can be inspected');
+  return inspectRaw(o.id, o.config as DockerConfig, service, reveal);
 }
 
 export { listTemplates };

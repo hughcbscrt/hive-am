@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { inspectMachine, NO_DAEMON } from './docker-info.js';
 import { execCapture } from './exec.js';
 import { ObjectError, splitArgs, type DockerConfig, type ObjectState } from './model.js';
 
@@ -144,8 +145,6 @@ export async function recreateDocker(id: string, c: DockerConfig, build = false)
   await startDocker(id, c);
 }
 
-/** Docker is installed but its daemon does not answer (stopped, or no permission on its socket). */
-const NO_DAEMON = /Cannot connect to the Docker daemon|Is the docker daemon running|error during connect|permission denied while trying to connect/i;
 /** The id of the container of one service of a compose project, or '' when it has none. */
 async function serviceContainer(c: DockerConfig, service: string): Promise<{ cid: string; r: Out }> {
   const r = await dk(composeArgs(c, ['ps', '-a', '-q', service]), { cwd: dirname(c.file!) });
@@ -247,6 +246,11 @@ export async function inspectDocker(id: string, c: DockerConfig, service?: strin
     if (e instanceof ObjectError && /not installed|took too long/.test(e.message)) return { exists: false, reason: 'no-docker', error: e.message, configured };
     throw e;
   }
+}
+
+/** The whole `docker inspect` of the container behind an object (or one compose service), with the secret-looking variables hidden unless `reveal`. */
+export async function inspectRaw(id: string, c: DockerConfig, service: string | undefined, reveal: boolean) {
+  return inspectMachine('container', await containerOf(id, c, service), reveal);
 }
 
 function inspected(j: any): Inspected {

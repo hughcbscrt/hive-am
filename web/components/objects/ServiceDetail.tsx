@@ -6,7 +6,8 @@ import { useDock } from '@/lib/dock';
 import { useI18n } from '@/lib/i18n/index';
 import { fmtDateTime } from '@/lib/format';
 import type { DockerConfigured, DockerInspect } from '@/lib/types';
-import { Banner, Modal } from '@/components/ui';
+import { Banner, Modal, TabPanel, Tabs } from '@/components/ui';
+import { DockerRaw } from './DockerRaw';
 import { NO_VALUE } from '@/lib/meta';
 
 const SECRET = /pass|secret|token|api[_-]?key|auth|credential|private/i;
@@ -33,6 +34,7 @@ export function InspectView({ objectId, service, onShell }: { objectId: string; 
   const [d, setD] = useState<DockerInspect | null>(null);
   const [err, setErr] = useState('');
   const [peek, setPeek] = useState(false);
+  const [view, setView] = useState<'summary' | 'raw'>('summary');
   useEffect(() => { api.get<DockerInspect>(`/objects/${objectId}/inspect${service ? `?service=${encodeURIComponent(service)}` : ''}`).then(setD).catch((e) => setErr(e instanceof Error ? e.message : 'error')); }, [objectId, service]);
   const when = (iso: string) => (iso && !iso.startsWith('0001') ? fmtDateTime(Date.parse(iso)) : NO_VALUE);
   const value = (name: string, v: string) => (SECRET.test(name) && !peek ? MASK : v);
@@ -40,7 +42,8 @@ export function InspectView({ objectId, service, onShell }: { objectId: string; 
   if (err) return <p className="gx-note err res-m0">{err}</p>;
   if (!d) return <p className="gx-note">{t('git.loading')}</p>;
   const labels = d.exists ? Object.entries(d.labels).sort(([a], [b]) => a.localeCompare(b)) : [];
-  return (<>
+  const q = service ? `?service=${encodeURIComponent(service)}` : '';
+  const summary = (<div className="ins-body">
     {d.exists && d.cfgStale && <Banner kind="warn">{t('ins.stale')}</Banner>}
     {!d.exists && <Banner kind={d.reason === 'no-docker' ? 'warn' : 'info'}>
       {t(`ins.absent.${d.reason}`)}{d.error && <span className="muted small mono"> · {d.error}</span>}
@@ -73,6 +76,13 @@ export function InspectView({ objectId, service, onShell }: { objectId: string; 
           return rows.length ? [<tr key={g.id} className="sd-group"><th colSpan={2}>{t(`ins.labels.${g.id}`)}</th></tr>, ...rows.map(([k, v]) => <tr key={k}><td className="mono">{k}</td><td className="mono">{v || NO_VALUE}</td></tr>)] : [];
         })}</tbody></table>}</section>
     </section>)}
+  </div>);
+  // The raw JSON only exists when Docker has the container; otherwise there is only the summary, without tabs.
+  if (!d.exists) return summary;
+  return (<>
+    <Tabs idPrefix="ins" variant="pill" label={t('raw.tabs')} value={view} onChange={(x) => setView(x as 'summary' | 'raw')} tabs={[{ id: 'summary', label: t('raw.tab.summary') }, { id: 'raw', label: t('raw.tab.raw') }]} />
+    <TabPanel id="summary" value={view} idPrefix="ins">{summary}</TabPanel>
+    <TabPanel id="raw" value={view} idPrefix="ins"><DockerRaw src={`/objects/${objectId}/inspect/raw${q}`} /></TabPanel>
   </>);
 }
 

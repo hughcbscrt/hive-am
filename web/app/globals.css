@@ -1318,6 +1318,14 @@ button.mini-sep .pip.unread { right: auto; left: 1px; background: var(--ok); ani
 .sd-pane { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
 .sd-pane-title { margin: 0; font-size: var(--fs-ui); font-weight: 700; }
 .sd-table tr.sd-group th { padding-top: 10px; border-top: 0; }
+.ins-body { display: flex; flex-direction: column; gap: 14px; }
+/* The raw docker inspect: a fixed-height code pane (its rows are virtualised, so it needs a box to scroll in). */
+.dr { flex: none; height: min(62vh, 600px); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.dr-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.dr-find { width: 220px; padding: 5px 10px; font-size: var(--fs-hint); }
+.dr-count { min-width: 64px; }
+.dr-note { margin: 0; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.dr-code { flex: 1; min-height: 0; }
 .cm-act .menu { display: inline-block; vertical-align: middle; } .cm-act { white-space: nowrap; }
 
 .tpls { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }

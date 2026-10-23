@@ -100,8 +100,8 @@ export type ObjectView = ObjectRow & { state: ObjectState; manager_id: string | 
 export const NAME_MAX = 60;
 const ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const PORT_SPEC = /^((\d{1,3}\.){3}\d{1,3}:)?\d{1,5}:\d{1,5}(\/(tcp|udp))?$/;
-const IMAGE = /^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,199}$/;
-const CONTAINER = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
+export const IMAGE = /^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,199}$/;
+export const CONTAINER = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
 const PROJECT = /^[a-z0-9][a-z0-9_-]{0,62}$/;
 
 const str = (v: unknown, what: string, max = 2000): string => {

@@ -128,6 +128,8 @@ The **Summary** of a Docker resource adds processes, network and disk, and shows
 
 **Inspect** (in **More**, for a created or an existing container) shows two panels: **Configured in hive-am**, what you set up (always there, even if the container does not exist), and **What Docker says**, the live detail with its variables, ports, mounts, networks, health checks and **Labels**. If Docker does not have the container yet (it is created the first time you start it), cannot find it, or is not running, Inspect says so instead of failing. If you changed the settings since the container was created, it warns that the container will be created again on the next start.
 
+Its **Raw JSON** tab shows everything `docker inspect` says, highlighted, with a search box that jumps to each match and a **Copy JSON** button that copies what you see. Variables whose name looks like a secret (passwords, tokens, keys) arrive hidden; press **Reveal** to see them. Labels and the command are not hidden, so check them before sharing the JSON. Each compose service has the same tab.
+
 ![Summary of the Cart Redis Docker resource: status, CPU and memory, network and disk, and details such as container, image and ports](img/recurso-docker.jpg)
 
 *Summary of "Cart Redis", an existing container (Managed as: Existing container). Note the usage (CPU, memory, processes, network and disk) and the details with the redis:7-alpine image and the published ports.*

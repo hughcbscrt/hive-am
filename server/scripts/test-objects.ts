@@ -12,8 +12,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { colonies } from '../src/db.js';
-import { composeServices, listContainers, listImages } from '../src/objects/docker-info.js';
-import { ObjectError, createObject, objectAction, objectInspect, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
+import { composeServices, inspectMachine, listContainers, listImages } from '../src/objects/docker-info.js';
+import { ObjectError, createObject, objectAction, objectInspect, objectInspectRaw, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
 import { HttpError } from '../src/http/errors.js';
 import { match } from '../src/http/router.js';
 import '../src/http/routes/resources.js';
@@ -113,12 +113,15 @@ check(!existsProcess(pid2), 'deleting a running server stops its process');
 
 // ---------------------------------------------------------------- inspect is local only, and says "Docker is off" without an error
 const routeStatus = async (method: string, path: string, origin?: string) => {
-  const m = match(method, path); if (!m) return 404;
-  try { await m.route.handler({ req: { headers: { host: '127.0.0.1:4400', ...(origin ? { origin } : {}) } } as unknown as IncomingMessage, res: null as never, params: m.params, url: new URL(`http://127.0.0.1:4400${path}`) }); return 200; }
+  const url = new URL(`http://127.0.0.1:4400${path}`), m = match(method, url.pathname); if (!m) return 404;
+  try { await m.route.handler({ req: { headers: { host: '127.0.0.1:4400', ...(origin ? { origin } : {}) } } as unknown as IncomingMessage, res: null as never, params: m.params, url }); return 200; }
   catch (e) { return e instanceof HttpError ? e.status : e instanceof ObjectError ? 400 : 500; }
 };
 check(await routeStatus('GET', '/api/objects/nope/inspect', 'https://evil.example') === 403, 'inspect answers 403 to a page that is not the local app');
 check(await routeStatus('GET', '/api/objects/nope/inspect', 'http://localhost:4401') === 400, 'and reaches the resource lookup from the local app');
+check(await routeStatus('GET', '/api/objects/nope/inspect/raw', 'https://evil.example') === 403 && await routeStatus('GET', '/api/docker/inspect?kind=image&ref=x', 'https://evil.example') === 403, 'the raw docker inspect routes are local only too');
+check(await routeStatus('GET', '/api/docker/inspect?kind=container&ref=-f') === 400 && await routeStatus('GET', '/api/docker/inspect?kind=network&ref=--help') === 400 && await routeStatus('GET', '/api/docker/inspect?kind=image&ref=') === 400, 'a reference that looks like an option (or is empty) is refused with 400');
+check(await rejects(() => inspectMachine('system', 'x'), /container, an image/) && await rejects(() => inspectMachine('volume', 'a b'), /not a valid volume/), 'only containers, images, volumes and networks with a valid name are inspected');
 // Without Docker (or with its daemon down) inspect still says what is configured, with one notice instead of an error.
 const here = dirname(fileURLToPath(import.meta.url));
 const probe = join(dir, 'probe.mts');
@@ -135,7 +138,7 @@ const dockerOk = (() => { try { execFileSync('docker', ['image', 'inspect', imag
 if (!dockerOk) console.log(`SKIP  Docker tests (no docker, or the image ${image} is not here)`);
 else {
   const hp = await freePort();
-  const cont = createObject({ name: 'test-container', kind: 'docker', colony_id: colony.id, config: { mode: 'container', image, ports: [`127.0.0.1:${hp}:80`], env: { HELLO: 'world' } } });
+  const cont = createObject({ name: 'test-container', kind: 'docker', colony_id: colony.id, config: { mode: 'container', image, ports: [`127.0.0.1:${hp}:80`], env: { HELLO: 'world', DB_PASSWORD: 'hunter2' } } });
   const cname = `hive-am-${cont.id.slice(0, 8)}`;
   check((await st(cont.id)) === 'stopped', 'a container that does not exist yet is "stopped"');
   await objectAction(cont.id, 'start');
@@ -157,6 +160,14 @@ else {
   check((await st(cont.id)) === 'stopped', 'stop works');
   const ic = await objectInspect(cont.id);
   check(ic.exists && ic.status === 'exited' && ic.labels['hive-am.object'] === cont.id && !!ic.labels['hive-am.cfg'] && ic.configured.image === image && !ic.cfgStale, 'a stopped container is inspected: Docker\'s detail (exited), its labels and what is configured');
+  const raw = await objectInspectRaw(cont.id, undefined, false);
+  const rawJ = JSON.parse(raw.text)[0];
+  check(raw.available && rawJ.Name === `/${cname}` && rawJ.Config.Env.includes('HELLO=world') && rawJ.Config.Env.includes('DB_PASSWORD=••••••••') && !raw.text.includes('hunter2') && raw.masked === 1, 'the raw inspect is the whole JSON, with the secret-looking variable hidden by the server');
+  const shown = await objectInspectRaw(cont.id, undefined, true);
+  check(JSON.parse(shown.text)[0].Config.Env.includes('DB_PASSWORD=hunter2') && shown.masked === 0, 'and in the clear only when asked to reveal it');
+  check(await rejects(() => inspectMachine('container', 'hive-am-does-not-exist'), /has no container/), 'a container that is not there is a clear error');
+  const imgRaw = await inspectMachine('image', image);
+  check(imgRaw.available && Array.isArray(JSON.parse(imgRaw.text)) && JSON.parse(imgRaw.text)[0].Id.startsWith('sha256:'), 'an image of the machine can be inspected raw too');
   const fresh = createObject({ name: 'test-not-created', kind: 'docker', config: { mode: 'container', image, ports: ['127.0.0.1:1:80'], env: { DB_PASSWORD: 'x' } } });
   const inc = await objectInspect(fresh.id);
   check(!inc.exists && inc.reason === 'not-created' && inc.configured.image === image && inc.configured.ports[0] === '127.0.0.1:1:80' && inc.configured.env[0]?.name === 'DB_PASSWORD', 'a container never started is not an error: what is configured, and that Docker does not have it yet');
@@ -185,6 +196,7 @@ else {
   const ins = await objectInspect(comp.id, 'web');
   check(!ins.exists && ins.reason === 'no-service' && ins.configured.image === image && ins.configured.ports[0] === `127.0.0.1:${cport}:80`, 'a compose service with no container: what the compose file says, and that it has to be started');
   check(await rejects(() => objectInspect(comp.id), /which service/), 'a compose project is inspected one service at a time');
+  check(await rejects(() => objectInspectRaw(comp.id, 'web', false), /has no container/), 'the raw inspect of a service with no container says to start it');
   await objectAction(comp.id, 'start');
   check(await until(async () => (await st(comp.id)) === 'running'), 'a compose project can be started');
   check((await fetch(`http://127.0.0.1:${cport}/`).then((r) => r.status).catch(() => 0)) === 200, 'and serves');
@@ -201,6 +213,8 @@ else {
   check(kst.services?.length === 1 && kst.services[0].name === 'web' && kst.services[0].state === 'running', 'a compose project lists its services');
   const isv = await objectInspect(comp.id, 'web');
   check(isv.exists && isv.status === 'running' && isv.labels['com.docker.compose.service'] === 'web' && isv.configured.name === 'web' && !isv.cfgStale, 'a running compose service is inspected with its compose labels');
+  const svcRaw = JSON.parse((await objectInspectRaw(comp.id, 'web', false)).text)[0];
+  check(svcRaw.Config.Labels['com.docker.compose.service'] === 'web', 'each compose service has its own raw inspect');
   await objectAction(comp.id, 'stop');
   check((await st(comp.id)) === 'stopped', 'and stopped');
   const proj = (objectsStore.get(comp.id)!.config as any).project;

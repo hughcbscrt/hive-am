@@ -1,9 +1,9 @@
 import { notifyAgentsChanged } from '../../runtime.js';
 import { DRIVER_PROPS } from '../../objects/driver-props.js';
-import { composeServices, listContainers, listImages } from '../../objects/docker-info.js';
+import { composeServices, inspectMachine, listContainers, listImages } from '../../objects/docker-info.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from '../../objects/agent.js';
 import { agentDb } from '../../objects/agent-db.js';
-import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, objectInspect, objectLogs, removeObject, updateObject } from '../../objects/index.js';
+import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, objectInspect, objectInspectRaw, objectLogs, removeObject, updateObject } from '../../objects/index.js';
 import { body, type Body } from '../body.js';
 import { notFound } from '../errors.js';
 import { requireLocal } from '../guards.js';
@@ -36,6 +36,9 @@ write('PUT', '/api/agents/:id/resources', (b, { params }) => { const r = setAgen
 write('POST', '/api/objects/from-template', (b) => createFromTemplate(b as Parameters<typeof createFromTemplate>[0]));
 // Inspect carries the container's environment variables in the clear, so it is local only like the other routes that read secrets.
 guarded('/api/objects/:id/inspect', ({ params, url }) => objectInspect(params[0], p(url, 'service')));
+guarded('/api/objects/:id/inspect/raw', ({ params, url }) => objectInspectRaw(params[0], p(url, 'service'), url.searchParams.get('reveal') === '1'));
+// The whole `docker inspect` of anything on this machine (container, image, volume, network): local only for the same reason.
+guarded('/api/docker/inspect', ({ url }) => inspectMachine(url.searchParams.get('kind') ?? '', url.searchParams.get('ref') ?? '', url.searchParams.get('reveal') === '1'));
 write('POST', '/api/objects/:id/service', (b, { params }) => objectServiceAction(params[0], b.service, b.action));
 write('POST', '/api/objects/:id/action', (b, { params }) => objectAction(params[0], b.action));
 // What Docker knows, to suggest in the forms (containers, images, the services of a compose file).
