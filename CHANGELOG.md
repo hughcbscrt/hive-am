@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-10-23
+
 ### Added
 
 - **Cancel a delegated task.** A task sent by mistake or no longer needed can be taken back, queued or running. In **Recent delegations** (Colony and Home) each unfinished task has a **×** button: a queued one is cancelled at once and never starts, a running one asks first and is stopped. The orchestrator is told once, in the place where it delegated. Orchestrators get two new tools, `dispatch_cancel` (only for their own tasks; they get no extra message for a task they cancel) and `dispatch_list` (their tasks that have not finished). A cancelled task shows as **cancelled** with a grey dot, frees its place in the limit of 10, and what the worker already changed stays in the folder. Unfinished tasks now come first in the list and are never hidden by its limit. Stop on a worker still stops only its current turn and marks that delegation failed.
@@ -300,7 +302,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.10.1...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/hughcbscrt/hive-am/compare/v1.10.1...v1.11.0
 [1.10.1]: https://github.com/hughcbscrt/hive-am/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/hughcbscrt/hive-am/compare/v1.9.1...v1.10.0
 [1.9.1]: https://github.com/hughcbscrt/hive-am/compare/v1.9.0...v1.9.1
