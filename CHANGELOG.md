@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Long prompts no longer cover the editor's footer.** In **Preview** and **Split**, a long system prompt was drawn over the word count and tips line under the editor. Each pane now scrolls on its own inside the editor and the footer stays visible below it.
+
 ## [1.10.0] - 2026-10-22
 
 ### Added
