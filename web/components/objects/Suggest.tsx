@@ -43,7 +43,7 @@ export function Suggest({ value, onChange, options, placeholder, mono = false, a
           {shown.length === 0 && <li className="sg-empty" role="presentation">{empty}</li>}
           {shown.map((o, i) => (
             <li key={o.value} {...cb.optionProps(i)} className={o.action ? 'sg-li' : undefined}>
-              <button type="button" tabIndex={-1} className={`sg-opt ${i === hi ? 'hi' : ''}`} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setHi(i)} onClick={() => pick(o)}>
+              <button type="button" tabIndex={-1} className={`sg-opt ${i === hi ? 'hi' : ''}`} title={o.label ?? o.value} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setHi(i)} onClick={() => pick(o)}>
                 <span className={`nm ${mono ? 'mono' : ''}`}>{o.label ?? o.value}</span>{o.hint && <span className="hint">{o.hint}</span>}
               </button>
               {o.action && <button type="button" className="btn ghost icon sm sg-act" aria-label={o.action.label} title={o.action.label} onMouseDown={(e) => e.preventDefault()} onClick={() => { setOpen(false); o.action!.onClick(); }}>{o.action.icon}</button>}

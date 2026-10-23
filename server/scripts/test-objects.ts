@@ -5,7 +5,7 @@
 // touches a container it did not create.
 import './_guard.js';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync, existsSync } from 'node:fs';
 import type { IncomingMessage } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { colonies } from '../src/db.js';
 import { composeServices, inspectMachine, listContainers, listImages, listNetworks, listVolumes, maskVar } from '../src/objects/docker-info.js';
-import { buildImage, createMade, removeMade } from '../src/objects/docker.js';
+import { DOCKERFILE_NAME, buildImage, createMade, removeMade } from '../src/objects/docker.js';
 import { ObjectError, createObject, objectAction, objectInspect, objectInspectRaw, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
 import { HttpError } from '../src/http/errors.js';
 import { match } from '../src/http/router.js';
@@ -206,6 +206,8 @@ await tryIt('removeByIdPrefix', () => d.removeMade('network', 'abc'));
 await tryIt('removeBridge', () => d.removeMade('network', 'bridge'));
 await tryIt('removeAnonymous', () => d.removeMade('volume', '${'f'.repeat(64)}'));
 await tryIt('createOption', () => d.createMade('volume', '--help'));
+await tryIt('createNetworkId', () => d.createMade('network', '${'a'.repeat(64)}'));
+await tryIt('removeNetworkId', () => d.removeMade('network', '${'b'.repeat(64)}'));
 await tryIt('build', () => d.buildImage({ dockerfile: ${JSON.stringify(df)}, tag: 'my-app:dev' }));
 await tryIt('buildFails', () => d.buildImage({ dockerfile: ${JSON.stringify(df)}, tag: 'bad:1' }));
 console.log(JSON.stringify(out));`);
@@ -228,9 +230,17 @@ console.log(JSON.stringify(out));`);
   ];
   check(JSON.stringify(calls) === JSON.stringify(want), 'each action runs exactly its docker commands; refused removals never reach rm, and bridge, anonymous names and option-like names never reach Docker');
   if (JSON.stringify(calls) !== JSON.stringify(want)) console.log(calls);
+  check(/network id/.test(o.createNetworkId?.error) && /network id/.test(o.removeNetworkId?.error), 'a network name of 64 hex digits (what an id looks like) is refused, like the volume one, before Docker');
   check(o.build?.tag === 'my-app:dev' && /naming to my-app:dev/.test(o.build.output) && /^The build failed:\n/.test(o.buildFails?.error) && /failed to solve/.test(o.buildFails.error) && !/step 10\b/.test(o.buildFails.error), 'a build answers with its tag and output; a failed one with only its last lines');
 }
-check(await rejects(() => buildImage({ dockerfile: join(dir, 'nope', 'Dockerfile'), tag: 'x:1' }), /does not exist/) && await rejects(() => buildImage({ dockerfile: 'Dockerfile', tag: 'x:1' }), /absolute path/) && await rejects(() => buildImage({ dockerfile: dir, tag: 'x:1' }), /not a file/), 'a Dockerfile that is not there, a relative path or a folder is refused before Docker');
+mkdirSync(join(dir, 'dirs', 'Dockerfile'), { recursive: true });
+check(await rejects(() => buildImage({ dockerfile: join(dir, 'nope', 'Dockerfile'), tag: 'x:1' }), /does not exist/) && await rejects(() => buildImage({ dockerfile: 'Dockerfile', tag: 'x:1' }), /absolute path/) && await rejects(() => buildImage({ dockerfile: join(dir, 'dirs', 'Dockerfile'), tag: 'x:1' }), /not a file/), 'a Dockerfile that is not there, a relative path or a folder is refused before Docker');
+// A failed build shows the last lines of the file, so only a file named like a Dockerfile is built (its real name too, through a link).
+writeFileSync(join(dir, 'run.sh'), 'echo secret\n'); writeFileSync(join(dir, 'notes.txt'), 'secret\n'); mkdirSync(join(dir, 'link'), { recursive: true });
+symlinkSync(join(dir, 'notes.txt'), join(dir, 'link', 'Dockerfile'));
+check(await rejects(() => buildImage({ dockerfile: '/etc/passwd', tag: 'x:1' }), /not named like a Dockerfile/) && await rejects(() => buildImage({ dockerfile: join(dir, 'run.sh'), tag: 'x:1' }), /not named like a Dockerfile/), 'a file that is not named like a Dockerfile (/etc/passwd, run.sh) is refused before Docker');
+check(await rejects(() => buildImage({ dockerfile: join(dir, 'link', 'Dockerfile'), tag: 'x:1' }), /leads to notes\.txt/), 'a link named Dockerfile that leads to a file of another name is refused');
+check(['Dockerfile', 'containerfile', 'Dockerfile.prod', 'web.Dockerfile', 'api.containerfile'].every((n) => DOCKERFILE_NAME.test(n)) && !['.Dockerfile', 'Dockerfile.', 'x.yml', 'passwd', 'Dockerfile/x', '-x.Dockerfile'].some((n) => DOCKERFILE_NAME.test(n)), 'the Dockerfile name rule takes Dockerfile, Containerfile and their .suffix / name. variants, and nothing else');
 writeFileSync(join(dir, 'Dockerfile'), 'FROM scratch\n');
 {
   for (const f of ['web.Dockerfile', 'Containerfile', 'Dockerfile.prod', 'notes.txt']) writeFileSync(join(dir, f), '');

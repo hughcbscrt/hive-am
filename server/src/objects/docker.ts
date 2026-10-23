@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { existsSync, statSync } from 'node:fs';
-import { dirname, isAbsolute } from 'node:path';
+import { existsSync, realpathSync, statSync } from 'node:fs';
+import { basename, dirname, isAbsolute } from 'node:path';
 import { inspectMachine, NO_DAEMON } from './docker-info.js';
 import { execCapture } from './exec.js';
 import { IMAGE, ObjectError, splitArgs, type DockerConfig, type ObjectState } from './model.js';
@@ -289,7 +289,8 @@ function madeName(kind: MadeKind, raw: unknown): string {
   const name = typeof raw === 'string' ? raw.trim() : '';
   if (!MADE_NAME[kind].test(name)) throw new ObjectError(`"${name}" is not a valid ${kind} name: letters, digits, _ . or -, starting with a letter or digit`);
   if (kind === 'network' && BUILTIN_NETWORKS.includes(name)) throw new ObjectError(`${name} is one of Docker's own networks`);
-  if (kind === 'volume' && /^[0-9a-f]{64}$/.test(name)) throw new ObjectError('That name looks like an anonymous volume');
+  // 64 hex digits is what Docker calls an anonymous volume, and what a network id looks like: never a name to create or remove.
+  if (/^[0-9a-f]{64}$/.test(name)) throw new ObjectError(kind === 'volume' ? 'That name looks like an anonymous volume' : 'That name looks like a network id');
   return name;
 }
 
@@ -317,7 +318,8 @@ export async function removeMade(kind: MadeKind, raw: unknown): Promise<{ name: 
   const labels = await madeLabels(kind, name);
   if (!labels) throw new ObjectError(`Docker has no ${kind} ${name}`);
   if (labels[CREATED] !== '1' || 'com.docker.volume.anonymous' in labels) throw new ObjectError(`hive-am did not create the ${kind} ${name}, so it does not remove it`);
-  // Docker itself removes a network a stopped container is still attached to: ask which containers use it.
+  // Docker itself removes a network a stopped container is still attached to: ask which containers use it. Docker cannot check and remove
+  // in one step, so a container created and attached to it between `ps` and `rm` (and not started) would be detached; that window stays.
   const users = await dk(['ps', '-a', '-q', '--filter', `${kind}=${name}`], { timeout: 20_000 });
   if (users.code !== 0) throw fail(users, `Could not check which containers use the ${kind} ${name}`);
   const n = users.out.split('\n').filter((l) => l.trim()).length;
@@ -327,17 +329,32 @@ export async function removeMade(kind: MadeKind, raw: unknown): Promise<{ name: 
   return { name, removed: true };
 }
 
+/** `Dockerfile`, `Containerfile`, `Dockerfile.<suffix>` or `<name>.Dockerfile` (any case): the only files built, read or written as a Dockerfile. */
+export const DOCKERFILE_NAME = /^(?:(?:dockerfile|containerfile)(?:\.\w[\w.-]{0,80})?|\w[\w.-]{0,80}\.(?:dockerfile|containerfile))$/i;
+/**
+ * An absolute path to an existing regular file named like a Dockerfile, as its real path: a link is followed and the real name must be one
+ * too. Anything else would let a build (whose error shows the last lines of the file) read any file of the machine.
+ */
+export function dockerfilePath(raw: unknown): string {
+  const file = typeof raw === 'string' ? raw.trim() : '';
+  if (!file || !isAbsolute(file)) throw new ObjectError('Choose the Dockerfile (an absolute path)');
+  if (!DOCKERFILE_NAME.test(basename(file))) throw new ObjectError(`${basename(file)} is not named like a Dockerfile (Dockerfile, Containerfile, Dockerfile.<name> or <name>.Dockerfile)`);
+  if (!existsSync(file)) throw new ObjectError(`The Dockerfile ${file} does not exist`);
+  if (!statSync(file).isFile()) throw new ObjectError(`${file} is not a file`);
+  const real = realpathSync(file);
+  if (!DOCKERFILE_NAME.test(basename(real))) throw new ObjectError(`${file} leads to ${basename(real)}, which is not named like a Dockerfile`);
+  return real;
+}
+
 /**
  * `docker build -t tag -f dockerfile context`: the context is the Dockerfile's folder unless another is given. It runs the Dockerfile's
  * `RUN` steps on this machine and may download base images, so it can take long (up to 15 minutes, like rebuilding a compose project). On
  * failure the error carries the last lines of the output.
  */
 export async function buildImage(o: { dockerfile?: unknown; context?: unknown; tag?: unknown }): Promise<{ tag: string; output: string }> {
-  const file = typeof o.dockerfile === 'string' ? o.dockerfile.trim() : '';
-  if (!file || !isAbsolute(file)) throw new ObjectError('Choose the Dockerfile (an absolute path)');
-  if (!existsSync(file)) throw new ObjectError(`The Dockerfile ${file} does not exist`);
-  if (!statSync(file).isFile()) throw new ObjectError(`${file} is not a file`);
-  const context = typeof o.context === 'string' && o.context.trim() ? o.context.trim() : dirname(file);
+  const file = dockerfilePath(o.dockerfile);
+  // The folder it was picked from, even when that name is a link to a Dockerfile elsewhere.
+  const context = typeof o.context === 'string' && o.context.trim() ? o.context.trim() : dirname(String(o.dockerfile).trim());
   if (!isAbsolute(context) || !existsSync(context) || !statSync(context).isDirectory()) throw new ObjectError(`The build folder ${context} is not a folder of this machine`);
   const tag = typeof o.tag === 'string' ? o.tag.trim() : '';
   if (!IMAGE.test(tag)) throw new ObjectError('The image name is not valid (for example my-app:dev)');
