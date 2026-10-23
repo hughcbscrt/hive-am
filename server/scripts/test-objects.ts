@@ -11,7 +11,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { colonies } from '../src/db.js';
+import { DATA_DIR, colonies } from '../src/db.js';
 import { composeServices, inspectMachine, listContainers, listImages, listNetworks, listVolumes, maskVar } from '../src/objects/docker-info.js';
 import { DOCKERFILE_NAME, applyDocker, buildImage, cfgHash, createMade, managedCopy, planChange, removeMade, runArgs } from '../src/objects/docker.js';
 import { assertCopyName, copySource, etagOf, readSource, writeSource } from '../src/objects/files.js';
@@ -329,6 +329,27 @@ check(await routeStatus('POST', '/api/docker/networks', 'https://evil.example') 
   check(await routeStatus('GET', `/api/objects/${comp.id}/docker/file`) === 200 && await routeStatus('GET', `/api/docker/dockerfile?path=${encodeURIComponent('/etc/passwd')}`) === 400, 'and the local app reads through them (a bad path is a 400)');
   for (const o of [comp, ex, ctr]) await removeObject(o.id);
 }
+
+// ---------------------------------------------------------------- a compose resource made by the old app templates (stacks folder of the data folder)
+// The templates are gone, but what they made stays a normal compose resource: its file in <data>/stacks/<slug>/docker-compose.yml, project hive-<slug>.
+const legacyStack = (slug: string, body: string) => {
+  const sdir = join(DATA_DIR, 'stacks', slug), file = join(sdir, 'docker-compose.yml');
+  mkdirSync(sdir, { recursive: true }); writeFileSync(file, body, { flag: 'wx' });
+  return { sdir, file, obj: createObject({ name: slug, kind: 'docker', config: { mode: 'compose', file, project: `hive-${slug}` } }) };
+};
+{
+  check(!match('GET', '/api/object-templates') && !match('POST', '/api/objects/from-template'), 'the routes of the app templates are gone (404)');
+  const { sdir, file, obj } = legacyStack('my-db', 'services:\n  db:\n    image: "postgres:16"\n    ports:\n      - "15432:5432"\n    environment:\n      POSTGRES_PASSWORD: "pw-1"\n');
+  check(obj.kind === 'docker' && (obj.config as any).mode === 'compose' && (obj.config as any).file === file && (obj.config as any).project === 'hive-my-db', 'a compose file in the stacks folder is still a compose resource');
+  const r = composeFileRead(obj.id);
+  check(r.path === file && r.content.includes('POSTGRES_PASSWORD: "pw-1"') && await routeStatus('GET', `/api/objects/${obj.id}/docker/file`) === 200, 'its File tab reads the compose file from the stacks folder');
+  const w = await composeFileWrite(obj.id, r.content.replace('postgres:16', 'postgres:17'), r.etag);
+  check(readFileSync(file, 'utf8').includes('postgres:17') && w.etag === etagOf(readFileSync(file)) && w.running === false, 'and saves it in place');
+  const cp = await composeFileCopy(obj.id, { name: 'docker-compose.copy.yml', repoint: true });
+  check(cp.path === join(sdir, 'docker-compose.copy.yml') && existsSync(file) && composeFileRead(obj.id).path === cp.path, 'a copy goes next to it in the stacks folder and the original stays');
+  await removeObject(obj.id);
+  check(existsSync(file) && existsSync(cp.path), 'deleting the resource leaves its files in the stacks folder alone');
+}
 // Saving the compose file asks Docker only to read: `compose config -q` and `compose ps`, nothing that creates or recreates.
 {
   const bin = mkdtempSync(join(tmpdir(), 'fake-docker-files-')), log = join(bin, 'calls.log'), yml = join(bin, 'c.yml');
@@ -488,6 +509,20 @@ else {
   const proj = (objectsStore.get(comp.id)!.config as any).project;
   await removeObject(comp.id);
   try { execFileSync('docker', ['compose', '-f', join(cdir, 'docker-compose.yml'), '-p', proj, 'down', '-v'], { stdio: 'ignore', timeout: 60000 }); } catch { /* cleanup */ }
+  {
+    // a compose resource the old app templates made, with its file in the stacks folder, starts and stops like any other
+    const slug = `hivetest-stack-${Date.now().toString(36)}`, sport = await freePort();
+    const { file, obj } = legacyStack(slug, `services:\n  web:\n    image: "${image}"\n    ports:\n      - "127.0.0.1:${sport}:80"\n`);
+    try {
+      await objectAction(obj.id, 'start');
+      check(await until(async () => (await st(obj.id)) === 'running') && (await fetch(`http://127.0.0.1:${sport}/`).then((r) => r.status).catch(() => 0)) === 200, 'a compose resource in the stacks folder (made by the old templates) starts and serves');
+      await objectAction(obj.id, 'stop');
+      check((await st(obj.id)) === 'stopped', 'and stops');
+    } finally {
+      await removeObject(obj.id);
+      try { execFileSync('docker', ['compose', '-f', file, '-p', `hive-${slug}`, 'down', '-v'], { stdio: 'ignore', timeout: 60000 }); } catch { /* cleanup */ }
+    }
+  }
 
   // creating and removing with real Docker: hive-am's own volume and network, a foreign volume, and a container that uses them; then an image
   const mk = Date.now().toString(36), mvol = `hive-am-test-mkvol-${mk}`, mnet = `hive-am-test-mknet-${mk}`, fvol = `hive-am-test-foreign-${mk}`, mcon = `hive-am-test-mk-${mk}`, mimg = `hive-am-test-img-${mk}:1`;

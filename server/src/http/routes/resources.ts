@@ -5,7 +5,7 @@ import { buildImage, createMade, removeMade } from '../../objects/docker.js';
 import { copySource, readSource, writeSource } from '../../objects/files.js';
 import { agentObjectAction, agentObjectLogs, agentObjects } from '../../objects/agent.js';
 import { agentDb } from '../../objects/agent-db.js';
-import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, listTemplates, createFromTemplate, composeFileCopy, composeFileRead, composeFileWrite, objectApply, objectInspect, objectManagedCopy, objectPlan, objectInspectRaw, objectLogs, removeObject, updateObject } from '../../objects/index.js';
+import { dbColumnsOf, dbHistory, dbHistoryClear, dbRun, dbSavedAdd, dbSavedList, dbSavedRemove, dbSavedUpdate, dbSchemaOf, dbTestConfig, createObject, statsOf, httpDescribe, httpSession, httpSessionClear, httpSessionSet, httpInspect, httpExport, httpFileRead, httpFileWrite, httpFileCreate, httpRun, httpHistory, httpDocs, httpHistoryClear, httpScan, listObjects, setObjectManager, setAgentObjects, objectAction, objectServiceAction, composeFileCopy, composeFileRead, composeFileWrite, objectApply, objectInspect, objectManagedCopy, objectPlan, objectInspectRaw, objectLogs, removeObject, updateObject } from '../../objects/index.js';
 import { body, type Body } from '../body.js';
 import { notFound } from '../errors.js';
 import { requireLocal } from '../guards.js';
@@ -32,10 +32,8 @@ route('GET', '/api/objects', () => listObjects());
 write('POST', '/api/objects', (b) => createObject(b as Parameters<typeof createObject>[0]));
 write('PATCH', '/api/objects/:id', (b, { params }) => updateObject(params[0], b as Parameters<typeof updateObject>[1]));
 route('DELETE', '/api/objects/:id', async ({ req, params }) => { local(req); if (!(await removeObject(params[0]))) throw notFound('Object not found'); return { ok: true }; });
-route('GET', '/api/object-templates', () => listTemplates());
 write('PUT', '/api/objects/:id/manager', (b, { params }) => { const r = setObjectManager(params[0], b.agent_id); if (r.skillAdded) notifyAgentsChanged(); return r; });
 write('PUT', '/api/agents/:id/resources', (b, { params }) => { const r = setAgentObjects(params[0], b.object_ids); if (r.skillAdded) notifyAgentsChanged(); return r; });
-write('POST', '/api/objects/from-template', (b) => createFromTemplate(b as Parameters<typeof createFromTemplate>[0]));
 // Reads, open like the other reads of resources (the app is also reached by other names on the network). Secret-looking variables and the
 // passwords of URLs come hidden in the raw one unless `reveal=1`.
 route('GET', '/api/objects/:id/inspect', ({ params, url }) => objectInspect(params[0], p(url, 'service')));

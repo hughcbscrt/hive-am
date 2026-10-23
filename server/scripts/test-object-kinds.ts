@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { colonies } from '../src/db.js';
-import { ObjectError, createObject, createFromTemplate, listTemplates, objectServiceAction, httpDocs, httpExport, httpHistory, httpHistoryClear, httpFileCreate, httpDescribe, httpFileRead, httpFileWrite, httpInspect, httpRun as runForObject, httpScan, httpSession, httpSessionClear, httpSessionSet, objectAction, objectLogs, refreshStates, removeObject, stateOf, updateObject, viewOf } from '../src/objects/index.js';
+import { ObjectError, createObject, objectServiceAction, httpDocs, httpExport, httpHistory, httpHistoryClear, httpFileCreate, httpDescribe, httpFileRead, httpFileWrite, httpInspect, httpRun as runForObject, httpScan, httpSession, httpSessionClear, httpSessionSet, objectAction, objectLogs, refreshStates, removeObject, stateOf, updateObject, viewOf } from '../src/objects/index.js';
 import { parseHttpFile, runHttp as httpRun } from '../src/objects/http.js';
 import { objectsStore } from '../src/objects/store.js';
 
@@ -276,13 +276,6 @@ const pm = JSON.parse(httpDocs(io.id, 'postman').content);
 check(pm.info.schema.includes('v2.1.0') && pm.item.some((f: any) => f.name === 'i.http' && f.item[0].request.method === 'POST') && pm.variable.some((v: any) => v.key === 'who'), 'or as a Postman collection (with the variables of the files)');
 check(httpDocs(io.id, 'postman', 'i.http').filename === 'i.postman_collection.json' && await rejects(async () => httpDocs(io.id, 'markdown', 'nope.http'), /not one of/), 'for one file or all of them; an unknown file is refused');
 check(await rejects(async () => objectServiceAction(io.id, 'web', 'start'), /Only a compose project/), 'a service action is only for a compose project');
-const tpls = listTemplates();
-check(tpls.length >= 8 && tpls.every((t) => t.fields.length > 0) && tpls.find((t) => t.id === 'postgres')!.fields.find((f) => f.key === 'password')!.default.length >= 10, 'the catalog lists the templates, each password starting with a random value');
-const fromTpl = createFromTemplate({ template: 'postgres', name: 'My DB', values: { port: '15432', password: 'pw-1' } });
-const tplFile = (fromTpl.config as any).file as string;
-check(fromTpl.kind === 'docker' && (fromTpl.config as any).mode === 'compose' && tplFile.endsWith('stacks/my-db/docker-compose.yml') && readFileSync(tplFile, 'utf8').includes('"15432:5432"') && readFileSync(tplFile, 'utf8').includes('POSTGRES_PASSWORD: "pw-1"'), 'a template becomes a compose file and a Docker object');
-check(await rejects(async () => createFromTemplate({ template: 'postgres', name: 'My DB', values: { password: 'pw-2' } }), /already a stack/) && await rejects(async () => createFromTemplate({ template: 'redis', name: 'r2', values: { port: '99999' } }), /port between/) && await rejects(async () => createFromTemplate({ template: 'redis', name: 'r3', values: { version: '7"; evil' } }), /valid image tag/) && await rejects(async () => createFromTemplate({ template: 'postgres', name: 'r4', values: { password: 'a b"c' } }), /Password:/) && await rejects(async () => createFromTemplate({ template: 'nope', name: 'x' }), /Unknown template/), 'values that are not valid are refused before anything is written');
-await removeObject(fromTpl.id);
 // files: create
 check(httpFileCreate(io.id, 'new/made.http', '### x\nGET http://h/\n').file === 'new/made.http' && httpFileRead(io.id, 'new/made.http').content.includes('GET http://h/'), 'a new .http file can be created (folders included)');
 check(await rejects(async () => httpFileCreate(io.id, 'new/made.http', ''), /already exists/) && await rejects(async () => httpFileCreate(io.id, '../out.http', ''), /Use a name/) && await rejects(async () => httpFileCreate(io.id, 'notes.txt', ''), /Use a name/), 'but never over an existing one, outside the folder or with another extension');

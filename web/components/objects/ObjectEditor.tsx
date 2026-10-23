@@ -25,10 +25,7 @@ export function ObjectEditor({ presetColonyId, presetKind, initial, title, notic
     if (!name) { setErr(t('obj.err.name')); return; }
     setBusy(true); setErr('');
     try {
-      if (d.kind === 'docker' && d.mode === 'template' && !d.template) { setErr(t('tpl.pick')); setBusy(false); return; }
-      const r = d.kind === 'docker' && d.mode === 'template'
-        ? await api.post<ObjectView>('/objects/from-template', { name, colony_id: d.colony_id || null, template: d.template, values: d.tplValues })
-        : await api.post<ObjectView>('/objects', { name, colony_id: d.colony_id || null, kind: d.kind, config: toConfig(d) });
+      const r = await api.post<ObjectView>('/objects', { name, colony_id: d.colony_id || null, kind: d.kind, config: toConfig(d) });
       if (d.manager && MANAGEABLE.includes(d.kind)) await api.put(`/objects/${r.id}/manager`, { agent_id: d.manager }).catch((e) => toast(e instanceof Error ? e.message : '', 'err'));
       await refresh(['objects', 'agents']);
       toast(t('obj.created')); onSaved?.(r.id); onClose();

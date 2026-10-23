@@ -27,6 +27,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - **Inspect explains instead of failing.** A container hive-am has not created yet, an existing container Docker cannot find, a compose service with no container and Docker not installed or not running no longer show a bare error: Inspect shows what is configured and says why Docker has nothing. When the settings changed since hive-am created the container, it says the container will be created again on the next start.
 - **`GET /api/objects/:id/inspect` changed shape.** It answers `{ exists, configured, ... }`: with `exists: true` the detail of `docker inspect` and `cfgStale`, with `exists: false` a `reason` (`not-created`, `not-found`, `no-service`, `no-docker`).
 
+### Removed
+
+- **App templates for Docker resources.** Creating a Docker resource no longer offers **From a template** (the ready-made Redis, PostgreSQL, MySQL and other services), so hive-am shows no predefined catalog of services or images and depends on no registry for one; the form opens in **Create a container**, and the other modes are unchanged. `GET /api/object-templates` and `POST /api/objects/from-template` are gone. A compose resource made from a template keeps working as before: its file stays in the data folder (`stacks/<name>/`) and is shown, started and edited (**File** tab) like any other compose file; nothing is moved or deleted.
+
 ## [1.11.0] - 2026-10-23
 
 ### Added
