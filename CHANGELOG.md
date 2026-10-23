@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cards no longer touch in a resource's Settings.** In the two-column Settings form, a full-width card (such as **Volumes**) sat 2 px under the last card of a column instead of the usual 14 px, so the two looked glued together. The gap is now the same everywhere.
+
 ## [1.12.0] - 2026-10-23
 
 ### Added
