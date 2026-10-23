@@ -21,6 +21,8 @@ export function ObjectConfig({ object: o }: { object: ObjectView }) {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
+  // Discarding mounts the fields again, so nothing opened in them (a folder list, a suggestion) outlives the values it was opened for.
+  const [gen, setGen] = useState(0);
   const [scan, setScan] = useState<HttpScan | null>(null);
   useEffect(() => { if (o.kind === 'http') api.get<HttpScan>(`/objects/${o.id}/http`).then(setScan).catch(() => undefined); }, [o.id, o.kind]);
   const dirty = JSON.stringify(d) !== JSON.stringify(base);
@@ -45,12 +47,12 @@ export function ObjectConfig({ object: o }: { object: ObjectView }) {
   return (
     <div className="oc">
       <div className="oc-body">
-        <div className="oc-form"><ObjectFields objectId={o.id} d={d} set={set} setD={setD} scan={scan} error={err} /></div>
+        <div className="oc-form"><ObjectFields key={gen} objectId={o.id} d={d} set={set} setD={setD} scan={scan} error={err} /></div>
       </div>
       <div className="savebar oc-bar">
         <span className="muted small grow">{dirty ? t('ow.cfg.dirty') : t('ow.cfg.saved')}{dirty && restartable ? ` · ${live ? t('ow.cfg.appliesRunning') : t('ow.cfg.applies')}` : ''}</span>
         <button className="btn danger" onClick={() => setConfirmDel(true)}><Trash2 size={15} />{t('common.delete')}</button>
-        <button className="btn ghost" disabled={!dirty || busy} onClick={() => { setD(() => base); setErr(''); }}>{t('ow.cfg.discard')}</button>
+        <button className="btn ghost" disabled={!dirty || busy} onClick={() => { setD(() => base); setErr(''); setGen((g) => g + 1); }}>{t('ow.cfg.discard')}</button>
         {restartable && live && <button className="btn" disabled={!dirty || busy} onClick={() => void save(true)}>{t('ow.cfg.saveRestart')}</button>}
         <button className="btn primary" disabled={!dirty || busy} onClick={() => void save()}>{t('ow.cfg.save')}</button>
       </div>

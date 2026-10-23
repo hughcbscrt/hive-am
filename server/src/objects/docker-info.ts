@@ -41,7 +41,18 @@ const list = (v: unknown) => String(v ?? '').split(',').map((x) => x.trim()).fil
 const labelled = (labels: unknown, re: RegExp) => re.test(String(labels ?? ''));
 const BUILTIN = ['bridge', 'host', 'none'];
 
-export async function listContainers(): Promise<{ available: boolean; error?: string; containers: ContainerInfo[] }> {
+type Containers = { available: boolean; error?: string; containers: ContainerInfo[] };
+let reading: Promise<Containers> | null = null;
+/**
+ * The containers of this machine. The form asks for containers, images, volumes and networks at once, and the last three count who uses
+ * them: while one `docker ps` is running, every other caller gets its answer instead of starting another one.
+ */
+export function listContainers(): Promise<Containers> {
+  reading ??= readContainers().finally(() => { reading = null; });
+  return reading;
+}
+
+async function readContainers(): Promise<Containers> {
   // --no-trunc: without it Docker cuts the mounts to a few characters ("/home/you/Doc…").
   const r = await run(['ps', '-a', '--no-trunc', '--format', '{{json .}}']);
   if (r.code !== 0) return { available: false, error: failed(r), containers: [] };

@@ -33,3 +33,8 @@ export const emptyRow = (): VolumeRow => ({ source: '', target: '', opts: [] });
 export const isReadOnly = (r: VolumeRow) => r.opts.includes('ro');
 /** Read-only on or off, keeping the other options in their order (`rw` goes away when it is turned on). */
 export const withReadOnly = (r: VolumeRow, on: boolean): VolumeRow => ({ ...r, opts: on ? [...r.opts.filter((o) => o !== 'rw' && o !== 'ro'), 'ro'] : r.opts.filter((o) => o !== 'ro') });
+
+/** A volume name the machine does not have yet (Docker creates it on the first start). Only said when the list of volumes is known. */
+export const isNewVolume = (source: string, volumes: { name: string }[] | null) => !!source && !isFolder(source) && volumes !== null && !volumes.some((v) => v.name === source);
+/** A row with only one side filled in: it cannot be saved (the server refuses `data:` and `:/data`). */
+export const isIncomplete = (r: VolumeRow) => r.raw === undefined && !r.source.trim() !== !r.target.trim();

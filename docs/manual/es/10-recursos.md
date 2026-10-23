@@ -122,7 +122,7 @@ Un recurso Docker maneja contenedores. Necesita el comando `docker` en tu máqui
 
 Los formularios consultan a Docker para sugerirte lo que ya existe: imágenes locales, redes y volúmenes (cada uno dice cuántos contenedores lo usan), contenedores existentes (los que creó hive-am aparecen marcados) y, al elegir un archivo compose, sus servicios. Si Docker no está disponible, las listas salen vacías y siempre puedes escribir el valor a mano.
 
-En **Volúmenes**, pulsa **Agregar un volumen** y, en la fila, elige un volumen de esta máquina, escribe un nombre nuevo (Docker lo crea la primera vez que inicia el contenedor, y la fila te lo dice) o pulsa **Carpeta** para elegir una carpeta; luego escribe la ruta dentro del contenedor y marca **Solo lectura** si el contenedor no debe escribir ahí. Un recurso que guardaste antes muestra sus volúmenes en estas filas.
+En **Volúmenes**, pulsa **Agregar un volumen** y, en la fila, elige un volumen de esta máquina, escribe un nombre nuevo (Docker lo crea la primera vez que inicia el contenedor, y la fila te lo dice) o pulsa **Carpeta** para elegir una carpeta; luego escribe la ruta dentro del contenedor (una fila necesita los dos lados para guardarse, y te lo dice) y marca **Solo lectura** si el contenedor no debe escribir ahí. Un recurso que guardaste antes muestra sus volúmenes en estas filas.
 
 En modo **Crear un contenedor** puedes elegir la **Red** y fijar límites (memoria, CPUs, tamaño del log, tiempo para detenerse). Si cambias uno, el contenedor se vuelve a crear la próxima vez que inicia o se reinicia, y lo que había dentro se pierde.
 

@@ -1240,6 +1240,7 @@ export const es: Record<DictKey, string> = {
   "dk.vol.ro": "Solo lectura",
   "dk.vol.add": "Agregar un volumen",
   "dk.vol.new": "Todavía no hay un volumen “{name}”: Docker lo crea cuando inicia el contenedor.",
+  "dk.vol.incomplete": "Completa los dos lados, el volumen o carpeta y la ruta en el contenedor: una fila con solo uno no se puede guardar.",
   "dk.pickContainer": "Elige un contenedor, o escribe su nombre",
   "dk.pickImage": "Elige una imagen, o escribe una (nginx:alpine)",
   "dk.pickNetwork": "Elige una red, o escribe una (bridge)",

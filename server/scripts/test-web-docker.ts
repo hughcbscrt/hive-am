@@ -1,8 +1,9 @@
 // The volume rows of the Docker form (web/lib/dockerVolumes.ts): a saved config shows as rows and edits write back the same text it always
-// saved, one `source:target[:options]` per line. No model, no browser.
+// saved, one `source:target[:options]` per line; and what the form makes of Docker's lists (web/lib/dockerLists.ts). No model, no browser.
 // Usage: HIVE_AM_HOME=$(mktemp -d) npx tsx scripts/test-web-docker.ts
 import './_guard.js';
-import { emptyRow, isFolder, isReadOnly, parseVolumeLine, parseVolumes, volumesText, withReadOnly } from '../../web/lib/dockerVolumes.ts';
+import { emptyRow, isFolder, isIncomplete, isNewVolume, isReadOnly, parseVolumeLine, parseVolumes, volumesText, withReadOnly } from '../../web/lib/dockerVolumes.ts';
+import { whenAvailable } from '../../web/lib/dockerLists.ts';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `got ${JSON.stringify(got)} want ${JSON.stringify(want)}`); if (!ok) fail++; };
 
@@ -28,6 +29,15 @@ eq('turning read only on adds ro after the other options', withReadOnly(r, true)
 eq('and off removes only ro', withReadOnly(parseVolumeLine('cache:/c:ro,z'), false).opts, ['z']);
 eq('turning it on drops rw (they cannot go together)', withReadOnly(parseVolumeLine('a:/b:rw'), true).opts, ['ro']);
 eq('turning it on twice does not repeat it', withReadOnly(withReadOnly(r, true), true).opts, ['z', 'ro']);
+
+const vols = [{ name: 'data' }];
+eq('a volume name the machine does not have is new; one it has, a folder or an empty source is not', ['cache', 'data', '/srv', ''].map((x) => isNewVolume(x, vols)), [true, false, false, false]);
+const down = whenAvailable({ available: false }, [] as { name: string }[]);
+eq('with Docker down the list is unknown (null), not empty', down, null);
+eq('so no row says its volume is missing (the one notice is Docker\'s)', isNewVolume('cache', down), false);
+eq('with Docker up the list is kept as it came', whenAvailable({ available: true }, vols), vols);
+eq('a row with only one side is incomplete; a full one, an empty one or one kept as typed is not',
+  [parseVolumeLine('data:'), parseVolumeLine(':/d'), parseVolumeLine('data:/d'), emptyRow(), parseVolumeLine('/data')].map(isIncomplete), [true, true, false, false, false]);
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

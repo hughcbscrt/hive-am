@@ -1242,6 +1242,7 @@ export const en = {
   "dk.vol.ro": "Read only",
   "dk.vol.add": "Add a volume",
   "dk.vol.new": "There is no volume “{name}” yet: Docker creates it when the container starts.",
+  "dk.vol.incomplete": "Fill in both sides, the volume or folder and the path in the container: a row with only one cannot be saved.",
   "dk.pickContainer": "Pick a container, or type its name",
   "dk.pickImage": "Pick an image, or type one (nginx:alpine)",
   "dk.pickNetwork": "Pick a network, or type one (bridge)",

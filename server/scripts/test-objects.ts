@@ -104,6 +104,7 @@ check(await rejects(() => createObject({ name: 'x4', kind: 'server', config: { c
 check(await rejects(() => createObject({ name: 'x5', kind: 'docker', config: { mode: 'container', image: '--privileged' } }), /image/), 'an image that looks like an option is refused');
 check(await rejects(() => createObject({ name: 'x6', kind: 'docker', config: { mode: 'container', image: 'nginx', ports: ['80'] } }), /port mapping/), 'a bad port mapping is refused');
 check(await rejects(() => createObject({ name: 'x7', kind: 'docker', config: { mode: 'container', image: 'nginx', volumes: ['--rm'] } }), /volume/), 'a volume that looks like an option is refused');
+check(await rejects(() => createObject({ name: 'x7b', kind: 'docker', config: { mode: 'container', image: 'nginx', volumes: ['data:'] } }), /both sides/) && await rejects(() => createObject({ name: 'x7c', kind: 'docker', config: { mode: 'container', image: 'nginx', volumes: [':/data'] } }), /both sides/), 'a volume with no path in the container, or no source, is refused (it would only fail in docker run)');
 check(await rejects(() => createObject({ name: 'x8', kind: 'docker', config: { mode: 'existing', container: '-f' } }), /container name/), 'a container name that looks like an option is refused');
 check(await rejects(() => createObject({ name: 'x9', kind: 'server', colony_id: 'nope', config: { cwd: dir, start: 'x' } }), /colony/), 'an unknown colony is refused');
 check(updateObject(srv.id, { name: 'web-app-2' }).name === 'web-app-2', 'an object can be renamed');
@@ -168,6 +169,7 @@ const inventoryWith = (env: NodeJS.ProcessEnv) => { const r = spawnSync(process.
   check(fn.available && net('appnet')?.inUse === 2 && !net('appnet')?.builtin && net('bridge')?.builtin && net('bridge')?.inUse === 1 && net('host')?.builtin && net('host')?.inUse === 0 && fn.networks[0]?.builtin, 'networks: how many containers use each, and Docker\'s own (bridge, host, none) marked builtin and first');
   const calls = readFileSync(fakeLog, 'utf8').trim().split('\n');
   check(calls.length > 0 && calls.every((c) => /^(ps -a --no-trunc|images|volume ls|network ls) --format \{\{json \.\}\}$/.test(c)), 'the listings only ever run read-only commands (ps, images, volume ls, network ls)');
+  check(calls.filter((c) => c.startsWith('ps ')).length === 1, 'the four lists asked at once share a single docker ps (images, volumes and networks count from it)');
 }
 {
   const none = inventoryWith({ ...process.env, PATH: mkdtempSync(join(tmpdir(), 'no-docker-')) });

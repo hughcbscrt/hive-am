@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api';
+import { whenAvailable } from './dockerLists';
 
 export interface DockerContainer { id: string; name: string; image: string; state: string; status: string; ports: string; managed: boolean; mounts: string[]; networks: string[] }
 export interface DockerImage { ref: string; id: string; size: string; created: string; inUse: number }
@@ -20,8 +21,9 @@ export function useDockerLists(enabled: boolean) {
     let dead = false;
     api.get<{ available: boolean; error?: string; containers: DockerContainer[] }>('/docker/containers').then((r) => { if (dead) return; setContainers(r.containers); setError(r.available ? '' : r.error ?? 'unavailable'); }).catch(() => !dead && setError('unavailable'));
     api.get<{ available: boolean; images: DockerImage[] }>('/docker/images').then((r) => !dead && setImages(r.images)).catch(() => undefined);
-    api.get<{ available: boolean; volumes: DockerVolume[] }>('/docker/volumes').then((r) => !dead && setVolumes(r.volumes)).catch(() => undefined);
-    api.get<{ available: boolean; networks: DockerNetwork[] }>('/docker/networks').then((r) => !dead && setNetworks(r.networks)).catch(() => undefined);
+    // Without Docker these stay null (not empty): a volume or a network cannot be said to be missing. The containers' error is the one notice.
+    api.get<{ available: boolean; volumes: DockerVolume[] }>('/docker/volumes').then((r) => !dead && setVolumes(whenAvailable(r, r.volumes))).catch(() => !dead && setVolumes(null));
+    api.get<{ available: boolean; networks: DockerNetwork[] }>('/docker/networks').then((r) => !dead && setNetworks(whenAvailable(r, r.networks))).catch(() => !dead && setNetworks(null));
     return () => { dead = true; };
   }, [enabled, tick]);
   const reload = useCallback(() => setTick((x) => x + 1), []);

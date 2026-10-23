@@ -192,7 +192,12 @@ export function parseDocker(c: any): DockerConfig {
     cpus: num(c?.cpus, 'The CPU limit', 0.01, 256), network: ((v) => { if (v && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(v)) throw new ObjectError('The network name is not valid'); return v; })(optStr(c?.network, 'The network', 64)),
     stopTimeoutSec: num(c?.stopTimeoutSec, 'The stop timeout', 1, 300), logMaxMb: num(c?.logMaxMb, 'The log size', 0.05, 500),
     ports: list(c?.ports, 'Ports', (s) => { if (!PORT_SPEC.test(s)) throw new ObjectError(`"${s}" is not a port mapping (use 8080:80)`); return s; }),
-    volumes: list(c?.volumes, 'Volumes', (s) => { if (s.startsWith('-') || !s.includes(':')) throw new ObjectError(`"${s}" is not a volume (use /host/path:/in/container)`); return s; }),
+    volumes: list(c?.volumes, 'Volumes', (s) => {
+      if (s.startsWith('-') || !s.includes(':')) throw new ObjectError(`"${s}" is not a volume (use /host/path:/in/container)`);
+      // `data:` or `:/data` would only fail later, in `docker run`.
+      const [from, to] = s.split(':'); if (!from.trim() || !to.trim()) throw new ObjectError(`"${s}" needs both sides: a volume or folder, and the path in the container`);
+      return s;
+    }),
   };
 }
 
