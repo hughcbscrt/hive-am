@@ -4,6 +4,7 @@
 import './_guard.js';
 import { emptyRow, isFolder, isIncomplete, isNewVolume, isReadOnly, parseVolumeLine, parseVolumes, volumesText, withReadOnly } from '../../web/lib/dockerVolumes.ts';
 import { canCreate, canRemove, imageNameFor, validName, whenAvailable } from '../../web/lib/dockerLists.ts';
+import { copyNameFor, folderOf } from '../../web/lib/dockerFiles.ts';
 let fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); console.log(ok ? 'PASS' : 'FAIL', name, ok ? '' : `got ${JSON.stringify(got)} want ${JSON.stringify(want)}`); if (!ok) fail++; };
 
@@ -47,6 +48,9 @@ eq('a volume needs two characters and is never a 64-hex name (that is an anonymo
 eq('delete is offered only on what hive-am created and nothing uses',
   [canRemove({ managed: true, inUse: 0 }), canRemove({ managed: true, inUse: 1 }), canRemove({ managed: false, inUse: 0 }), canRemove({ managed: true, inUse: 0, builtin: true }), canRemove({ managed: true, inUse: 0, anonymous: true })], [true, false, false, false, false]);
 eq('an image name is suggested from the Dockerfile\'s folder', [imageNameFor('/home/you/My App/Dockerfile'), imageNameFor('/srv/api/web.Dockerfile'), imageNameFor('/Dockerfile'), imageNameFor('')], ['my-app:latest', 'api:latest', '', '']);
+eq('the name offered for a copy keeps the kind of the file (the server refuses anything else)', ['/a/docker-compose.yml', '/a/compose.YAML', '/a/Dockerfile', '/a/web.Dockerfile', '/a/Dockerfile.prod', '/a/Containerfile'].map((p) => copyNameFor(p.endsWith('ml') || p.endsWith('ML') ? 'compose' : 'dockerfile', p)),
+  ['docker-compose.copy.yml', 'compose.copy.YAML', 'Dockerfile.copy', 'web.copy.Dockerfile', 'Dockerfile.prod.copy', 'Containerfile.copy']);
+eq('a copy goes in the folder of the original', [folderOf('/srv/app/docker-compose.yml'), folderOf('/Dockerfile')], ['/srv/app', '/']);
 
 console.log(fail ? `\n${fail} FAILED` : '\nALL PASSED');
 process.exit(fail ? 1 : 0);

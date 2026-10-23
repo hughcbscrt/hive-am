@@ -1,7 +1,7 @@
 'use client';
 import { ManagerField, MANAGEABLE } from './ManagerField';
 import { useState } from 'react';
-import { ChevronRight, RefreshCw } from 'lucide-react';
+import { ChevronRight, FilePen, RefreshCw } from 'lucide-react';
 import { CheckRow, Field, FolderPicker, PathPicker, Segmented } from '@/components/ui';
 import { useComposeServices, useDockerLists } from '@/lib/useDocker';
 import { canCreate } from '@/lib/dockerLists';
@@ -11,6 +11,7 @@ import { DockerBuild, useDockerMake } from './DockerMake';
 import { TemplatePicker } from './TemplatePicker';
 import { useI18n } from '@/lib/i18n/index';
 import { useHive } from '@/lib/store';
+import { useQueryState } from '@/lib/hooks/useQueryState';
 import type { ClusterConfig, DatabaseConfig, DbEngine, DockerConfig, HttpConfig, HttpScan, ObjectKind, ObjectView, ServerConfig } from '@/lib/types';
 import { KIND, envToText, lines, textToEnv } from './meta';
 import { VarsEditor, type Vars } from './VarsEditor';
@@ -88,6 +89,13 @@ export const dbConfigOf = (d: Draft): DatabaseConfig => {
 export const Card = ({ title, hint, wide = false, children }: { title: string; hint?: string; wide?: boolean; children: React.ReactNode }) => (
   <section className={`of-card ${wide ? 'wide' : ''}`} id={`of-${title.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-')}`} data-title={title}><header><h4>{title}</h4>{hint && <p className="muted small">{hint}</p>}</header>{children}</section>
 );
+
+/** In the settings of a compose resource: opens its File tab, where the saved compose file is edited. */
+function FileTabLink() {
+  const { t } = useI18n();
+  const [, setTab] = useQueryState('tab', 'summary');
+  return <p className="muted small res-m0"><button type="button" className="btn ghost sm" onClick={() => setTab('file')}><FilePen size={14} />{t('fe.openTab')}</button> {t('fe.openTab.hint')}</p>;
+}
 
 /** The services of a compose file, to pick (none picked = all of them). */
 function ServicePicker({ file, project, services, onServices, onProject }: { file: string; project: string; services: string; onServices: (v: string) => void; onProject: (v: string) => void }) {
@@ -270,6 +278,7 @@ export function ObjectFields({ d, set, setD, scan, showKind = false, error, obje
         {d.mode === 'compose' && (
           <Card title={t('obj.mode.compose')}>
             <PathPicker mode="file" exts={['yml', 'yaml']} value={d.file} onChange={(v) => set('file', v)} label={t('obj.f.file')} hint={t('obj.f.file.hint')} placeholder="/home/you/app/docker-compose.yml" />
+            {objectId && <FileTabLink />}
             <ServicePicker file={d.file} project={d.project} services={d.services} onServices={(v) => set('services', v)} onProject={(v) => set('project', v)} />
             <Field label={t('obj.sup.stopTimeout')} hint={t('obj.sup.stopTimeout.hint')}>{text('stopTimeout', { placeholder: '10' })}</Field>
           </Card>

@@ -1340,6 +1340,19 @@ button.mini-sep .pip.unread { right: auto; left: 1px; background: var(--ok); ani
 .dr-count { min-width: 64px; }
 .dr-note { margin: 0; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--surface); }
 .dr-code { flex: 1; min-height: 0; }
+/* Editing a compose file (File tab) or a Dockerfile (a modal over the form): a bar that wraps instead of spilling, notices, then the editor. */
+.fe { flex: 1; min-height: 0; height: 100%; display: flex; flex-direction: column; min-width: 0; }
+.fe-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.fe-path { flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: var(--fs-hint); font-weight: 600; }
+.fe-size { flex: none; }
+.fe-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+.fe-note { margin: 0; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.fe-msgs { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; background: var(--surface); border-bottom: 1px solid var(--line); color: var(--ink); }
+.fe-out { margin: 6px 0 0; padding: 6px 8px; max-height: 140px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--fs-caption); background: var(--bg-deep); border-radius: 6px; }
+.fe-body { flex: 1; min-height: 200px; display: flex; } .fe-body .ce { border: 0; border-radius: 0; height: 100%; }
+.fe-modal { display: flex; flex-direction: column; height: min(66vh, 640px); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.fe-copy { display: flex; flex-direction: column; gap: 12px; }
+.fe-fail { padding: 12px; }
 .cm-act .menu { display: inline-block; vertical-align: middle; } .cm-act { white-space: nowrap; }
 
 .tpls { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }

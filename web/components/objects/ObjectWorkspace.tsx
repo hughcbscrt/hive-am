@@ -18,9 +18,13 @@ import { TerminalButton } from '@/components/dock/TerminalButton';
 import { HttpWorkspace } from './HttpWorkspace';
 import { HttpVars } from './HttpVars';
 import { DbWorkspace } from './DbWorkspace';
+import { FileEditor } from './FileEditor';
+import { copyCompose, readCompose, saveCompose } from '@/lib/dockerFiles';
 
-type Tab = 'summary' | 'logs' | 'config' | 'requests' | 'history' | 'vars' | 'query' | 'schema';
-const tabsOf = (o: ObjectView): Tab[] => (o.kind === 'http' ? ['requests', 'history', 'vars', 'config'] : o.kind === 'database' ? ['query', 'schema', 'history', 'config'] : ['summary', 'logs', 'config']);
+type Tab = 'summary' | 'logs' | 'file' | 'config' | 'requests' | 'history' | 'vars' | 'query' | 'schema';
+// Only a compose resource has a file of its own to edit (an existing container has none).
+const tabsOf = (o: ObjectView): Tab[] => (o.kind === 'http' ? ['requests', 'history', 'vars', 'config'] : o.kind === 'database' ? ['query', 'schema', 'history', 'config']
+  : o.kind === 'docker' && (o.config as DockerConfig).mode === 'compose' ? ['summary', 'logs', 'file', 'config'] : ['summary', 'logs', 'config']);
 
 /** One object on a whole screen, like an agent: the list at the left, and its tabs (summary, logs, settings, or requests and variables). */
 export function ObjectWorkspace({ id }: { id?: string }) {
@@ -60,6 +64,10 @@ function Screen({ object: o }: { object: ObjectView }) {
   const [logFilter, setLogFilter] = useState('');
   const [inspecting, setInspecting] = useState(false);
   const [recreating, setRecreating] = useState(false);
+  // Unsaved edits of the File tab: leaving it for another tab asks first.
+  const [fileDirty, setFileDirty] = useState(false);
+  const [leaving, setLeaving] = useState<Tab | null>(null);
+  const go = (x: Tab) => { if (x === 'logs') setLogFilter(''); setTab(x); };
   const [busy, setBusy] = useState<string | null>(null);
   const { icon: Icon, color } = KIND[o.kind];
   const st = o.state.status, live = st === 'running' || st === 'starting';
@@ -113,11 +121,15 @@ function Screen({ object: o }: { object: ObjectView }) {
         primary={primary}
         actions={actions}
       />
-      <Tabs idPrefix="ow" label={t('rs.tabs')} value={tab} onChange={(x) => { if (x === 'logs') setLogFilter(''); setTab(x); }} tabs={tabs.map((x) => ({ id: x, label: t(`ow.tab.${x}`) }))} />
-      <div className={`ow-body ${tab === 'logs' || tab === 'requests' || tab === 'history' || tab === 'query' || tab === 'schema' ? 'full' : ''}`}>
+      <Tabs idPrefix="ow" label={t('rs.tabs')} value={tab} onChange={(x) => { if (tab === 'file' && fileDirty && x !== 'file') setLeaving(x as Tab); else go(x as Tab); }} tabs={tabs.map((x) => ({ id: x, label: t(`ow.tab.${x}`) }))} />
+      <div className={`ow-body ${tab === 'logs' || tab === 'file' || tab === 'requests' || tab === 'history' || tab === 'query' || tab === 'schema' ? 'full' : ''}`}>
         <TabPanel id={tab} value={tab} idPrefix="ow">
           {tab === 'summary' && <ObjectSummary object={o} onSeeLogs={(filter) => { setLogFilter(filter ?? ''); setTab('logs'); }} />}
           {tab === 'logs' && <LogPane key={logFilter} id={o.id} members={cluster ? memberNames : undefined} initialFilter={logFilter || undefined} />}
+          {tab === 'file' && docker?.mode === 'compose' && (
+            <FileEditor key={docker.file} kind="compose" load={() => readCompose(o.id)} save={(content, etag) => saveCompose(o.id, content, etag)} copy={(p) => copyCompose(o.id, p)}
+              repointOption onRecreate={() => setRecreating(true)} onDirty={setFileDirty} />
+          )}
           {tab === 'config' && <ObjectConfig object={o} />}
           {o.kind === 'database' && (tab === 'query' || tab === 'schema' || tab === 'history') && <DbWorkspace object={o} pane={tab} onPane={setTab} />}
           {o.kind === 'http' && (tab === 'requests' || tab === 'history') && <HttpWorkspace object={o} pane={tab} onOpenVars={() => setTab('vars')} onGoRequests={() => setTab('requests')} />}
@@ -125,6 +137,10 @@ function Screen({ object: o }: { object: ObjectView }) {
         </TabPanel>
       </div>
       {inspecting && <ServiceDetail objectId={o.id} title={o.name} onClose={() => setInspecting(false)} />}
+      {leaving && (
+        <ConfirmDialog title={t('fe.leave.title')} body={t('fe.leave.body')} confirmLabel={t('common.discard')} danger
+          onConfirm={() => { setFileDirty(false); go(leaving); }} onClose={() => setLeaving(null)} />
+      )}
       {recreating && (
         <ConfirmDialog title={t('rs.recreate.title', { name: o.name })} body={t('svc.recreate.hint')} confirmLabel={t('obj.act.recreate')} danger
           onConfirm={() => act('recreate')} onClose={() => setRecreating(false)} />
