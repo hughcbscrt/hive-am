@@ -102,7 +102,7 @@ button.nav { width: 100%; border: 0; background: none; font: inherit; font-weigh
   :root[data-rail='collapsed'] .conn .t { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
-.dot.ok { background: var(--ok); } .dot.err { background: var(--err); } .dot.run { background: var(--honey); animation: pulse 1.4s ease-in-out infinite; } .dot.wait { background: transparent; box-shadow: inset 0 0 0 2px var(--honey); }
+.dot.ok { background: var(--ok); } .dot.err { background: var(--err); } .dot.run { background: var(--honey); animation: pulse 1.4s ease-in-out infinite; } .dot.wait { background: transparent; box-shadow: inset 0 0 0 2px var(--honey); } .dot.off { background: color-mix(in srgb, var(--muted) 55%, transparent); }
 @keyframes pulse { 50% { opacity: .35; transform: scale(.8); } }
 
 .main { overflow-y: auto; min-width: 0; }
@@ -1508,6 +1508,9 @@ a.card.stat:focus-visible, .table tbody tr.row-link:focus-visible { outline: 2px
 .feed-item .dot { margin-top: 7px; }
 .feed-item .feed-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feed-item .feed-when { font-size: var(--fs-small); }
+.feed-item.open { grid-template-columns: auto minmax(0, 1fr) auto; }
+.feed-item .feed-cancel { align-self: start; margin-top: 1px; color: var(--muted); }
+.feed-item .feed-cancel:hover { color: var(--err); }
 .feed-item a { color: inherit; font-weight: 700; text-decoration: none; } .feed-item a:hover { text-decoration: underline; }
 .table-scroll { overflow-x: auto; border-radius: var(--radius); } .table-scroll .table { min-width: 760px; }
 .agents-filters { margin-bottom: 16px; } .agents-filters .search { max-width: 360px; flex: 1; min-width: 200px; }

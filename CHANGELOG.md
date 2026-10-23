@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Cancel a delegated task.** A task sent by mistake or no longer needed can be taken back, queued or running. In **Recent delegations** (Colony and Home) each unfinished task has a **×** button: a queued one is cancelled at once and never starts, a running one asks first and is stopped. The orchestrator is told once, in the place where it delegated. Orchestrators get two new tools, `dispatch_cancel` (only for their own tasks; they get no extra message for a task they cancel) and `dispatch_list` (their tasks that have not finished). A cancelled task shows as **cancelled** with a grey dot, frees its place in the limit of 10, and what the worker already changed stays in the folder. Unfinished tasks now come first in the list and are never hidden by its limit. Stop on a worker still stops only its current turn and marks that delegation failed.
+
 ### Fixed
 
 - **Lists follow the language at once.** Changing the language with the app open left some names in the old language until a reload: the **No colony** group in the chat's agent list and in **Resources**, and the colony hints in the agent form and the resource manager field. They now change right away.

@@ -254,8 +254,9 @@ export const agents = {
 };
 
 // ---- dispatch log ----
-// A delegation is `queued` until the worker's turn starts (it waits behind the worker's other turns), then `running`, then `done`, `failed`
-// or `interrupted` (the server stopped while it was queued or running).
+// A delegation is `queued` until the worker's turn starts (it waits behind the worker's other turns), then `running`, then `done`, `failed`,
+// `interrupted` (the server stopped while it was queued or running) or `cancelled` (its orchestrator or the person took it back). Only a
+// row still queued or running is closed, so the first of the end of the turn and a cancel sets the one final state.
 export const dispatches = {
   start(from: string, to: string, task: string, mode: 'sync' | 'background' = 'sync', origin: string | null = null) {
     const id = uid();
@@ -266,16 +267,24 @@ export const dispatches = {
   setRunning: (id: string) => q("UPDATE dispatches SET status='running' WHERE id=? AND status='queued'").run(id),
   setSession: (id: string, sessionId: string) => q('UPDATE dispatches SET session_id=? WHERE id=?').run(sessionId, id),
   finish: (id: string, status: string, result: string) =>
-    q('UPDATE dispatches SET status=?, result=?, finished_at=? WHERE id=?').run(status, result.slice(0, 20000), now(), id),
+    q("UPDATE dispatches SET status=?, result=?, finished_at=? WHERE id=? AND status IN ('queued','running')").run(status, result.slice(0, 20000), now(), id).changes > 0,
+  /** Cancels a task that has not finished; false if it already had. Cancelled by its orchestrator, it is never announced (the tool told it). */
+  cancel: (id: string, result: string, byOrchestrator: boolean) => {
+    const at = now();
+    return q("UPDATE dispatches SET status='cancelled', result=?, finished_at=?, notified_at=CASE WHEN ? THEN ? ELSE notified_at END WHERE id=? AND status IN ('queued','running')").run(result, at, byOrchestrator ? 1 : 0, at, id).changes > 0;
+  },
   markNotified: (id: string) => q('UPDATE dispatches SET notified_at=? WHERE id=? AND notified_at IS NULL').run(now(), id),
   markRead: (id: string) => q('UPDATE dispatches SET read_at=? WHERE id=? AND read_at IS NULL').run(now(), id),
   /** Background tasks of an orchestrator that have not finished yet. */
   unfinished: (from: string) => (q("SELECT COUNT(*) AS n FROM dispatches WHERE from_id=? AND mode='background' AND status IN ('queued','running')").get(from) as { n: number }).n,
+  /** Every task of an orchestrator that has not finished, oldest first. */
+  open: (from: string) => q("SELECT * FROM dispatches WHERE from_id=? AND status IN ('queued','running') ORDER BY created_at, id").all(from) as DispatchRow[],
   /** Finished background tasks whose result was not handed to the orchestrator yet. */
   undelivered: () => q("SELECT * FROM dispatches WHERE mode='background' AND status NOT IN ('queued','running') AND notified_at IS NULL ORDER BY created_at").all() as DispatchRow[],
   /** At startup nothing is running any more: what was queued or running is interrupted (a task is never resumed). */
   interruptLeftovers: () => q("UPDATE dispatches SET status='interrupted', finished_at=? WHERE status IN ('queued','running')").run(now()).changes,
-  recent: (limit = 50) => q('SELECT * FROM dispatches ORDER BY created_at DESC LIMIT ?').all(limit) as DispatchRow[],
+  /** The newest rows, plus any older one that has not finished (so the interface can always show and cancel it). */
+  recent: (limit = 50) => q("SELECT * FROM (SELECT * FROM dispatches ORDER BY created_at DESC LIMIT ?) UNION SELECT * FROM dispatches WHERE status IN ('queued','running') ORDER BY created_at DESC").all(limit) as DispatchRow[],
 };
 
 // Agents left 'running' by a crash/blackout are simply idle again: their session is intact on disk.

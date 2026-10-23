@@ -764,6 +764,11 @@ export const es: Record<DictKey, string> = {
   "colony.task.done": "Terminada",
   "colony.task.failed": "Falló",
   "colony.task.interrupted": "Interrumpida: hive-am se reinició mientras corría",
+  "colony.task.cancelled": "Cancelada: se retiró antes de terminar",
+  "colony.cancelTask": "Cancelar esta tarea",
+  "colony.cancelRunning.title": "¿Detener esta tarea?",
+  "colony.cancelRunning.body": "{name} está trabajando en ella. Se detiene en el acto y se le avisa al orquestador; lo que ya cambió se queda en la carpeta.",
+  "colony.cancelRunning.confirm": "Detener tarea",
 
   // ---- agents ----
   "agents.subtitle": "Cada agente es un puntero a una sesión nativa del CLI. Cierra el navegador o pierde la luz: al reabrir un agente se reanuda su conversación real.",

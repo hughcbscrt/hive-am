@@ -10,15 +10,17 @@
 
 ## 9.2 How an orchestrator delegates
 
-The orchestrator receives three tools, exposed by an **MCP server** (`server/mcp/dispatch.mjs`) named `hive`. The same server also announces the tools of connections ([document 14](14-external-connections.md)), of the notebook and of on-demand skills ([7.3](07-agents-types-skills-colonies.md#73-skills)) according to the agent's capabilities (`HIVE_CAPS`):
+The orchestrator receives five tools, exposed by an **MCP server** (`server/mcp/dispatch.mjs`) named `hive`. The same server also announces the tools of connections ([document 14](14-external-connections.md)), of the notebook and of on-demand skills ([7.3](07-agents-types-skills-colonies.md#73-skills)) according to the agent's capabilities (`HIVE_CAPS`):
 
 | Tool | What it does |
 |---|---|
 | `list_agents` | Returns (JSON) the orchestrator's direct subagents: `name`, `role`, `description`, `provider`, `busy`. |
 | `dispatch` `{ agent, task, background? }` | Sends a self-contained task to a subagent by **exact name**. By default (`background` true) it returns at once with a task id and the answer arrives later as a message; with `background: false` it waits for the final answer ([9.3](#93-flow-of-a-delegation)). |
-| `dispatch_status` `{ id, wait_seconds? }` | State of a task the orchestrator delegated (`queued`, `running`, `done`, `failed`, `interrupted`) and its result once finished. With `wait_seconds` (0 to 60) it waits up to that long for the end; more than 60 is capped at 60 and the answer says so. |
+| `dispatch_status` `{ id, wait_seconds? }` | State of a task the orchestrator delegated (`queued`, `running`, `done`, `failed`, `interrupted`, `cancelled`) and its result once finished. With `wait_seconds` (0 to 60) it waits up to that long for the end; more than 60 is capped at 60 and the answer says so. |
+| `dispatch_list` | The orchestrator's tasks that have not finished (`queued` or `running`), oldest first: id, subagent, status, mode, age and the start of the task. |
+| `dispatch_cancel` `{ id }` | Cancels a task the orchestrator delegated ([9.3](#93-flow-of-a-delegation)). A queued one never starts; a running one is aborted; one already finished is left as it is and its state is answered (not an error). It says whether the worker was running. |
 
-In the CLIs they appear as `mcp__hive__list_agents`, `mcp__hive__dispatch` and `mcp__hive__dispatch_status`.
+In the CLIs they appear as `mcp__hive__list_agents`, `mcp__hive__dispatch`, `mcp__hive__dispatch_status`, `mcp__hive__dispatch_list` and `mcp__hive__dispatch_cancel`.
 
 ### The MCP server
 
@@ -27,8 +29,10 @@ In the CLIs they appear as `mcp__hive__list_agents`, `mcp__hive__dispatch` and `
   - `list_agents` → `GET /api/orchestrators/<HIVE_AGENT_ID>/workers`
   - `dispatch` with `background: false` → `POST /api/dispatch { from: HIVE_AGENT_ID, agent, task, poll: true }`, then `POST /api/dispatch/status { from, id, wait_seconds }` in a loop until the task ends (each call waits at most `HIVE_AM_DISPATCH_POLL_S` seconds, 25 by default). By default (`background` not false): `POST /api/dispatch { …, background: true }` and nothing else.
   - `dispatch_status` → `POST /api/dispatch/status { from: HIVE_AGENT_ID, id, wait_seconds }`
+  - `dispatch_list` → `POST /api/dispatch/list { from: HIVE_AGENT_ID }`
+  - `dispatch_cancel` → `POST /api/dispatch/cancel { from: HIVE_AGENT_ID, id }`
 - If the API answers with an error, it returns an `isError` result with the message to the model (e.g. *"X is not assigned to Y"*).
-- A synchronous `dispatch` returns the worker's final answer; if it is empty: *"(the subagent finished without a text answer)"*. A task that ends `failed` or `interrupted` is an `isError` result with the reason. If the API cannot be reached for a while during the wait, the error carries the task id, so the orchestrator can ask with `dispatch_status`.
+- A synchronous `dispatch` returns the worker's final answer; if it is empty: *"(the subagent finished without a text answer)"*. A task that ends `failed` or `interrupted` is an `isError` result with the reason; one that is `cancelled` is an `isError` result *"<name> task was cancelled: Cancelled by … before it finished."* If the API cannot be reached for a while during the wait, the error carries the task id, so the orchestrator can ask with `dispatch_status`.
 - A background `dispatch` returns `Task <id> sent to <name> (running|queued). You will be woken with the result when it finishes; you can also ask with dispatch_status.`
 
 ### How it is injected depending on the provider
@@ -108,23 +112,24 @@ Details:
 - **No long request:** every call returns within about a minute (`dispatch_status` waits 60 s at most). The result does not depend on the caller: if it goes away, the row is finished anyway and can be read later with `dispatch_status`. `POST /api/dispatch` without `poll` or `background` still holds the request until the worker answers, for older callers; the MCP server no longer uses it.
 - **What the synchronous mode does not fix:** the orchestrator's own CLI prints nothing while it waits on a tool, and a CLI silent for 10 minutes is cut ([document 6](06-providers.md)). That is why `background` is true by default and the instructions tell the orchestrator to use `background: false` only for a very short task whose answer it needs right now.
 - **The notice** (`dispatches.ts`, background only): when the task ends (done, failed, or interrupted by a restart) the orchestrator gets one message `Delegated task <id> to <name> finished (<status>). Result:` followed by the result (cut at 20,000 characters like the stored one). It goes where the dispatch was made, as a wake-up does ([14.6.7](14-external-connections.md#1467-telling-the-person-later-the-wake-ups-skill-and-wake_me)): the chat thread the orchestrator was answering (mentioning who asked, in a group), or a message of its web conversation. If the orchestrator is in the middle of a turn, the message waits in its queue. It reuses `deliverTo` of `wake.ts`: `retry` (the platform is not connected yet) tries again every `HIVE_AM_WAKE_RETRY_MS`, 12 times; `dropped` (the thread is gone, muted, or the connection now belongs to another agent) gives up, and the result stays readable with `dispatch_status`. `notified_at` is written just before the message is handed over, so a restart neither drops it nor sends it twice.
-- **Ownership:** only the orchestrator that started a task can read it (`403` otherwise); an unknown id is `404`.
-- **Limit:** at most **10 unfinished background tasks** per orchestrator; the 11th is refused with a 400 that says the limit. Synchronous tasks do not count.
-- **Restart** (`armDispatchNotices()` at startup): every task left `queued` or `running` is marked `interrupted` (it is never resumed); background ones are announced with *"hive-am restarted while <name> was working on it; check the branch or the files and send the task again if needed."*, and finished background tasks whose notice was not handed over yet are announced now.
-- **Log:** `dispatches` stores task, status (`queued` → `running` → `done`/`failed`; `interrupted` if the server went down), result, `session_id`, `mode` (`sync` or `background`), `origin`, `notified_at` and `read_at` ([document 4](04-storage.md#table-dispatches)).
+- **Ownership:** only the orchestrator that started a task can read, list or cancel it (`403` otherwise); an unknown id is `404`. The person can cancel any task from the web.
+- **Cancel** (`cancelTask` in `dispatches.ts`, from `dispatch_cancel` or `POST /api/dispatches/:id/cancel`): a `queued` task leaves the worker's queue at once (`runtime.cancelQueued`: the `queued` count drops and a `status` event goes out now; when the chain reaches it the turn is skipped and the provider is never called); a `running` one has its turn aborted (`runtime.abortDispatch`), only if the turn running on the worker serves this task, so cancelling one task never stops another. The row becomes `cancelled`, with `finished_at` and a fixed result, *"Cancelled by the orchestrator before it finished."* or *"Cancelled by the person before it finished."* (the worker's partial text is not kept). What the worker already changed stays in the folder. Both the cancel and the end of the turn write the final state only while the row is still `queued` or `running`, so whichever comes first wins, the aborted turn does not turn `cancelled` into `failed`, and cancelling twice or as the task ends leaves one state and at most one notice. A task already finished is not changed: the answer gives its state. Cancelled by its orchestrator, `notified_at` is set in the same update (the tool call already told it); cancelled by the person, a background task is announced at once, even if it was queued, as *"Delegated task <id> to <name> finished (cancelled). Result: Cancelled by the person before it finished."* A second notice for the same task while the first is being delivered is ignored.
+- **Limit:** at most **10 unfinished background tasks** per orchestrator; the 11th is refused with a 400 that says the limit. Synchronous tasks do not count, and a cancelled task frees its place at once.
+- **Restart** (`armDispatchNotices()` at startup): every task left `queued` or `running` is marked `interrupted` (it is never resumed); background ones are announced with *"hive-am restarted while <name> was working on it; check the branch or the files and send the task again if needed."*, and finished background tasks whose notice was not handed over yet (a cancel by the person included) are announced now. A `cancelled` row is already finished: it is not touched.
+- **Log:** `dispatches` stores task, status (`queued` → `running` → `done`/`failed`; `interrupted` if the server went down; `cancelled` if it was taken back), result, `session_id`, `mode` (`sync` or `background`), `origin`, `notified_at` and `read_at` ([document 4](04-storage.md#table-dispatches)).
 
 ## 9.4 Per-agent queue
 
 `runtime.ts` keeps, per agent, a chain of promises:
 
 ```ts
-State = { chain: Promise, controller: AbortController | null, queued: number, live: Live | null }
+State = { chain: Promise, controller: AbortController | null, dispatchId: string | null, queued: number, live: Live | null, cancelled: Set<string> }
 ```
 
 - **One turn at a time per agent.** If a message (yours or a delegation) arrives while one is in progress, it is **queued** and run afterwards, in order. `queued` is exposed in the API and the UI ("N queued").
 - Different agents run **in parallel** with each other.
 - A turn whose CLI prints nothing for 10 minutes is cut off and reported as failed (`<cmd> stopped answering`), and the queue goes on with the next message. The queue lives in memory: a restart loses the messages that had not started.
-- **Stop** (`POST …/stop`) aborts only the turn **in progress** (`SIGTERM` to the CLI). Turns already queued **continue** and will run next.
+- **Stop** (`POST …/stop`) aborts only the turn **in progress** (`SIGTERM` to the CLI). Turns already queued **continue** and will run next. A delegation stopped this way ends `failed` with the worker's partial text; to take back one task, queued or running, cancel it instead (`dispatch_cancel`, or *Recent delegations* in the web).
 - A delegation to a busy worker waits its turn in the same queue, with status `queued` in `dispatches` until its turn starts. A synchronous `dispatch` keeps the orchestrator waiting meanwhile; a background one does not.
 - Each turn emits `turn_start`, events and `status` over WebSocket, and keeps `live` (accumulated events) so the view can be rebuilt if the browser reloads.
 
@@ -132,7 +137,7 @@ State = { chain: Promise, controller: AbortController | null, queued: number, li
 
 `composeInstructions` adds a **Your team** section that depends on the current state:
 
-- **With subagents:** a `- **name**: description` list of **only** the connected ones; it says they are the *only* ones it can delegate to; it tells it to delegate with `dispatch` instead of doing the work, warns that each delegation opens a new conversation (all the context must be given in the task), explains that `dispatch` returns at once and the result arrives as a message (or with `dispatch_status`), and to use `background: false` only for a very short task and that, if asked about its agents, it must **call `list_agents` and answer exactly with what it returns**, never with an old list, and not mention or use agents outside that list.
+- **With subagents:** a `- **name**: description` list of **only** the connected ones; it says they are the *only* ones it can delegate to; it tells it to delegate with `dispatch` instead of doing the work, warns that each delegation opens a new conversation (all the context must be given in the task), explains that `dispatch` returns at once and the result arrives as a message (or with `dispatch_status`), to use `background: false` only for a very short task, that a task no longer needed is taken back with `dispatch_cancel` (and `dispatch_list` lists the unfinished ones; what the subagent already changed stays in the folder) and that, if asked about its agents, it must **call `list_agents` and answer exactly with what it returns**, never with an old list, and not mention or use agents outside that list.
 - **Without subagents:** it tells it that it cannot delegate and not to claim to know other agents.
 
 **Update when connections change:** the CLIs fix the instructions when the session starts (Claude ignores `--append-system-prompt` on resume; OpenCode and Kiro receive them inside the message); that is why the fingerprint (`instr_hash`) is compared and, if the team changed (or the skills, or the notebook edited from outside), the next message carries an `<instructions update="true">` block that replaces the previous one ([document 6](06-providers.md#67-instructions-preamble-providerspreamblets)).
@@ -176,6 +181,6 @@ Relations are drawn **on top of** the honeycomb cells:
 |---|---|
 | Orchestrator's chat | **Delegate** row (`dispatch` tool) with the worker and the task; when opened, the output is the worker's answer (or, in the background, the task id). A background result arrives later as a new message that starts with "Delegated task …" |
 | Worker's chat, while it runs | **"Delegated task from X"** card with the task; it disappears when it finishes because it does not belong to its direct conversation |
-| Colony → *Recent delegations* | Last 6: from → to, task, how long ago, status (animated: running; hollow: queued; green: done; red: failed or interrupted; hovering the dot names it) |
+| Colony → *Recent delegations* | Unfinished tasks first (never hidden by the limit), then the latest up to 6: from → to, task, how long ago, status (animated: running; hollow: queued; green: done; grey: cancelled; red: failed or interrupted; hovering the dot names it). Queued and running rows have a Cancel button (`POST /api/dispatches/:id/cancel`); a running one asks first |
 | Worker's Settings → Sessions | The task's session, in *Delegated tasks* |
 | Agent list (side selector) | While it works, the worker's subtitle says "Delegated task · …" |

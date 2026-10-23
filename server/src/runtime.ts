@@ -21,11 +21,12 @@ const emit = (m: BusMessage) => bus.emit('msg', m);
 export const notifyAgentsChanged = () => emit({ kind: 'agents_changed' });
 
 interface Live { turnId: string; prompt: string; events: StreamEvent[]; source: 'user' | 'dispatch'; origin?: Origin }
-interface State { chain: Promise<unknown>; controller: AbortController | null; queued: number; live: Live | null }
+// `dispatchId` is the delegation the running turn serves; `cancelled` holds queued delegations taken back before their turn came.
+interface State { chain: Promise<unknown>; controller: AbortController | null; dispatchId: string | null; queued: number; live: Live | null; cancelled: Set<string> }
 const states = new Map<string, State>();
 const st = (id: string): State => {
   let s = states.get(id);
-  if (!s) states.set(id, (s = { chain: Promise.resolve(), controller: null, queued: 0, live: null }));
+  if (!s) states.set(id, (s = { chain: Promise.resolve(), controller: null, dispatchId: null, queued: 0, live: null, cancelled: new Set() }));
   return s;
 };
 
@@ -64,6 +65,8 @@ export function sendTurn(agentId: string, prompt: string, source: 'user' | 'disp
 
 async function execute(agentId: string, prompt: string, source: 'user' | 'dispatch', from?: string, dispatchId?: string, origin?: Origin): Promise<TurnResult> {
   const s = st(agentId);
+  // A delegation cancelled while it waited never reaches the provider; it already left the queue count when it was cancelled.
+  if (dispatchId && s.cancelled.delete(dispatchId)) return { ok: false, text: '', error: 'Cancelled' };
   s.queued--;
   let raw: ReturnType<typeof agents.get>;
   let agent: ReturnType<typeof resolved>;
@@ -97,6 +100,7 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
 
   try {
     s.controller = controller;
+    s.dispatchId = dispatchId ?? null;
     s.live = { turnId, prompt, events: [], source, origin };
     if (dispatchId) dispatches.setRunning(dispatchId);
     agents.setStatus(agentId, 'running');
@@ -135,6 +139,7 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
   if (!events && !error && !controller.signal.aborted) { error = 'The agent produced no events, so the turn did not run'; push({ t: 'error', message: error }); }
   if (controller.signal.aborted && !error) push({ t: 'done', ok: false, summary: 'Stopped' });
   s.controller = null;
+  s.dispatchId = null;
   s.live = null;
   if (!error && !delegated && !controller.signal.aborted) { agents.setInstrHash(agentId, hash); notebooks.markSeen(agentId, nbVersion); }
   agents.setStatus(agentId, error ? 'error' : 'idle');
@@ -145,6 +150,24 @@ async function execute(agentId: string, prompt: string, source: 'user' | 'dispat
 export function stopAgent(agentId: string, clearQueue = true): boolean {
   const s = states.get(agentId);
   if (!s?.controller) return false;
+  s.controller.abort();
+  return true;
+}
+
+/** Takes a queued delegation out of the worker's queue: its turn is skipped when the chain reaches it, and the count drops now. */
+export function cancelQueued(agentId: string, dispatchId: string): boolean {
+  const s = states.get(agentId);
+  if (!s || s.queued <= 0 || s.cancelled.has(dispatchId)) return false;
+  s.cancelled.add(dispatchId);
+  s.queued--;
+  emit({ kind: 'status', agentId, status: s.live ? 'running' : s.queued ? 'queued' : agents.get(agentId)?.status === 'error' ? 'error' : 'idle', queued: s.queued });
+  return true;
+}
+
+/** Aborts the worker's turn only if it is serving this delegation, so cancelling one task never stops another. */
+export function abortDispatch(agentId: string, dispatchId: string): boolean {
+  const s = states.get(agentId);
+  if (!s?.controller || s.dispatchId !== dispatchId) return false;
   s.controller.abort();
   return true;
 }
@@ -163,6 +186,7 @@ export function startDispatch(fromId: string, workerName: string, task: string, 
   if (!from.worker_ids.includes(worker.id)) throw new Error(`"${worker.name}" is not assigned to ${from.name}`);
   const id = dispatches.start(from.id, worker.id, task, mode, origin);
   const done = sendTurn(worker.id, task, 'dispatch', from.id, id).then((res) => {
+    // A no-op when the task was cancelled meanwhile: the aborted or skipped turn does not turn `cancelled` into `failed`.
     dispatches.finish(id, res.ok ? 'done' : 'failed', res.text || res.error || '');
     return res;
   });

@@ -152,12 +152,12 @@ Delegation log: who asked what of whom.
 | `id` | UUID |
 | `from_id`, `to_id` | Orchestrator and worker (no foreign key: the record survives if an agent is deleted) |
 | `task` | Full task text |
-| `status` | `queued` (waiting behind the worker's other turns) \| `running` \| `done` \| `failed` \| `interrupted` |
+| `status` | `queued` (waiting behind the worker's other turns) \| `running` \| `done` \| `failed` \| `interrupted` \| `cancelled` (taken back by its orchestrator or the person; `result` says who). Only a row still `queued` or `running` gets a final state, so the end of a turn and a cancel never overwrite each other |
 | `result` | The worker's final answer, trimmed to 20,000 characters |
 | `session_id` | The worker's native session where it ran (migration) |
 | `mode` | `sync` (the answer goes back to the tool call) or `background` (the orchestrator is told when it ends). Migration 9; older rows are `sync` |
 | `origin` | Background only: JSON with the chat thread where the orchestrator was asked (`connection_id`, `thread_id`, `req_id`, `req_name`); `NULL` for its web conversation |
-| `notified_at` | When the result of a background task was handed to the orchestrator (or given up on because there was nobody to tell) |
+| `notified_at` | When the result of a background task was handed to the orchestrator (or given up on because there was nobody to tell); set with the cancel when the orchestrator cancelled it itself |
 | `read_at` | When the orchestrator read the finished result with `dispatch_status` |
 | `created_at`, `finished_at` | |
 

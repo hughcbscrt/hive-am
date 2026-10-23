@@ -125,8 +125,11 @@ Reads: [document 13, §13.4](13-changes-explorer-git.md#134-read-api). History a
 | `GET /api/orchestrators/:id/workers` | — | `[{ name, role, description, provider, busy }]`: only the **direct** subagents (used by the `list_agents` tool) |
 | `PUT /api/orchestrators/:id/workers` | `{ worker_ids }` | Replaces the orchestrator's connections. 400 if the agent is not an orchestrator. |
 | `POST /api/dispatch` | `{ from, agent, task, background?, poll? }` | With `background: true` or `poll: true` it stores and queues the task and returns at once `{ id, agent, status, mode }` (`background` also announces the result to the orchestrator when it ends; 400 past 10 unfinished background tasks). With neither it **blocks** until the worker finishes and returns `{ ok, text, error? }` (kept for older callers). 400 if the agent does not exist, is not assigned, etc. |
-| `POST /api/dispatch/status` | `{ from, id, wait_seconds? }` | `{ id, agent, status, mode, result?, note? }`: `result` once the task ended (`done`, `failed`, `interrupted`). `wait_seconds` (0 to 60, more is capped and `note` says so) waits for the end. 403 if `from` did not start it, 404 for an unknown id |
-| `GET /api/dispatches` | — | Last 50 delegations |
+| `POST /api/dispatch/status` | `{ from, id, wait_seconds? }` | `{ id, agent, status, mode, result?, note? }`: `result` once the task ended (`done`, `failed`, `interrupted`, `cancelled`). `wait_seconds` (0 to 60, more is capped and `note` says so) waits for the end. 403 if `from` did not start it, 404 for an unknown id |
+| `POST /api/dispatch/list` | `{ from }` | `[{ id, agent, status, mode, task, age_s }]`: the tasks of `from` that have not finished, oldest first (the `dispatch_list` tool) |
+| `POST /api/dispatch/cancel` | `{ from, id }` | `{ id, agent, status, mode, was, cancelled, result? }`: cancels a task of `from` (the `dispatch_cancel` tool). `cancelled` is false when it had already finished; `status` is then its state. 403 if `from` did not start it, 404 for an unknown id |
+| `GET /api/dispatches` | — | Last 50 delegations, plus any older one that has not finished |
+| `POST /api/dispatches/:id/cancel` | `{}` | The same cancel from the web: any task, by the person (the orchestrator is told). 404 for an unknown id |
 
 ### Utilities
 

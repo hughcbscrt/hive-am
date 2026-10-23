@@ -125,8 +125,11 @@ Lecturas: [documento 13, §13.4](13-explorador-de-cambios-git.md#134-api-de-lect
 | `GET /api/orchestrators/:id/workers` | — | `[{ name, role, description, provider, busy }]`: solo los subagentes **directos** (lo usa la herramienta `list_agents`) |
 | `PUT /api/orchestrators/:id/workers` | `{ worker_ids }` | Reemplaza las conexiones del orquestador. 400 si el agente no es orquestador. |
 | `POST /api/dispatch` | `{ from, agent, task, background?, poll? }` | Con `background: true` o `poll: true` guarda y encola la tarea y devuelve enseguida `{ id, agent, status, mode }` (`background` además le avisa el resultado al orquestador cuando termina; 400 pasadas 10 tareas en segundo plano sin terminar). Sin ninguno **bloquea** hasta que el worker termina y devuelve `{ ok, text, error? }` (se mantiene para clientes antiguos). 400 si el agente no existe, no está asignado, etc. |
-| `POST /api/dispatch/status` | `{ from, id, wait_seconds? }` | `{ id, agent, status, mode, result?, note? }`: `result` cuando la tarea terminó (`done`, `failed`, `interrupted`). `wait_seconds` (0 a 60; más se recorta y `note` lo dice) espera a que termine. 403 si `from` no la inició, 404 si el id no existe |
-| `GET /api/dispatches` | — | Últimas 50 delegaciones |
+| `POST /api/dispatch/status` | `{ from, id, wait_seconds? }` | `{ id, agent, status, mode, result?, note? }`: `result` cuando la tarea terminó (`done`, `failed`, `interrupted`, `cancelled`). `wait_seconds` (0 a 60; más se recorta y `note` lo dice) espera a que termine. 403 si `from` no la inició, 404 si el id no existe |
+| `POST /api/dispatch/list` | `{ from }` | `[{ id, agent, status, mode, task, age_s }]`: las tareas de `from` que no han terminado, la más antigua primero (la herramienta `dispatch_list`) |
+| `POST /api/dispatch/cancel` | `{ from, id }` | `{ id, agent, status, mode, was, cancelled, result? }`: cancela una tarea de `from` (la herramienta `dispatch_cancel`). `cancelled` es false si ya había terminado; `status` es entonces su estado. 403 si `from` no la inició, 404 si el id no existe |
+| `GET /api/dispatches` | — | Últimas 50 delegaciones, más cualquier otra más antigua que no haya terminado |
+| `POST /api/dispatches/:id/cancel` | `{}` | La misma cancelación desde la web: cualquier tarea, por la persona (se le avisa al orquestador). 404 si el id no existe |
 
 ### Utilidades
 
