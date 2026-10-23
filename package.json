@@ -1,7 +1,7 @@
 {
   "name": "hive-am",
   "private": true,
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "A colony of coding agents: orchestrators and subagents over Claude Code, OpenCode, Kiro and Cursor, with real session resume, a browser UI and Telegram.",
   "keywords": [
     "ai-agents",
