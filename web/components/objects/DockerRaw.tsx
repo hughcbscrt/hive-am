@@ -29,6 +29,7 @@ export function DockerRaw({ src }: { src: string }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     let live = true;
+    setR(null); setErr('');
     api.get<Raw>(`${src}${src.includes('?') ? '&' : '?'}reveal=${reveal ? 1 : 0}`).then((x) => { if (live) { setR(x); setErr(''); } }).catch((e) => { if (live) setErr(e instanceof Error ? e.message : 'error'); });
     return () => { live = false; };
   }, [src, reveal]);

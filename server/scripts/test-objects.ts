@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { colonies } from '../src/db.js';
-import { composeServices, inspectMachine, listContainers, listImages } from '../src/objects/docker-info.js';
+import { composeServices, inspectMachine, listContainers, listImages, maskVar } from '../src/objects/docker-info.js';
 import { ObjectError, createObject, objectAction, objectInspect, objectInspectRaw, objectLogs, removeObject, stateOf, statsOf, updateObject } from '../src/objects/index.js';
 import { HttpError } from '../src/http/errors.js';
 import { match } from '../src/http/router.js';
@@ -112,15 +112,21 @@ check(objectsStore.list().filter((o) => o.kind === 'server').length === 0, 'dele
 check(!existsProcess(pid2), 'deleting a running server stops its process');
 
 // ---------------------------------------------------------------- inspect is local only, and says "Docker is off" without an error
-const routeStatus = async (method: string, path: string, origin?: string) => {
+const routeStatus = async (method: string, path: string, origin?: string, host = '127.0.0.1:4400') => {
   const url = new URL(`http://127.0.0.1:4400${path}`), m = match(method, url.pathname); if (!m) return 404;
-  try { await m.route.handler({ req: { headers: { host: '127.0.0.1:4400', ...(origin ? { origin } : {}) } } as unknown as IncomingMessage, res: null as never, params: m.params, url }); return 200; }
+  try { await m.route.handler({ req: { headers: { host, ...(origin ? { origin } : {}) } } as unknown as IncomingMessage, res: null as never, params: m.params, url }); return 200; }
   catch (e) { return e instanceof HttpError ? e.status : e instanceof ObjectError ? 400 : 500; }
 };
 check(await routeStatus('GET', '/api/objects/nope/inspect', 'https://evil.example') === 403, 'inspect answers 403 to a page that is not the local app');
 check(await routeStatus('GET', '/api/objects/nope/inspect', 'http://localhost:4401') === 400, 'and reaches the resource lookup from the local app');
 check(await routeStatus('GET', '/api/objects/nope/inspect/raw', 'https://evil.example') === 403 && await routeStatus('GET', '/api/docker/inspect?kind=image&ref=x', 'https://evil.example') === 403, 'the raw docker inspect routes are local only too');
+const rebound = await Promise.all(['/api/objects/nope/inspect', '/api/objects/nope/inspect/raw?reveal=1', '/api/docker/inspect?kind=image&ref=x&reveal=1'].map((u) => routeStatus('GET', u, 'http://evil.example', 'evil.example')));
+check(rebound.every((s) => s === 403), 'a page that reached hive-am through another name (DNS rebinding: Host and Origin both evil.example) gets 403 from every inspect route');
+check(await routeStatus('GET', '/api/objects/nope/inspect/raw', 'http://localhost:4401') === 400 && await routeStatus('GET', '/api/objects/nope/inspect', undefined, 'localhost:4400') === 400, 'while the local app (and a program with no origin) still reach them');
 check(await routeStatus('GET', '/api/docker/inspect?kind=container&ref=-f') === 400 && await routeStatus('GET', '/api/docker/inspect?kind=network&ref=--help') === 400 && await routeStatus('GET', '/api/docker/inspect?kind=image&ref=') === 400, 'a reference that looks like an option (or is empty) is refused with 400');
+check(maskVar('DB_PASSWORD=hunter2') === 'DB_PASSWORD=••••••••' && maskVar('HELLO=world') === 'HELLO=world' && maskVar('NOVALUE') === 'NOVALUE', 'a secret-looking variable is hidden whole, an ordinary one is left alone');
+check(maskVar('DATABASE_URL=postgres://u:urlpass@h/db') === 'DATABASE_URL=postgres://u:••••••••@h/db' && maskVar('OPTS=--a=redis://:p4ss@cache:6379/0 --b=amqp://guest:g@mq') === 'OPTS=--a=redis://:••••••••@cache:6379/0 --b=amqp://guest:••••••••@mq', 'the password of a URL with credentials is hidden, wherever it sits in the value');
+check(maskVar('API=http://host:8080/path@x') === 'API=http://host:8080/path@x' && maskVar('MIRROR=https://user@example.com/x') === 'MIRROR=https://user@example.com/x', 'a port with an @ later in the path, or a user with no password, is not mistaken for a password');
 check(await rejects(() => inspectMachine('system', 'x'), /container, an image/) && await rejects(() => inspectMachine('volume', 'a b'), /not a valid volume/), 'only containers, images, volumes and networks with a valid name are inspected');
 // Without Docker (or with its daemon down) inspect still says what is configured, with one notice instead of an error.
 const here = dirname(fileURLToPath(import.meta.url));
@@ -138,7 +144,7 @@ const dockerOk = (() => { try { execFileSync('docker', ['image', 'inspect', imag
 if (!dockerOk) console.log(`SKIP  Docker tests (no docker, or the image ${image} is not here)`);
 else {
   const hp = await freePort();
-  const cont = createObject({ name: 'test-container', kind: 'docker', colony_id: colony.id, config: { mode: 'container', image, ports: [`127.0.0.1:${hp}:80`], env: { HELLO: 'world', DB_PASSWORD: 'hunter2' } } });
+  const cont = createObject({ name: 'test-container', kind: 'docker', colony_id: colony.id, config: { mode: 'container', image, ports: [`127.0.0.1:${hp}:80`], env: { HELLO: 'world', DB_PASSWORD: 'hunter2', DATABASE_URL: 'postgres://u:urlpass@db/app' } } });
   const cname = `hive-am-${cont.id.slice(0, 8)}`;
   check((await st(cont.id)) === 'stopped', 'a container that does not exist yet is "stopped"');
   await objectAction(cont.id, 'start');
@@ -162,9 +168,9 @@ else {
   check(ic.exists && ic.status === 'exited' && ic.labels['hive-am.object'] === cont.id && !!ic.labels['hive-am.cfg'] && ic.configured.image === image && !ic.cfgStale, 'a stopped container is inspected: Docker\'s detail (exited), its labels and what is configured');
   const raw = await objectInspectRaw(cont.id, undefined, false);
   const rawJ = JSON.parse(raw.text)[0];
-  check(raw.available && rawJ.Name === `/${cname}` && rawJ.Config.Env.includes('HELLO=world') && rawJ.Config.Env.includes('DB_PASSWORD=••••••••') && !raw.text.includes('hunter2') && raw.masked === 1, 'the raw inspect is the whole JSON, with the secret-looking variable hidden by the server');
+  check(raw.available && rawJ.Name === `/${cname}` && rawJ.Config.Env.includes('HELLO=world') && rawJ.Config.Env.includes('DB_PASSWORD=••••••••') && !raw.text.includes('hunter2') && rawJ.Config.Env.includes('DATABASE_URL=postgres://u:••••••••@db/app') && !raw.text.includes('urlpass') && raw.masked === 2, 'the raw inspect is the whole JSON, with the secret-looking variable and the password of a URL hidden by the server');
   const shown = await objectInspectRaw(cont.id, undefined, true);
-  check(JSON.parse(shown.text)[0].Config.Env.includes('DB_PASSWORD=hunter2') && shown.masked === 0, 'and in the clear only when asked to reveal it');
+  check(JSON.parse(shown.text)[0].Config.Env.includes('DB_PASSWORD=hunter2') && JSON.parse(shown.text)[0].Config.Env.includes('DATABASE_URL=postgres://u:urlpass@db/app') && shown.masked === 0, 'and in the clear only when asked to reveal it');
   check(await rejects(() => inspectMachine('container', 'hive-am-does-not-exist'), /has no container/), 'a container that is not there is a clear error');
   const imgRaw = await inspectMachine('image', image);
   check(imgRaw.available && Array.isArray(JSON.parse(imgRaw.text)) && JSON.parse(imgRaw.text)[0].Id.startsWith('sha256:'), 'an image of the machine can be inspected raw too');

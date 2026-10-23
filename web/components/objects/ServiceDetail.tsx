@@ -10,8 +10,12 @@ import { Banner, Modal, TabPanel, Tabs } from '@/components/ui';
 import { DockerRaw } from './DockerRaw';
 import { NO_VALUE } from '@/lib/meta';
 
+// The same rule the server uses for the raw inspect (`maskVar` in server/src/objects/docker-info.ts): a secret-looking name hides the whole
+// value, otherwise only the password of a URL with credentials is hidden.
 const SECRET = /pass|secret|token|api[_-]?key|auth|credential|private/i;
+const URL_PASSWORD = /([a-z][a-z0-9+.-]*:\/\/[^\s/:@]*:)[^\s/@]+@/gi;
 const MASK = '••••••••';
+const masked = (name: string, v: string) => (SECRET.test(name) ? MASK : v.replace(URL_PASSWORD, `$1${MASK}@`));
 /** Labels in the order a person looks for them: the ones hive-am puts, the ones compose puts, then the rest. */
 const LABEL_GROUPS = [{ id: 'hive', test: (k: string) => k.startsWith('hive-am.') }, { id: 'compose', test: (k: string) => k.startsWith('com.docker.compose.') }, { id: 'other', test: () => true }] as const;
 
@@ -37,7 +41,7 @@ export function InspectView({ objectId, service, onShell }: { objectId: string; 
   const [view, setView] = useState<'summary' | 'raw'>('summary');
   useEffect(() => { api.get<DockerInspect>(`/objects/${objectId}/inspect${service ? `?service=${encodeURIComponent(service)}` : ''}`).then(setD).catch((e) => setErr(e instanceof Error ? e.message : 'error')); }, [objectId, service]);
   const when = (iso: string) => (iso && !iso.startsWith('0001') ? fmtDateTime(Date.parse(iso)) : NO_VALUE);
-  const value = (name: string, v: string) => (SECRET.test(name) && !peek ? MASK : v);
+  const value = (name: string, v: string) => (peek ? v : masked(name, v));
   const revealBtn = <button className="btn ghost sm" onClick={() => setPeek((p) => !p)}>{peek ? <EyeOff size={14} /> : <Eye size={14} />}{t('iv.reveal')}</button>;
   if (err) return <p className="gx-note err res-m0">{err}</p>;
   if (!d) return <p className="gx-note">{t('git.loading')}</p>;

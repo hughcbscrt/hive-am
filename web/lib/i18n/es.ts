@@ -1471,7 +1471,7 @@ export const es: Record<DictKey, string> = {
   "raw.copy": "Copiar JSON",
   "raw.masked_one": "Se oculta {count} variable que parece un secreto.",
   "raw.masked_other": "Se ocultan {count} variables que parecen secretos.",
-  "raw.warn": "Solo se ocultan variables: las etiquetas, el comando y otros campos también pueden llevar secretos.",
+  "raw.warn": "Solo se ocultan variables (todo el valor si el nombre parece un secreto; si no, la contraseña de una URL como esquema://usuario:contraseña@host): las etiquetas, el comando y otros campos también pueden llevar secretos.",
   "raw.noDocker": "Docker no está disponible (no está instalado o no está en marcha).",
   "svc.recreate.hint": "Quita el contenedor y lo crea de nuevo desde su imagen (lo que hay dentro se pierde).",
   "svc.rebuild.hint": "Construye la imagen otra vez desde su Dockerfile y crea el contenedor.",

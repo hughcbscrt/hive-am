@@ -18,6 +18,15 @@ export const NO_DAEMON = /Cannot connect to the Docker daemon|Is the docker daem
 /** Variable names whose value is hidden unless asked for (the same pattern the interface uses for the variables it shows). */
 export const SECRET_NAME = /pass|secret|token|api[_-]?key|auth|credential|private/i;
 export const MASK = '••••••••';
+/** The password of a URL with credentials (`scheme://user:password@host`), wherever it sits in a value. */
+const URL_PASSWORD = /([a-z][a-z0-9+.-]*:\/\/[^\s/:@]*:)[^\s/@]+@/gi;
+/** A `NAME=value` variable with its secret hidden: the whole value when the name looks like a secret, else the password of any URL in it. */
+export function maskVar(item: string): string {
+  const i = item.indexOf('=');
+  if (i < 0) return item;
+  if (SECRET_NAME.test(item.slice(0, i))) return `${item.slice(0, i + 1)}${MASK}`;
+  return item.slice(0, i + 1) + item.slice(i + 1).replace(URL_PASSWORD, `$1${MASK}@`);
+}
 
 export interface ContainerInfo { id: string; name: string; image: string; state: string; status: string; ports: string; /** Created by hive-am for one of its objects. */ managed: boolean }
 export interface ImageInfo { ref: string; id: string; size: string; created: string }
@@ -65,15 +74,15 @@ export async function composeServices(file: string): Promise<{ services: string[
 export type InspectKind = 'container' | 'image' | 'volume' | 'network';
 const KINDS: InspectKind[] = ['container', 'image', 'volume', 'network'];
 
-/** The `NAME=value` items of `Config.Env` (and the older `ContainerConfig.Env` of an image) whose name looks like a secret, hidden. */
+/** The `NAME=value` items of `Config.Env` (and the older `ContainerConfig.Env` of an image) with their secrets hidden (`maskVar`). */
 function maskEnv(items: any[]): number {
   let n = 0;
   for (const it of items) for (const cfg of [it?.Config, it?.ContainerConfig]) {
     if (!Array.isArray(cfg?.Env)) continue;
     cfg.Env = (cfg.Env as unknown[]).map((e) => {
-      const s = String(e), i = s.indexOf('=');
-      if (i < 0 || !SECRET_NAME.test(s.slice(0, i))) return e;
-      n++; return `${s.slice(0, i + 1)}${MASK}`;
+      const s = String(e), m = maskVar(s);
+      if (m === s) return e;
+      n++; return m;
     });
   }
   return n;
@@ -81,7 +90,8 @@ function maskEnv(items: any[]): number {
 
 /**
  * The whole `docker inspect` of a container, an image, a volume or a network, as indented JSON. The values of the variables whose name
- * looks like a secret are hidden unless `reveal` (other fields, like labels or the command, can carry secrets too and are not touched).
+ * looks like a secret, and the passwords of URLs in the others, are hidden unless `reveal` (other fields, like labels or the command, can
+ * carry secrets too and are not touched).
  * `available: false` when Docker is not installed or does not answer.
  */
 export async function inspectMachine(kind: string, ref: string, reveal = false): Promise<{ available: boolean; error?: string; text: string; masked: number }> {

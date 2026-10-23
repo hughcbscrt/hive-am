@@ -1473,7 +1473,7 @@ export const en = {
   "raw.copy": "Copy JSON",
   "raw.masked_one": "{count} variable that looks like a secret is hidden.",
   "raw.masked_other": "{count} variables that look like secrets are hidden.",
-  "raw.warn": "Only variables are hidden: labels, the command and other fields can carry secrets too.",
+  "raw.warn": "Only variables are hidden (the whole value when the name looks like a secret, else the password of a URL like scheme://user:password@host): labels, the command and other fields can carry secrets too.",
   "raw.noDocker": "Docker is not available (not installed, or not running).",
   "svc.recreate.hint": "Removes the container and creates it again from its image (what is inside it is lost).",
   "svc.rebuild.hint": "Builds the image again from its Dockerfile and creates the container.",
