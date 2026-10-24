@@ -9,6 +9,7 @@ Líneas verificadas contra el commit `60f69d8`. Los números de línea se mueven
 ## Diagramas
 
 7. [Mapa del código de `server/src`](07-server-source-map.md): una línea por archivo, "para cambiar esto, abre aquello".
+8. [Modelo de datos](08-data-model.md): las tablas de SQLite, sus relaciones y la migración que creó cada una.
 
 ## Cómo leer una página
 
