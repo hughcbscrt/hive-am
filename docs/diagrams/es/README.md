@@ -9,6 +9,7 @@ Líneas verificadas contra el commit `60f69d8`. Los números de línea se mueven
 ## Diagramas
 
 2. [Un turno dentro de un agente](02-agent-turn.md): la cola de cada agente, la llamada al proveedor, los eventos en el WebSocket y lo que se guarda al final.
+3. [Cómo se arma el prompt efectivo](03-effective-prompt.md): las secciones de las instrucciones en orden, el hash que decide cuándo se reenvían y cómo las recibe cada CLI.
 6. [Procesos y puertos](06-processes-and-ports.md): qué corre, quién arranca a quién, qué puerto usa cada pieza y qué sobrevive a hive-am.
 7. [Mapa del código de `server/src`](07-server-source-map.md): una línea por archivo, "para cambiar esto, abre aquello".
 8. [Modelo de datos](08-data-model.md): las tablas de SQLite, sus relaciones y la migración que creó cada una.
