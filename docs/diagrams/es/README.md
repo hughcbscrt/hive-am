@@ -8,6 +8,7 @@ Líneas verificadas contra el commit `60f69d8`. Los números de línea se mueven
 
 ## Diagramas
 
+6. [Procesos y puertos](06-processes-and-ports.md): qué corre, quién arranca a quién, qué puerto usa cada pieza y qué sobrevive a hive-am.
 7. [Mapa del código de `server/src`](07-server-source-map.md): una línea por archivo, "para cambiar esto, abre aquello".
 8. [Modelo de datos](08-data-model.md): las tablas de SQLite, sus relaciones y la migración que creó cada una.
 

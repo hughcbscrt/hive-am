@@ -8,6 +8,7 @@ Lines checked against commit `60f69d8`. Line numbers move as the code changes: w
 
 ## Diagrams
 
+6. [Processes and ports](06-processes-and-ports.md): what runs, who starts whom, which port each piece uses and what outlives hive-am.
 7. [Source map of `server/src`](07-server-source-map.md): one line per file, "to change this, open that".
 8. [Data model](08-data-model.md): the SQLite tables, their relations and the migration that created each one.
 
