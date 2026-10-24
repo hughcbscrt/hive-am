@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.12.1] - 2026-10-24
+
 ### Added
 
 - **Diagrams of how hive-am works inside.** `docs/diagrams/`, in English and Spanish, has ten pages that each follow a real path through the code: a chat message, a turn, the effective prompt, a delegation, wake-ups and schedules, processes and ports, a source map of `server/src`, the data model, the life cycle of an agent and the providers. Each has a Mermaid diagram, a table that maps every step to a file, a function and a line, the test scripts that cover it and its edge cases. The README and the reference index link to them.
@@ -339,7 +341,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.12.0...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.12.1...HEAD
+[1.12.1]: https://github.com/hughcbscrt/hive-am/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/hughcbscrt/hive-am/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/hughcbscrt/hive-am/compare/v1.10.1...v1.11.0
 [1.10.1]: https://github.com/hughcbscrt/hive-am/compare/v1.10.0...v1.10.1
