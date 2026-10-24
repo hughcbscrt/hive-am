@@ -77,7 +77,7 @@ flowchart LR
 | 22 | `server/src/terminals.ts:19` | `MAX_TERMINALS` | Las terminales son pseudoterminales dentro del proceso de la API, 12 como máximo; `HIVE_AM_TERMINALS=0` las apaga (línea 21). |
 | 23 | `server/src/connections/manager.ts:72` | `startAll` | Arranca cada conexión activa: el long polling de Telegram y el Socket Mode de Slack corren dentro del proceso de la API. |
 | 24 | `server/src/objects/runner.ts:65` | `detached: true` | Un recurso servidor corre en su propio grupo de procesos con su salida en un archivo de log, así sobrevive a un reinicio de hive-am. |
-| 25 | `server/src/objects/index.ts:81` | `armObjects` | Sondea el estado de cada recurso; no arranca ninguno. |
+| 25 | `server/src/objects/index.ts:81` | `armObjects` | Sondea el estado de cada recurso cada pocos segundos (`POLL_MS`, línea 20) y aplica la supervisión a los servidores: uno que terminó solo se vuelve a arrancar, tras una espera creciente, según su política `restart` (`on-failure` o `always`), y uno que sigue fallando sus revisiones de salud se reinicia si `health.restartWhenUnhealthy` está activo; ambos cuentan contra `maxRestarts` (`supervise`, `server/src/objects/supervisor.ts:47`); uno que la persona detuvo nunca se vuelve a arrancar. |
 | 26 | `server/src/index.ts:60` | `shutdown` | Al detener: WebSockets, HTTP, terminales, conexiones, base de datos, en ese orden. Los recursos no se detienen. |
 
 ## Lo cubren
@@ -94,7 +94,7 @@ flowchart LR
 - **Un paso del apagado se cuelga**: después de 5 segundos el proceso sale de todos modos (`server/src/index.ts:63`).
 - **Errores inesperados**: una promesa rechazada que nadie manejó se registra y el servidor sigue atendiendo; una excepción no atrapada se registra y el servidor se apaga en orden con código 1 (`server/src/index.ts:79` y `:80`).
 - **hive-am muerto con `kill -9`**: un `opencode serve` que arrancó le sobrevive y se recoge en el siguiente arranque. Un turno en curso se pierde; al reiniciar, el agente vuelve a `idle` (diagrama 9).
-- **Los recursos sobreviven a hive-am por diseño** (comentario en `server/src/index.ts:57`); `armObjects` los vuelve a encontrar.
+- **Los recursos sobreviven a hive-am por diseño** (comentario en `server/src/index.ts:57`); `armObjects` los vuelve a encontrar. Solo el proceso que arrancó un servidor anota cómo terminó (el listener de `exit`, `server/src/objects/runner.ts:70`), así que un servidor que muere mientras hive-am está apagado aparece como `stopped` y no se reinicia solo (`server/src/objects/runner.ts:51`); la supervisión solo reinicia uno cuyo final quedó anotado y que la persona no detuvo (`server/src/objects/supervisor.ts:77`).
 - `opencode serve` también arranca un momento para leer el catálogo de modelos (`server/src/providers/opencode-server.ts:84`) y para compactar una conversación (`:196`).
 - **Nunca uses 4400 ni 4401 para pruebas**: los scripts que levantan un servidor reciben su propio `HIVE_AM_PORT`, y una segunda web puede usar `NEXT_DIST_DIR` y `HIVE_AM_API`.
 
