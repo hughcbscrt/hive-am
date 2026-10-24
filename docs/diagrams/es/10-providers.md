@@ -75,7 +75,7 @@ sequenceDiagram
 | 4 | `server/src/providers/claude.ts:19` | `CLAUDE_EDIT_DENY` | Al editar (`acceptEdits`) no puede tocar `.git`, `*.pem` ni `*.key` (lista en la línea 13). |
 | 5 | `server/src/providers/claude.ts:20` | `--resume` | Retoma la sesión del agente. |
 | 6 | `server/src/providers/claude.ts:27` | `--append-system-prompt` | Las instrucciones como prompt de sistema. |
-| 7 | `server/src/providers/claude.ts:31` | `--chrome` | Un agente con el interruptor Browser (y que no sea de solo lectura) maneja el Chrome de la persona. |
+| 7 | `server/src/providers/claude.ts:31` | `--chrome` | Un agente con el interruptor Browser (y que no esté en modo Plan) maneja el Chrome de la persona. |
 | 8 | `server/src/providers/claude.ts:33` | `DATA_DIR` | Escribe el archivo de config MCP y permite `mcp__hive`. |
 | 9 | `server/src/providers/claude.ts:44` | `stdin: prompt` | Claude es el único proveedor que recibe el mensaje por stdin. |
 | 10 | `server/src/providers/opencode.ts:58` | `runOpencode` | OpenCode. |

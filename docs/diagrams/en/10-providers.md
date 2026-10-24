@@ -75,7 +75,7 @@ sequenceDiagram
 | 4 | `server/src/providers/claude.ts:19` | `CLAUDE_EDIT_DENY` | Editing (`acceptEdits`) cannot touch `.git`, `*.pem` or `*.key` (list at line 13). |
 | 5 | `server/src/providers/claude.ts:20` | `--resume` | Resumes the agent's session. |
 | 6 | `server/src/providers/claude.ts:27` | `--append-system-prompt` | The instructions as a system prompt. |
-| 7 | `server/src/providers/claude.ts:31` | `--chrome` | An agent with the Browser switch (and not read-only) drives the person's Chrome. |
+| 7 | `server/src/providers/claude.ts:31` | `--chrome` | An agent with the Browser switch (and not in Plan mode) drives the person's Chrome. |
 | 8 | `server/src/providers/claude.ts:33` | `DATA_DIR` | Writes the MCP config file and allows `mcp__hive`. |
 | 9 | `server/src/providers/claude.ts:44` | `stdin: prompt` | Claude is the only provider that gets the message on stdin. |
 | 10 | `server/src/providers/opencode.ts:58` | `runOpencode` | OpenCode. |
