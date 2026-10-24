@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- **The sidebar shows the new logo.** The sidebar loaded `/icon.png`, which the server sends with a one-year cache, so a browser that had the old logo kept it. It now loads `/logo.png`, which is revalidated.
+
 ## [1.12.1] - 2026-10-24
 
 ### Added

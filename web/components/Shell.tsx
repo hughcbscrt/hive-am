@@ -28,7 +28,7 @@ import { useRouter } from 'next/navigation';
 const VERSION = process.env.NEXT_PUBLIC_HIVE_AM_VERSION ?? '';
 
 function HiveMark() {
-  return <img src="/icon.png" width={34} height={34} alt="" aria-hidden className="brand-mark" />;
+  return <img src="/logo.png" width={34} height={34} alt="" aria-hidden className="brand-mark" />;
 }
 
 /** Language switch at the top of the rail, and the keyboard shortcuts sheet at its right. The language lives in localStorage; URLs never change. */
