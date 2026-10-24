@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="web/public/logo-completo.png" alt="hive-am" width="420" />
+  <img src="web/public/logo-completo.png" alt="hive-am" width="640" />
 </p>
 
 <p align="center">
@@ -166,3 +166,7 @@ Diagrams of how it works inside, with the file, function and line behind each st
 - A turn in flight during a crash is lost; the session is intact and the agent is idle on restart.
 - Instructions are advice to the model; what the server enforces is who an agent can delegate to, who a connection answers, which files can be sent, and the permission level.
 - There is no automated test suite. Features are checked with simulations against real agents (`server/scripts/sim-*.ts`).
+
+<p align="center">
+  <img src="web/public/logo.png" alt="hive-am" width="56" />
+</p>
