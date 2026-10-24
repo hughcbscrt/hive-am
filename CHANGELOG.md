@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 - **Diagrams of how hive-am works inside.** `docs/diagrams/`, in English and Spanish, has ten pages that each follow a real path through the code: a chat message, a turn, the effective prompt, a delegation, wake-ups and schedules, processes and ports, a source map of `server/src`, the data model, the life cycle of an agent and the providers. Each has a Mermaid diagram, a table that maps every step to a file, a function and a line, the test scripts that cover it and its edge cases. The README and the reference index link to them.
 
+### Changed
+
+- **New hive-am logos.** The README uses the full logo (isotype plus wordmark), and the app logo, favicon and icons use the new isotype. The editable sources and exports are in `docs/brand/`.
+
 ### Fixed
 
 - **Cards no longer touch in a resource's Settings.** In the two-column Settings form, a full-width card (such as **Volumes**) sat 2 px under the last card of a column instead of the usual 14 px, so the two looked glued together. The gap is now the same everywhere.

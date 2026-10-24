@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="web/public/logo.png" alt="hive-am" width="180" />
+  <img src="web/public/logo-completo.png" alt="hive-am" width="420" />
 </p>
-
-<h1 align="center">hive-am</h1>
 
 <p align="center">
   <strong>A colony of coding agents on your machine.</strong><br />

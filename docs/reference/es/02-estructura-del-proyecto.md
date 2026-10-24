@@ -80,7 +80,8 @@ hive-am/
     ├── package.json
     ├── tsconfig.json
     ├── next.config.mjs       # proxy /api → servidor, distDir configurable
-    ├── public/logo.png       # logo de la app (PNG con fondo transparente)
+    ├── public/logo.png       # isotipo de la app (PNG con fondo transparente)
+    ├── public/logo-completo.png  # isotipo + logotipo (el del README)
     ├── app/
     │   ├── favicon.ico, icon.png, apple-icon.png   # favicon e iconos (Next los detecta por nombre)
     │   ├── layout.tsx        # raíz: fuentes, metadatos, <Shell>
