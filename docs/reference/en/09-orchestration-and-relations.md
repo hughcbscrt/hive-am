@@ -104,6 +104,8 @@ sequenceDiagram
   S->>O: deliverTo(origin): "Delegated task <id> to <name> finished (done). Result: …"
 ```
 
+> See also: [diagram 4, a delegation](../../diagrams/en/04-dispatch.md), with the file and line behind each step.
+
 Details:
 
 - **Validations** (`runtime.startDispatch`): the orchestrator must exist; the worker is looked up by name (case-insensitive) and must be in the orchestrator's `worker_ids`. Errors come back as HTTP 400 and reach the model as a tool error.
