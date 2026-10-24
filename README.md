@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="web/public/logo-completo.png" alt="hive-am" width="640" />
+  <img src="web/public/logo-completo.png" alt="hive-am" width="100%" />
 </p>
 
 <p align="center">
@@ -168,5 +168,5 @@ Diagrams of how it works inside, with the file, function and line behind each st
 - There is no automated test suite. Features are checked with simulations against real agents (`server/scripts/sim-*.ts`).
 
 <p align="center">
-  <img src="web/public/logo.png" alt="hive-am" width="56" />
+  <img src="web/public/logo.png" alt="hive-am" width="84" />
 </p>
