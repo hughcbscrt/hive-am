@@ -30,6 +30,8 @@ stateDiagram-v2
   Active --> Active: "Make this conversation current"<br/>(another direct session of the agent)
 ```
 
+> See also: [diagram 9, agent life cycle](../../diagrams/en/09-agent-lifecycle.md) and [diagram 2, a turn inside an agent](../../diagrams/en/02-agent-turn.md).
+
 Step by step (`runtime.ts`, function `execute`):
 
 1. **First message:** the agent has no `session_id`; the CLI is launched without resuming.

@@ -70,6 +70,8 @@ flowchart LR
   MCP -- "POST /api/dispatch" --> API
 ```
 
+> See also: [diagram 6, processes and ports](../../diagrams/en/06-processes-and-ports.md), with the file and line behind each process.
+
 ### Responsibilities by layer
 
 | Layer | Files | Responsibility |

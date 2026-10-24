@@ -40,6 +40,8 @@ erDiagram
   agents      ||--o{ dispatches : "from_id / to_id"
 ```
 
+> See also: [diagram 8, data model](../../diagrams/en/08-data-model.md), with the migration that created each table.
+
 ### Table `skills`
 
 | Column | Type | Notes |

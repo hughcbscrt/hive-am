@@ -39,3 +39,7 @@ This folder describes the whole project: how it is organized, how it runs, where
 - File paths are relative to the repository root (`hive-am/`).
 - English fragments (field names, commands, interface messages) are left as they exist in the code.
 - When something is a limitation or a conscious decision, it is marked as a **Note** or listed in document 12.
+
+## Diagrams
+
+[docs/diagrams](../../diagrams/en/README.md) follows ten real paths through the code (a chat message, a turn, a delegation, a wake-up, the data model...) with a diagram each and the file, function and line behind every step.

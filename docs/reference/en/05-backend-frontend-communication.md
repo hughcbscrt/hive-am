@@ -195,6 +195,8 @@ sequenceDiagram
   A-->>U: complete native transcript of the turn
 ```
 
+> See also: [diagram 2, a turn inside an agent](../../diagrams/en/02-agent-turn.md), with the file and line behind each step.
+
 Important points:
 
 1. **The HTTP response of the POST does not contain the agent's answer**; it only confirms it was queued.

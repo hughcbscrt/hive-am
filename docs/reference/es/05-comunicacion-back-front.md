@@ -195,6 +195,8 @@ sequenceDiagram
   A-->>U: transcripción nativa completa del turno
 ```
 
+> Ver también: [diagrama 2, un turno dentro de un agente](../../diagrams/es/02-agent-turn.md), con el archivo y la línea detrás de cada paso.
+
 Puntos importantes:
 
 1. **La respuesta HTTP del POST no contiene la respuesta del agente**; solo confirma que se encoló.
