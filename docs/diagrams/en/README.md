@@ -8,6 +8,7 @@ Lines checked against commit `60f69d8`. Line numbers move as the code changes: w
 
 ## Diagrams
 
+1. [A chat message, round trip](01-channel-message.md): from Telegram or Slack to the agent and back, with the access checks, the group filter and the secret filter.
 2. [A turn inside an agent](02-agent-turn.md): the per-agent queue, the provider call, the events on the WebSocket and what is saved at the end.
 3. [How the effective prompt is built](03-effective-prompt.md): the sections of the instructions in order, the hash that decides when they are sent again and how each CLI receives them.
 4. [A delegation, with files](04-dispatch.md): `dispatch` from the MCP tool to the worker's turn and back to the orchestrator, background and synchronous, cancel and restart.

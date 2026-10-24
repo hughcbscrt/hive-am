@@ -8,6 +8,7 @@ Líneas verificadas contra el commit `60f69d8`. Los números de línea se mueven
 
 ## Diagramas
 
+1. [Un mensaje de chat, ida y vuelta](01-channel-message.md): de Telegram o Slack al agente y de regreso, con las revisiones de acceso, el filtro de grupos y el filtro de secretos.
 2. [Un turno dentro de un agente](02-agent-turn.md): la cola de cada agente, la llamada al proveedor, los eventos en el WebSocket y lo que se guarda al final.
 3. [Cómo se arma el prompt efectivo](03-effective-prompt.md): las secciones de las instrucciones en orden, el hash que decide cuándo se reenvían y cómo las recibe cada CLI.
 4. [Una delegación, con archivos](04-dispatch.md): `dispatch` desde la herramienta MCP hasta el turno del trabajador y de regreso al orquestador, en segundo plano y síncrona, cancelación y reinicio.
