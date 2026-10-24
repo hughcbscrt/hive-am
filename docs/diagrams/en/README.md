@@ -8,6 +8,7 @@ Lines checked against commit `60f69d8`. Line numbers move as the code changes: w
 
 ## Diagrams
 
+7. [Source map of `server/src`](07-server-source-map.md): one line per file, "to change this, open that".
 
 ## How to read a page
 

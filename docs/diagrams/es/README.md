@@ -8,6 +8,7 @@ Líneas verificadas contra el commit `60f69d8`. Los números de línea se mueven
 
 ## Diagramas
 
+7. [Mapa del código de `server/src`](07-server-source-map.md): una línea por archivo, "para cambiar esto, abre aquello".
 
 ## Cómo leer una página
 
