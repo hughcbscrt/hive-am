@@ -146,6 +146,8 @@ A step by step guide with screenshots, from installing hive-am to running resour
 
 Full documentation in English and Spanish: **[English](docs/reference/en/README.md)** · **[Español](docs/reference/es/README.md)**.
 
+Diagrams of how it works inside, with the file, function and line behind each step: **[English](docs/diagrams/en/README.md)** · **[Español](docs/diagrams/es/README.md)**.
+
 | Topic | Where |
 |---|---|
 | Overview and architecture | [docs/01](docs/reference/en/01-overview.md) |

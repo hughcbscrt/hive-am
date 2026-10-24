@@ -39,3 +39,7 @@ Esta carpeta describe el proyecto completo: cómo está organizado, cómo se eje
 - Las rutas de archivo son relativas a la raíz del repositorio (`hive-am/`).
 - Los fragmentos en inglés (nombres de campos, comandos, mensajes de la interfaz) se dejan tal cual existen en el código.
 - Cuando algo es una limitación o una decisión consciente, se indica con **Nota** o se lista en el documento 12.
+
+## Diagramas
+
+[docs/diagrams](../../diagrams/es/README.md) sigue diez caminos reales por el código (un mensaje de chat, un turno, una delegación, un recordatorio, el modelo de datos...) con un diagrama cada uno y el archivo, la función y la línea detrás de cada paso.
