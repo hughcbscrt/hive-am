@@ -13,6 +13,7 @@ Lines checked against commit `60f69d8`. Line numbers move as the code changes: w
 6. [Processes and ports](06-processes-and-ports.md): what runs, who starts whom, which port each piece uses and what outlives hive-am.
 7. [Source map of `server/src`](07-server-source-map.md): one line per file, "to change this, open that".
 8. [Data model](08-data-model.md): the SQLite tables, their relations and the migration that created each one.
+9. [Agent life cycle](09-agent-lifecycle.md): the states of an agent and of its sessions, and what retention removes.
 10. [Providers](10-providers.md): Claude Code, OpenCode, Kiro and Cursor side by side: prompt, instructions, sessions, MCP, permissions and extra processes.
 
 ## How to read a page
