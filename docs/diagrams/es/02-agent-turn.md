@@ -58,7 +58,7 @@ sequenceDiagram
 
 | Paso | Archivo | Función o símbolo | Qué hace |
 |---|---|---|---|
-| 1 | `server/src/http/routes/agents.ts:35` | `sendTurn` | Un mensaje de la web (`POST /api/agents/:id/messages`) se encola y la petición responde de inmediato; el router de chats (`server/src/connections/router.ts:202`), las delegaciones (`server/src/runtime.ts:188`), los recordatorios (`server/src/wake.ts:81`) y las programaciones (`server/src/schedules.ts:104`) llaman a la misma función. |
+| 1 | `server/src/http/routes/agents.ts:36` | `sendTurn` | Un mensaje de la web (`POST /api/agents/:id/messages`) se encola y la petición responde de inmediato; el router de chats (`server/src/connections/router.ts:202`), las delegaciones (`server/src/runtime.ts:188`), los recordatorios (`server/src/wake.ts:81`) y las programaciones (`server/src/schedules.ts:104`) llaman a la misma función. |
 | 2 | `server/src/runtime.ts:26` | `states` | Un estado en memoria por agente: cadena de promesas, controlador, cuántos en cola, turno en curso, delegaciones canceladas. |
 | 3 | `server/src/runtime.ts:57` | `sendTurn` | Cuenta el mensaje como en cola, emite un estado y encadena `execute` después del turno anterior del agente, así un agente corre un turno a la vez. |
 | 4 | `server/src/runtime.ts:69` | `cancelled.delete` | Una delegación que se canceló mientras esperaba termina aquí como `Cancelled` sin llegar al CLI. |

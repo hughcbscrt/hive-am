@@ -30,6 +30,22 @@ export interface AgentType {
 export type SkillLoad = 'always' | 'on_demand';
 export interface Skill { id: string; name: string; description: string; content: string; load: SkillLoad; created_at: number; updated_at: number }
 export interface NotebookInfo { content: string; version: number; size: number; max: number; updated_at: number; updated_by: string; enabled: boolean; /** The skill that switches the notebook on for an agent. */ skill_id: string; /** The other agents that read and write the same notebook (a clone and its source). */ shared_with: { id: string; name: string }[] }
+/** `GET /api/agents/:id/instructions-size`: the saved agent's instructions part by part, in characters and estimated tokens (4 characters each). */
+export interface InstructionsPart {
+  key: string; group: 'identity' | 'colony' | 'own' | 'skill' | 'lazy_list' | 'team' | 'channel' | 'other'; chars: number; tokens_est: number;
+  skill_id?: string; skill_name?: string; mode?: SkillLoad; from_colony?: string; count?: number; channel?: string;
+}
+export interface InstructionsSize {
+  provider: Provider; colony_id: string | null; colony_name: string | null;
+  /** Claude in Read-only (plan) mode loads every skill in full. */
+  plan_all: boolean;
+  total_chars: number; total_tokens_est: number; parts: InstructionsPart[];
+  on_demand: { skill_id: string; skill_name: string; from_colony?: string }[];
+  /** Added by the first skill on demand besides its line (the list's header, the OpenCode note), taken away by the last one. */
+  lazy_overhead_chars: number;
+  /** Not in the total: the notes change as the agent writes. */
+  notebook_chars: number; notebook_tokens_est: number;
+}
 export interface ProviderInfo { id: Provider; label: string; installed: boolean; version: string }
 export type ChannelKind = 'telegram' | 'slack';
 export interface ConnectionStatus { state: 'connecting' | 'connected' | 'error' | 'stopped'; detail?: string; lastEventAt?: number }

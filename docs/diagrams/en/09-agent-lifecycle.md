@@ -62,7 +62,7 @@ stateDiagram-v2
 | 11 | `server/src/runtime.ts:125` | `agents.setSession` | The first session id of a direct turn becomes the agent's session (`setSession`, `server/src/db.ts:230`): it also clears `instr_hash` and logs the session with its permission. |
 | 12 | `server/src/runtime.ts:85` | `agents.setSession(raw, null)` | The folder changed since the session started: the next turn starts a new one. |
 | 13 | `server/src/connections/router.ts:144` | `name === 'new'` | `/new confirm` from an admin in a chat stops the agent and drops its session (line 147). |
-| 14 | `server/src/http/routes/agents.ts:67` | `/api/agents/:id/new-session` | The web's New session: stop and drop the session. |
+| 14 | `server/src/http/routes/agents.ts:68` | `/api/agents/:id/new-session` | The web's New session: stop and drop the session. |
 | 15 | `server/src/services/agents.ts:115` | `resumeSession` | Makes a past direct session current again; a delegated one cannot be. |
 | 16 | `server/src/runtime.ts:124` | `agents.recordSession` | A delegation's session is only logged as `delegation` (`server/src/db.ts:240`), with who asked and the task. |
 | 17 | `server/src/history/index.ts:21` | `readHistory` | Any of these conversations is read from the CLI's own transcript. |

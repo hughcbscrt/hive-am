@@ -120,6 +120,7 @@ To change the mode, click the **always** or **on demand** label of the skill ins
 - Below the selector you will see how many tokens always go in the prompt and how many skills are on demand. If it is a lot, the warning suggests moving the longest ones to "On demand".
 - If a skill arrives through the colony and the agent also has it, the mode chosen on the **agent** wins.
 - When you create an agent from a type, the type's modes are copied.
+- To see what each skill weighs next to the rest of the instructions, and switch modes there, open the agent's **Settings** > **Instructions** (see [Agents](03-agents.md#instructions)).
 
 > **Tip:** keep "always" for short rules and move long guides to "on demand". That way you only pay for the list and for the text of the skills that are actually used.
 

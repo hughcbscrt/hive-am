@@ -62,7 +62,7 @@ stateDiagram-v2
 | 11 | `server/src/runtime.ts:125` | `agents.setSession` | El primer id de sesión de un turno directo se vuelve la sesión del agente (`setSession`, `server/src/db.ts:230`): además limpia `instr_hash` y registra la sesión con su permiso. |
 | 12 | `server/src/runtime.ts:85` | `agents.setSession(raw, null)` | La carpeta cambió desde que empezó la sesión: el siguiente turno empieza una nueva. |
 | 13 | `server/src/connections/router.ts:144` | `name === 'new'` | `/new confirmar` de un administrador en un chat detiene al agente y suelta su sesión (línea 147). |
-| 14 | `server/src/http/routes/agents.ts:67` | `/api/agents/:id/new-session` | La opción Nueva sesión de la web: detener y soltar la sesión. |
+| 14 | `server/src/http/routes/agents.ts:68` | `/api/agents/:id/new-session` | La opción Nueva sesión de la web: detener y soltar la sesión. |
 | 15 | `server/src/services/agents.ts:115` | `resumeSession` | Vuelve a hacer actual una sesión directa pasada; una delegada no puede serlo. |
 | 16 | `server/src/runtime.ts:124` | `agents.recordSession` | La sesión de una delegación solo se registra como `delegation` (`server/src/db.ts:240`), con quién la pidió y la tarea. |
 | 17 | `server/src/history/index.ts:21` | `readHistory` | Cualquiera de estas conversaciones se lee de la transcripción propia del CLI. |

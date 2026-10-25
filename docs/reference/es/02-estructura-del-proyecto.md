@@ -32,7 +32,7 @@ hive-am/
 │       │   ├── body.ts       # cuerpo JSON con límite (413); límite mayor para subidas
 │       │   ├── validate.ts   # ayudas de validación tipadas
 │       │   └── routes/*.ts   # las rutas, un archivo por dominio (agents, git, resources…)
-│       ├── services/         # reglas de dominio que son más que HTTP (agents, colonies, connections, notebook, schedules, providers)
+│       ├── services/         # reglas de dominio que son más que HTTP (agents, colonies, connections, notebook, schedules, providers, instructions-size)
 │       ├── types.ts          # tipos compartidos del backend
 │       ├── seed.ts           # datos iniciales de primera ejecución
 │       ├── models.ts         # lista de modelos por proveedor (con caché)
@@ -180,10 +180,10 @@ No hay un framework de pruebas: `server/scripts/test-*.ts` son scripts independi
 | `index.ts` | Ejecuta `seedIfEmpty()`, crea el servidor HTTP en `127.0.0.1:<puerto>`, monta el WebSocket en `/ws` y suscribe cada cliente al bus de eventos del runtime. Cierre ordenado con SIGINT/SIGTERM (tope de 5 s), error claro si el puerto está ocupado y la política ante errores no capturados. |
 | `api.ts` | Fachada de unas 50 líneas que exporta `handle`: CORS abierto, `OPTIONS`, el 404 de una ruta inexistente y el único sitio donde un error se vuelve respuesta. Aquí vive el `TODO(security)` pendiente sobre CORS/Origin. |
 | `http/*` | `router.ts` (tabla de rutas), `errors.ts` (`HttpError`, `toHttpError`), `guards.ts` (`requireLocal`), `body.ts` (límite de 2 MiB para JSON, unos 135 MB para subidas, 413), `validate.ts` y `routes/*.ts` (un archivo por dominio). |
-| `services/*` | Reglas de dominio que estaban dentro de los handlers: `agents` (carpeta efectiva, herencia, validación), `colonies`, `connections`, `notebook`, `schedules` y `providers` (CLIs instalados, `PROVIDERS`). |
+| `services/*` | Reglas de dominio que estaban dentro de los handlers: `agents` (carpeta efectiva, herencia, validación), `colonies`, `connections`, `notebook`, `schedules`, `providers` (CLIs instalados, `PROVIDERS`) e `instructions-size` (tamaño de las instrucciones de un agente por parte). |
 | `errors.ts` | `DomainError` con `kind` (`invalid`, `forbidden`, `not_found`, `conflict`, `unavailable`) y `code`; la base de las clases de error de cada módulo. |
 | `runtime.ts` | `sendTurn` (cola por agente), `execute` (un turno), `dispatch` (delegación), `stopAgent`, `liveTurn`, `liveOrigin`, `bus`. |
-| `instructions.ts` | `composeInstructions` (identidad, prompt, skills, equipo, canales, cuaderno), `notebookBlock`, `lazySkills` y `mcpCaps`: qué herramientas MCP recibe cada agente. |
+| `instructions.ts` | `composeInstructions` (identidad, prompt, skills, equipo, canales, cuaderno), que une los bloques marcados de `instructionParts`, `notebookBlock`, `lazySkills` y `mcpCaps`: qué herramientas MCP recibe cada agente. |
 | `db.ts` | Abre la base y ejecuta las migraciones, expone `skills`, `types`, `colonies`, `agents`, `dispatches` y la función `resolved()` (sentencias preparadas en caché; crear o actualizar un agente, un tipo o una colonia es una sola transacción); guarda también cómo se carga cada skill asignada. |
 | `db/migrations.ts`, `db/json.ts` | Todo el esquema como lista de migraciones idempotentes versionadas con `PRAGMA user_version`, y `parseJson` para leer columnas JSON sin lanzar. |
 | `types.ts` | `Agent`, `Colony`, `AgentType`, `Skill`, `StreamEvent`, `Block`, `ChatMessage`, `Usage`, `TurnOptions`, etc. |

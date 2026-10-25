@@ -21,13 +21,14 @@ import { GitExplorer } from '@/components/git/GitExplorer';
 import { useGit } from '@/lib/git/useGit';
 import { AgentForm } from '@/components/agents/AgentForm';
 import { NotebookPanel } from '@/components/agents/NotebookPanel';
+import { InstructionsPanel } from '@/components/agents/InstructionsPanel';
 import { CloneChip, ClonesChip } from '@/components/agents/CloneTag';
 import { Banner, ConfirmDialog, Drawer, EmptyState, Hex, ProviderBadge, RoleChip, StatusChip, TabPanel, Tabs, WorkspaceHeader, useToast, type HeaderAction } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
 
 interface Sess { session_id: string; first_seen: number; last_seen: number; kind: 'direct' | 'delegation'; from_name: string | null; task: string | null }
-type CfgTab = 'config' | 'notebook' | 'sessions';
-const CFG_TABS: CfgTab[] = ['config', 'notebook', 'sessions'];
+type CfgTab = 'config' | 'notebook' | 'instructions' | 'sessions';
+const CFG_TABS: CfgTab[] = ['config', 'notebook', 'instructions', 'sessions'];
 
 export default function AgentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -42,7 +43,7 @@ function Workspace({ id }: { id: string }) {
   const agent = useAgent(id);
   const router = useRouter();
   const toast = useToast();
-  // The settings drawer is open only while the URL says so (?tab=config|notebook|sessions): a modal never opens by itself from a saved preference.
+  // The settings drawer is open only while the URL says so (?tab=config|notebook|instructions|sessions): a modal never opens by itself from a saved preference.
   const [qtab, setQtab] = useQueryState('tab', '');
   const [lastTab, setLastTab] = useState<CfgTab>('config');
   const tab: CfgTab = (CFG_TABS as string[]).includes(qtab) ? (qtab as CfgTab) : lastTab;
@@ -128,7 +129,7 @@ function Workspace({ id }: { id: string }) {
 
       {open && (
         <Drawer title={agent.name} subtitle={`${t(`role.${agent.role}`)} · ${PROVIDERS[agent.provider].label}`} onClose={closeCfg}
-          footer={tab === 'config' && draft ? (
+          footer={(tab === 'config' || tab === 'instructions') && draft ? (
             <>
               <span className="muted small grow">{dirty ? t('agent.unsavedChanges') : t('agent.allSaved')}{dirty && agent.status === 'running' ? ` ${t('agent.appliesNextTurn')}` : ''}</span>
               {settings.actions({ size: 'sm' })}
@@ -136,7 +137,7 @@ function Workspace({ id }: { id: string }) {
           ) : undefined}>
           <div className="agent-config">
             <Tabs idPrefix="cfg" label={t('fa.cfg.tabs')} value={tab} onChange={(v) => setOpen(true, v as CfgTab)}
-              tabs={[{ id: 'config', label: t('agent.tab.config') }, { id: 'notebook', label: t('agent.tab.notebook') }, { id: 'sessions', label: t('nav.sessions') }]} />
+              tabs={[{ id: 'config', label: t('agent.tab.config') }, { id: 'notebook', label: t('agent.tab.notebook') }, { id: 'instructions', label: t('agent.tab.instructions') }, { id: 'sessions', label: t('nav.sessions') }]} />
           <TabPanel id="config" value={tab} idPrefix="cfg">
             {draft && (
               <>
@@ -145,6 +146,7 @@ function Workspace({ id }: { id: string }) {
             )}
           </TabPanel>
           <TabPanel id="notebook" value={tab} idPrefix="cfg"><NotebookPanel agent={agent} /></TabPanel>
+          <TabPanel id="instructions" value={tab} idPrefix="cfg"><InstructionsPanel agent={agent} draft={draft} onChange={setDraft} dirty={dirty} /></TabPanel>
           <TabPanel id="sessions" value={tab} idPrefix="cfg">
             <div className="pane">
               <p className="hint m0">{t('agent.sessions.intro', { path: shortPath(agent.effective.cwd) })}</p>

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Instructions tab in the agent settings.** Next to Configuration, Notebook and Sessions, it shows what the saved agent's instructions weigh when a new conversation starts, part by part and heaviest first: the colony's prompt, the agent's own prompt, each skill loaded in full, the on-demand list, the team, the channel and the rest, in characters and estimated tokens (1 per 4 characters). The notebook is shown apart, outside the total. Each skill has an **Always** / **On demand** switch on the same draft as Configuration (the Save footer is there too) and the line "After saving" estimates the change before saving; a notice points at a skill always loaded that weighs 800 tokens or more and is at least 25% of the total. Colony skills and Claude in Read-only mode keep the switch disabled, with the reason. The data comes from the new `GET /api/agents/:id/instructions-size`. The text sent to the agents does not change.
+
 ## [1.12.1] - 2026-10-24
 
 ### Added

@@ -128,7 +128,7 @@ If the agent is linked to a connection (Telegram or Slack), a notice appears and
 
 ## The agent settings panel
 
-To edit an existing agent, open its screen and click **Settings** in the header. A panel opens on the right with three tabs: **Configuration**, **Notebook** and **Sessions**.
+To edit an existing agent, open its screen and click **Settings** in the header. A panel opens on the right with four tabs: **Configuration**, **Notebook**, **Instructions** and **Sessions**.
 
 ![Queen's settings panel, Configuration tab, with the form and the footer buttons](img/agente-ajustes-configuracion.jpg)
 
@@ -171,6 +171,23 @@ To edit it:
 **Shared notebook.** An agent and its clones (see [The colony](02-the-colony.md#clone-an-agent)) read and write the same notebook. When it is shared, the tab says so ("Shared with Backend 2: what any of them writes, all of them read") and offers **Separate**. **Clear all** then empties it for all of them, and says so in its confirmation.
 
 > **Note:** the notebook works thanks to the **Notebook** skill. If the agent does not have it, the tab warns you ("This agent doesn’t have the “Notebook” skill, so it doesn’t use its notebook.") and offers a **Turn on** button.
+
+## Instructions
+
+The **Instructions** tab shows how big the instructions are that the agent receives when a new conversation starts, so you can see where the tokens go and trim the heavy part.
+
+- At the top, the total in estimated tokens and in characters. The estimate is 1 token per 4 characters: it is a guide, not an exact count.
+- The table lists each part, heaviest first, with its characters, tokens and share of the total: the colony's prompt (if the agent follows it), its own prompt, each skill that goes in full, the list of on-demand skills, the team (orchestrators), the channel (if it has a connection) and **Other** (identity, provider notes, resources, databases and how to use the notebook).
+- The **Notebook** row comes after the total and does not count in it: the notes change as the agent writes.
+- The table measures the **saved** agent. A resumed conversation only receives the instructions again when they change.
+
+Each skill has an **Always** / **On demand** switch. It changes the same draft as the **Configuration** tab, so the footer with **Save changes** is also here, and nothing is saved until you press it.
+
+- While there are unsaved changes, a notice says so, the changed skills are marked **Unsaved**, and the line "After saving: −N tokens (estimate)" tells you how much the change would save. After saving, the table shows the new values.
+- If one skill always loaded weighs 800 tokens or more and is at least 25% of the total, a notice points at it with a **Switch to "On demand"** button, which does the same as its switch. The agent will then read it when it needs it.
+- On-demand skills appear under their list, so you can switch them back to **Always**.
+- A skill that comes from the colony shows "From colony" and its switch is disabled: change it in the colony.
+- With Claude Code in **Read-only** (Plan) mode, every skill is loaded in full, so the switches are disabled and a notice explains why.
 
 The **Sessions** tab is explained in [Sessions](07-sessions.md).
 

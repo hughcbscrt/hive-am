@@ -40,7 +40,7 @@ Detalle y límites en el [documento 6](06-proveedores.md) y el [12](12-operacion
 | Colony / Agents → **New agent** | `NewAgentDrawer` | Paso 1: elegir un tipo o "Blank agent"; paso 2: formulario. Si se abre desde la celda **+** de una colonia, la colonia viene preseleccionada. |
 | Pantalla Types → **Create agent** | `NewAgentDrawer` con tipo fijo | Salta el paso 1. |
 | Colony → botón de ajustes del agente seleccionado | `AgentEditDrawer` | Edita en un panel lateral sin salir del panal. |
-| Pantalla del agente → **Settings** | panel plegable de `agents/[id]/page.tsx` | Incluye pestaña *Sessions* y borrado. |
+| Pantalla del agente → **Settings** | panel plegable de `agents/[id]/page.tsx` | Incluye las pestañas *Notebook*, *Instructions* y *Sessions* y borrado. |
 
 Los tres usan el mismo formulario, `components/agents/AgentForm.tsx`, con la misma validación (`validate()`):
 
@@ -184,6 +184,24 @@ Si la carpeta efectiva queda vacía al empezar un turno, el turno falla con: *"T
 4. **Equipo** (solo orquestadores): ver [documento 9](09-orquestacion-y-relaciones.md#95-instrucciones-del-orquestador).
 5. **Conexiones** (si el agente tiene alguna): cómo llegan los mensajes de un canal y cómo responder; ver [documento 14](14-conexiones-externas.md).
 6. **Cuaderno** (si tiene la skill Notebook): cómo usarlo, y aparte el texto actual de sus notas, que no cuenta para el hash de instrucciones ([7.3.2](#732-el-cuaderno-del-agente)).
+
+### 7.6.1 Tamaño por parte (pestaña Instrucciones)
+
+`instructionParts(agent, delegated)` devuelve los bloques que `composeInstructions` une con `\n\n`, en el mismo orden y con exactamente el mismo texto (`instr_hash`, [documento 8](08-sesiones-e-historial.md), es el sha1 de esa unión, así que un byte de diferencia reenviaría las instrucciones a toda conversación reanudada; `test-instructions-compose.ts` fija el texto y el sha1 de ocho agentes). Cada bloque tiene una `key` y un `group`: `identity`, `colony` (el prompt de la colonia, cuando el agente lo sigue), `own` (el prompt propio del agente), `skill` (una por skill cargada completa, con `skill_id`), `lazy_list`, `team`, `channel` (alias y la sección del canal) y `other` (notas del proveedor, wake-ups, recursos, bases de datos y las instrucciones del cuaderno). El prompt de colonia y el propio, que `agentOf` ya juntó, se separan de nuevo de modo que `colony + "\n\n" + own` es el prompt efectivo.
+
+`GET /api/agents/:id/instructions-size` (`services/instructions-size.ts`) mide el agente **guardado**, resuelto, como conversación directa (una tarea delegada suma unos 170 caracteres a la identidad). No lee historiales.
+
+| Campo | Significado |
+|---|---|
+| `provider`, `colony_id`, `colony_name` | El proveedor del agente y la colonia a la que pertenece. |
+| `plan_all` | `true` para Claude en Solo lectura (`plan`): todas las skills van completas ([7.3.3](#733-carga-bajo-demanda)). |
+| `parts[]` | Una entrada por bloque: `key`, `group`, `chars`, `tokens_est`; las skills añaden `skill_id`, `skill_name`, `mode` y `from_colony` (nombre de la colonia, cuando la skill solo viene de la colonia); `colony` añade `from_colony`; `lazy_list` y `team` añaden `count`; `channel` añade el nombre de la plataforma en `channel`. |
+| `total_chars`, `total_tokens_est` | Suma de `parts[].chars` (los separadores `\n\n` no cuentan: `composeInstructions(a).length === total_chars + 2 * (parts.length - 1)`) y su estimación. |
+| `on_demand[]` | Las skills que solo se listan: `skill_id`, `skill_name`, `from_colony`. |
+| `lazy_overhead_chars` | Lo que la lista a demanda suma además de sus líneas, contado como `total_chars`: la cabecera «Skills you can load» y, en OpenCode, la nota sobre las herramientas hive cuando nada más la pide. La trae la primera skill a demanda y se va con la última; `0` con `plan_all`. |
+| `notebook_chars`, `notebook_tokens_est` | Tamaño de `notebookBlock` (las notas), fuera del total. |
+
+Los tokens son una estimación, `ceil(chars / 4)`, la misma regla que `web/lib/tokens.ts`. La pestaña web (`web/components/agents/InstructionsPanel.tsx`) ordena las partes por peso, junta `identity` y `other` en una fila y `channel` en otra, y estima «Al guardar» en el navegador con `saveDelta` (`web/lib/tokens.ts`): `skillWeight` sobre las skills propias del borrador frente a las guardadas, más o menos `lazy_overhead_chars` cuando el número de skills a demanda pasa de 0 a más o vuelve a 0, sin llamar al servidor. El umbral del aviso de skill pesada está en `HEAVY_SKILL_TOKENS` (800) y `HEAVY_SKILL_SHARE` (25%). Prueba: `test-instructions-size.ts`.
 
 ### Dónde viven las reglas que recibe un agente
 

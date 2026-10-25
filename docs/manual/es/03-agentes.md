@@ -128,7 +128,7 @@ Si el agente está vinculado a una conexión (Telegram o Slack), aparece un avis
 
 ## El panel de ajustes del agente
 
-Para editar un agente existente, abre su pantalla y pulsa **Ajustes** en la cabecera. Se abre un panel a la derecha con tres pestañas: **Configuración**, **Cuaderno** y **Sesiones**.
+Para editar un agente existente, abre su pantalla y pulsa **Ajustes** en la cabecera. Se abre un panel a la derecha con cuatro pestañas: **Configuración**, **Cuaderno**, **Instrucciones** y **Sesiones**.
 
 ![Panel de ajustes de Reina, pestaña Configuración, con el formulario y los botones del pie](img/agente-ajustes-configuracion.jpg)
 
@@ -171,6 +171,23 @@ Para editarlo:
 **Cuaderno compartido.** Un agente y sus clones (ver [La colonia](02-la-colonia.md#clonar-un-agente)) leen y escriben el mismo cuaderno. Cuando se comparte, la pestaña lo dice ("Compartido con Backend 2: lo que escribe cualquiera de ellos, lo leen todos") y ofrece **Separar**. **Borrar todo** entonces lo vacía para todos, y su confirmación lo dice.
 
 > **Nota:** el cuaderno funciona gracias a la skill **Notebook**. Si el agente no la tiene, la pestaña lo avisa ("Este agente no tiene la skill «Notebook»") y ofrece un botón **Activar**.
+
+## Instrucciones
+
+La pestaña **Instrucciones** muestra cuánto pesan las instrucciones que recibe el agente al iniciar una conversación nueva, para que veas dónde se van los tokens y recortes la parte pesada.
+
+- Arriba, el total en tokens estimados y en caracteres. La estimación es 1 token cada 4 caracteres: sirve para comparar, no es una cuenta exacta.
+- La tabla lista cada parte, de la más pesada a la más ligera, con sus caracteres, tokens y porcentaje del total: el prompt de la colonia (si el agente lo sigue), su prompt propio, cada skill que va completa, la lista de skills a demanda, el equipo (orquestadores), el canal (si tiene una conexión) y **Otros** (identidad, notas del proveedor, recursos, bases de datos y cómo usar el cuaderno).
+- La fila **Cuaderno** va después del total y no cuenta en él: las notas cambian conforme el agente escribe.
+- La tabla mide el agente **guardado**. Una conversación reanudada solo vuelve a recibir las instrucciones cuando cambian.
+
+Cada skill tiene un interruptor **Siempre** / **A demanda**. Cambia el mismo borrador que la pestaña **Configuración**, así que el pie con **Guardar cambios** también está aquí, y nada se guarda hasta que lo pulses.
+
+- Mientras haya cambios sin guardar, un aviso lo dice, las skills cambiadas se marcan **Sin guardar** y la línea «Al guardar: −N tokens (estimado)» te dice cuánto ahorrarías. Al guardar, la tabla muestra los valores nuevos.
+- Si una skill que siempre se carga pesa 800 tokens o más y es al menos el 25% del total, un aviso la señala con el botón **Pasar a «A demanda»**, que hace lo mismo que su interruptor. El agente la leerá cuando la necesite.
+- Las skills a demanda aparecen debajo de su lista, para que puedas regresarlas a **Siempre**.
+- Una skill que viene de la colonia dice «De la colonia» y su interruptor está deshabilitado: se cambia en la colonia.
+- Con Claude Code en modo **Solo lectura** (Plan) todas las skills se cargan completas, así que los interruptores están deshabilitados y un aviso explica por qué.
 
 La pestaña **Sesiones** se explica en [Sesiones](07-sesiones.md).
 

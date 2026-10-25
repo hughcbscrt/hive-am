@@ -28,7 +28,7 @@ have installed; it does not replace them and it never copies your conversations 
 - **Real sessions.** An agent stores only a pointer (`provider`, `session_id`, `cwd`). The transcript lives in the CLI's own store and is read back from there. After a restart every agent resumes its real session.
 - **Orchestration.** An orchestrator delegates to the workers connected to it on the Relations canvas. Every delegation runs in a fresh native session of the worker, and the rule is enforced on the server, not just requested.
 - **Colonies.** Group agents on a honeycomb map and lend them defaults: working folder, permissions, skills and a shared prompt. Each agent can opt out per field.
-- **Skills.** Ten skills ship with hive-am (all ordinary: edit or delete them). Assign them to an agent, a type or a colony, and choose per assignment whether they are **always** in the instructions or loaded **on demand** with a `skill_read` tool. Searchable picker with token weights.
+- **Skills.** Ten skills ship with hive-am (all ordinary: edit or delete them). Assign them to an agent, a type or a colony, and choose per assignment whether they are **always** in the instructions or loaded **on demand** with a `skill_read` tool. Searchable picker with token weights, and an **Instructions** tab in each agent's settings that shows what every part of its instructions weighs, heaviest first, with the switch of each skill.
 - **Notebook.** An agent can keep a persistent notebook of what it learns (no credentials, no duplicates, every note with its source). You can read and edit it from the agent's settings.
 - **Telegram.** Link a bot to an agent: private chats, groups and topics, one shared session across all of them. In groups the agent can listen to everything and speak only when it adds something; people can mute it per thread and bring it back.
 - **Slack.** The same over Socket Mode (no public URL): DMs and channels, the agent answers in a thread opened on the message, scheduled messages land in the channel, `/hive` slash commands.
@@ -134,7 +134,7 @@ checked on the server. Tokens are stored in `~/.hive-am/hive-am.db` and never re
   - `src/connections/`: external connections. One agent session shared by every chat, group or topic.
   - `src/skills/`: the skills that ship with hive-am and the agent notebook.
   - `mcp/dispatch.mjs`: the `hive` MCP server: `list_agents` and `dispatch` for orchestrators, `channel_*` for connections, `notebook_*` and `skill_read`.
-- `web/`: Next.js 15 UI. Home (every screen at a glance), Colony (honeycomb), Agents, the agent workspace (chat, changes, settings, notebook, sessions), Relations canvas, Types, Skills, Connections and Sessions.
+- `web/`: Next.js 15 UI. Home (every screen at a glance), Colony (honeycomb), Agents, the agent workspace (chat, changes, settings, notebook, instructions, sessions), Relations canvas, Types, Skills, Connections and Sessions.
 
 ## User manual
 
