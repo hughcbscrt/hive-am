@@ -7,3 +7,6 @@ export const fmtTok = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 100
 export const skillWeight = (s: Pick<Skill, 'name' | 'description' | 'content' | 'load'>) => (s.load === 'on_demand' ? estTokens(`- **${s.name}**: ${s.description}`) : estTokens(s.content) + estTokens(s.name) + estTokens(s.description));
 /** Above this, the skills an agent always carries start to crowd its context. */
 export const ALWAYS_BUDGET = 3000;
+/** The Instructions tab points at one skill always loaded when it is this heavy (estimated tokens) and this big a share of the total (%). */
+export const HEAVY_SKILL_TOKENS = 800;
+export const HEAVY_SKILL_SHARE = 25;
