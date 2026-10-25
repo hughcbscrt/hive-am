@@ -89,6 +89,7 @@ sequenceDiagram
 - `test-runtime-recovery.ts` (sin modelo): una falla al preparar un turno es el error de ese turno y no deja al agente en `running`; una ráfaga de 34 turnos corre en orden; un CLI callado se corta (con `HIVE_AM_TURN_STALL_MS=400`) y el mensaje de atrás corre, mientras que un turno que sigue imprimiendo no se corta; una entrega de recordatorio que falló se vuelve a intentar.
 - `test-providers-common.ts` (sin modelo): `spawnJson` y `spawnLines`, stdin, códigos de salida y stderr en los errores, un CLI que ignora SIGTERM se corta.
 - `test-provider-args.ts` (sin modelo, CLIs de mentira): cómo reciben el prompt OpenCode, Kiro y Cursor.
+- `test-claude-args.ts` (sin modelo, CLI de mentira): los argumentos de Claude y el mensaje que recibe por stdin, nueva o retomada.
 - `test-effort.ts` (sin modelo, levanta un servidor): el esfuerzo que pide un turno y los argumentos que recibe cada CLI.
 
 ## Casos límite

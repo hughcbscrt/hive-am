@@ -32,7 +32,7 @@ flowchart TB
   notes["notebookBlock<br/>las notas, fuera del hash"]
   full["instrucciones que se envían al proveedor"]
   refresh{"¿sesión directa retomada y<br/>cambió el hash o las notas?"}
-  claude["Claude: --append-system-prompt<br/>más withInstructions en el mensaje"]
+  claude["Claude: --append-system-prompt<br/>withInstructions solo al retomar"]
   others["OpenCode, Kiro, Cursor:<br/>withInstructions en el mensaje"]
 
   res --> id --> del --> oc --> kiro --> sp --> always --> lazy --> team --> chan --> wake --> objs --> dbs --> nb
@@ -73,8 +73,8 @@ flowchart TB
 | 21 | `server/src/runtime.ts:112` | `notebookBlock(agent)` | Las notas se agregan después del texto armado, así una nota que escribe el agente no cuenta como cambio de configuración. |
 | 22 | `server/src/runtime.ts:113` | `createHash` | El hash cubre solo el texto armado. |
 | 23 | `server/src/runtime.ts:115` | `refreshInstructions` | Una sesión directa retomada recibe de nuevo las instrucciones cuando el hash no coincide con el `instr_hash` guardado o las notas son más nuevas que lo que este lector ya vio. |
-| 24 | `server/src/providers/claude.ts:27` | `--append-system-prompt` | Claude Code recibe las instrucciones como prompt de sistema en cada turno; una sesión retomada lo ignora (comentario en la línea 25). |
-| 25 | `server/src/providers/claude.ts:28` | `withInstructions` | Claude también pasa el mensaje por `withInstructions`, igual que los otros tres. |
+| 24 | `server/src/providers/claude.ts:27` | `--append-system-prompt` | Claude Code recibe las instrucciones como prompt de sistema en cada turno; una sesión retomada lo ignora (comentario en la línea 25). En una sesión nueva es la única copia. |
+| 25 | `server/src/providers/claude.ts:28` | `withInstructions` | Claude pasa el mensaje por `withInstructions` solo en una sesión retomada, así recibe únicamente la actualización; el mensaje de una sesión nueva va tal cual. |
 | 26 | `server/src/providers/preamble.ts:5` | `withInstructions` | Sesión nueva: el bloque `<instructions>` completo antes del mensaje. Retomada con cambios: `<instructions update="true">`. Si no: solo el mensaje. |
 | 27 | `server/src/providers/preamble.ts:16` | `stripInstructions` | Cuando se lee una conversación, el bloque se quita del mensaje de la persona. |
 | 28 | `server/src/runtime.ts:144` | `setInstrHash` | Después de un turno directo que salió bien, se guarda el hash y las notas se marcan como vistas. |
@@ -86,13 +86,14 @@ flowchart TB
 - `test-providers-common.ts` (sin modelo): `withInstructions` y `stripInstructions`.
 - `test-session-permission.ts` (sin modelo): una conversación de OpenCode se marca cuando su permiso cambió después de empezar.
 - `sim-skills.ts` necesita un modelo real: las skills bajo demanda quedan fuera de las instrucciones y el agente las lee cuando las necesita.
-- Ningún script revisa el orden de las secciones, y ningún script revisa los argumentos de Claude.
+- `test-claude-args.ts` (sin modelo, CLI de mentira): los argumentos de Claude, las instrucciones solo como prompt de sistema en una sesión nueva y la actualización dentro del mensaje de una retomada.
+- Ningún script revisa el orden de las secciones.
 
 ## Casos límite
 
 - **Notas editadas en otro lado** (por la persona, o en otra conversación de un agente que comparte la libreta) hacen que el siguiente turno directo reenvíe las instrucciones: `notebooks.get(agentId).seen < nbVersion` (`server/src/runtime.ts:115`).
-- **Los turnos delegados nunca se refrescan**: cada delegación es una sesión nueva y siempre recibe el bloque completo.
-- **Claude y `--resume`**: Claude fija su prompt de sistema cuando empieza la sesión, así que una conversación retomada solo se entera de un cambio por la actualización dentro del mensaje (`server/src/providers/claude.ts:25`).
+- **Los turnos delegados nunca se refrescan**: cada delegación es una sesión nueva y siempre recibe las instrucciones completas (Claude como prompt de sistema, los demás como el bloque en el mensaje).
+- **Claude y `--resume`**: Claude fija su prompt de sistema cuando empieza la sesión, así que una sesión nueva recibe las instrucciones solo ahí y una conversación retomada solo se entera de un cambio por la actualización dentro del mensaje (`server/src/providers/claude.ts:25`).
 - **Los tipos de agente no se heredan al correr**: crear un agente desde un tipo copia una vez el prompt, las skills y el permiso del tipo (`spawnFromType`, `server/src/services/agents.ts:39`); los cambios posteriores al tipo no le llegan. Solo la colonia se aplica en cada turno.
 - **Un permiso cambiado** no llega a una conversación de OpenCode que ya empezó: conserva las herramientas con las que empezó y el agente queda marcado (`permissionStale`, `server/src/services/agents.ts:109`).
 - **Un ajuste cambiado** (un trabajador nuevo, una skill, un alias) cambia el hash; las instrucciones llegan a una conversación retomada en su siguiente turno, no de inmediato.

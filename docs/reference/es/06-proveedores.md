@@ -55,7 +55,7 @@ claude -p --output-format stream-json --verbose --include-partial-messages \
 |---|---|
 | Permisos | `--permission-mode` recibe directamente `plan`, `acceptEdits` o `bypassPermissions`. En `acceptEdits` se añade `--disallowedTools` con `CLAUDE_EDIT_DENY` (`Edit(**/.git/**)`, `Edit(**/*.pem)`, `Edit(**/*.key)`); `.env` queda editable y escribir fuera de la carpeta ya lo bloquea el propio modo. Es el único proveedor que distingue «Editar archivos» de «Acceso total»: con el primero edita archivos pero un comando de shell que no sea de archivos (p. ej. `python3 …`) queda sin aprobar y falla; con el segundo corre todo. |
 | Reanudación | `--resume <id>` si el agente tiene sesión. |
-| Instrucciones | Se pasan en cada turno con `--append-system-prompt`, **pero Claude solo las aplica al crear la sesión**: con `--resume` conserva el system prompt original. Por eso, si cambiaron (skills, equipo, notas editadas…), la sesión reanudada recibe un bloque `<instructions update="true">` delante del mensaje, igual que OpenCode y Kiro; el historial lo oculta. |
+| Instrucciones | Se pasan en cada turno con `--append-system-prompt`, **pero Claude solo las aplica al crear la sesión**: con `--resume` conserva el system prompt original. Una sesión nueva las recibe solo así: su mensaje va tal cual, sin bloque `<instructions>`. Si cambiaron (skills, equipo, notas editadas…), la sesión reanudada recibe un bloque `<instructions update="true">` delante del mensaje, igual que OpenCode y Kiro; el historial lo oculta. |
 | Delegación | Si es orquestador con subagentes: escribe el archivo MCP y añade `--mcp-config` y `--allowedTools mcp__hive` (permite todas las herramientas del servidor `hive` sin pedir confirmación). |
 | Id de sesión | Se toma del primer evento que trae `session_id`. |
 
@@ -188,6 +188,8 @@ OpenCode, Kiro y Cursor no tienen un flag para añadir un system prompt, así qu
 | Sesión reanudada sin cambios | Solo el mensaje |
 
 ¿Cómo sabe el runtime que cambiaron? Calcula un SHA‑1 de las instrucciones compuestas y lo compara con `agents.instr_hash` (la huella que recibió esa sesión). Esto evita, por ejemplo, que un orquestador conserve una lista de subagentes antigua tras conectarle nuevos.
+
+Claude Code solo usa la fila de actualización: una sesión nueva recibe las instrucciones como prompt de sistema (`--append-system-prompt`, ver 6.3) y el mensaje solo, y una reanudada recibe el bloque `update` cuando cambiaron.
 
 Los lectores de historial **ocultan** estos bloques al mostrar el chat (ver [documento 8](08-sesiones-e-historial.md)). Los modelos sí los reciben.
 
