@@ -10,6 +10,7 @@ import { liveTurn, notifyAgentsChanged, queueDepth, sendTurn, stopAgent } from '
 import { sessionStats } from '../../stats.js';
 import { summaryOf } from '../../sessions-summary.js';
 import { emptyUsage } from '../../pricing.js';
+import { instructionsSize } from '../../services/instructions-size.js';
 import { agentOrFail, cloneAgent, createAgent, permissionStale, removeAgent, resumeSession, sessionToRead, updateAgent } from '../../services/agents.js';
 import { UPLOAD_LIMIT, body } from '../body.js';
 import { HttpError, bad, notFound } from '../errors.js';
@@ -85,6 +86,8 @@ route('GET', '/api/agents/:id/stats', ({ params, url }) => {
   const a = agentOrFail(params[0]);
   return sessionStats(readHistory(resolved(a), sessionToRead(a, url.searchParams.get('session'))), a.provider);
 });
+// What the agent's saved instructions weigh, part by part (no history is read).
+route('GET', '/api/agents/:id/instructions-size', ({ params }) => instructionsSize(agentOrFail(params[0])));
 route('GET', '/api/agents/:id/live', ({ params }) => liveTurn(params[0]));
 route('GET', '/api/agents/:id/sessions', ({ params }) => agents.sessions(params[0]));
 
