@@ -120,6 +120,7 @@ Para cambiar el modo, haz clic en la etiqueta **siempre** o **a demanda** de la 
 - Bajo el selector verás cuántos tokens van siempre en el prompt y cuántas skills van a demanda. Si es mucho, el aviso te sugiere pasar las más largas a "a demanda".
 - Si una skill llega por la colonia y el agente también la tiene, vale el modo elegido en el **agente**.
 - Al crear un agente desde un tipo se copian los modos del tipo.
+- Para ver cuánto pesa cada skill junto al resto de las instrucciones, y cambiar el modo ahí mismo, abre **Ajustes** > **Instrucciones** del agente (ver [Agentes](03-agentes.md#instrucciones)).
 
 > **Consejo:** deja "siempre" para reglas cortas y pasa a "a demanda" las guías largas. Así solo pagas la lista y el texto de las skills que se usan.
 

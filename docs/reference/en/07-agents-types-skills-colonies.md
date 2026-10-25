@@ -40,7 +40,7 @@ Details and limits in [document 6](06-providers.md) and [12](12-operations-and-t
 | Colony / Agents → **New agent** | `NewAgentDrawer` | Step 1: choose a type or "Blank agent"; step 2: form. If opened from a colony's **+** cell, the colony comes preselected. |
 | Types screen → **Create agent** | `NewAgentDrawer` with a fixed type | Skips step 1. |
 | Colony → settings button of the selected agent | `AgentEditDrawer` | Edits in a side panel without leaving the honeycomb. |
-| Agent screen → **Settings** | collapsible panel of `agents/[id]/page.tsx` | Includes the *Sessions* tab and deletion. |
+| Agent screen → **Settings** | collapsible panel of `agents/[id]/page.tsx` | Includes the *Notebook*, *Instructions* and *Sessions* tabs and deletion. |
 
 All three use the same form, `components/agents/AgentForm.tsx`, with the same validation (`validate()`):
 
@@ -184,6 +184,23 @@ If the effective folder is empty when a turn starts, the turn fails with: *"This
 4. **Team** (orchestrators only): see [document 9](09-orchestration-and-relations.md#95-orchestrator-instructions).
 5. **Connections** (if the agent has any): how messages from a channel arrive and how to reply; see [document 14](14-external-connections.md).
 6. **Notebook** (if it has the Notebook skill): how to use it, and separately the current text of its notes, which does not count toward the instructions hash ([7.3.2](#732-the-agents-notebook)).
+
+### 7.6.1 Size per part (Instructions tab)
+
+`instructionParts(agent, delegated)` returns the blocks `composeInstructions` joins with `\n\n`, in the same order and with exactly the same text (`instr_hash`, [document 8](08-sessions-and-history.md), is the sha1 of that join, so a byte of difference would resend the instructions to every resumed conversation; `test-instructions-compose.ts` pins the text and sha1 of eight agents). Each block has a `key` and a `group`: `identity`, `colony` (the colony's prompt, when the agent follows it), `own` (the agent's own prompt), `skill` (one per skill loaded in full, with `skill_id`), `lazy_list`, `team`, `channel` (aliases and the channel section) and `other` (provider notes, wake-ups, resources, databases and the notebook instructions). The colony and own prompts, already merged by `agentOf`, are split back so that `colony + "\n\n" + own` is the effective prompt.
+
+`GET /api/agents/:id/instructions-size` (`services/instructions-size.ts`) measures the **saved** agent, resolved, as a direct conversation (a delegated task adds about 170 characters to the identity). It reads no history.
+
+| Field | Meaning |
+|---|---|
+| `provider`, `colony_id`, `colony_name` | The agent's provider and the colony it belongs to. |
+| `plan_all` | `true` for Claude in Read-only (`plan`): every skill goes in full ([7.3.3](#733-on-demand-loading)). |
+| `parts[]` | One entry per block: `key`, `group`, `chars`, `tokens_est`; skills add `skill_id`, `skill_name`, `mode` and `from_colony` (colony name, when the skill comes only from the colony); `colony` adds `from_colony`; `lazy_list` and `team` add `count`; `channel` adds the platform name in `channel`. |
+| `total_chars`, `total_tokens_est` | Sum of `parts[].chars` (the `\n\n` separators are not counted: `composeInstructions(a).length === total_chars + 2 * (parts.length - 1)`) and its estimate. |
+| `on_demand[]` | The skills that are only listed: `skill_id`, `skill_name`, `from_colony`. |
+| `notebook_chars`, `notebook_tokens_est` | Size of `notebookBlock` (the notes), outside the total. |
+
+Tokens are an estimate, `ceil(chars / 4)`, the same rule as `web/lib/tokens.ts`. The web tab (`web/components/agents/InstructionsPanel.tsx`) sorts the parts by weight, merges `identity` and `other` into one row and `channel` into another, and estimates "After saving" in the browser with `skillWeight` over the draft's own skills, without calling the server. The threshold of the heavy skill notice is in `HEAVY_SKILL_TOKENS` (800) and `HEAVY_SKILL_SHARE` (25%). Test: `test-instructions-size.ts`.
 
 ### Where the rules an agent receives live
 

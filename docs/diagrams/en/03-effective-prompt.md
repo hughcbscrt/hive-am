@@ -54,22 +54,22 @@ flowchart TB
 | 2 | `server/src/db.ts:191` | `system_prompt` | The colony's prompt first, then the agent's, so the agent has the last word. |
 | 3 | `server/src/db.ts:192` | `skill_ids` | The colony's skills plus the agent's; for how each is loaded the agent's choice wins (line 194). |
 | 4 | `server/src/db.ts:201` | `resolved` | The agent with those effective values in place; `runtime.ts` composes from it. |
-| 5 | `server/src/instructions.ts:38` | `composeInstructions` | Writes the sections below in this order and joins them with blank lines. |
-| 6 | `server/src/instructions.ts:44` | `## Who you are` | Name, role and purpose, "do not introduce yourself as the CLI", the working folder, the colony (line 49) and, for a delegated turn, the note to finish with a report (line 50). |
-| 7 | `server/src/instructions.ts:54` | `opencode` | OpenCode with any hive tool: how to call them through its `execute` tool. |
-| 8 | `server/src/instructions.ts:58` | `kiro` | Kiro: how to leave a command running without blocking the turn. |
-| 9 | `server/src/instructions.ts:61` | `system_prompt` | The effective prompt (colony and agent). |
-| 10 | `server/src/instructions.ts:63` | `skill_ids` | Each always-on skill, in full, as `## Skill: <name>`. |
-| 11 | `server/src/instructions.ts:67` | `lazy.length` | On-demand skills: name and description only, with the `skill_read` tool. |
+| 5 | `server/src/instructions.ts:46` | `composeInstructions` | Joins with blank lines the sections that `instructionParts` (line 51) writes below, in this order, each tagged with what it is (the Instructions tab measures them). |
+| 6 | `server/src/instructions.ts:57` | `## Who you are` | Name, role and purpose, "do not introduce yourself as the CLI", the working folder, the colony (line 63) and, for a delegated turn, the note to finish with a report (line 64). |
+| 7 | `server/src/instructions.ts:68` | `opencode` | OpenCode with any hive tool: how to call them through its `execute` tool. |
+| 8 | `server/src/instructions.ts:72` | `kiro` | Kiro: how to leave a command running without blocking the turn. |
+| 9 | `server/src/instructions.ts:76` | `system_prompt` | The effective prompt (colony and agent), as two parts when the agent follows its colony's prompt. |
+| 10 | `server/src/instructions.ts:82` | `skill_ids` | Each always-on skill, in full, as `## Skill: <name>`. |
+| 11 | `server/src/instructions.ts:86` | `lazy.length` | On-demand skills: name and description only, with the `skill_read` tool. |
 | 12 | `server/src/instructions.ts:17` | `lazySkills` | Claude in Plan mode cannot call MCP tools, so there every skill is included in full. |
-| 13 | `server/src/instructions.ts:73` | `orchestrator` | An orchestrator: its team and how to delegate, or "you have no subagents". |
-| 14 | `server/src/instructions.ts:84` | `connections.forAgent` | An agent with a connection: its aliases (line 88) and how to answer chat messages with `channel_reply` (line 89). |
-| 15 | `server/src/instructions.ts:93` | `WAKEUPS_SKILL_ID` | With the Wake-ups skill: `wake_me`, `wake_when_done` and schedules. |
-| 16 | `server/src/instructions.ts:97` | `OBJECTS_SKILL_ID` | With the Colony resources skill: the resource tools. |
-| 17 | `server/src/instructions.ts:101` | `DATABASES_SKILL_ID` | With the Database management skill: the database tools. |
-| 18 | `server/src/instructions.ts:106` | `NOTEBOOK_SKILL_ID` | With the Notebook skill: how to use the notebook, and whether it is shared. |
+| 13 | `server/src/instructions.ts:92` | `orchestrator` | An orchestrator: its team and how to delegate, or "you have no subagents". |
+| 14 | `server/src/instructions.ts:103` | `connections.forAgent` | An agent with a connection: its aliases (line 107) and how to answer chat messages with `channel_reply` (line 108). |
+| 15 | `server/src/instructions.ts:112` | `WAKEUPS_SKILL_ID` | With the Wake-ups skill: `wake_me`, `wake_when_done` and schedules. |
+| 16 | `server/src/instructions.ts:116` | `OBJECTS_SKILL_ID` | With the Colony resources skill: the resource tools. |
+| 17 | `server/src/instructions.ts:120` | `DATABASES_SKILL_ID` | With the Database management skill: the database tools. |
+| 18 | `server/src/instructions.ts:125` | `NOTEBOOK_SKILL_ID` | With the Notebook skill: how to use the notebook, and whether it is shared. |
 | 19 | `server/src/instructions.ts:23` | `mcpCaps` | Which hive tools the turn's MCP server offers; the same conditions as the sections above. |
-| 20 | `server/src/instructions.ts:118` | `notebookBlock` | The notes themselves, under `### Your current notes`. |
+| 20 | `server/src/instructions.ts:137` | `notebookBlock` | The notes themselves, under `### Your current notes`. |
 | 21 | `server/src/runtime.ts:112` | `notebookBlock(agent)` | The notes are appended after the composed text, so a note the agent writes is not a change of configuration. |
 | 22 | `server/src/runtime.ts:113` | `createHash` | The hash covers the composed text only. |
 | 23 | `server/src/runtime.ts:115` | `refreshInstructions` | A resumed direct session is sent the instructions again when the hash differs from the saved `instr_hash` or the notes are newer than what this reader has seen. |
@@ -86,7 +86,9 @@ flowchart TB
 - `test-providers-common.ts` (no model): `withInstructions` and `stripInstructions`.
 - `test-session-permission.ts` (no model): an OpenCode conversation is flagged when its permission changed after it began.
 - `sim-skills.ts` needs a real model: on-demand skills stay out of the instructions and the agent reads them when needed.
-- No script asserts the order of the sections, and no script checks Claude's arguments.
+- `test-instructions-compose.ts` (no model): the exact text and sha1 of eight agents, one per branch above, so a change of order or of a single byte fails.
+- `test-instructions-size.ts` (no model): the parts join into the text sent, and the size per part used by the Instructions tab.
+- No script checks Claude's arguments.
 
 ## Edge cases
 

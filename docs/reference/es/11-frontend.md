@@ -32,9 +32,11 @@ Tabla con búsqueda (nombre, descripción, carpeta), filtros por rol y proveedor
 
 ### Agente (`/agents/<id>`)
 
-Selector de agentes + chat + ajustes plegables (ver [documento 10](10-chat-y-visualizacion.md)). La cabecera es un `WorkspaceHeader`. El panel de ajustes y su pestaña viven en la URL (`?tab=config|notebook|sessions`), así que un enlace los abre; en pantallas de más de 1100 px el panel abierto reserva su ancho en el chat (ya no lo tapa) y su ancho se arrastra y se recuerda. En la cabecera, el control **Chat / Cambios** alterna entre la conversación y el [explorador de cambios de git](13-explorador-de-cambios-git.md). El panel de ajustes tiene dos pestañas:
+Selector de agentes + chat + ajustes plegables (ver [documento 10](10-chat-y-visualizacion.md)). La cabecera es un `WorkspaceHeader`. El panel de ajustes y su pestaña viven en la URL (`?tab=config|notebook|instructions|sessions`), así que un enlace los abre; en pantallas de más de 1100 px el panel abierto reserva su ancho en el chat (ya no lo tapa) y su ancho se arrastra y se recuerda. En la cabecera, el control **Chat / Cambios** alterna entre la conversación y el [explorador de cambios de git](13-explorador-de-cambios-git.md). El panel de ajustes tiene cuatro pestañas:
 
 - **Configuration:** `AgentForm` completo con barra inferior *Save changes* / *Discard* y botón *Delete agent* (con confirmación).
+- **Notebook:** las notas del agente (`NotebookPanel`).
+- **Instructions:** tamaño de las instrucciones guardadas por parte, con el interruptor Siempre / A demanda de cada skill sobre el mismo borrador que Configuración, por eso la barra inferior también sale aquí (`InstructionsPanel`, [documento 7](07-agentes-tipos-skills-colonias.md#761-tamaño-por-parte-pestaña-instrucciones)).
 - **Sessions:** conversaciones y tareas delegadas.
 
 Cabecera: volver a Colony (`/colony`), avatar, nombre, rol, proveedor, modelo, estado, **New conversation** (con confirmación) y **Settings**.

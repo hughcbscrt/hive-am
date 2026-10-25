@@ -58,7 +58,7 @@ sequenceDiagram
 
 | Step | File | Function or symbol | What it does |
 |---|---|---|---|
-| 1 | `server/src/http/routes/agents.ts:35` | `sendTurn` | A web message (`POST /api/agents/:id/messages`) is queued and the request answers at once; the chat router (`server/src/connections/router.ts:202`), delegations (`server/src/runtime.ts:188`), wake-ups (`server/src/wake.ts:81`) and schedules (`server/src/schedules.ts:104`) call the same function. |
+| 1 | `server/src/http/routes/agents.ts:36` | `sendTurn` | A web message (`POST /api/agents/:id/messages`) is queued and the request answers at once; the chat router (`server/src/connections/router.ts:202`), delegations (`server/src/runtime.ts:188`), wake-ups (`server/src/wake.ts:81`) and schedules (`server/src/schedules.ts:104`) call the same function. |
 | 2 | `server/src/runtime.ts:26` | `states` | One in-memory state per agent: promise chain, controller, queued count, live turn, cancelled delegations. |
 | 3 | `server/src/runtime.ts:57` | `sendTurn` | Counts the message as queued, emits a status and chains `execute` after the agent's previous turn, so one agent runs one turn at a time. |
 | 4 | `server/src/runtime.ts:69` | `cancelled.delete` | A delegation cancelled while it waited ends here as `Cancelled` without reaching the CLI. |

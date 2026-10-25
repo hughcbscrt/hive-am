@@ -32,9 +32,11 @@ Table with search (name, description, folder), filters by role and provider, and
 
 ### Agent (`/agents/<id>`)
 
-Agent switcher + chat + collapsible settings (see [document 10](10-chat-and-display.md)). The header is a `WorkspaceHeader`. The settings panel and its tab live in the URL (`?tab=config|notebook|sessions`), so a link opens them; on screens wider than 1100 px the open panel reserves its width in the chat (it no longer covers it) and its width is dragged and remembered. In the header, the **Chat / Changes** control toggles between the conversation and the [git changes explorer](13-changes-explorer-git.md). The settings panel has two tabs:
+Agent switcher + chat + collapsible settings (see [document 10](10-chat-and-display.md)). The header is a `WorkspaceHeader`. The settings panel and its tab live in the URL (`?tab=config|notebook|instructions|sessions`), so a link opens them; on screens wider than 1100 px the open panel reserves its width in the chat (it no longer covers it) and its width is dragged and remembered. In the header, the **Chat / Changes** control toggles between the conversation and the [git changes explorer](13-changes-explorer-git.md). The settings panel has four tabs:
 
 - **Configuration:** the full `AgentForm` with a bottom bar *Save changes* / *Discard* and a *Delete agent* button (with confirmation).
+- **Notebook:** the agent's notes (`NotebookPanel`).
+- **Instructions:** size of the saved instructions per part, with the Always / On demand switch of each skill on the same draft as Configuration, so the bottom bar shows here too (`InstructionsPanel`, [document 7](07-agents-types-skills-colonies.md#761-size-per-part-instructions-tab)).
 - **Sessions:** conversations and delegated tasks.
 
 Header: back to Colony (`/colony`), avatar, name, role, provider, model, status, **New conversation** (with confirmation) and **Settings**.

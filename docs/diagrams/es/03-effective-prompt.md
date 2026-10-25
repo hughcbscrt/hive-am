@@ -54,22 +54,22 @@ flowchart TB
 | 2 | `server/src/db.ts:191` | `system_prompt` | Primero el prompt de la colonia y luego el del agente, para que el agente tenga la última palabra. |
 | 3 | `server/src/db.ts:192` | `skill_ids` | Las skills de la colonia más las del agente; en cómo se carga cada una gana lo que eligió el agente (línea 194). |
 | 4 | `server/src/db.ts:201` | `resolved` | El agente con esos valores efectivos en su lugar; `runtime.ts` arma las instrucciones a partir de él. |
-| 5 | `server/src/instructions.ts:38` | `composeInstructions` | Escribe las secciones de abajo en este orden y las une con líneas en blanco. |
-| 6 | `server/src/instructions.ts:44` | `## Who you are` | Nombre, rol y propósito, "no te presentes como el CLI", la carpeta de trabajo, la colonia (línea 49) y, en un turno delegado, la nota de terminar con un reporte (línea 50). |
-| 7 | `server/src/instructions.ts:54` | `opencode` | OpenCode con alguna herramienta hive: cómo llamarlas desde su herramienta `execute`. |
-| 8 | `server/src/instructions.ts:58` | `kiro` | Kiro: cómo dejar un comando corriendo sin bloquear el turno. |
-| 9 | `server/src/instructions.ts:61` | `system_prompt` | El prompt efectivo (colonia y agente). |
-| 10 | `server/src/instructions.ts:63` | `skill_ids` | Cada skill siempre activa, completa, como `## Skill: <nombre>`. |
-| 11 | `server/src/instructions.ts:67` | `lazy.length` | Skills bajo demanda: solo nombre y descripción, con la herramienta `skill_read`. |
+| 5 | `server/src/instructions.ts:46` | `composeInstructions` | Une con líneas en blanco las secciones que `instructionParts` (línea 51) escribe abajo, en este orden, cada una marcada con lo que es (la pestaña Instrucciones las mide). |
+| 6 | `server/src/instructions.ts:57` | `## Who you are` | Nombre, rol y propósito, "no te presentes como el CLI", la carpeta de trabajo, la colonia (línea 63) y, en un turno delegado, la nota de terminar con un reporte (línea 64). |
+| 7 | `server/src/instructions.ts:68` | `opencode` | OpenCode con alguna herramienta hive: cómo llamarlas desde su herramienta `execute`. |
+| 8 | `server/src/instructions.ts:72` | `kiro` | Kiro: cómo dejar un comando corriendo sin bloquear el turno. |
+| 9 | `server/src/instructions.ts:76` | `system_prompt` | El prompt efectivo (colonia y agente), en dos partes cuando el agente sigue el prompt de su colonia. |
+| 10 | `server/src/instructions.ts:82` | `skill_ids` | Cada skill siempre activa, completa, como `## Skill: <nombre>`. |
+| 11 | `server/src/instructions.ts:86` | `lazy.length` | Skills bajo demanda: solo nombre y descripción, con la herramienta `skill_read`. |
 | 12 | `server/src/instructions.ts:17` | `lazySkills` | Claude en modo Plan no puede llamar herramientas MCP, así que ahí todas las skills van completas. |
-| 13 | `server/src/instructions.ts:73` | `orchestrator` | Un orquestador: su equipo y cómo delegar, o "no tienes subagentes". |
-| 14 | `server/src/instructions.ts:84` | `connections.forAgent` | Un agente con conexión: sus alias (línea 88) y cómo contestar mensajes de chat con `channel_reply` (línea 89). |
-| 15 | `server/src/instructions.ts:93` | `WAKEUPS_SKILL_ID` | Con la skill Wake-ups: `wake_me`, `wake_when_done` y las programaciones. |
-| 16 | `server/src/instructions.ts:97` | `OBJECTS_SKILL_ID` | Con la skill Colony resources: las herramientas de recursos. |
-| 17 | `server/src/instructions.ts:101` | `DATABASES_SKILL_ID` | Con la skill Database management: las herramientas de bases de datos. |
-| 18 | `server/src/instructions.ts:106` | `NOTEBOOK_SKILL_ID` | Con la skill Notebook: cómo usar la libreta y si es compartida. |
+| 13 | `server/src/instructions.ts:92` | `orchestrator` | Un orquestador: su equipo y cómo delegar, o "no tienes subagentes". |
+| 14 | `server/src/instructions.ts:103` | `connections.forAgent` | Un agente con conexión: sus alias (línea 107) y cómo contestar mensajes de chat con `channel_reply` (línea 108). |
+| 15 | `server/src/instructions.ts:112` | `WAKEUPS_SKILL_ID` | Con la skill Wake-ups: `wake_me`, `wake_when_done` y las programaciones. |
+| 16 | `server/src/instructions.ts:116` | `OBJECTS_SKILL_ID` | Con la skill Colony resources: las herramientas de recursos. |
+| 17 | `server/src/instructions.ts:120` | `DATABASES_SKILL_ID` | Con la skill Database management: las herramientas de bases de datos. |
+| 18 | `server/src/instructions.ts:125` | `NOTEBOOK_SKILL_ID` | Con la skill Notebook: cómo usar la libreta y si es compartida. |
 | 19 | `server/src/instructions.ts:23` | `mcpCaps` | Qué herramientas hive ofrece el servidor MCP del turno; las mismas condiciones que las secciones de arriba. |
-| 20 | `server/src/instructions.ts:118` | `notebookBlock` | Las notas en sí, bajo `### Your current notes`. |
+| 20 | `server/src/instructions.ts:137` | `notebookBlock` | Las notas en sí, bajo `### Your current notes`. |
 | 21 | `server/src/runtime.ts:112` | `notebookBlock(agent)` | Las notas se agregan después del texto armado, así una nota que escribe el agente no cuenta como cambio de configuración. |
 | 22 | `server/src/runtime.ts:113` | `createHash` | El hash cubre solo el texto armado. |
 | 23 | `server/src/runtime.ts:115` | `refreshInstructions` | Una sesión directa retomada recibe de nuevo las instrucciones cuando el hash no coincide con el `instr_hash` guardado o las notas son más nuevas que lo que este lector ya vio. |
@@ -86,7 +86,9 @@ flowchart TB
 - `test-providers-common.ts` (sin modelo): `withInstructions` y `stripInstructions`.
 - `test-session-permission.ts` (sin modelo): una conversación de OpenCode se marca cuando su permiso cambió después de empezar.
 - `sim-skills.ts` necesita un modelo real: las skills bajo demanda quedan fuera de las instrucciones y el agente las lee cuando las necesita.
-- Ningún script revisa el orden de las secciones, y ningún script revisa los argumentos de Claude.
+- `test-instructions-compose.ts` (sin modelo): el texto exacto y el sha1 de ocho agentes, uno por rama de arriba, así que un cambio de orden o de un solo byte falla.
+- `test-instructions-size.ts` (sin modelo): las partes se unen en el texto que se envía, y el tamaño por parte que usa la pestaña Instrucciones.
+- Ningún script revisa los argumentos de Claude.
 
 ## Casos límite
 
