@@ -22,10 +22,10 @@ export async function* runClaude(o: TurnOptions): AsyncGenerator<StreamEvent> {
   if (o.effort) args.push('--effort', o.effort);
   // Files people sent through a connection live outside the working folder; let the agent read them.
   if (existsSync(inboxDir(agent.id))) args.push('--add-dir', inboxDir(agent.id));
-  // The system prompt of a session is fixed when it starts: `--append-system-prompt` is ignored on `--resume`. So a
-  // resumed conversation whose instructions changed (skills, team, notebook…) gets them as an update inside the message.
+  // The system prompt of a session is fixed when it starts: `--append-system-prompt` is ignored on `--resume`. A new session gets the
+  // instructions only as the system prompt; a resumed conversation whose instructions changed (skills, team, notebook…) gets them as an update inside the message.
   if (o.instructions) args.push('--append-system-prompt', o.instructions);
-  const prompt = withInstructions(o.prompt, o.instructions, !!agent.session_id, o.refreshInstructions);
+  const prompt = agent.session_id ? withInstructions(o.prompt, o.instructions, true, o.refreshInstructions) : o.prompt;
   // Agents with the Browser switch on drive the person's Chrome through its extension; `-p` has nobody to approve each call, so the tools are allowed up front.
   const allowed: string[] = [];
   if (agent.browser && agent.permission !== 'plan') { args.push('--chrome'); allowed.push('mcp__claude-in-chrome'); }

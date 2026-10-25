@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Claude no longer receives the instructions twice in a new session.** A new Claude Code conversation (and every delegated task, which always starts one) got the instructions as its system prompt and again as an `<instructions>` block in front of the first message, one extra copy that stayed in the context for the whole session. Now a new session gets them only as the system prompt; a resumed one still gets the `update` block when they changed, since Claude ignores the system prompt on `--resume`. OpenCode, Kiro and Cursor are unchanged. Claude's arguments and stdin are tested in the new `test-claude-args.ts` (no model).
+
 ## [1.12.1] - 2026-10-24
 
 ### Added

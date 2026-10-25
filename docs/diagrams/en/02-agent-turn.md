@@ -89,6 +89,7 @@ sequenceDiagram
 - `test-runtime-recovery.ts` (no model): a failure while preparing a turn is that turn's error and does not leave the agent `running`; a burst of 34 turns runs in order; a silent CLI is cut (with `HIVE_AM_TURN_STALL_MS=400`) and the message behind it runs, while a turn that keeps printing is not cut; a wake-up delivery that failed is tried again.
 - `test-providers-common.ts` (no model): `spawnJson` and `spawnLines`, stdin, exit codes and stderr in errors, a CLI that ignores SIGTERM is cut off.
 - `test-provider-args.ts` (no model, stub CLIs): how OpenCode, Kiro and Cursor receive the prompt.
+- `test-claude-args.ts` (no model, stub CLI): Claude's arguments and the message it gets on stdin, new or resumed.
 - `test-effort.ts` (no model, starts a server): the effort a turn asks for and the arguments each CLI gets.
 
 ## Edge cases

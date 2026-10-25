@@ -55,7 +55,7 @@ claude -p --output-format stream-json --verbose --include-partial-messages \
 |---|---|
 | Permissions | `--permission-mode` receives `plan`, `acceptEdits` or `bypassPermissions` directly. In `acceptEdits`, `--disallowedTools` is added with `CLAUDE_EDIT_DENY` (`Edit(**/.git/**)`, `Edit(**/*.pem)`, `Edit(**/*.key)`); `.env` stays editable and writing outside the folder is already blocked by the mode itself. It is the only provider that tells "Edit files" from "Full access": with the former it edits files but a shell command that is not a file command (e.g. `python3 …`) is left unapproved and fails; with the latter everything runs. |
 | Resume | `--resume <id>` if the agent has a session. |
-| Instructions | They are passed on every turn with `--append-system-prompt`, **but Claude only applies them when the session is created**: with `--resume` it keeps the original system prompt. So, if they changed (skills, team, edited notes…), the resumed session receives an `<instructions update="true">` block before the message, like OpenCode and Kiro; the history hides it. |
+| Instructions | They are passed on every turn with `--append-system-prompt`, **but Claude only applies them when the session is created**: with `--resume` it keeps the original system prompt. A new session gets them only that way: its message goes as is, with no `<instructions>` block. If they changed (skills, team, edited notes…), the resumed session receives an `<instructions update="true">` block before the message, like OpenCode and Kiro; the history hides it. |
 | Delegation | If it is an orchestrator with subagents: it writes the MCP file and adds `--mcp-config` and `--allowedTools mcp__hive` (allows all tools of the `hive` server without asking for confirmation). |
 | Session id | Taken from the first event that carries `session_id`. |
 
@@ -188,6 +188,8 @@ OpenCode, Kiro and Cursor have no flag to add a system prompt, so the instructio
 | Resumed session without changes | Only the message |
 
 How does the runtime know they changed? It computes a SHA‑1 of the composed instructions and compares it with `agents.instr_hash` (the fingerprint that session received). This avoids, for example, an orchestrator keeping an old list of subagents after new ones are connected to it.
+
+Claude Code only uses the update row: a new session gets the instructions as its system prompt (`--append-system-prompt`, see 6.3) and the message alone, and a resumed one gets the `update` block when they changed.
 
 The history readers **hide** these blocks when showing the chat (see [document 8](08-sessions-and-history.md)). The models do receive them.
 

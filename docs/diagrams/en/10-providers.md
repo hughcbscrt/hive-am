@@ -25,7 +25,7 @@ sequenceDiagram
   X->>A: run(agent, prompt, instructions, refresh, mcpCaps, effort)
   alt Claude Code
     A->>A: write DATA_DIR/mcp/agent.json, --append-system-prompt
-    A->>S: claude -p --output-format stream-json, prompt on stdin
+    A->>S: claude -p --output-format stream-json, prompt on stdin (update block only when resumed)
   else OpenCode
     A->>A: OPENCODE_CONFIG_CONTENT with MCP and permission rules
     opt agent has the channel capability
@@ -57,7 +57,7 @@ sequenceDiagram
 |---|---|---|---|---|
 | Command | `claude -p --output-format stream-json` | `opencode run --format json` | `kiro-cli chat --no-interactive --output-format stream-json` | `cursor-agent -p --output-format stream-json --stream-partial-output` |
 | Message | on stdin | last argument | last argument | last argument |
-| Instructions | `--append-system-prompt` on every turn, and `withInstructions` in the message | `withInstructions` in the message | `withInstructions` in the message | `withInstructions` in the message |
+| Instructions | `--append-system-prompt` on every turn; `withInstructions` in the message only when resumed (the update) | `withInstructions` in the message | `withInstructions` in the message | `withInstructions` in the message |
 | Resume | `--resume <id>` | `-s <id>`, only when the session belongs to the same folder | `--resume-id <id>` | `--resume <id>` |
 | MCP config | file `DATA_DIR/mcp/<agent>.json` and `--mcp-config` | `OPENCODE_CONFIG_CONTENT` in the environment | a generated profile `~/.kiro/agents/hive-<agent>.json` and `--agent` | `<folder>/.cursor/mcp.json` with `${env:...}` values, and `--approve-mcps` |
 | Permissions | `--permission-mode`, plus a deny list for edits | OpenCode permission rules in the config | trusted tools and allowed paths in the profile, `--trust-all-tools` for Full access | `permissions` rules in a `cli-config.json` (`CURSOR_CONFIG_DIR`), `--mode plan` for read-only |
@@ -74,10 +74,10 @@ sequenceDiagram
 | 3 | `server/src/providers/claude.ts:18` | `--permission-mode` | The flags of every turn, with the agent's permission as Claude's own mode. |
 | 4 | `server/src/providers/claude.ts:19` | `CLAUDE_EDIT_DENY` | Editing (`acceptEdits`) cannot touch `.git`, `*.pem` or `*.key` (list at line 13). |
 | 5 | `server/src/providers/claude.ts:20` | `--resume` | Resumes the agent's session. |
-| 6 | `server/src/providers/claude.ts:27` | `--append-system-prompt` | The instructions as a system prompt. |
+| 6 | `server/src/providers/claude.ts:27` | `--append-system-prompt` | The instructions as a system prompt, the only copy a new session gets. |
 | 7 | `server/src/providers/claude.ts:31` | `--chrome` | An agent with the Browser switch (and not in Plan mode) drives the person's Chrome. |
 | 8 | `server/src/providers/claude.ts:33` | `DATA_DIR` | Writes the MCP config file and allows `mcp__hive`. |
-| 9 | `server/src/providers/claude.ts:44` | `stdin: prompt` | Claude is the only provider that gets the message on stdin. |
+| 9 | `server/src/providers/claude.ts:44` | `stdin: prompt` | Claude is the only provider that gets the message on stdin: as is in a new session, with the update block in front in a resumed one whose instructions changed (line 28). |
 | 10 | `server/src/providers/opencode.ts:58` | `runOpencode` | OpenCode. |
 | 11 | `server/src/providers/opencode.ts:38` | `opencodeRunFlags` | Reads `opencode run --help` once and passes only the flags that version knows (1.x and 2.x differ). |
 | 12 | `server/src/providers/opencode.ts:65` | `resume` | A session started in another folder is not resumed. |
@@ -104,12 +104,13 @@ sequenceDiagram
 
 ## Covered by
 
+- `test-claude-args.ts` (no model, stub CLI): Claude's flags for each permission, resume, model, effort, browser, MCP and inbox folder, and what reaches stdin in a new and a resumed session.
 - `test-provider-args.ts` (no model, stub CLIs): OpenCode, Kiro and Cursor get the message once, as the last argument; Cursor's flags for resume, model, effort and each permission.
 - `test-providers-common.ts` (no model): the shared spawn helpers and that there is a history reader for every provider.
 - `test-cursor-provider.ts` (no model, recorded output through a stub CLI): Cursor's events, permission rules, `.cursor/mcp.json` and models.
 - `test-cursor-history.ts` (no model): reading a Cursor conversation back.
 - `test-session-permission.ts` (no model): an OpenCode conversation keeps the tools it started with.
-- No script runs the real Claude, OpenCode or Kiro CLI without a model, and none checks Claude's arguments. The `sim-*` scripts (for example `sim-readonly.ts`, which checks that each permission level is enforced by the CLI) take a provider argument and need a real model.
+- No script runs the real Claude, OpenCode or Kiro CLI without a model. The `sim-*` scripts (for example `sim-readonly.ts`, which checks that each permission level is enforced by the CLI) take a provider argument and need a real model.
 
 ## Edge cases
 
