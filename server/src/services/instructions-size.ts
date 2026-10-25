@@ -1,7 +1,7 @@
 import { agents, colonies, resolved, skills } from '../db.js';
 import { connections } from '../connections/store.js';
 import { platformName } from '../connections/prompt.js';
-import { instructionParts, lazySkills, notebookBlock, type InstructionPart } from '../instructions.js';
+import { instructionParts, lazyOverheadChars, lazySkills, notebookBlock, type InstructionPart } from '../instructions.js';
 import type { Agent, SkillLoad } from '../types.js';
 
 /**
@@ -22,6 +22,9 @@ export interface InstructionsSize {
   parts: SizedPart[];
   /** The skills that are only listed (read on demand), with where each one comes from, so they can be switched back. */
   on_demand: { skill_id: string; skill_name: string; from_colony?: string }[];
+  /** What the list of skills on demand adds besides the lines themselves, counted like `total_chars` (its header and, for OpenCode, the
+   *  note on the hive tools when nothing else needs it): the first skill switched to on demand brings it, the last one takes it away. 0 in plan mode. */
+  lazy_overhead_chars: number;
   /** The notes go after the instructions and change as the agent writes: shown apart, not in the total. */
   notebook_chars: number; notebook_tokens_est: number;
 }
@@ -56,6 +59,7 @@ export function instructionsSize(agent: Agent): InstructionsSize {
     plan_all: a.provider === 'claude' && a.permission === 'plan',
     total_chars: total, total_tokens_est: estTokens(total), parts,
     on_demand: lazy.map((s) => { const c = fromColony(s.id); return c ? { skill_id: s.id, skill_name: s.name, from_colony: c } : { skill_id: s.id, skill_name: s.name }; }),
+    lazy_overhead_chars: lazyOverheadChars(a),
     notebook_chars: notes, notebook_tokens_est: estTokens(notes),
   };
 }

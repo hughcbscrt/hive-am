@@ -35,6 +35,25 @@ export function mcpCaps(a: Agent): string[] {
 /** How each CLI names the tools of the `hive` MCP server. OpenCode exposes them as `tools.<server>.<tool>`, Kiro as `@<server>/<tool>`, Cursor as `<server>-<tool>`. */
 const toolName = (provider: Agent['provider'], tool: string) => (provider === 'opencode' ? `tools.hive.${tool}` : provider === 'kiro' ? `@hive/${tool}` : provider === 'cursor' ? `hive-${tool}` : `mcp__hive__${tool}`);
 
+/** The note on calling the hive tools from OpenCode (see `instructionParts`). */
+const OPENCODE_NOTE = `## Calling the hive tools
+The hive tools (\`tools.hive.*\`) are called from the \`execute\` tool, with \`await\`, using exactly the names given in these instructions. Do not \`search\` for them and do not probe with \`shell\` first: call them directly, e.g. \`execute\` with \`return await tools.hive.channel_reply({ text: "..." });\`. At the start of a turn the hive tools are still connecting, so your very first call can fail with \`Unknown tool 'hive.…'. Use search to find available tools.\` That is expected: ignore the hint, do not \`search\` and do not change tools; make the same call again right away with the same arguments and it will work. Use \`shell\` only for real shell work (commands, files), never to run JavaScript or as a placeholder. For a simple question, answer it in a single call.`;
+
+/** The text above the on-demand list: it is there only while the agent has at least one skill on demand. */
+const lazyListHeader = (provider: Agent['provider']) => `## Skills you can load
+You have these skills. Their instructions are NOT loaded yet, to keep your context small. When a task matches one of them, call \`skill_read\` (${toolName(provider, 'skill_read')}) with its exact name BEFORE doing that work, then follow what it says. Load only what the task needs; once loaded, it stays available for the rest of the conversation.`;
+
+/**
+ * What the first skill on demand brings besides its own line, and the last one takes away, counted like the parts (without the
+ * separators between them): the header of the list with its line break and, for OpenCode, the note on calling the hive tools when
+ * nothing else needs them. 0 for Claude in Read-only (plan) mode, where no skill is ever on demand.
+ */
+export function lazyOverheadChars(a: Agent): number {
+  if (a.provider === 'claude' && a.permission === 'plan') return 0;
+  const note = a.provider === 'opencode' && !mcpCaps(a).some((c) => c !== 'skills') ? OPENCODE_NOTE.length : 0;
+  return lazyListHeader(a.provider).length + 1 + note;
+}
+
 /** One block of the instructions, tagged with what it is so its size can be shown part by part. */
 export interface InstructionPart {
   key: string;
@@ -65,8 +84,7 @@ export function instructionParts(a: Agent, delegated = false): InstructionPart[]
   push('identity', 'identity', id.join('\n'));
 
   // OpenCode 2.x puts MCP tools behind its `execute` tool (JavaScript). Models that guess here waste several turns on `search`, shell placeholders and retries.
-  if (a.provider === 'opencode' && mcpCaps(a).length > 0) push('opencode', 'other', `## Calling the hive tools
-The hive tools (\`tools.hive.*\`) are called from the \`execute\` tool, with \`await\`, using exactly the names given in these instructions. Do not \`search\` for them and do not probe with \`shell\` first: call them directly, e.g. \`execute\` with \`return await tools.hive.channel_reply({ text: "..." });\`. At the start of a turn the hive tools are still connecting, so your very first call can fail with \`Unknown tool 'hive.…'. Use search to find available tools.\` That is expected: ignore the hint, do not \`search\` and do not change tools; make the same call again right away with the same arguments and it will work. Use \`shell\` only for real shell work (commands, files), never to run JavaScript or as a placeholder. For a simple question, answer it in a single call.`);
+  if (a.provider === 'opencode' && mcpCaps(a).length > 0) push('opencode', 'other', OPENCODE_NOTE);
 
   // Kiro's shell tool returns only when the command's output pipes close, so a plain `cmd &` keeps the whole turn (and the chat) waiting until it ends.
   if (a.provider === 'kiro') push('kiro', 'other', `## Background commands
@@ -84,8 +102,7 @@ Your shell tool waits until the command and everything it started has closed its
     if (s?.content.trim() && !lazy.some((l) => l.id === s.id)) push(`skill:${s.id}`, 'skill', `## Skill: ${s.name}\n${s.description ? `_${s.description}_\n\n` : ''}${s.content.trim()}`, s.id);
   }
   if (lazy.length) {
-    push('lazy_list', 'lazy_list', `## Skills you can load
-You have these skills. Their instructions are NOT loaded yet, to keep your context small. When a task matches one of them, call \`skill_read\` (${toolName(a.provider, 'skill_read')}) with its exact name BEFORE doing that work, then follow what it says. Load only what the task needs; once loaded, it stays available for the rest of the conversation.
+    push('lazy_list', 'lazy_list', `${lazyListHeader(a.provider)}
 ${lazy.map((s) => `- **${s.name}**${s.description ? `: ${s.description}` : ''}`).join('\n')}`);
   }
 

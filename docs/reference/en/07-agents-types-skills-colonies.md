@@ -198,9 +198,10 @@ If the effective folder is empty when a turn starts, the turn fails with: *"This
 | `parts[]` | One entry per block: `key`, `group`, `chars`, `tokens_est`; skills add `skill_id`, `skill_name`, `mode` and `from_colony` (colony name, when the skill comes only from the colony); `colony` adds `from_colony`; `lazy_list` and `team` add `count`; `channel` adds the platform name in `channel`. |
 | `total_chars`, `total_tokens_est` | Sum of `parts[].chars` (the `\n\n` separators are not counted: `composeInstructions(a).length === total_chars + 2 * (parts.length - 1)`) and its estimate. |
 | `on_demand[]` | The skills that are only listed: `skill_id`, `skill_name`, `from_colony`. |
+| `lazy_overhead_chars` | What the on-demand list adds besides its lines, counted like `total_chars`: the "Skills you can load" header and, for OpenCode, the note on the hive tools when nothing else needs it. The first skill on demand brings it and the last one takes it away; `0` with `plan_all`. |
 | `notebook_chars`, `notebook_tokens_est` | Size of `notebookBlock` (the notes), outside the total. |
 
-Tokens are an estimate, `ceil(chars / 4)`, the same rule as `web/lib/tokens.ts`. The web tab (`web/components/agents/InstructionsPanel.tsx`) sorts the parts by weight, merges `identity` and `other` into one row and `channel` into another, and estimates "After saving" in the browser with `skillWeight` over the draft's own skills, without calling the server. The threshold of the heavy skill notice is in `HEAVY_SKILL_TOKENS` (800) and `HEAVY_SKILL_SHARE` (25%). Test: `test-instructions-size.ts`.
+Tokens are an estimate, `ceil(chars / 4)`, the same rule as `web/lib/tokens.ts`. The web tab (`web/components/agents/InstructionsPanel.tsx`) sorts the parts by weight, merges `identity` and `other` into one row and `channel` into another, and estimates "After saving" in the browser with `saveDelta` (`web/lib/tokens.ts`): `skillWeight` over the draft's own skills against the saved ones, plus or minus `lazy_overhead_chars` when the number of skills on demand goes from 0 to more or back to 0, without calling the server. The threshold of the heavy skill notice is in `HEAVY_SKILL_TOKENS` (800) and `HEAVY_SKILL_SHARE` (25%). Test: `test-instructions-size.ts`.
 
 ### Where the rules an agent receives live
 

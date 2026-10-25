@@ -41,6 +41,8 @@ export interface InstructionsSize {
   plan_all: boolean;
   total_chars: number; total_tokens_est: number; parts: InstructionsPart[];
   on_demand: { skill_id: string; skill_name: string; from_colony?: string }[];
+  /** Added by the first skill on demand besides its line (the list's header, the OpenCode note), taken away by the last one. */
+  lazy_overhead_chars: number;
   /** Not in the total: the notes change as the agent writes. */
   notebook_chars: number; notebook_tokens_est: number;
 }

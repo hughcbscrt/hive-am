@@ -198,9 +198,10 @@ Si la carpeta efectiva queda vacía al empezar un turno, el turno falla con: *"T
 | `parts[]` | Una entrada por bloque: `key`, `group`, `chars`, `tokens_est`; las skills añaden `skill_id`, `skill_name`, `mode` y `from_colony` (nombre de la colonia, cuando la skill solo viene de la colonia); `colony` añade `from_colony`; `lazy_list` y `team` añaden `count`; `channel` añade el nombre de la plataforma en `channel`. |
 | `total_chars`, `total_tokens_est` | Suma de `parts[].chars` (los separadores `\n\n` no cuentan: `composeInstructions(a).length === total_chars + 2 * (parts.length - 1)`) y su estimación. |
 | `on_demand[]` | Las skills que solo se listan: `skill_id`, `skill_name`, `from_colony`. |
+| `lazy_overhead_chars` | Lo que la lista a demanda suma además de sus líneas, contado como `total_chars`: la cabecera «Skills you can load» y, en OpenCode, la nota sobre las herramientas hive cuando nada más la pide. La trae la primera skill a demanda y se va con la última; `0` con `plan_all`. |
 | `notebook_chars`, `notebook_tokens_est` | Tamaño de `notebookBlock` (las notas), fuera del total. |
 
-Los tokens son una estimación, `ceil(chars / 4)`, la misma regla que `web/lib/tokens.ts`. La pestaña web (`web/components/agents/InstructionsPanel.tsx`) ordena las partes por peso, junta `identity` y `other` en una fila y `channel` en otra, y estima «Al guardar» en el navegador con `skillWeight` sobre las skills propias del borrador, sin llamar al servidor. El umbral del aviso de skill pesada está en `HEAVY_SKILL_TOKENS` (800) y `HEAVY_SKILL_SHARE` (25%). Prueba: `test-instructions-size.ts`.
+Los tokens son una estimación, `ceil(chars / 4)`, la misma regla que `web/lib/tokens.ts`. La pestaña web (`web/components/agents/InstructionsPanel.tsx`) ordena las partes por peso, junta `identity` y `other` en una fila y `channel` en otra, y estima «Al guardar» en el navegador con `saveDelta` (`web/lib/tokens.ts`): `skillWeight` sobre las skills propias del borrador frente a las guardadas, más o menos `lazy_overhead_chars` cuando el número de skills a demanda pasa de 0 a más o vuelve a 0, sin llamar al servidor. El umbral del aviso de skill pesada está en `HEAVY_SKILL_TOKENS` (800) y `HEAVY_SKILL_SHARE` (25%). Prueba: `test-instructions-size.ts`.
 
 ### Dónde viven las reglas que recibe un agente
 

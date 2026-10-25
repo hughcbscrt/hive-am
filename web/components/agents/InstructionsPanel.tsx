@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useHiveData } from '@/lib/store';
 import { useI18n } from '@/lib/i18n/index';
 import { fmtNum } from '@/lib/format';
-import { HEAVY_SKILL_SHARE, HEAVY_SKILL_TOKENS, skillWeight } from '@/lib/tokens';
+import { HEAVY_SKILL_SHARE, HEAVY_SKILL_TOKENS, saveDelta } from '@/lib/tokens';
 import { Banner } from '@/components/ui';
 import type { Agent, InstructionsPart, InstructionsSize, SkillLoad } from '@/lib/types';
 import type { AgentDraft } from './AgentForm';
@@ -39,15 +39,8 @@ export function InstructionsPanel({ agent, draft, onChange, dirty }: { agent: Ag
   const modeOf = (id: string, fallback: SkillLoad = 'always'): SkillLoad => (draft && own(id) ? draft.skill_loads[id] ?? skillOf(id)?.load ?? fallback : fallback);
   const setMode = (id: string, mode: SkillLoad) => { if (draft && own(id)) onChange({ ...draft, skill_loads: { ...draft.skill_loads, [id]: mode } }); };
 
-  // What saving would change: the weight of the agent's own skills in the draft against the saved ones (in plan mode every skill stays in full).
-  const delta = useMemo(() => {
-    if (!draft || !data) return 0;
-    const weigh = (ids: string[], loads: Record<string, SkillLoad>) => ids.reduce((n, id) => {
-      const s = skillOf(id); if (!s?.content.trim()) return n;
-      return n + skillWeight({ ...s, load: data.plan_all ? 'always' : loads[id] ?? s.load });
-    }, 0);
-    return weigh(draft.skill_ids, draft.skill_loads) - weigh(agent.skill_ids, agent.skill_loads);
-  }, [draft, data, agent.skill_ids, agent.skill_loads, skills]); // eslint-disable-line react-hooks/exhaustive-deps
+  // What saving would change (`saveDelta`): the agent's own skills in the draft against the saved ones, and the list's header when it comes or goes.
+  const delta = useMemo(() => (draft && data ? saveDelta(skills, agent, draft, data) : 0), [draft, data, agent, skills]);
 
   if (error && !data) return (
     <div className="pane">
@@ -178,7 +171,7 @@ export function InstructionsPanel({ agent, draft, onChange, dirty }: { agent: Ag
           </tr>
         </tfoot>
       </table>
-      {dirty && delta !== 0 && <p className="ins-after" role="status">{t('ins.afterSave', { delta: `${delta < 0 ? '−' : '+'}${fmtNum(Math.abs(delta))}` })}</p>}
+      {dirty && delta !== 0 && <p className="ins-after" role="status">{t('ins.afterSave', { count: Math.abs(delta), delta: `${delta < 0 ? '−' : '+'}${fmtNum(Math.abs(delta))}` })}</p>}
     </div>
   );
 }
