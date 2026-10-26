@@ -87,7 +87,7 @@ const txt = def!.content;
 for (const h of ['Before you create anything', 'The colony prompt', 'One prompt per role', 'Skills per role', 'Names', 'Linking workers', 'Resources', 'Changing things carefully', 'Deleting (confirmation)', 'Checking the result', 'What never to do', 'Tool reference']) check(txt.includes(`## ${h}`), `the skill has the section "${h}"`);
 check(TOOLS.every((t) => txt.includes(`\`${t}\``)), 'the skill names every real tool');
 check(/Role - Name - ACRONYM/.test(txt) && /never talks to another worker/.test(txt) && /explicit yes/.test(txt), 'it covers names, workers that do not talk to each other and the explicit yes');
-check(!/—/.test(txt + def!.description) && !/\b(AI|Anthropic)\b/.test(txt), 'it has no long dash and no AI attribution');
+check(!/\u2014/.test(txt + def!.description) && !/\b(AI|Anthropic)\b/.test(txt), 'it has no long dash and no AI attribution');
 
 // ---- 3: who may call ---------------------------------------------------------------------------------------------------------------------
 const nobody = await api('create', { from: 'no-such-agent', name: 'Ghost' });
