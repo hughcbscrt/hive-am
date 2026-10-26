@@ -336,7 +336,7 @@ An agent with the **Colony resources** skill gets three tools:
 - `object_logs`: read a resource's logs.
 - `object_action`: start, stop or restart a resource.
 
-These are the only tools. An agent **cannot create, edit or delete** resources, or change the command they run: that is left to people. Also, the skill is not just an instruction: the server enforces the rules.
+These are the only tools. An agent **cannot create, edit or delete** resources, or change the command they run: that is left to people (unless you give it the **Colony builder** skill, see below). Also, the skill is not just an instruction: the server enforces the rules.
 
 - An agent sees only the resources of **its own colony**.
 - A **read-only** agent can list and read logs, but not start, stop or restart.
@@ -365,6 +365,10 @@ You can choose it in three ways:
 Choosing an agent that does not have the skill gives it the skill. Choosing a resource that another agent already looks after takes it away from that agent.
 
 You can also create a new agent that is already set up: pick the resource on the map and press **Create a manager agent** on its card.
+
+### Agents that create resources
+
+An agent with the **Colony builder** skill can create, change and delete resources of any colony from a chat (servers, Docker, HTTP requests, databases and clusters, with the same fields as the form) and choose the agent that looks after each one. It never sees or writes a secret: passwords and secret variables come empty, `env` values come as `***`, and if it tries to save a password the server refuses it. Create the resource with the agent and then fill in the password yourself in its form. A secret variable you saved stays when the agent changes the resource, and only you can remove it. Keep secrets in `env`, never in the start command or the health check, which the agent sees as they are. It deletes a resource only after you say yes to the exact name. It does not start or stop resources: that is still **Colony resources**. More in [Permissions and security](13-permissions-and-security.md#agents-that-build-colonies).
 
 ## The resource card in the colony
 

@@ -336,7 +336,7 @@ Un agente con la skill **Colony resources** recibe tres herramientas:
 - `object_logs`: leer los logs de un recurso.
 - `object_action`: iniciar, detener o reiniciar un recurso.
 
-Son las únicas herramientas. Un agente **no puede crear, editar ni eliminar** recursos, ni cambiar el comando que corren: eso queda para las personas. Además, la skill no solo es una instrucción: el servidor aplica las reglas.
+Son las únicas herramientas. Un agente **no puede crear, editar ni eliminar** recursos, ni cambiar el comando que corren: eso queda para las personas (salvo que le des la skill **Colony builder**, ver abajo). Además, la skill no solo es una instrucción: el servidor aplica las reglas.
 
 - Un agente ve solo los recursos de **su propia colonia**.
 - Un agente de **solo lectura** puede listar y leer logs, pero no iniciar, detener ni reiniciar.
@@ -365,6 +365,10 @@ Puedes elegirlo de tres maneras:
 Elegir un agente que no tiene la skill se la da. Elegir un recurso que ya cuida otro agente se lo quita a ese.
 
 También puedes crear un agente nuevo ya preparado: elige el recurso en el mapa y pulsa **Crear un agente administrador** en su tarjeta.
+
+### Agentes que crean recursos
+
+Un agente con la skill **Colony builder** puede crear, cambiar y borrar recursos de cualquier colonia desde un chat (servidores, Docker, peticiones HTTP, bases de datos y clústeres, con los mismos campos que el formulario) y elegir el agente que cuida cada uno. Nunca ve ni escribe un secreto: las contraseñas y las variables secretas llegan vacías, los valores de `env` llegan como `***`, y si intenta guardar una contraseña el servidor la rechaza. Crea el recurso con el agente y luego llena tú la contraseña en su formulario. Una variable secreta que guardaste se conserva cuando el agente cambia el recurso, y solo tú puedes quitarla. Guarda los secretos en `env`, nunca en el comando de inicio ni en la comprobación de salud, que el agente ve tal cual. Solo borra un recurso después de que digas que sí al nombre exacto. No inicia ni detiene recursos: eso sigue siendo de **Colony resources**. Más en [Permisos y seguridad](13-permisos-y-seguridad.md#agentes-que-arman-colonias).
 
 ## La tarjeta del recurso en la colonia
 

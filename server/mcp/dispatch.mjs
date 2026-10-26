@@ -5,6 +5,7 @@
 //   wake     → wake_me, wake_when_done, schedule_create, schedule_list, schedule_cancel (agents with the Wake-ups skill: to be woken later in the same place)
 //   objects  → object_list, object_logs, object_action (agents with the Colony objects skill: the servers and containers of their colony)
 //   databases → object_db_* (agents with the Database management skill: the database resources of their colony)
+//   colonies → colony_* (agents with the Colony builder skill: colonies, agents and resources of any colony)
 // It only talks to the hive-am HTTP API; all rules (assignments, queueing) live there.
 import { createInterface } from 'node:readline';
 
@@ -283,6 +284,53 @@ const dbTools = [
   dbTool('delete', 'Delete a database resource (Full access only). The database itself is not touched: only hive-am forgets the connection, its saved queries and its history.', { name: NAME }, ['name']),
 ];
 allTools.push(...dbTools);
+
+// ---- Colony builder (cap `colonies`): one tool per operation, all answered by POST /api/agent-colonies/<op> (`colony_agent_list` → agent_list) ----
+const CNAME = (what) => ({ type: 'string', description: `The exact name of the ${what} (case does not matter).` });
+const COLONY_REF = { type: ['string', 'null'], description: 'A colony name, or null / "none" for no colony.' };
+const SKILLS = { type: 'array', description: 'The whole list of skills (it replaces the old one): [{ name, load }] with load always or on_demand (default: the skill\'s own). See colony_skill_list.', items: { type: 'object', properties: { name: { type: 'string' }, load: { type: 'string', enum: ['always', 'on_demand'] } }, required: ['name'] } };
+const PERMISSION = { type: 'string', enum: ['plan', 'acceptEdits', 'bypassPermissions'], description: 'plan = read-only, acceptEdits = edit files, bypassPermissions = Full access (only when the person asked for it).' };
+const CONFIRM = { type: 'string', description: 'The exact name of what is deleted, ONLY after the person said yes to deleting it. Without it nothing is deleted and the answer says what would be.' };
+const colonyFields = {
+  color: { type: 'string', description: 'A CSS color, e.g. #2f8f5b.' }, cwd: { type: 'string', description: 'The shared folder (absolute path; it must exist).' }, permission: PERMISSION,
+  system_prompt: { type: 'string', description: 'The colony prompt, placed before the prompt of each member that inherits it.' }, skills: SKILLS,
+  inherit: { type: 'object', description: 'Which fields members follow by default: { cwd, permission, skills, prompt } as true or false.', properties: { cwd: { type: 'boolean' }, permission: { type: 'boolean' }, skills: { type: 'boolean' }, prompt: { type: 'boolean' } }, additionalProperties: false },
+};
+const agentFields = {
+  description: { type: 'string', description: 'One line: what it delivers and what it does not do. The orchestrator reads it to choose.' }, role: { type: 'string', enum: ['orchestrator', 'worker'] },
+  provider: { type: 'string', enum: ['claude', 'opencode', 'kiro', 'cursor'] }, model: { type: 'string', description: 'A model id from colony_options (empty: the CLI\'s default).' },
+  effort: { type: 'string', description: 'A level the model takes (colony_options), or empty for the CLI\'s default.' }, permission: PERMISSION,
+  cwd: { type: 'string', description: 'Its own working folder (absolute, it must exist). Leave it out to use the colony\'s.' }, system_prompt: { type: 'string', description: 'Its own prompt (it comes after the colony\'s).' },
+  browser: { type: 'boolean', description: 'Claude only: let it drive the person\'s Chrome.' }, colony: COLONY_REF,
+  overrides: { type: 'array', items: { type: 'string', enum: ['cwd', 'permission', 'skills', 'prompt'] }, description: 'Fields where it ignores its colony and uses its own value (the whole list).' },
+  skills: SKILLS, workers: { type: 'array', items: { type: 'string' }, description: 'Orchestrators only: the names of its workers (the whole list, it replaces the old one).' },
+};
+const resourceFields = {
+  colony: COLONY_REF,
+  config: { type: 'object', description: 'The same fields as the form of the web app. server: cwd, start, stop, env, port, restart, health… docker: mode (container, compose, existing) and image, ports, volumes, env… or file / container. http: folder, env, variables. database: engine (mysql, postgresql, sqlite, mssql), host, port, user, database, or file for SQLite, ssl, readOnly… (never a password). cluster: members (resource names).' },
+};
+const colonyTool = (name, description, properties = {}, required = []) => ({ cap: 'colonies', name: `colony_${name}`, description, inputSchema: { type: 'object', properties, required, additionalProperties: false } });
+const colonyTools = [
+  colonyTool('options', 'What can be chosen when creating agents and resources: providers (installed or not), their models and the effort levels each takes, roles, permissions, inherited fields, skill loads and resource kinds. Give provider (and model) to see the levels of one model.', { provider: { type: 'string' }, model: { type: 'string' } }),
+  colonyTool('list', 'List every colony: name, folder, permission, agents and skills.'),
+  colonyTool('get', 'One colony in full: folder, permission, prompt, what its members inherit, skills with their load, and agents.', { name: CNAME('colony') }, ['name']),
+  colonyTool('create', 'Create a colony. Ask the person first and show the plan. Add agents afterwards (colony_agent_create with colony, or colony_update with agents).', { name: { type: 'string' }, ...colonyFields }, ['name']),
+  colonyTool('update', 'Change a colony: only what you send changes (skills and agents replace their whole list). It reaches every member that inherits from it. A change that would take away your own access is refused and nothing changes.', { name: CNAME('colony'), new_name: { type: 'string' }, ...colonyFields, agents: { type: 'array', items: { type: 'string' }, description: 'The names of ALL its members (agents not listed leave it).' } }, ['name']),
+  colonyTool('delete', 'Delete a colony (its agents stay, without a colony). Only after the person said yes: call it first without confirm to see what goes with it.', { name: CNAME('colony'), confirm: CONFIRM }, ['name']),
+  colonyTool('agent_list', 'List every agent (or the ones of one colony): name, role, provider, model, effective permission, colony, description and status.', { colony: COLONY_REF }),
+  colonyTool('agent_get', 'One agent in full: its own fields and prompt, skills with their load, workers, orchestrators, overrides, what it inherits and what it really runs with (effective).', { name: CNAME('agent') }, ['name']),
+  colonyTool('agent_create', 'Create an agent with the same checks as the web app (unique name, existing folder, a provider and an effort the model takes). Ask the person first and show the plan.', { name: { type: 'string', description: 'Role - Name - ACRONYM, different from every other.' }, ...agentFields }, ['name', 'provider']),
+  colonyTool('agent_update', 'Change an agent: only what you send changes (skills, workers and overrides replace their whole list). A change that would take away your own access is refused and nothing changes.', { name: CNAME('agent'), new_name: { type: 'string' }, ...agentFields }, ['name']),
+  colonyTool('agent_delete', 'Delete an agent (a turn it runs is stopped). Only after the person said yes: call it first without confirm to see what goes with it. Not yourself, your orchestrator, an agent you have a task open with, or one linked to a chat connection.', { name: CNAME('agent'), confirm: CONFIRM }, ['name']),
+  colonyTool('skill_list', 'List the skills that can be assigned: name, description, suggested load and how many agents and types use each.'),
+  colonyTool('resource_list', 'List the resources of every colony (or of one): name, kind, colony, state and the agent that looks after it.', { colony: COLONY_REF }),
+  colonyTool('resource_get', 'One resource with its configuration. Passwords and secret variables come empty and env values as ***.', { name: CNAME('resource') }, ['name']),
+  colonyTool('resource_create', 'Create a resource in any colony. Never give a password or a secret variable: the person fills them in the web app.', { name: { type: 'string' }, kind: { type: 'string', enum: ['server', 'docker', 'http', 'database', 'cluster'] }, ...resourceFields }, ['name', 'kind', 'config']),
+  colonyTool('resource_update', 'Change a resource: only the config keys you send change, and a saved password is kept. env is replaced whole: send every key you keep, the ones not to change as ***. HTTP variables merge by environment and name: a plain one is removed only by sending it as null, and a saved secret is kept and cannot be removed, emptied or made plain here.', { name: CNAME('resource'), new_name: { type: 'string' }, ...resourceFields }, ['name']),
+  colonyTool('resource_delete', 'Delete a resource (a server is stopped first; a container hive-am created is removed). Only after the person said yes: call it first without confirm to see what goes with it.', { name: CNAME('resource'), confirm: CONFIRM }, ['name']),
+  colonyTool('resource_manager', 'Choose the one agent that looks after a server, container, cluster or database (it gets the skill it needs), or null / "none" to leave it to the agents of its colony.', { name: CNAME('resource'), agent: { type: ['string', 'null'], description: 'An agent name, or null / "none".' } }, ['name']),
+];
+allTools.push(...colonyTools);
 const tools = allTools.filter((t) => CAPS.has(t.cap)).map(({ cap, ...t }) => t);
 
 // ---- how a database answer is written for the model ----
@@ -312,6 +360,30 @@ const dbAnswer = (op, j) => {
     case 'config_set': return `Saved the connection of "${j.name}" after testing it.`;
     case 'delete': return `Deleted the database resource "${j.deleted}".`;
     default: return JSON.stringify(j);
+  }
+};
+
+// ---- how a Colony builder answer is written for the model ----
+const pretty = (j) => JSON.stringify(j, null, 2);
+const list = (xs) => (xs?.length ? xs.join(', ') : '(none)');
+const colonyAnswer = (op, j) => {
+  switch (op) {
+    case 'list': return j.colonies.length ? j.colonies.map((c) => `${c.name} · ${c.cwd || '(no folder)'} · ${c.permission} · agents: ${list(c.agents)} · skills: ${list(c.skills)}`).join('\n') : 'There are no colonies.';
+    case 'agent_list': return j.agents.length ? j.agents.map((a) => `${a.name} · ${a.role} · ${a.provider}${a.model ? `/${a.model}` : ''} · ${a.permission} · ${a.colony ?? '(no colony)'} · ${a.status}${a.description ? `\n  ${a.description}` : ''}`).join('\n') : 'No agents.';
+    case 'skill_list': return j.skills.map((s) => `${s.name} (${s.load}; ${s.agents} agent${s.agents === 1 ? '' : 's'}, ${s.types} type${s.types === 1 ? '' : 's'})${s.description ? `: ${s.description}` : ''}`).join('\n') || 'No skills.';
+    case 'resource_list': return j.resources.length ? j.resources.map((o) => `${o.name} · ${o.kind} · ${o.colony ?? '(no colony)'} · ${o.status}${o.detail ? ` (${o.detail})` : ''}${o.manager ? ` · looked after by ${o.manager}` : ''}`).join('\n') : 'No resources.';
+    case 'create': return `Created the colony "${j.colony.name}":\n${pretty(j.colony)}`;
+    case 'update': return `Saved the colony "${j.colony.name}":\n${pretty(j.colony)}`;
+    case 'agent_create': return `Created the agent "${j.agent.name}":\n${pretty(j.agent)}`;
+    case 'agent_update': return `Saved the agent "${j.agent.name}":\n${pretty(j.agent)}`;
+    case 'resource_create': return `Created the resource "${j.resource.name}":\n${pretty(j.resource)}`;
+    case 'resource_update': return `Saved the resource "${j.resource.name}":\n${pretty(j.resource)}`;
+    case 'resource_manager': return j.manager ? `${j.manager} looks after "${j.name}" now${j.skill_added ? ' (it was given the skill it needs)' : ''}.` : `"${j.name}" is left to the agents of its colony.`;
+    case 'delete': case 'agent_delete': case 'resource_delete':
+      if (!j.deleted) return `Nothing was deleted. This would delete ${j.would_delete}\nTell the person exactly this and wait for their explicit yes; only then call it again with confirm: "${j.name}".`;
+      if (op !== 'delete') return `Deleted "${j.name}".`;
+      return `Deleted the colony "${j.name}".${j.left_without_colony.length ? ` Left without a colony: ${j.left_without_colony.join(', ')}.` : ''}${j.without_folder.length ? ` With no working folder now (they cannot run until they get one): ${j.without_folder.join(', ')}.` : ''}`;
+    default: return pretty(j);
   }
 };
 
@@ -443,6 +515,13 @@ async function call(name, args) {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? `${name} failed (${r.status})`);
     return dbAnswer(op, j);
+  }
+  if (name.startsWith('colony_')) {
+    const op = name.slice('colony_'.length);
+    const r = await fetch(`${API}/api/agent-colonies/${op}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ from: FROM, ...args }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? `${name} failed (${r.status})`);
+    return colonyAnswer(op, j);
   }
   if (name === 'object_list' || name === 'object_logs' || name === 'object_action') {
     const r = await fetch(`${API}/api/agent-objects/${name.slice('object_'.length)}`, {
