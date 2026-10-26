@@ -172,6 +172,37 @@ function refuseSecrets(kind: string, config: unknown) {
     for (const vars of Object.values(config.variables)) if (isRecord(vars)) for (const v of Object.values(vars)) if (isRecord(v) && v.secret && typeof v.value === 'string' && v.value !== '') throw bad(NO_SECRETS);
   }
 }
+/**
+ * `variables` of an HTTP resource, merged by environment and by name with the saved ones (masked: a secret comes empty and the store keeps
+ * its value). A variable that is not sent stays; a plain one is removed by sending it (or its whole environment) as null. A saved secret
+ * cannot be removed, emptied or made plain from here: the person does that in the web app.
+ */
+function mergeVariables(saved: unknown, incoming: unknown) {
+  if (incoming === null) incoming = Object.fromEntries(Object.keys(isRecord(saved) ? saved : {}).map((env) => [env, null]));
+  if (!isRecord(incoming)) throw bad('variables must be an object: { environment: { NAME: { value, secret } } }');
+  const out: Record<string, Record<string, unknown>> = Object.fromEntries(Object.entries(isRecord(saved) ? saved : {}).map(([env, vars]) => [env, { ...(vars as Record<string, unknown>) }]));
+  const secretOf = (env: string, k: string) => { const v = out[env]?.[k]; return isRecord(v) && !!v.secret; };
+  const refuse = (env: string, k: string) => bad(`${env}.${k} is a secret saved in the web app: it cannot be removed, emptied or made plain from here. Ask the person to do it in the web app.`);
+  for (const [env, vars] of Object.entries(incoming)) {
+    if (vars === null) {
+      const secret = Object.keys(out[env] ?? {}).find((k) => secretOf(env, k));
+      if (secret) throw refuse(env, secret);
+      delete out[env];
+      continue;
+    }
+    if (!isRecord(vars)) throw bad(`variables.${env} must be an object of NAME: { value, secret } (or null to remove it)`);
+    const cur = out[env] ?? {};
+    for (const [k, v] of Object.entries(vars)) {
+      if (secretOf(env, k)) {
+        if (!isRecord(v) || !v.secret) throw refuse(env, k);
+        cur[k] = { value: '', secret: true };
+      } else if (v === null) delete cur[k];
+      else cur[k] = v;
+    }
+    out[env] = cur;
+  }
+  return out;
+}
 /** Cluster members by name (ids still work). */
 function membersById(config: unknown) {
   if (!isRecord(config) || !Array.isArray(config.members)) return config;
@@ -301,12 +332,18 @@ export async function agentColonies(op: unknown, body: Args): Promise<unknown> {
       if (args.colony !== undefined) p.colony_id = colonyArg(args.colony);
       if (args.config !== undefined) {
         // Only the keys sent change. It starts from the masked config, so an empty password or secret is kept by the store as it does for the web
-        // app, and an `env` value shown as *** keeps the one that is saved.
+        // app; HTTP `variables` are merged by environment and name.
         const stored = objectsStore.get(o.id)!, base = { ...(maskConfig(stored).config as unknown as Record<string, unknown>) };
         delete base.passwordSet;
         const next: Record<string, unknown> = { ...base, ...(membersById(args.config) as Record<string, unknown>) };
+        if (o.kind === 'http' && args.config.variables !== undefined) next.variables = mergeVariables(base.variables, args.config.variables);
+        // `env` is replaced whole (its values are not shown): the keys to keep are sent as ***, which only stands for a key already saved.
         const savedEnv = (stored.config as { env?: Record<string, string> }).env ?? {};
-        if (isRecord(next.env)) next.env = Object.fromEntries(Object.entries(next.env).map(([k, v]) => [k, v === MASK && k in savedEnv ? savedEnv[k] : v]));
+        if (isRecord(next.env)) next.env = Object.fromEntries(Object.entries(next.env).map(([k, v]) => {
+          if (v !== MASK) return [k, v];
+          if (!(k in savedEnv)) throw bad(`env ${k} is not saved, so *** has nothing to keep: give it a value (or leave it out)`);
+          return [k, savedEnv[k]];
+        }));
         p.config = next;
       }
       const v = updateObject(o.id, p);
