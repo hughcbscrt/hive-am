@@ -1,7 +1,7 @@
 import { agents, colonies, resolved, skills } from './db.js';
 import { connections } from './connections/store.js';
 import { platformName } from './connections/prompt.js';
-import { DATABASES_SKILL_ID, NOTEBOOK_SKILL_ID, OBJECTS_SKILL_ID, WAKEUPS_SKILL_ID } from './skills/defaults.js';
+import { COLONIES_SKILL_ID, DATABASES_SKILL_ID, NOTEBOOK_SKILL_ID, OBJECTS_SKILL_ID, WAKEUPS_SKILL_ID } from './skills/defaults.js';
 import { NOTEBOOK_MAX, notebooks } from './skills/notebook.js';
 import type { Agent, Skill } from './types.js';
 
@@ -19,7 +19,7 @@ export function lazySkills(a: Agent): Skill[] {
   return a.skill_ids.map((id) => skills.get(id)).filter((s): s is Skill => !!s && a.skill_loads[s.id] === 'on_demand' && !!s.content.trim());
 }
 
-/** Which hive tools an agent gets: `dispatch` (orchestrator with a team) and `channel` (linked to an external connection). */
+/** Which hive tools an agent gets: `dispatch` (orchestrator with a team), `channel` (linked to an external connection) and one group per skill that comes with tools. */
 export function mcpCaps(a: Agent): string[] {
   const caps: string[] = [];
   if (a.role === 'orchestrator' && a.worker_ids.length > 0) caps.push('dispatch');
@@ -28,6 +28,7 @@ export function mcpCaps(a: Agent): string[] {
   if (a.skill_ids.includes(WAKEUPS_SKILL_ID)) caps.push('wake');
   if (a.skill_ids.includes(OBJECTS_SKILL_ID)) caps.push('objects');
   if (a.skill_ids.includes(DATABASES_SKILL_ID)) caps.push('databases');
+  if (a.skill_ids.includes(COLONIES_SKILL_ID)) caps.push('colonies');
   if (lazySkills(a).length > 0) caps.push('skills');
   return caps;
 }
@@ -102,6 +103,11 @@ You look after the servers and containers of your colony. Tools: \`object_list\`
     const t = (tool: string) => `\`${tool}\` (${toolName(a.provider, tool)})`;
     parts.push(`## Database management
 You look after the database resources of your colony. Look: ${t('object_db_list')}, ${t('object_db_schema')}, ${t('object_db_columns')}, ${t('object_db_describe')}, ${t('object_db_search')}, ${t('object_db_ddl')}, ${t('object_db_sample')}, ${t('object_db_explain')}. Run SQL: ${t('object_db_query')} (one statement) and ${t('object_db_exec')} (several, in one transaction)${a.permission === 'plan' ? ' (read-only: you can only read)' : ''}; ${t('object_db_export')} writes a result to a file in your folder. Keep: ${t('object_db_saved')}, ${t('object_db_history')}, ${t('object_db_sessions')}. The resource itself: ${t('object_db_config')}, ${t('object_db_test')}, and with Full access ${t('object_db_config_set')}, ${t('object_db_create')}, ${t('object_db_delete')}, ${t('object_db_kill')}. Follow the "Database management" skill: writes are real, DROP and TRUNCATE need Full access, and you never write or repeat a password.`);
+  }
+  if (a.skill_ids.includes(COLONIES_SKILL_ID)) {
+    const t = (tool: string) => `\`${tool}\` (${toolName(a.provider, tool)})`;
+    parts.push(`## Colony builder
+You can create, change and delete the colonies, agents and resources of ANY colony, with any permission: full control, so go slowly. Look: ${t('colony_options')}, ${t('colony_list')}, ${t('colony_get')}, ${t('colony_agent_list')}, ${t('colony_agent_get')}, ${t('colony_skill_list')}, ${t('colony_resource_list')}, ${t('colony_resource_get')}. Change${a.permission === 'plan' ? ' (not available to you: you are read-only)' : ''}: ${t('colony_create')}, ${t('colony_update')}, ${t('colony_delete')}, ${t('colony_agent_create')}, ${t('colony_agent_update')}, ${t('colony_agent_delete')}, ${t('colony_resource_create')}, ${t('colony_resource_update')}, ${t('colony_resource_delete')}, ${t('colony_resource_manager')}. Follow the "Colony builder" skill: ask before you build, change only what was asked, and delete only after the person's explicit yes (the delete tools need \`confirm\` with the exact name). Secrets and chat connections are set by the person in the web app.`);
   }
   if (a.skill_ids.includes(NOTEBOOK_SKILL_ID)) {
     const nb = { read: toolName(a.provider, 'notebook_read'), add: toolName(a.provider, 'notebook_add'), rewrite: toolName(a.provider, 'notebook_rewrite') };

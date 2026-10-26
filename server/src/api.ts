@@ -10,6 +10,7 @@ import './http/routes/terminals.js';
 import './http/routes/skills.js';
 import './http/routes/types.js';
 import './http/routes/colonies.js';
+import './http/routes/agent-colonies.js';
 import './http/routes/connections.js';
 import './http/routes/orchestration.js';
 import './http/routes/notebook.js';
