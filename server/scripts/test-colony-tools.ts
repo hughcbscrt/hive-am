@@ -229,6 +229,30 @@ for (const [what, v] of [['emptied as plain', { dev: { token: { value: '', secre
   check(x.err && /dev\.token is a secret saved in the web app/.test(x.text), `a saved secret cannot be ${what}`);
 }
 eq(JSON.stringify(objectsStore.byName('http-folio')), before2, 'and the resource is exactly as it was');
+// Names that reach Object.prototype are refused, sent as raw JSON (a JS literal `{ __proto__: x }` would set the prototype, not a key). The server
+// runs in this process, so Object.prototype itself shows whether it was touched.
+const raw = async (op: string, json: string) => { const r = await fetch(`${API}/api/agent-colonies/${op}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: json }); return { status: r.status, j: await r.json() as any }; };
+const upd = (config: string) => raw('resource_update', `{"from":"${builder.id}","name":"http-folio","config":${config}}`);
+for (const [what, config, msg] of [
+  ['an environment named __proto__', '{"variables":{"__proto__":{"polluted":{"value":"1"}}}}', /An environment cannot be named __proto__/],
+  ['an environment named constructor', '{"variables":{"constructor":{"polluted":{"value":"1"}}}}', /An environment cannot be named constructor/],
+  ['a variable named __proto__', '{"variables":{"dev":{"__proto__":{"polluted":{"value":"1"}}}}}', /A variable cannot be named __proto__/],
+  ['a variable named prototype', '{"variables":{"dev":{"prototype":{"value":"1"}}}}', /A variable cannot be named prototype/],
+] as const) {
+  const r = await upd(config);
+  check(r.status === 400 && msg.test(r.j.error ?? ''), `${what} is refused with a 400`);
+}
+check(!Object.hasOwn(Object.prototype, 'polluted') && ({} as Record<string, unknown>).polluted === undefined && ({} as Record<string, unknown>).secret === undefined, 'and Object.prototype is left clean');
+eq(JSON.stringify(objectsStore.byName('http-folio')), before2, 'and the resource is exactly as it was');
+const envSaved = JSON.stringify((objectsStore.byName('web-folio')!.config as ServerConfig).env);
+const ctorEnv = await raw('resource_update', `{"from":"${builder.id}","name":"web-folio","config":{"env":{"constructor":"***"}}}`);
+check(ctorEnv.status === 400 && /An env variable cannot be named constructor/.test(ctorEnv.j.error ?? '') && JSON.stringify((objectsStore.byName('web-folio')!.config as ServerConfig).env) === envSaved, 'an env key named constructor is refused, not kept from the prototype');
+// A variable that is not { value, secret } or null is refused instead of being saved empty.
+for (const v of ['"plain string"', '5', '[]', 'true']) {
+  const r = await upd(`{"variables":{"dev":{"z":${v}}}}`);
+  check(r.status === 400 && /variables\.dev\.z must be \{ value, secret \}/.test(r.j.error ?? ''), `a variable sent as ${v} is refused`);
+}
+eq(JSON.stringify(objectsStore.byName('http-folio')), before2, 'and the resource is still as it was');
 await b.call('colony_resource_update', { name: 'web-folio', new_name: 'web-folio-2', config: { port: 5000 } });
 check((objectsStore.byName('web-folio-2')!.config as ServerConfig).port === 5000, 'a resource can be renamed and changed');
 check(/There is already a resource named/.test(await errOf('colony_resource_create', { name: 'API-FOLIO', kind: 'http', config: { folder: root } })), 'a resource name taken with other case is refused');
