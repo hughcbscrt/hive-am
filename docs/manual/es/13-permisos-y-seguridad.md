@@ -103,7 +103,7 @@ La skill **Colony builder** le permite a un agente crear, cambiar y borrar colon
 
 Lo que aplica el servidor, le digan lo que le digan al agente:
 
-- Un agente de **Solo lectura** (Plan mode) con la skill también puede usar todas sus herramientas: Plan mode limita lo que hace en su carpeta, no estas herramientas. También puede dar **Editar archivos** o **Acceso total** a otros; la skill le dice que te pregunte antes de dar Acceso total.
+- Con OpenCode, Kiro o Cursor, un agente de **Solo lectura** (Plan mode) con la skill también puede usar todas sus herramientas: Plan mode limita lo que hace en su carpeta, no estas herramientas. Con Claude Code, Plan mode bloquea todas las herramientas de hive, así que ahí la skill no sirve hasta que el agente tenga **Editar archivos** o **Acceso total**. También puede dar **Editar archivos** o **Acceso total** a otros; la skill le dice que te pregunte antes de dar Acceso total.
 - Nunca ve una contraseña, una variable secreta ni un valor de `env`, y no puede guardar una contraseña ni un secreto: esos los llenas tú desde la web.
 - No puede tocar las conexiones de Telegram o Slack, ni borrar un agente que tenga una.
 - No puede borrarse a sí mismo, ni al orquestador para el que trabaja, ni a un agente con el que tiene una tarea, ni a su propia colonia, y no puede quitarse esta skill.

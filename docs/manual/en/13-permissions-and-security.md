@@ -103,7 +103,7 @@ The **Colony builder** skill lets an agent create, change and delete colonies, a
 
 What the server enforces, whatever the agent is told:
 
-- An agent in **Read-only** (Plan mode) with the skill can still use all of its tools: Plan mode limits what it does in its folder, not these tools. It can give **Edit files** or **Full access** to others too; the skill tells it to ask you before giving Full access.
+- With OpenCode, Kiro or Cursor, an agent in **Read-only** (Plan mode) with the skill can still use all of its tools: Plan mode limits what it does in its folder, not these tools. With Claude Code, Plan mode blocks every hive tool, so the skill does nothing there until the agent has **Edit files** or **Full access**. It can give **Edit files** or **Full access** to others too; the skill tells it to ask you before giving Full access.
 - It never sees a password, a secret variable or an `env` value, and it cannot save a password or a secret: you fill those in from the web app.
 - It cannot touch Telegram or Slack connections, nor delete an agent that has one.
 - It cannot delete itself, the orchestrator it works for, an agent it has a task with, or its own colony, and it cannot take this skill away from itself.
