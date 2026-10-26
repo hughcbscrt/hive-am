@@ -97,6 +97,20 @@ Lo que hive-am guarda de su propio registro no crece para siempre. Cada seis hor
 
 > **Nota:** la base de datos contiene tus prompts, skills y los cuadernos de los agentes en texto plano. El cuaderno rechaza las notas con credenciales.
 
+## Agentes que arman colonias
+
+La skill **Colony builder** le permite a un agente crear, cambiar y borrar colonias, agentes y recursos de **cualquier** colonia, y dar cualquier permiso, **Acceso total** incluido. Darle esta skill es darle control sobre todo lo que corre en hive-am: puede crear un agente con Acceso total o un servidor que ejecuta un comando. Asígnala solo a un agente al que le confíes todo, y quítasela a los que no la necesitan (en el formulario del agente, o en las skills de su colonia si le llega de ahí).
+
+Lo que aplica el servidor, le digan lo que le digan al agente:
+
+- Un agente de **Solo lectura** con la skill solo puede consultar.
+- Nunca ve una contraseña, una variable secreta ni un valor de `env`, y no puede guardar una contraseña ni un secreto: esos los llenas tú desde la web.
+- No puede tocar las conexiones de Telegram o Slack, ni borrar un agente que tenga una.
+- No puede borrarse a sí mismo, ni al orquestador para el que trabaja, ni a un agente con el que tiene una tarea, ni a su propia colonia, y no puede quitarse esta skill ni dejarse en solo lectura.
+- Solo borra cuando da el nombre exacto de lo que se borra; el primer intento solo dice qué se iría.
+
+La skill le pide preguntarte antes de construir, cambiar solo lo que pediste y borrar solo después de tu sí explícito en el mismo mensaje. El servidor no puede saber quién dijo que sí: en un grupo de Telegram o Slack, el mensaje de otra persona podría pedirle borrar algo. Mantén a este agente fuera de grupos compartidos, o limítalos a **Solo estas personas**.
+
 ## Dónde van los secretos
 
 - **Los CLI usan su propia sesión.** hive-am no guarda tus inicios de sesión de Claude, OpenCode, Kiro ni Cursor.
@@ -114,7 +128,8 @@ Lo que hive-am guarda de su propio registro no crece para siempre. Cada seis hor
 4. Revisa los cambios con la pestaña **Cambios** antes de hacer commit.
 5. Con conexiones, autoriza solo a personas y grupos de confianza, y limita los grupos compartidos a **Solo estas personas**.
 6. No pongas contraseñas ni tokens en prompts, skills ni cuadernos.
-7. No expongas el puerto de hive-am a la red (por ejemplo con un túnel) mientras no haya inicio de sesión.
-8. Haz copia de `~/.hive-am/` si tu configuración te importa.
+7. Dale la skill **Colony builder** a un agente de confianza, no a toda una colonia.
+8. No expongas el puerto de hive-am a la red (por ejemplo con un túnel) mientras no haya inicio de sesión.
+9. Haz copia de `~/.hive-am/` si tu configuración te importa.
 
 Siguiente: [Problemas frecuentes](14-problemas-frecuentes.md)

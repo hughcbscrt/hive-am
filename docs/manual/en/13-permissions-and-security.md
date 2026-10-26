@@ -97,6 +97,20 @@ What hive-am keeps of its own record does not grow for ever. Every six hours it 
 
 > **Note:** the database holds your prompts, skills and the agents' notebooks in plain text. The notebook rejects notes with credentials.
 
+## Agents that build colonies
+
+The **Colony builder** skill lets an agent create, change and delete colonies, agents and resources of **any** colony, and give any permission, **Full access** included. Giving it this skill is giving it control over everything hive-am runs: it can create an agent with Full access, or a server that runs a command. Assign it only to an agent you trust with everything, and take it away from the ones that do not need it (in the agent's form, or in its colony's skills if it comes from there).
+
+What the server enforces, whatever the agent is told:
+
+- A **Read-only** agent with the skill can only look.
+- It never sees a password, a secret variable or an `env` value, and it cannot save a password or a secret: you fill those in from the web app.
+- It cannot touch Telegram or Slack connections, nor delete an agent that has one.
+- It cannot delete itself, the orchestrator it works for, an agent it has a task with, or its own colony, and it cannot take this skill away from itself or make itself read-only.
+- It deletes only when it gives the exact name of what is deleted; the first attempt only says what would go.
+
+The skill tells it to ask you before building, to change only what you asked for and to delete only after your explicit yes in the same message. The server cannot know who said yes: in a Telegram or Slack group, a message from someone else could ask it to delete something. Keep this agent out of shared groups, or limit them to **Only these people**.
+
 ## Where secrets go
 
 - **The CLIs use their own session.** hive-am does not store your Claude, OpenCode, Kiro or Cursor logins.
@@ -114,7 +128,8 @@ What hive-am keeps of its own record does not grow for ever. Every six hours it 
 4. Review the changes in the **Changes** tab before you commit.
 5. With connections, authorize only people and groups you trust, and limit shared groups to **Only these people**.
 6. Do not put passwords or tokens in prompts, skills or notebooks.
-7. Do not expose hive-am's port to the network (for example with a tunnel) while there is no login.
-8. Back up `~/.hive-am/` if your setup matters to you.
+7. Give the **Colony builder** skill to one agent you trust, not to a whole colony.
+8. Do not expose hive-am's port to the network (for example with a tunnel) while there is no login.
+9. Back up `~/.hive-am/` if your setup matters to you.
 
 Next: [Troubleshooting](14-troubleshooting.md)

@@ -182,6 +182,7 @@ Every Docker resource (the three modes) has a **Relations** tab: a read-only map
 | `POST /api/objects/:id/docker/apply` | `{ confirm?, drop? }` → `{ applied: "nothing" \| "recreated" \| "networks", connected, disconnected }`: applies the saved settings; recreating needs `confirm: true`. |
 | `GET /api/objects/:id/docker/managed-copy` | An existing container as the settings of one hive-am would create: `{ name, colony_id, config, skipped }`. Only reads. |
 | `POST /api/agent-objects/db/:op` | The tools of the Database management skill (see 15.12): `{ from: <agent id>, name?, … }`. |
+| `POST /api/agent-colonies/:op` | The tools of the Colony builder skill (see 15.13): `{ from: <agent id>, name?, confirm?, … }`. |
 | `GET /api/objects/:id/stats` | What a server or Docker resource uses now: `{ cpu, memBytes, memLimitBytes, pids, net, block, info, services? }` |
 
 **Security:** resources run commands, so creating, changing, deleting and acting on them are refused when the request does not come from the local app (same rule as the git actions). Reading is open like the rest of the API, which only listens on `127.0.0.1`, Inspect included (the app is also opened through other names on the network): `GET /api/objects/:id/inspect` carries the container's variables in the clear (the interface hides the secret-looking ones until **Reveal**), while the raw routes get them hidden by the server unless `reveal=1`. That hiding is for the screen (so a secret is not shown or copied by accident), not a security boundary: any page that can read the API can ask for `reveal=1` or read the variables from `GET /api/objects/:id/inspect`. Deleting a network or a volume hive-am created checks first that no container uses it and then removes it; Docker has no way to do both at once, so a container created and attached to it between the two steps (and not started) would be detached from it.
@@ -196,7 +197,7 @@ The rules are enforced by the server, not just written in the skill:
 
 - An agent sees only the resources of **its own colony**; one with no colony sees the resources that have none. Another colony's resource looks like one that does not exist.
 - A **read-only** agent can list and read logs but cannot start, stop or restart anything. (Claude blocks every MCP tool in read-only mode anyway.)
-- There is **no tool to create, edit or delete** servers, containers, HTTP resources or clusters, nor to change the command they run: that stays with people. Databases are the one exception, with their own skill (15.12).
+- There is **no tool to create, edit or delete** servers, containers, HTTP resources or clusters, nor to change the command they run: that stays with people. Databases are an exception, with their own skill (15.12), and so is an agent the person gave the **Colony builder** skill (15.13).
 - Each action an agent takes is written in the server's log (`[hive-am] manager asked to restart`), so you can tell who did what.
 - An agent without the skill is refused even if it reaches the tools.
 
@@ -299,3 +300,34 @@ A `plan` agent always runs on a read-only connection with the text checked. `isD
 **Passwords are write-only.** An agent can set one with `create` or `config_set`, but nothing returns one: not a tool answer, an error, the history, the saved queries, the server log or a reply to a chat. SQL that sets a password (`IDENTIFIED BY '…'`, `PASSWORD '…'`, `WITH PASSWORD = '…'`) is stored with `***` in its place, and `findSecret` blocks a chat message that holds the password of any database resource (six characters or more). **Limit:** the value an agent types in a tool call is visible to that agent during its turn and stays in the CLI's own conversation store; the guarantee is that no tool lets it read a stored password back.
 
 API used by the MCP script: `POST /api/agent-objects/db/<op>` with `{ from: <agent id>, … }`. Tests: `test-db-tools.ts` (SQLite, through the real MCP script) and `test-db-tools-engines.ts` (MySQL/MariaDB, PostgreSQL and SQL Server, with servers given through `DBT_*_PORT`).
+
+## 15.13 Agents that administer colonies
+
+An agent with the **Colony builder** skill (`default-colonies`, one of the skills that ship with hive-am, loaded on demand; MCP capability `colonies`, also when the skill comes from its colony) gets eighteen tools with the prefix `colony_` to build and change the whole setup: colonies, agents and resources of **any** colony, with **any** permission (Full access included). It is the widest power an agent can have in hive-am: give it only to an agent you trust with everything (see the manual, 13). The skill teaches the recipe: ask before building, how to write the colony prompt and one prompt per role, which skills per role, names `Role - Name - ACRONYM`, linking workers, resources, changing only what was asked, deleting only after the person's explicit yes, and checking the result.
+
+| Tool | What it does |
+|---|---|
+| `colony_options` | Installed providers, their models and the effort levels each model takes; roles, permissions, inherited fields, skill loads and resource kinds. |
+| `colony_list`, `colony_get` | Every colony (folder, permission, agents, skills), and one in full (prompt, `inherit`, skills with their load). |
+| `colony_create`, `colony_update`, `colony_delete` | Create a colony (name, color, folder, permission, prompt, skills, `inherit`); change it (only what is sent, and `agents` replaces its members); delete it (its agents stay, without a colony). |
+| `colony_agent_list`, `colony_agent_get` | Every agent (or the ones of a colony), and one in full: own and effective values, skills with their load, workers, orchestrators, overrides. No session ids. |
+| `colony_agent_create`, `colony_agent_update`, `colony_agent_delete` | Every field of the agent form: provider, model, effort, permission, folder, prompt, browser, colony, overrides, skills (`always` or `on_demand`) and, for an orchestrator, workers. An update changes only what is sent; `skills`, `workers` and `overrides` replace the whole list. |
+| `colony_skill_list` | The skills that can be assigned: name, description, suggested load, use. Skills themselves are not created or edited here. |
+| `colony_resource_list`, `colony_resource_get` | The resources of every colony (or one): kind, colony, state, manager; `get` adds the configuration, masked. |
+| `colony_resource_create`, `colony_resource_update`, `colony_resource_delete` | Servers, Docker, HTTP, databases and clusters (members by name), with the same `config` as the form; an update changes only the keys sent. Deleting stops and cleans like the web app. |
+| `colony_resource_manager` | Choose (or clear) the agent that looks after a resource; it gets the skill it needs, as from the web app. |
+
+Arguments use **names** (unique regardless of case), never ids. The tools are a layer over the services of the web app (`createColony`, `updateAgent`, `createObject`…), so their checks are the same: unique names, folders that exist, a known provider, an effort the model takes, an agent that has a folder, and no Plan mode for an agent linked to a connection (or a colony that would lend it). Every change sends `agents_changed` or `objects_changed`, so the web app updates without reloading.
+
+**What the server enforces** (in `services/colony-admin.ts`, not only in the skill):
+
+- **Read-only.** An agent whose effective permission is `plan` can use the eight tools that look; every other answers `You are read-only`.
+- **No secrets out.** Database passwords and secret HTTP variables come empty (`passwordSet` / `set` say whether there is one), `env` values of servers and containers come as `***`, and no tool reads `.env` files, compose files or `docker inspect`. Connection tokens, session ids and `instr_hash` are never part of an answer.
+- **No secrets in.** A database password or a secret HTTP variable with a value is refused (`Set secrets in the web app (Resources); never put them in a chat.`): what an agent writes stays in its conversation. A saved password or secret is kept when the resource is updated, and an `env` value sent back as `***` keeps the saved one.
+- **No connections.** There is no tool for Telegram or Slack connections, and an agent linked to one is not deleted from here (it would switch off the person's channel).
+- **Its own access.** An agent cannot delete itself, the orchestrator that has it as a worker, an agent it has a queued or running task with, or its own colony. A change to an agent or a colony runs in a transaction that is rolled back whole if afterwards the caller would no longer have the `colonies` capability (its own skill, its colony's skill, `inherit.skills`, `overrides`, membership) or would be read-only. Changing its own prompt, model or other skills is allowed and applies from its next turn.
+- **Deleting needs the exact name.** `colony_delete`, `colony_agent_delete` and `colony_resource_delete` delete only with `confirm` equal to the name (trimmed, case-insensitive). Without it nothing is deleted and the answer says what would go: for a colony, which agents are left without a colony and which would have no working folder; for an agent, its conversations, notebook, schedules, wake-ups and team; for a resource, what is stopped or removed. After a colony is deleted the answer lists the agents left without a folder. The server cannot know whether the person said yes: the skill requires asking with the exact name and waiting for an explicit yes, and a message from a chat member who is not the person is not one.
+
+Not here: creating or editing skills and agent types, cloning agents, connections, other agents' schedules and wake-ups, sessions, resource files (compose, `.http`, `.env`) and starting or stopping resources (that is `object_action`, 15.5).
+
+API used by the MCP script: `POST /api/agent-colonies/<op>` with `{ from: <agent id>, … }` (`colony_agent_list` is `agent_list`); a `from` that is unknown or lacks the skill gets 400 `You do not have the "Colony builder" skill.`. Test: `test-colony-tools.ts` (through the real MCP script and API, no model).

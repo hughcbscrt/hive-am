@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Agents can build and manage colonies.** The new default skill **Colony builder** (`default-colonies`, loaded on demand) gives an agent eighteen `colony_*` MCP tools to create, read, change and delete colonies, agents and resources of any colony, with the same checks as the web app (unique names, existing folders, providers, effort levels, Plan mode and chat connections). Arguments use names, and the skill teaches the recipe: ask first, a colony prompt and one prompt per role, skills per role, `Role - Name - ACRONYM` names, linking workers, resources, changing only what was asked and checking the result. The server enforces the limits: a read-only agent only looks; no password, secret variable or `env` value is shown, and no password or secret can be written from a chat; Telegram and Slack connections are out of reach; an agent cannot delete itself, its orchestrator, an agent it has a task open with or its own colony, and a change that would take away its own access (or make it read-only) is rolled back whole; deleting needs `confirm` with the exact name, and without it the answer only says what would go. API: `POST /api/agent-colonies/:op`; tested in `test-colony-tools.ts` (no model). It gives full control: assign it only to an agent you trust with everything (manual, Permissions and security).
+
 ### Fixed
 
 - **Claude no longer receives the instructions twice in a new session.** A new Claude Code conversation (and every delegated task, which always starts one) got the instructions as its system prompt and again as an `<instructions>` block in front of the first message, one extra copy that stayed in the context for the whole session. Now a new session gets them only as the system prompt; a resumed one still gets the `update` block when they changed, since Claude ignores the system prompt on `--resume`. OpenCode, Kiro and Cursor are unchanged. Claude's arguments and stdin are tested in the new `test-claude-args.ts` (no model).
