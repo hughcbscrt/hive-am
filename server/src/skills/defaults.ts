@@ -254,6 +254,10 @@ Short and different from each other: orchestrators delegate by exact name. Use \
 ## Resources
 - \`colony_resource_create\` takes \`name\`, \`kind\` (server, docker, http, database, cluster), \`colony\` and \`config\`, the same fields as the form of the web app (a server needs at least \`cwd\` and \`start\`; a database \`engine\` and \`host\`/\`database\`, or \`file\` for SQLite; a cluster \`members\` by name).
 - Passwords and secret HTTP variables are NOT given here: the tool refuses them. Create the resource without them and tell the person to fill them in the web app (Resources). Never put a secret in \`env\` either.
+- Never put a secret in \`start\`, \`stop\`, \`command\`, \`entrypoint\` or the health check either: those are shown as they are. Secrets go in \`env\`, set by the person.
+- \`colony_resource_update\` changes only the keys you send, but \`env\` is replaced whole: send every key you want to keep, the ones not to change as \`***\` (a key that is not sent is removed).
+- HTTP \`variables\` are merged by environment and name: what you do not send stays. To remove a plain variable send it as \`null\`. A saved secret is kept, and it cannot be removed, emptied or made plain from here: ask the person.
+- Before you change the \`host\` or \`port\` of a database that has a saved password, tell the person: the saved password will be sent to the new address.
 - Choose who looks after a resource with \`colony_resource_manager\`. Starting and stopping is \`object_action\`, of the Colony resources skill, not this one.
 
 ## Changing things carefully
