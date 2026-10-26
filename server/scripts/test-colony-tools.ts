@@ -95,6 +95,11 @@ check(nobody.status === 400 && nobody.j.error === 'You do not have the "Colony b
 const noskill = await api('create', { from: plain.id, name: 'Ghost' });
 check(noskill.status === 400 && noskill.j.error === 'You do not have the "Colony builder" skill.' && !colonies.list().some((c) => c.name === 'Ghost'), 'an agent without the skill is refused and nothing is created');
 check((await api('list', { from: plain.id })).status === 400, 'even to read');
+// A page of another origin cannot use them (the API answers any origin); a simple text/plain request has no preflight to stop it.
+const evil = await fetch(`${API}/api/agent-colonies/resource_create`, { method: 'POST', headers: { origin: 'http://evil.example', 'content-type': 'text/plain' }, body: JSON.stringify({ from: builder.id, name: 'pwned', kind: 'server', config: { cwd: root, start: 'touch /tmp/pwned' } }) });
+check(evil.status === 403 && ((await evil.json()) as any).error === 'Colonies can only be changed from the local app' && !objectsStore.byName('pwned'), 'a request from another origin gets 403 and creates nothing');
+const evilRead = await fetch(`${API}/api/agent-colonies/list`, { method: 'POST', headers: { origin: 'http://evil.example', 'content-type': 'text/plain' }, body: JSON.stringify({ from: builder.id }) });
+check(evilRead.status === 403, 'not even a read');
 
 const b = withCap;
 // ---- options -----------------------------------------------------------------------------------------------------------------------------
@@ -201,6 +206,29 @@ const htu = await b.call('colony_resource_update', { name: 'http-folio', config:
 check(!htu.err && (objectsStore.byName('http-folio')!.config as HttpConfig).variables!.dev.token.value === SENTINEL, 'and the saved secret variables');
 await b.call('colony_resource_update', { name: 'web-folio', config: { env: { API_KEY: '***', MODE: 'prod' } } });
 eq((objectsStore.byName('web-folio')!.config as ServerConfig).env, { API_KEY: SENTINEL, MODE: 'prod' }, 'an env value sent back as *** keeps the saved one');
+const nk = await b.call('colony_resource_update', { name: 'web-folio', config: { env: { API_KEY: '***', MODE: 'prod', NEW: '***' } } });
+check(nk.err && /env NEW is not saved/.test(nk.text), '*** for a key that is not saved is refused');
+eq((objectsStore.byName('web-folio')!.config as ServerConfig).env, { API_KEY: SENTINEL, MODE: 'prod' }, 'and env stays as it was');
+await b.call('colony_resource_update', { name: 'web-folio', config: { env: { API_KEY: '***' } } });
+eq((objectsStore.byName('web-folio')!.config as ServerConfig).env, { API_KEY: SENTINEL }, 'env is replaced whole: a key not sent is removed');
+
+// HTTP variables merge by environment and name; a secret saved in the web app stays and cannot be removed, emptied or made plain.
+const vars = () => (objectsStore.byName('http-folio')!.config as HttpConfig).variables;
+await b.call('colony_resource_update', { name: 'http-folio', config: { variables: { dev: { base: { value: 'http://y' } } } } });
+eq(vars(), { dev: { token: { value: SENTINEL, secret: true }, base: { value: 'http://y' } } }, 'changing one variable keeps the secret that was not sent');
+await b.call('colony_resource_update', { name: 'http-folio', config: { variables: { dev: { extra: { value: '1' } }, prod: { base: { value: 'https://p' } } } } });
+eq(vars(), { dev: { token: { value: SENTINEL, secret: true }, base: { value: 'http://y' }, extra: { value: '1' } }, prod: { base: { value: 'https://p' } } }, 'a new variable and a new environment are added next to the saved ones');
+await b.call('colony_resource_update', { name: 'http-folio', config: { variables: { dev: { extra: null }, prod: null } } });
+eq(vars(), { dev: { token: { value: SENTINEL, secret: true }, base: { value: 'http://y' } } }, 'a plain variable or a whole environment sent as null is removed');
+await b.call('colony_resource_update', { name: 'http-folio', config: { variables: { dev: { token: { value: '', secret: true } } } } });
+check(vars()!.dev.token.value === SENTINEL, 'a secret sent back empty keeps its value');
+const before2 = JSON.stringify(objectsStore.byName('http-folio'));
+for (const [what, v] of [['emptied as plain', { dev: { token: { value: '', secret: false } } }], ['made plain with a value', { dev: { token: { value: 'x' } } }], ['removed', { dev: { token: null } }],
+  ['removed with its environment', { dev: null }], ['removed with every environment', null]] as const) {
+  const x = await b.call('colony_resource_update', { name: 'http-folio', config: { variables: v } });
+  check(x.err && /dev\.token is a secret saved in the web app/.test(x.text), `a saved secret cannot be ${what}`);
+}
+eq(JSON.stringify(objectsStore.byName('http-folio')), before2, 'and the resource is exactly as it was');
 await b.call('colony_resource_update', { name: 'web-folio', new_name: 'web-folio-2', config: { port: 5000 } });
 check((objectsStore.byName('web-folio-2')!.config as ServerConfig).port === 5000, 'a resource can be renamed and changed');
 check(/There is already a resource named/.test(await errOf('colony_resource_create', { name: 'API-FOLIO', kind: 'http', config: { folder: root } })), 'a resource name taken with other case is refused');
