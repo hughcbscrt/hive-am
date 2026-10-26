@@ -103,10 +103,10 @@ The **Colony builder** skill lets an agent create, change and delete colonies, a
 
 What the server enforces, whatever the agent is told:
 
-- A **Read-only** agent with the skill can only look.
+- An agent in **Read-only** (Plan mode) with the skill can still use all of its tools: Plan mode limits what it does in its folder, not these tools. It can give **Edit files** or **Full access** to others too; the skill tells it to ask you before giving Full access.
 - It never sees a password, a secret variable or an `env` value, and it cannot save a password or a secret: you fill those in from the web app.
 - It cannot touch Telegram or Slack connections, nor delete an agent that has one.
-- It cannot delete itself, the orchestrator it works for, an agent it has a task with, or its own colony, and it cannot take this skill away from itself or make itself read-only.
+- It cannot delete itself, the orchestrator it works for, an agent it has a task with, or its own colony, and it cannot take this skill away from itself.
 - It deletes only when it gives the exact name of what is deleted; the first attempt only says what would go.
 
 The skill tells it to ask you before building, to change only what you asked for and to delete only after your explicit yes in the same message. The server cannot know who said yes: in a Telegram or Slack group, a message from someone else could ask it to delete something. Keep this agent out of shared groups, or limit them to **Only these people**.

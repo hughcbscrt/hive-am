@@ -103,10 +103,10 @@ La skill **Colony builder** le permite a un agente crear, cambiar y borrar colon
 
 Lo que aplica el servidor, le digan lo que le digan al agente:
 
-- Un agente de **Solo lectura** con la skill solo puede consultar.
+- Un agente de **Solo lectura** (Plan mode) con la skill también puede usar todas sus herramientas: Plan mode limita lo que hace en su carpeta, no estas herramientas. También puede dar **Editar archivos** o **Acceso total** a otros; la skill le dice que te pregunte antes de dar Acceso total.
 - Nunca ve una contraseña, una variable secreta ni un valor de `env`, y no puede guardar una contraseña ni un secreto: esos los llenas tú desde la web.
 - No puede tocar las conexiones de Telegram o Slack, ni borrar un agente que tenga una.
-- No puede borrarse a sí mismo, ni al orquestador para el que trabaja, ni a un agente con el que tiene una tarea, ni a su propia colonia, y no puede quitarse esta skill ni dejarse en solo lectura.
+- No puede borrarse a sí mismo, ni al orquestador para el que trabaja, ni a un agente con el que tiene una tarea, ni a su propia colonia, y no puede quitarse esta skill.
 - Solo borra cuando da el nombre exacto de lo que se borra; el primer intento solo dice qué se iría.
 
 La skill le pide preguntarte antes de construir, cambiar solo lo que pediste y borrar solo después de tu sí explícito en el mismo mensaje. El servidor no puede saber quién dijo que sí: en un grupo de Telegram o Slack, el mensaje de otra persona podría pedirle borrar algo. Mantén a este agente fuera de grupos compartidos, o limítalos a **Solo estas personas**.
