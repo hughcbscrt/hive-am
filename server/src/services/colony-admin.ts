@@ -19,19 +19,17 @@ import type { Agent, Colony, InheritField, Permission, SkillLoad } from '../type
  * What an agent with the "Colony builder" skill can do: create, read, change and delete colonies, agents and resources of ANY colony,
  * through the same services the web app uses (their checks are the ones that apply). On top of them, enforced here and not only written
  * in the skill:
- *  - a read-only (Plan mode) agent can look but not change anything;
  *  - no secret leaves (database passwords, secret HTTP variables, `env` values) and none comes in (they are set in the web app);
  *  - Telegram/Slack connections are not reachable, and an agent linked to one is not deleted from here;
  *  - an agent cannot delete itself, the orchestrator it works for, an agent it has a task open with, or its own colony, and no change may
- *    take away its own access to these tools (or leave it read-only): such a change is rolled back whole;
+ *    take away its own access to these tools: such a change is rolled back whole;
  *  - deleting needs `confirm` equal to the exact name of what is deleted; without it nothing is deleted and the answer says what would be.
  * Arguments use names, never ids: the names of colonies, agents, skills and resources are unique regardless of case.
  */
 type Args = Record<string, any>;
 
 const NO_SKILL = 'You do not have the "Colony builder" skill.';
-const READ_ONLY = 'You are read-only: you can look at colonies, agents and resources but not change them.';
-const SELF_LOCKOUT = 'That change would take away your own Colony builder access (or make you read-only). Ask the person to do it from the web app.';
+const SELF_LOCKOUT = 'That change would take away your own Colony builder access. Ask the person to do it from the web app.';
 const NO_SECRETS = 'Set secrets in the web app (Resources); never put them in a chat.';
 const PERMISSIONS: Permission[] = ['plan', 'acceptEdits', 'bypassPermissions'];
 const FIELDS: InheritField[] = ['cwd', 'permission', 'skills', 'prompt'];
@@ -42,13 +40,12 @@ function whoAsks(from: unknown): Agent {
   if (!a || !mcpCaps(resolved(a)).includes('colonies')) throw bad(NO_SKILL);
   return a;
 }
-const writer = (a: Agent) => { if (a.effective.permission === 'plan') throw bad(READ_ONLY); };
 /** Keeps the caller able to use these tools: the change runs in a transaction that is rolled back if it would not be. */
 function keepingAccess<T>(a: Agent, change: () => T): T {
   return db.transaction(() => {
     const out = change();
     const me = agents.get(a.id);
-    if (!me || !mcpCaps(resolved(me)).includes('colonies') || me.effective.permission === 'plan') throw bad(SELF_LOCKOUT);
+    if (!me || !mcpCaps(resolved(me)).includes('colonies')) throw bad(SELF_LOCKOUT);
     return out;
   })();
 }
@@ -288,29 +285,27 @@ export async function agentColonies(op: unknown, body: Args): Promise<unknown> {
 
     case 'list': return { colonies: colonies.list().map(colonyLine) };
     case 'get': return colonyOut(colonyNamed(args.name));
-    case 'create': { writer(a); return { created: true, colony: colonyOut(createColony(colonyInput(args, false))) }; }
+    case 'create': return { created: true, colony: colonyOut(createColony(colonyInput(args, false))) };
     case 'update': {
-      writer(a);
       const c = colonyNamed(args.name), p = { ...args }; delete p.name;
       if (args.new_name !== undefined) { p.name = args.new_name; delete p.new_name; }
       return { updated: true, colony: colonyOut(keepingAccess(a, () => updateColony(c.id, colonyInput(p, true)))) };
     }
-    case 'delete': { writer(a); return deleteColony(a, args); }
+    case 'delete': return deleteColony(a, args);
 
     case 'agent_list': {
       const col = args.colony === undefined ? undefined : colonyArg(args.colony);
       return { agents: agents.list().filter((x) => col === undefined || (x.colony_id ?? null) === col).map(agentLine) };
     }
     case 'agent_get': return agentOut(agentNamed(args.name));
-    case 'agent_create': { writer(a); return { created: true, agent: agentOut(createAgent(agentInput(args))) }; }
+    case 'agent_create': return { created: true, agent: agentOut(createAgent(agentInput(args))) };
     case 'agent_update': {
-      writer(a);
       const t = agentNamed(args.name), p = { ...args }; delete p.name;
       if (args.new_name !== undefined) { p.name = args.new_name; delete p.new_name; }
       const input = agentInput(p, t);
       return { updated: true, agent: agentOut(keepingAccess(a, () => updateAgent(t.id, input))!) };
     }
-    case 'agent_delete': { writer(a); return deleteAgent(a, args); }
+    case 'agent_delete': return deleteAgent(a, args);
 
     case 'skill_list': {
       const usage = skills.usage();
@@ -323,7 +318,6 @@ export async function agentColonies(op: unknown, body: Args): Promise<unknown> {
     }
     case 'resource_get': { const o = resourceNamed(args.name); return { ...resourceLine(o), config: configOut(o) }; }
     case 'resource_create': {
-      writer(a);
       const kind = kindOf(args.kind);
       if (!isKind(kind)) throw bad('kind must be server, docker, http, database or cluster');
       refuseSecrets(kind, args.config);
@@ -331,7 +325,6 @@ export async function agentColonies(op: unknown, body: Args): Promise<unknown> {
       return { created: true, resource: { ...resourceLine(made), config: configOut(made) } };
     }
     case 'resource_update': {
-      writer(a);
       const o = resourceNamed(args.name);
       if (args.config !== undefined && !isRecord(args.config)) throw bad('config must be an object with the fields to change');
       refuseSecrets(o.kind, args.config);
@@ -358,9 +351,8 @@ export async function agentColonies(op: unknown, body: Args): Promise<unknown> {
       const v = updateObject(o.id, p);
       return { updated: true, resource: { ...resourceLine(v), config: configOut(v) } };
     }
-    case 'resource_delete': { writer(a); return deleteResource(args); }
+    case 'resource_delete': return deleteResource(args);
     case 'resource_manager': {
-      writer(a);
       const o = resourceNamed(args.name);
       const r = setObjectManager(o.id, isNone(args.agent) ? null : agentNamed(args.agent).id);
       if (r.skillAdded) notifyAgentsChanged();

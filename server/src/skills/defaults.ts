@@ -285,7 +285,7 @@ Short and different from each other: orchestrators delegate by exact name. Use \
 - Never touch Telegram or Slack connections: there is no tool for them and they belong to the person.
 - Never give more permission than the person asked for, and never give this skill to an agent the person did not choose.
 - Never delete yourself or take away your own access; the tools refuse it, do not look for a way around.
-- If you are read-only (Plan mode) you can look but not change anything.
+- Being in Plan mode yourself does not stop these tools: you can still create, change and delete, and give any permission. Giving Full access to another agent or colony is the person's decision: ask before you do it, unless they already asked for it.
 
 ## Tool reference
 - Look: \`colony_options\`, \`colony_list\`, \`colony_get\`, \`colony_agent_list\`, \`colony_agent_get\`, \`colony_skill_list\`, \`colony_resource_list\`, \`colony_resource_get\`.
