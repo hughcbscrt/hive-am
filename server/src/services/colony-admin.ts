@@ -164,6 +164,9 @@ function agentInput(args: Args, cur?: Agent): AgentInput {
   return validateAgentInput(p, !!cur);
 }
 
+/** Names that reach Object.prototype when used as a key: refused for the environments, variables and env keys an agent sends. */
+const RESERVED = ['__proto__', 'constructor', 'prototype'];
+const plainName = (what: string, k: string) => { if (RESERVED.includes(k)) throw bad(`${what} cannot be named ${k}`); };
 /** A secret written here would stay in the conversation: database passwords and the values of secret HTTP variables come from the web app. */
 function refuseSecrets(kind: string, config: unknown) {
   if (!isRecord(config)) return;
@@ -180,10 +183,13 @@ function refuseSecrets(kind: string, config: unknown) {
 function mergeVariables(saved: unknown, incoming: unknown) {
   if (incoming === null) incoming = Object.fromEntries(Object.keys(isRecord(saved) ? saved : {}).map((env) => [env, null]));
   if (!isRecord(incoming)) throw bad('variables must be an object: { environment: { NAME: { value, secret } } }');
-  const out: Record<string, Record<string, unknown>> = Object.fromEntries(Object.entries(isRecord(saved) ? saved : {}).map(([env, vars]) => [env, { ...(vars as Record<string, unknown>) }]));
-  const secretOf = (env: string, k: string) => { const v = out[env]?.[k]; return isRecord(v) && !!v.secret; };
+  // Without a prototype, a name sent by the client (`__proto__`, `constructor`) can only be an own key, never Object.prototype.
+  const out: Record<string, Record<string, unknown>> = Object.create(null);
+  for (const [env, vars] of Object.entries(isRecord(saved) ? saved : {})) out[env] = Object.assign(Object.create(null), vars);
+  const secretOf = (env: string, k: string) => { const v = Object.hasOwn(out, env) ? out[env][k] : undefined; return isRecord(v) && !!v.secret; };
   const refuse = (env: string, k: string) => bad(`${env}.${k} is a secret saved in the web app: it cannot be removed, emptied or made plain from here. Ask the person to do it in the web app.`);
   for (const [env, vars] of Object.entries(incoming)) {
+    plainName('An environment', env);
     if (vars === null) {
       const secret = Object.keys(out[env] ?? {}).find((k) => secretOf(env, k));
       if (secret) throw refuse(env, secret);
@@ -191,10 +197,12 @@ function mergeVariables(saved: unknown, incoming: unknown) {
       continue;
     }
     if (!isRecord(vars)) throw bad(`variables.${env} must be an object of NAME: { value, secret } (or null to remove it)`);
-    const cur = out[env] ?? {};
+    const cur: Record<string, unknown> = out[env] ?? Object.create(null);
     for (const [k, v] of Object.entries(vars)) {
+      plainName('A variable', k);
+      if (v !== null && !isRecord(v)) throw bad(`variables.${env}.${k} must be { value, secret } (or null to remove it)`);
       if (secretOf(env, k)) {
-        if (!isRecord(v) || !v.secret) throw refuse(env, k);
+        if (!v || !v.secret) throw refuse(env, k);
         cur[k] = { value: '', secret: true };
       } else if (v === null) delete cur[k];
       else cur[k] = v;
@@ -340,8 +348,9 @@ export async function agentColonies(op: unknown, body: Args): Promise<unknown> {
         // `env` is replaced whole (its values are not shown): the keys to keep are sent as ***, which only stands for a key already saved.
         const savedEnv = (stored.config as { env?: Record<string, string> }).env ?? {};
         if (isRecord(next.env)) next.env = Object.fromEntries(Object.entries(next.env).map(([k, v]) => {
+          plainName('An env variable', k);
           if (v !== MASK) return [k, v];
-          if (!(k in savedEnv)) throw bad(`env ${k} is not saved, so *** has nothing to keep: give it a value (or leave it out)`);
+          if (!Object.hasOwn(savedEnv, k)) throw bad(`env ${k} is not saved, so *** has nothing to keep: give it a value (or leave it out)`);
           return [k, savedEnv[k]];
         }));
         p.config = next;
