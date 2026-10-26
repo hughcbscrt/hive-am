@@ -10,7 +10,7 @@ FORCE   ?=
 ALLOW_BRANCH ?=
 PUSH    ?= 1
 
-.PHONY: help typecheck build changelog-add changelog-show release-preview release npm-build npm-pack npm-check npm-publish publish clean
+.PHONY: help typecheck build changelog-add changelog-show release-preview release release-patch release-minor release-major npm-build npm-pack npm-check npm-publish publish clean
 
 help: ## Show this help
 	@echo "hive-am $(VERSION)"
@@ -22,6 +22,7 @@ help: ## Show this help
 	@echo "1) Release (asks for the changes, bumps versions, updates CHANGELOG.md, commits, tags and pushes)"
 	@echo "     make release-preview [BUMP=patch|minor|major|x.y.z]   show the new version and the changelog entry"
 	@echo "     make release [BUMP=patch|minor|major|x.y.z]           do it (clean tree on main, everything pushed)"
+	@echo "     make release-patch | release-minor | release-major   same as release, with the bump already chosen"
 	@echo "       YES=1            do not ask for confirmation"
 	@echo "       PUSH=0           commit and tag locally without pushing"
 	@echo "       ALLOW_BRANCH=1   release from a branch other than main"
@@ -50,6 +51,15 @@ release-preview: ## Show what a release would do
 
 release: ## Bump versions, update the changelog, commit, tag and push
 	node scripts/release.mjs $(BUMP) $(if $(filter 0,$(PUSH)),--no-push,) $(if $(ALLOW_BRANCH),--allow-branch,) $(if $(YES),--yes,)
+
+release-patch: ## Release a patch version
+	$(MAKE) release BUMP=patch
+
+release-minor: ## Release a minor version
+	$(MAKE) release BUMP=minor
+
+release-major: ## Release a major version
+	$(MAKE) release BUMP=major
 
 npm-build: ## Assemble the npm package in dist/npm
 	node scripts/build-npm.mjs
