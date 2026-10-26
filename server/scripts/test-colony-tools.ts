@@ -1,6 +1,6 @@
 // What an agent with the "Colony builder" skill can do, through the real MCP script and the real HTTP API (no model): the `colony_*` tools exist only
 // with the skill (its own or its colony's), they create, read, change and delete colonies, agents and resources of any colony with the checks of the
-// web app, no secret goes out or comes in, read-only agents only look, deleting needs the exact name, and no change can cut off the caller's own access.
+// web app (also from an agent in Plan mode), no secret goes out or comes in, deleting needs the exact name, and no change can cut off the caller's own access.
 // Usage:
 //   HIVE_AM_OBJECT_POLL_MS=60000 HIVE_AM_HOME=$(mktemp -d) HIVE_AM_PORT=4486 npx tsx scripts/test-colony-tools.ts
 import './_guard.js';
@@ -276,8 +276,6 @@ dispatches.finish(task, 'done', 'ok');
 check(/is your own colony/.test(await errOf('colony_delete', { name: 'Home', confirm: 'Home' })) && !!colonies.get(home.id), 'nor its own colony');
 snap = snapshot();
 check(/take away your own Colony builder access/.test(await errOf('colony_agent_update', { name: 'Builder', skills: [{ name: 'Notebook' }] })), 'removing its own skill is refused');
-check(/take away your own Colony builder access/.test(await errOf('colony_agent_update', { name: 'Builder', permission: 'plan', overrides: ['permission'] })), 'and so is making itself read-only');
-check(/take away your own Colony builder access/.test(await errOf('colony_update', { name: 'Home', permission: 'plan' })), 'or its colony lending it Plan mode');
 const h = session(heir.id, 'colonies');
 for (const args of [{ name: 'Lending', skills: [] }, { name: 'Lending', inherit: { skills: false } }, { name: 'Lending', agents: [] }]) {
   const r = await h.call('colony_update', args);
@@ -290,6 +288,13 @@ check(mv.err, 'nor by leaving that colony (here it would also have no folder)');
 eq(snapshot(), snap, 'every refused change left the database exactly as it was');
 const self = await b.call('colony_agent_update', { name: 'Builder', description: 'Builds colonies.', system_prompt: 'Be careful.' });
 check(!self.err && agents.get(builder.id)!.description === 'Builds colonies.', 'changing its own description and prompt is allowed');
+const selfPlan = await b.call('colony_agent_update', { name: 'Builder', permission: 'plan', overrides: ['permission'] });
+check(!selfPlan.err && agents.get(builder.id)!.effective.permission === 'plan', 'putting itself in Plan mode is allowed: it keeps its access');
+await b.call('colony_agent_update', { name: 'Builder', overrides: [] });
+const homePlan = await b.call('colony_update', { name: 'Home', permission: 'plan' });
+check(!homePlan.err && agents.get(builder.id)!.effective.permission === 'plan', 'and so is its colony lending it Plan mode');
+await b.call('colony_update', { name: 'Home', permission: 'acceptEdits' });
+check(agents.get(builder.id)!.effective.permission === 'acceptEdits', 'and it can leave Plan mode again');
 
 // ---- 12: deleting needs the exact name ---------------------------------------------------------------------------------------------------
 const tmp = await b.call('colony_create', { name: 'Scratch', cwd: dir('scratch') });
@@ -315,20 +320,39 @@ check(!['web-folio-2', 'box-folio', 'sqlite-folio', 'api-folio', 'pg-folio', 'ht
 check(await emitted('agents_changed', async () => { await b.call('colony_update', { name: 'Folio Two', color: '#000000' }); }), 'a colony change tells the web too');
 check(await emitted('objects_changed', async () => { await b.call('colony_resource_create', { name: 'last', kind: 'server', config: { cwd: root, start: 'true' } }); }), 'and so does a new resource');
 
-// ---- 13: a read-only agent only looks ----------------------------------------------------------------------------------------------------
+// ---- 13: an agent in Plan mode can use every tool -----------------------------------------------------------------------------------------
+check(agents.get(reader.id)!.effective.permission === 'plan', 'Reader is in Plan mode');
 const r = session(reader.id, 'colonies');
 for (const [t, args] of [['colony_list', {}], ['colony_get', { name: 'Folio Two' }], ['colony_agent_list', {}], ['colony_agent_get', { name: 'Builder' }], ['colony_skill_list', {}], ['colony_resource_list', {}], ['colony_resource_get', { name: 'last' }]] as const) {
-  check(!(await r.call(t, args)).err, `a read-only agent can use ${t}`);
+  check(!(await r.call(t, args)).err, `an agent in Plan mode can use ${t}`);
 }
+const pc = await r.call('colony_create', { name: 'Planned', cwd: dir('planned'), permission: 'acceptEdits' });
+check(!pc.err && !!colonies.list().find((c) => c.name === 'Planned'), 'an agent in Plan mode creates a colony');
+const pa = await r.call('colony_agent_create', { name: 'Unbound', provider: 'claude', colony: 'Planned', permission: 'bypassPermissions', overrides: ['permission'] });
+check(!pa.err && agents.byName('Unbound')?.effective.permission === 'bypassPermissions', 'and an agent with Full access in it');
+const pe = await r.call('colony_agent_update', { name: 'Plain', permission: 'plan' });
+check(!pe.err && agents.get(plain.id)!.effective.permission === 'plan', 'it can put another agent in Plan mode');
+const pwe = await r.call('colony_agent_update', { name: 'Plain', permission: 'acceptEdits' });
+check(!pwe.err && agents.get(plain.id)!.effective.permission === 'acceptEdits', 'give it Edit files');
+const pf = await r.call('colony_agent_update', { name: 'Plain', permission: 'bypassPermissions' });
+check(!pf.err && agents.get(plain.id)!.effective.permission === 'bypassPermissions', 'and give it Full access');
+const pu = await r.call('colony_update', { name: 'Planned', permission: 'bypassPermissions' });
+check(!pu.err && colonies.list().find((c) => c.name === 'Planned')!.permission === 'bypassPermissions', 'and a colony too');
+await r.call('colony_agent_update', { name: 'Plain', permission: 'acceptEdits' });
+const pr = await r.call('colony_resource_create', { name: 'planned-web', kind: 'server', config: { cwd: root, start: 'true' } });
+check(!pr.err && !!objectsStore.byName('planned-web'), 'it creates a resource');
+check(!(await r.call('colony_resource_update', { name: 'planned-web', config: { port: 5001 } })).err && (objectsStore.byName('planned-web')!.config as ServerConfig).port === 5001, 'changes it');
+check(!(await r.call('colony_resource_manager', { name: 'planned-web', agent: 'Plain' })).err && objectsStore.managers().get(objectsStore.byName('planned-web')!.id) === plain.id, 'and chooses who looks after it');
+check(/Nothing was deleted/.test((await r.call('colony_resource_delete', { name: 'planned-web' })).text) && !!objectsStore.byName('planned-web'), 'deleting still needs confirm');
+check(!(await r.call('colony_resource_delete', { name: 'planned-web', confirm: 'planned-web' })).err && !objectsStore.byName('planned-web'), 'with it the resource is deleted');
+check(!(await r.call('colony_agent_delete', { name: 'Unbound', confirm: 'Unbound' })).err && !agents.byName('Unbound'), 'and so is the agent');
+check(!(await r.call('colony_delete', { name: 'Planned', confirm: 'Planned' })).err && !colonies.list().find((c) => c.name === 'Planned'), 'and the colony');
 snap = snapshot();
-for (const [t, args] of [['colony_create', { name: 'RO' }], ['colony_update', { name: 'Folio Two', color: '#fff' }], ['colony_delete', { name: 'Folio Two', confirm: 'Folio Two' }], ['colony_agent_create', { name: 'RO', provider: 'claude', cwd: root }],
-  ['colony_agent_update', { name: 'Plain', description: 'x' }], ['colony_agent_delete', { name: 'Plain', confirm: 'Plain' }], ['colony_resource_create', { name: 'RO', kind: 'server', config: { cwd: root, start: 'true' } }],
-  ['colony_resource_update', { name: 'last', config: { port: 1 } }], ['colony_resource_delete', { name: 'last', confirm: 'last' }], ['colony_resource_manager', { name: 'last', agent: 'Plain' }]] as const) {
-  const x = await r.call(t, args);
-  check(x.err && /You are read-only/.test(x.text), `but ${t} answers "You are read-only"`);
-}
-eq(snapshot(), snap, 'and nothing changed');
-check(!!objectsStore.byName('last'), 'not even the resource');
+const rs = await r.call('colony_agent_update', { name: 'Reader', skills: [{ name: 'Notebook' }] });
+check(rs.err && /take away your own Colony builder access/.test(rs.text), 'it still cannot take away its own skill');
+const rlk = await r.call('colony_agent_update', { name: 'Linked', permission: 'plan', overrides: ['permission'] });
+check(rlk.err && /linked to an external connection/.test(rlk.text), 'nor put an agent with a connection in Plan mode');
+eq(snapshot(), snap, 'and both refusals left the database exactly as it was');
 
 // ---- the rest of the delete: an agent and a colony created here -------------------------------------------------------------------------
 await b.call('colony_agent_delete', { name: 'Orchestrator - Leo - FOLIO', confirm: 'Orchestrator - Leo - FOLIO' });
