@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-10-26
+
 ### Added
 
 - **Agents can build and manage colonies.** The new default skill **Colony builder** (`default-colonies`, loaded on demand) gives an agent eighteen `colony_*` MCP tools to create, read, change and delete colonies, agents and resources of any colony, with the same checks as the web app (unique names, existing folders, providers, effort levels, Plan mode and chat connections). Arguments use names, and the skill teaches the recipe: ask first, a colony prompt and one prompt per role, skills per role, `Role - Name - ACRONYM` names, linking workers, resources, changing only what was asked and checking the result. The server enforces the limits (an agent in Plan mode on OpenCode, Kiro or Cursor can use all of them too, and can give Full access, so the skill tells it to ask the person first; Claude Code blocks every hive tool in Plan mode); no password, secret variable or `env` value is shown, and no password or secret can be written from a chat (a saved secret HTTP variable is kept on update and cannot be removed or made plain from there); Telegram and Slack connections are out of reach; an agent cannot delete itself, its orchestrator, an agent it has a task open with or its own colony, and a change that would take away its own access is rolled back whole; deleting needs `confirm` with the exact name, and without it the answer only says what would go. API: `POST /api/agent-colonies/:op`, local app only like the writes of resources; tested in `test-colony-tools.ts` (no model). It gives full control: assign it only to an agent you trust with everything (manual, Permissions and security).
@@ -349,7 +351,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Complete documentation in English and Spanish.
 - npm package with the `hive-am` command.
 
-[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.12.1...HEAD
+[Unreleased]: https://github.com/hughcbscrt/hive-am/compare/v1.13.0...HEAD
+[1.13.0]: https://github.com/hughcbscrt/hive-am/compare/v1.12.1...v1.13.0
 [1.12.1]: https://github.com/hughcbscrt/hive-am/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/hughcbscrt/hive-am/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/hughcbscrt/hive-am/compare/v1.10.1...v1.11.0
